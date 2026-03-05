@@ -1,0 +1,416 @@
+// Kenge ISP Billing System - Database Schema
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── SYSTEM USERS (login accounts for admins/agents) ─────────────────────────
+model User {
+  id        String   @id @default(cuid())
+  username  String   @unique
+  email     String   @unique
+  password  String
+  phone     String?
+  role      Role     @default(AGENT)
+  status    UserStatus @default(ACTIVE)
+  lastLogin DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  vouchers  Voucher[]
+  expenses  Expense[]
+
+  @@map("users")
+}
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  AGENT
+  VIEWER
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+}
+
+// ─── CLIENTS (ISP customers) ────────────────────────────────────────────────
+model Client {
+  id          String        @id @default(cuid())
+  username    String        @unique
+  fullName    String
+  phone       String?
+  email       String?
+  serviceType ServiceType
+  status      ClientStatus  @default(ACTIVE)
+  accountType AccountType   @default(PERSONAL)
+  macAddress  String?
+  device      String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  subscriptions Subscription[]
+  transactions  Transaction[]
+  invoices      Invoice[]
+  smsMessages   SmsMessage[]
+
+  @@map("clients")
+}
+
+enum ServiceType {
+  HOTSPOT
+  PPPOE
+}
+
+enum ClientStatus {
+  ACTIVE
+  INACTIVE
+  EXPIRED
+  SUSPENDED
+  BANNED
+  DISABLED
+  LIMITED
+}
+
+enum AccountType {
+  PERSONAL
+  BUSINESS
+}
+
+// ─── PACKAGES (service plans) ───────────────────────────────────────────────
+model Package {
+  id            String      @id @default(cuid())
+  name          String
+  type          ServiceType
+  category      AccountType @default(PERSONAL)
+  uploadSpeed   Float
+  uploadUnit    String      @default("Mbps")
+  downloadSpeed Float
+  downloadUnit  String      @default("Mbps")
+  price         Float
+  duration      Int
+  durationUnit  DurationUnit
+  status        PackageStatus @default(ACTIVE)
+  burstEnabled  Boolean     @default(false)
+  hotspotType   HotspotType?
+  devices       Int?        @default(1)
+  paymentType   PaymentType @default(PREPAID)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  routerId      String?
+  router        Router?     @relation(fields: [routerId], references: [id])
+
+  subscriptions Subscription[]
+  vouchers      Voucher[]
+
+  @@map("packages")
+}
+
+enum DurationUnit {
+  MINUTES
+  HOURS
+  DAYS
+  MONTHS
+}
+
+enum PackageStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum HotspotType {
+  UNLIMITED
+  DATA_CAPPED
+}
+
+enum PaymentType {
+  PREPAID
+  POSTPAID
+}
+
+// ─── SUBSCRIPTIONS (active/expired plans for clients) ───────────────────────
+model Subscription {
+  id          String             @id @default(cuid())
+  clientId    String
+  client      Client             @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  packageId   String
+  package     Package            @relation(fields: [packageId], references: [id])
+  routerId    String?
+  router      Router?            @relation(fields: [routerId], references: [id])
+  status      SubscriptionStatus @default(ACTIVE)
+  method      String?
+  activatedAt DateTime           @default(now())
+  expiresAt   DateTime
+  dataUsed    String?
+  onlineStatus OnlineStatus?     @default(OFFLINE)
+  syncStatus  String?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  @@map("subscriptions")
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  EXPIRED
+  EXTENDED
+  SUSPENDED
+}
+
+enum OnlineStatus {
+  ONLINE
+  OFFLINE
+}
+
+// ─── TRANSACTIONS ───────────────────────────────────────────────────────────
+model Transaction {
+  id          String            @id @default(cuid())
+  clientId    String
+  client      Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  planName    String?
+  amount      Float
+  type        TransactionType   @default(MOBILE)
+  method      String
+  status      TransactionStatus @default(PENDING)
+  reference   String            @unique
+  expiryDate  String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@map("transactions")
+}
+
+enum TransactionType {
+  MANUAL
+  MOBILE
+  VOUCHER
+}
+
+enum TransactionStatus {
+  COMPLETED
+  PENDING
+  FAILED
+}
+
+// ─── ROUTERS (MikroTik) ────────────────────────────────────────────────────
+model Router {
+  id          String       @id @default(cuid())
+  name        String       @unique
+  host        String
+  username    String?
+  password    String?
+  port        Int?         @default(8728)
+  type        String       @default("MikroTik")
+  status      RouterStatus @default(OFFLINE)
+  activeUsers Int          @default(0)
+  cpuLoad     Float        @default(0)
+  memoryUsed  Float        @default(0)
+  uptime      String?
+  lastSeen    String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  packages      Package[]
+  subscriptions Subscription[]
+  equipments    Equipment[]
+  vouchers      Voucher[]
+
+  @@map("routers")
+}
+
+enum RouterStatus {
+  ONLINE
+  OFFLINE
+}
+
+// ─── EQUIPMENT ──────────────────────────────────────────────────────────────
+model Equipment {
+  id           String          @id @default(cuid())
+  name         String
+  type         String
+  serialNumber String          @unique
+  status       EquipmentStatus @default(ACTIVE)
+  location     String?
+  assignedTo   String?
+  purchaseDate DateTime?
+  notes        String?
+  routerId     String?
+  router       Router?         @relation(fields: [routerId], references: [id])
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  @@map("equipments")
+}
+
+enum EquipmentStatus {
+  ACTIVE
+  INACTIVE
+  MAINTENANCE
+}
+
+// ─── VOUCHERS ───────────────────────────────────────────────────────────────
+model Voucher {
+  id         String        @id @default(cuid())
+  code       String        @unique
+  packageId  String
+  package    Package       @relation(fields: [packageId], references: [id])
+  routerId   String?
+  router     Router?       @relation(fields: [routerId], references: [id])
+  status     VoucherStatus @default(UNUSED)
+  createdById String
+  createdBy  User          @relation(fields: [createdById], references: [id])
+  usedBy     String?
+  usedAt     DateTime?
+  customer   Int?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  @@map("vouchers")
+}
+
+enum VoucherStatus {
+  UNUSED
+  ACTIVE
+  USED
+  EXPIRED
+  REVOKED
+}
+
+// ─── EXPENSES ───────────────────────────────────────────────────────────────
+model Expense {
+  id          String   @id @default(cuid())
+  category    String
+  description String
+  amount      Float
+  date        DateTime
+  reference   String?
+  receipt     String?
+  createdById String
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("expenses")
+}
+
+// ─── INVOICES ───────────────────────────────────────────────────────────────
+model Invoice {
+  id            String        @id @default(cuid())
+  invoiceNumber String        @unique
+  clientId      String
+  client        Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  amount        Float
+  status        InvoiceStatus @default(DRAFT)
+  dueDate       DateTime
+  issuedDate    DateTime
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  items InvoiceItem[]
+
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id          String  @id @default(cuid())
+  invoiceId   String
+  invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  description String
+  quantity    Int
+  unitPrice   Float
+  total       Float
+
+  @@map("invoice_items")
+}
+
+enum InvoiceStatus {
+  PAID
+  UNPAID
+  OVERDUE
+  DRAFT
+}
+
+// ─── SMS MESSAGES ───────────────────────────────────────────────────────────
+model SmsMessage {
+  id        String    @id @default(cuid())
+  clientId  String?
+  client    Client?   @relation(fields: [clientId], references: [id])
+  recipient String
+  message   String
+  status    SmsStatus @default(PENDING)
+  type      SmsType   @default(INDIVIDUAL)
+  sentAt    DateTime  @default(now())
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@map("sms_messages")
+}
+
+enum SmsStatus {
+  SENT
+  FAILED
+  PENDING
+}
+
+enum SmsType {
+  BROADCAST
+  INDIVIDUAL
+}
+
+// ─── MESSAGE TEMPLATES ──────────────────────────────────────────────────────
+model MessageTemplate {
+  id        String       @id @default(cuid())
+  name      String
+  content   String
+  type      TemplateType @default(CUSTOM)
+  variables String[]
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@map("message_templates")
+}
+
+enum TemplateType {
+  ACTIVATION
+  EXPIRY
+  PAYMENT
+  CUSTOM
+  REMINDER
+}
+
+// ─── PAYMENT CHANNELS ───────────────────────────────────────────────────────
+model PaymentChannel {
+  id            String        @id @default(cuid())
+  name          String
+  provider      String
+  accountNumber String?
+  apiKey        String?
+  apiSecret     String?
+  status        ChannelStatus @default(ACTIVE)
+  config        Json?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@map("payment_channels")
+}
+
+enum ChannelStatus {
+  ACTIVE
+  INACTIVE
+}
+
+// ─── SYSTEM SETTINGS ────────────────────────────────────────────────────────
+model SystemSetting {
+  id    String @id @default(cuid())
+  key   String @unique
+  value String
+  group String @default("general")
+
+  @@map("system_settings")
+}
