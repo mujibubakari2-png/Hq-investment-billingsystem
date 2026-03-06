@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import ConfirmationNumberIcon from '@mui/icons-material/ConfirmationNumber';
 import CloseIcon from '@mui/icons-material/Close';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
-import { mockPackages, mockRouters } from '../data/mockData';
+import { packagesApi, routersApi } from '../api/client';
+import type { Package, Router } from '../types';
 
 interface GenerateVouchersModalProps {
     onClose: () => void;
@@ -33,8 +34,15 @@ export default function GenerateVouchersModal({ onClose, onGenerate }: GenerateV
     const [smsPhone, setSmsPhone] = useState('');
     const [sendSms, setSendSms] = useState(false);
     const [showAdvanced, setShowAdvanced] = useState(false);
+    const [routersList, setRoutersList] = useState<Router[]>([]);
+    const [packagesList, setPackagesList] = useState<Package[]>([]);
 
-    const filteredPackages = mockPackages.filter(p =>
+    useEffect(() => {
+        routersApi.list().then(d => setRoutersList(d as unknown as Router[])).catch(console.error);
+        packagesApi.list().then(d => setPackagesList(d as unknown as Package[])).catch(console.error);
+    }, []);
+
+    const filteredPackages = packagesList.filter(p =>
         (!packageType || p.type === packageType) &&
         (!router || p.router === router)
     );
@@ -76,7 +84,7 @@ export default function GenerateVouchersModal({ onClose, onGenerate }: GenerateV
                         <label className="form-label">Router</label>
                         <select className="form-select" value={router} onChange={e => setRouter(e.target.value)}>
                             <option value="">Select Router</option>
-                            {mockRouters.map(r => (
+                            {routersList.map(r => (
                                 <option key={r.id} value={r.name}>{r.name}</option>
                             ))}
                         </select>

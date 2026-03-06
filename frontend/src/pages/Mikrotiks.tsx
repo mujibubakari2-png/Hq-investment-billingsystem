@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import RouterIcon from '@mui/icons-material/Router';
 import AddIcon from '@mui/icons-material/Add';
@@ -8,19 +8,24 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import VisibilityIcon from '@mui/icons-material/Visibility';
-import { mockRouters } from '../data/mockData';
+import { routersApi } from '../api/client';
 import AddRouterModal from '../modals/AddRouterModal';
 import RouterDetailModal from '../modals/RouterDetailModal';
 import type { Router } from '../types';
 
 export default function Mikrotiks() {
     const navigate = useNavigate();
+    const [routers, setRouters] = useState<Router[]>([]);
     const [showAddModal, setShowAddModal] = useState(false);
     const [selectedRouter, setSelectedRouter] = useState<Router | null>(null);
     const [entriesPerPage, setEntriesPerPage] = useState(25);
     const [searchTerm, setSearchTerm] = useState('');
 
-    const filtered = mockRouters.filter(r =>
+    useEffect(() => {
+        routersApi.list().then(data => setRouters(data as unknown as Router[])).catch(console.error);
+    }, []);
+
+    const filtered = routers.filter(r =>
         r.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         r.host.toLowerCase().includes(searchTerm.toLowerCase())
     );

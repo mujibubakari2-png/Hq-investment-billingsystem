@@ -1,28 +1,41 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import AddIcon from '@mui/icons-material/Add';
 import SearchIcon from '@mui/icons-material/Search';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import DeleteIcon from '@mui/icons-material/Delete';
-import { mockTransactions } from '../data/mockData';
+import { transactionsApi } from '../api/client';
+import type { Transaction } from '../types';
 import AddTransactionModal from '../modals/AddTransactionModal';
 import ConfirmDeleteModal from '../modals/ConfirmDeleteModal';
 
 export default function AllTransactions() {
+    const [transactions, setTransactions] = useState<Transaction[]>([]);
+    const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [methodFilter, setMethodFilter] = useState('All');
     const [statusFilter, setStatusFilter] = useState('All');
     const [showAddModal, setShowAddModal] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
 
-    const filtered = mockTransactions.filter(tx => {
+    const fetchTransactions = async () => {
+        setLoading(true);
+        try {
+            const res = await transactionsApi.list();
+            setTransactions((res.data || []) as unknown as Transaction[]);
+        } catch (err) { console.error('Failed to load transactions:', err); }
+        finally { setLoading(false); }
+    };
+    useEffect(() => { fetchTransactions(); }, []);
+
+    const filtered = transactions.filter(tx => {
         const matchSearch = tx.user.toLowerCase().includes(searchTerm.toLowerCase()) || (tx.planName || '').toLowerCase().includes(searchTerm.toLowerCase()) || tx.reference.toLowerCase().includes(searchTerm.toLowerCase());
         const matchMethod = methodFilter === 'All' || tx.method === methodFilter;
         const matchStatus = statusFilter === 'All' || tx.status === statusFilter;
         return matchSearch && matchMethod && matchStatus;
     });
 
-    const totalRevenue = mockTransactions.filter(tx => tx.status === 'Completed').reduce((s, tx) => s + tx.amount, 0);
+    const totalRevenue = transactions.filter(tx => tx.status === 'Completed').reduce((s, tx) => s + tx.amount, 0);
 
     return (
         <div>
@@ -62,11 +75,11 @@ export default function AllTransactions() {
                 </div>
                 <div className="card card-body" style={{ borderLeft: '4px solid var(--info)' }}>
                     <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Completed</div>
-                    <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--info)', marginTop: 4 }}>{mockTransactions.filter(t => t.status === 'Completed').length}</div>
+                    <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--info)', marginTop: 4 }}>{transactions.filter(t => t.status === 'Completed').length}</div>
                 </div>
                 <div className="card card-body" style={{ borderLeft: '4px solid var(--warning)' }}>
                     <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Pending / Failed</div>
-                    <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--warning)', marginTop: 4 }}>{mockTransactions.filter(t => t.status !== 'Completed').length}</div>
+                    <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--warning)', marginTop: 4 }}>{transactions.filter(t => t.status !== 'Completed').length}</div>
                 </div>
             </div>
 
@@ -147,7 +160,7 @@ export default function AllTransactions() {
                 </div>
 
                 <div className="pagination">
-                    <div className="pagination-info">Showing 1 to {filtered.length} of {mockTransactions.length} entries</div>
+                    <div className="pagination-info">Showing 1 to {filtered.length} of {transactions.length} entries</div>
                     <div className="pagination-buttons">
                         <button className="pagination-btn">Previous</button>
                         <button className="pagination-btn active">1</button>

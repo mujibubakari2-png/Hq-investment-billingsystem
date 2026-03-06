@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import PersonOffIcon from '@mui/icons-material/PersonOff';
 import SearchIcon from '@mui/icons-material/Search';
 import RefreshIcon from '@mui/icons-material/Refresh';
@@ -9,25 +9,33 @@ import TimerOffIcon from '@mui/icons-material/TimerOff';
 import TodayIcon from '@mui/icons-material/Today';
 import WifiIcon from '@mui/icons-material/Wifi';
 import PersonIcon from '@mui/icons-material/Person';
-import { mockExpiredSubscribers } from '../data/mockData';
+import { subscriptionsApi } from '../api/client';
+import type { ExpiredSubscriber } from '../types';
 
 type TabFilter = 'All' | 'PPPoE' | 'Hotspot';
 
 export default function ExpiredSubscribers() {
+    const [subs, setSubs] = useState<ExpiredSubscriber[]>([]);
     const [activeTab, setActiveTab] = useState<TabFilter>('All');
     const [searchTerm, setSearchTerm] = useState('');
     const [entriesPerPage, setEntriesPerPage] = useState(25);
 
+    useEffect(() => {
+        subscriptionsApi.list({ status: 'EXPIRED' }).then(res => {
+            setSubs((res.data || []) as unknown as ExpiredSubscriber[]);
+        }).catch(console.error);
+    }, []);
+
     const stats = {
-        totalExpired: 10,
+        totalExpired: subs.length,
         thisWeek: 0,
         extendedToday: 0,
-        pppoe: 0,
-        hotspot: 10,
-        active: 2,
+        pppoe: subs.filter(s => s.type === 'PPPoE').length,
+        hotspot: subs.filter(s => s.type === 'Hotspot').length,
+        active: 0,
     };
 
-    const filtered = mockExpiredSubscribers.filter((sub) => {
+    const filtered = subs.filter((sub) => {
         const matchesTab = activeTab === 'All' || sub.type === activeTab;
         const matchesSearch = sub.username.toLowerCase().includes(searchTerm.toLowerCase());
         return matchesTab && matchesSearch;
@@ -98,7 +106,7 @@ export default function ExpiredSubscribers() {
                                 className={`filter-chip ${activeTab === 'All' ? 'active' : ''}`}
                                 onClick={() => setActiveTab('All')}
                             >
-                                📋 All ({mockExpiredSubscribers.length})
+                                📋 All ({subs.length})
                             </button>
                             <button
                                 className={`filter-chip ${activeTab === 'PPPoE' ? 'active' : ''}`}
@@ -110,7 +118,7 @@ export default function ExpiredSubscribers() {
                                 className={`filter-chip ${activeTab === 'Hotspot' ? 'active' : ''}`}
                                 onClick={() => setActiveTab('Hotspot')}
                             >
-                                📶 Hotspot ({mockExpiredSubscribers.length})
+                                📶 Hotspot ({subs.filter(s => s.type === 'Hotspot').length})
                             </button>
                         </div>
 

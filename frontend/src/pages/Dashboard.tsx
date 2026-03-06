@@ -1,4 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { dashboardApi, routersApi } from '../api/client';
+import type { DashboardResponse } from '../api/client';
+import authStore from '../stores/authStore';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
@@ -28,97 +31,33 @@ import BoltIcon from '@mui/icons-material/Bolt';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import './Dashboard.css';
 
-// --- Mock data for the new dashboard layout ---
-const revenueCards = [
-    {
-        label: "Today's Revenue",
-        value: 'TSH 0.00',
-        change: -100,
-        color: '#e53935',
-        icon: '💰',
-    },
-    {
-        label: 'Monthly Revenue',
-        value: 'TSH 2,500.00',
-        change: -82.4,
-        color: '#00bcd4',
-        icon: '📊',
-    },
-    {
-        label: 'Active Users',
-        value: '3',
-        subtitle: '⚡ 2 online',
-        change: null,
-        color: '#4caf50',
-        icon: '👥',
-    },
-    {
-        label: "Today's Recharges",
-        value: '3',
-        change: null,
-        color: '#9c27b0',
-        icon: '🔋',
-    },
-];
-
-const voucherCards = [
-    {
-        label: "Today's Voucher Revenue",
-        value: 'TSH 2,500.00',
-        change: 166.7,
-        color: '#2196f3',
-    },
-    {
-        label: 'Monthly Voucher Revenue',
-        value: 'TSH 6,500.00',
-        change: -77.8,
-        color: '#e91e63',
-    },
-];
-
-const routerData = [
-    {
-        name: 'INVESTMENT-123',
-        ip: '10.7.0.187',
-        status: 'Online',
-        lastSeen: 'Mar 2, 2026 23:00',
-    },
-];
-
-const recentTransactions = [
-    { user: 'HS-10MI361', time: '2 hrs ago', plan: 'masaa 6', type: 'Hotspot', amount: 'TSH 500.00', method: 'voucher - 2135' },
-    { user: 'HS-CWK6147', time: '3 hrs ago', plan: 'masaa 74', type: 'Hotspot', amount: 'TSH 1,000.00', method: 'voucher - 5175' },
-    { user: 'HS-GI039307', time: '1 days ago', plan: 'masaa 24', type: 'Hotspot', amount: 'TSH 1,000.00', method: 'voucher - 5221' },
-    { user: 'HS-ZCT8206', time: '1 days ago', plan: 'masaa 6', type: 'Hotspot', amount: 'TSH 500.00', method: 'voucher - 5809' },
-    { user: 'HS-XV15026', time: '1 days ago', plan: 'masaa 6', type: 'Hotspot', amount: 'TSH 500.00', method: 'voucher - 8579' },
-];
-
-const servicePlans = [
-    { name: 'masaa 6', type: 'Hotspot Plan', users: 41, color: '#e53935' },
-    { name: 'masaa 24', type: 'Hotspot Plan', users: 25, color: '#e91e63' },
-    { name: 'siku 3', type: 'Hotspot Plan', users: 3, color: '#9c27b0' },
-];
-
-const revenueAnalyticsData = [
-    { date: 'Feb 26', revenue: 3200 },
-    { date: 'Feb 27', revenue: 3400 },
-    { date: 'Feb 28', revenue: 3000 },
-    { date: 'Mar 1', revenue: 2800 },
-    { date: 'Mar 2', revenue: 3800 },
-    { date: 'Mar 3', revenue: 3500 },
-    { date: 'Mar 4', revenue: 1500 },
-];
-
-const systemActivityData = [
-    { role: 'SuperAdmin', email: 'mujibubakan7@gmail.com', action: 'logged in via...', time: '11 Oct, 2026 19:11', color: '#e53935' },
-    { role: 'SuperAdmin', email: 'mujibubakan7@gmail.com', action: 'logged in via...', time: '4/0 Oct, 2026 18:11', color: '#e53935' },
-    { role: 'SuperAdmin', email: 'mujibubakan2@gmail.com', action: 'logged in via...', time: '3/4 Oct, 2026 11:11', color: '#e53935' },
-    { role: 'User', email: "User 'unknown' logged out from IP...", action: '', time: '3/2 Oct, 2026 11:11', color: '#2196f3' },
-    { role: 'SuperAdmin', email: 'mujibubakan2@gmail.com', action: 'logged in via...', time: '18 Oct, 2026 11:11', color: '#e53935' },
-];
+// Formats a number as TZS currency
+function fmt(n: number) { return `TSH ${n.toLocaleString('en-US', { minimumFractionDigits: 2 })}`; }
 
 export default function Dashboard() {
+    const { user } = authStore.useAuth();
     const [hiddenCards, setHiddenCards] = useState<Set<number>>(new Set());
+    const [stats, setStats] = useState<DashboardResponse | null>(null);
+    const [routers, setRouters] = useState<Array<{ name: string; host: string; status: string; lastSeen: string }>>([]);
+    const [loading, setLoading] = useState(true);
+
+    const fetchData = async () => {
+        setLoading(true);
+        try {
+            const [dashData, routerData] = await Promise.all([
+                dashboardApi.getStats(),
+                routersApi.list(),
+            ]);
+            setStats(dashData);
+            setRouters(routerData as unknown as typeof routers);
+        } catch (err) {
+            console.error('Dashboard fetch error:', err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => { fetchData(); }, []);
 
     const toggleCardVisibility = (index: number) => {
         setHiddenCards(prev => {
@@ -133,15 +72,56 @@ export default function Dashboard() {
     const dateStr = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     const timeStr = now.toLocaleTimeString('en-US', { hour12: false });
 
+    const greetName = user?.username || 'User';
+    const hour = now.getHours();
+    const greeting = hour < 12 ? '☀️ Good morning!' : hour < 18 ? '🌤️ Good afternoon!' : '🌙 Good night!';
+
+    const revenueCards = [
+        { label: "Today's Revenue", value: fmt(0), change: null, color: '#e53935', icon: '💰' },
+        { label: 'Monthly Revenue', value: fmt(stats?.monthlyRevenue ?? 0), change: null, color: '#00bcd4', icon: '📊' },
+        { label: 'Active Users', value: String(stats?.activeSubscribers ?? 0), subtitle: `⚡ ${stats?.onlineUsers ?? 0} online`, change: null, color: '#4caf50', icon: '👥' },
+        { label: 'Total Clients', value: String(stats?.totalClients ?? 0), change: null, color: '#9c27b0', icon: '🔋' },
+    ];
+
+    const voucherCards = [
+        { label: 'Total Revenue', value: fmt(stats?.totalRevenue ?? 0), change: null, color: '#2196f3' },
+        { label: 'Expired Subscribers', value: String(stats?.expiredSubscribers ?? 0), change: null, color: '#e91e63' },
+    ];
+
+    const recentTransactions = (stats?.recentTransactions ?? []).map(t => ({
+        user: t.user,
+        time: t.date,
+        plan: '',
+        type: '',
+        amount: fmt(t.amount),
+        method: t.method,
+    }));
+
+    const revenueAnalyticsData = (stats?.revenueChartData ?? []).map(d => ({
+        date: d.name,
+        revenue: d.value,
+    }));
+
+    const routerData = routers.map(r => ({
+        name: r.name,
+        ip: r.host,
+        status: r.status,
+        lastSeen: r.lastSeen || 'Unknown',
+    }));
+
+    if (loading && !stats) {
+        return <div style={{ padding: 60, textAlign: 'center', color: 'var(--text-muted)' }}>Loading dashboard...</div>;
+    }
+
     return (
         <div className="dashboard-new">
             {/* ===== DARK WELCOME HEADER ===== */}
             <div className="dash-welcome-bar">
                 <div className="dash-welcome-left">
-                    <div className="dash-welcome-avatar">MR</div>
+                    <div className="dash-welcome-avatar">{greetName.slice(0, 2).toUpperCase()}</div>
                     <div className="dash-welcome-text">
-                        <h1>Welcome back, Mujibu!</h1>
-                        <p>🌙 Good night!</p>
+                        <h1>Welcome back, {greetName}!</h1>
+                        <p>{greeting}</p>
                     </div>
                 </div>
                 <div className="dash-welcome-right">
@@ -168,7 +148,7 @@ export default function Dashboard() {
                     </span>
                 </div>
                 <div className="dash-datetime-right">
-                    <button className="dash-refresh-btn">
+                    <button className="dash-refresh-btn" onClick={() => fetchData()}>
                         <RefreshIcon style={{ fontSize: 16 }} />
                         Refresh Data
                     </button>
@@ -244,14 +224,16 @@ export default function Dashboard() {
                             {hiddenCards.has(100 + i) ? '•••••' : card.value}
                         </div>
                         <div className="dash-stat-label">{card.label}</div>
-                        <div className={`dash-stat-change ${card.change >= 0 ? 'up' : 'down'}`}>
-                            {card.change >= 0 ? (
-                                <TrendingUpIcon style={{ fontSize: 14 }} />
-                            ) : (
-                                <TrendingDownIcon style={{ fontSize: 14 }} />
-                            )}
-                            {card.change >= 0 ? '+' : ''}{card.change}%
-                        </div>
+                        {card.change !== null && card.change !== undefined && (
+                            <div className={`dash-stat-change ${(card.change ?? 0) >= 0 ? 'up' : 'down'}`}>
+                                {(card.change ?? 0) >= 0 ? (
+                                    <TrendingUpIcon style={{ fontSize: 14 }} />
+                                ) : (
+                                    <TrendingDownIcon style={{ fontSize: 14 }} />
+                                )}
+                                {(card.change ?? 0) >= 0 ? '+' : ''}{card.change}%
+                            </div>
+                        )}
                     </div>
                 ))}
             </div>
@@ -270,17 +252,17 @@ export default function Dashboard() {
                         <div className="router-status-counts">
                             <div className="router-count-item">
                                 <CheckCircleIcon style={{ fontSize: 28, color: '#4caf50' }} />
-                                <div className="router-count-num">1</div>
+                                <div className="router-count-num">{stats?.onlineRouters ?? 0}</div>
                                 <div className="router-count-label">Online</div>
                             </div>
                             <div className="router-count-item">
                                 <CancelIcon style={{ fontSize: 28, color: '#e53935' }} />
-                                <div className="router-count-num">0</div>
+                                <div className="router-count-num">{(stats?.totalRouters ?? 0) - (stats?.onlineRouters ?? 0)}</div>
                                 <div className="router-count-label">Offline</div>
                             </div>
                             <div className="router-count-item">
                                 <ErrorIcon style={{ fontSize: 28, color: '#e53935' }} />
-                                <div className="router-count-num">1</div>
+                                <div className="router-count-num">{stats?.totalRouters ?? 0}</div>
                                 <div className="router-count-label">Total</div>
                             </div>
                         </div>
@@ -336,12 +318,12 @@ export default function Dashboard() {
                                 <div className="conn-counts">
                                     <div className="conn-count-item">
                                         <CheckCircleIcon style={{ fontSize: 22, color: '#4caf50' }} />
-                                        <div className="conn-count-num">3</div>
+                                        <div className="conn-count-num">{stats?.activeSubscribers ?? 0}</div>
                                         <div className="conn-count-label">Active</div>
                                     </div>
                                     <div className="conn-count-item">
                                         <WifiIcon style={{ fontSize: 22, color: '#4caf50' }} />
-                                        <div className="conn-count-num">2</div>
+                                        <div className="conn-count-num">{stats?.onlineUsers ?? 0}</div>
                                         <div className="conn-count-label">Online</div>
                                     </div>
                                 </div>
@@ -378,7 +360,7 @@ export default function Dashboard() {
                             <div className="conn-footer-item">
                                 <PeopleIcon style={{ fontSize: 16, color: '#9c27b0' }} />
                                 <span className="conn-footer-label">Total Customers</span>
-                                <span className="conn-footer-value">23 registered</span>
+                                <span className="conn-footer-value">{stats?.totalClients ?? 0} registered</span>
                             </div>
                         </div>
                     </div>
@@ -461,23 +443,22 @@ export default function Dashboard() {
                 <div className="dash-card-body">
                     <div className="service-tabs">
                         <button className="service-tab active">
-                            ❤️ Hotspot Plans <span className="service-tab-count">{servicePlans.length}</span>
+                            ❤️ Hotspot Plans <span className="service-tab-count">{stats?.activeSubscribers ?? 0}</span>
                         </button>
                     </div>
 
                     <div className="service-plan-grid">
-                        {servicePlans.map((plan, i) => (
+                        {(stats?.recentSubscriptions ?? []).slice(0, 5).map((sub: { id: string; username: string; plan: string; status: string }, i: number) => (
                             <div className="service-plan-item" key={i}>
                                 <div className="service-plan-left">
-                                    <FiberManualRecordIcon style={{ fontSize: 10, color: plan.color }} />
+                                    <FiberManualRecordIcon style={{ fontSize: 10, color: ['#e53935', '#e91e63', '#9c27b0', '#2196f3', '#4caf50'][i % 5] }} />
                                     <div>
-                                        <div className="service-plan-name">{plan.name}</div>
-                                        <div className="service-plan-type">{plan.type}</div>
+                                        <div className="service-plan-name">{sub.plan}</div>
+                                        <div className="service-plan-type">{sub.username}</div>
                                     </div>
                                 </div>
                                 <div className="service-plan-count">
-                                    <span className="service-plan-num">{plan.users}</span>
-                                    <span className="service-plan-unit">users</span>
+                                    <span className={`badge ${sub.status.toLowerCase()}`}>{sub.status}</span>
                                 </div>
                             </div>
                         ))}
@@ -556,17 +537,17 @@ export default function Dashboard() {
                     </div>
                     <div className="dash-card-body no-pad">
                         <div className="system-activity-list">
-                            {systemActivityData.map((item, i) => (
+                            {(stats?.recentTransactions ?? []).slice(0, 5).map((tx: { id: string; user: string; amount: number; method: string; status: string; date: string }, i: number) => (
                                 <div className="sys-activity-item" key={i}>
-                                    <div className="sys-activity-dot" style={{ background: item.color }} />
+                                    <div className="sys-activity-dot" style={{ background: tx.status === 'Completed' ? '#4caf50' : tx.status === 'Failed' ? '#e53935' : '#ff9800' }} />
                                     <div className="sys-activity-content">
-                                        <div className="sys-activity-role" style={{ color: item.color }}>
-                                            {item.role}
+                                        <div className="sys-activity-role" style={{ color: tx.status === 'Completed' ? '#4caf50' : '#e53935' }}>
+                                            {tx.user}
                                         </div>
                                         <div className="sys-activity-desc">
-                                            {item.email}{item.action ? ` ${item.action}` : ''}
+                                            {tx.method} - {fmt(tx.amount)}
                                         </div>
-                                        <div className="sys-activity-time">{item.time}</div>
+                                        <div className="sys-activity-time">{tx.date}</div>
                                     </div>
                                 </div>
                             ))}

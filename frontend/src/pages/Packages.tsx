@@ -1,21 +1,41 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import InventoryIcon from '@mui/icons-material/Inventory';
 import AddIcon from '@mui/icons-material/Add';
 import SearchIcon from '@mui/icons-material/Search';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
-import { mockPackages } from '../data/mockData';
+import { packagesApi } from '../api/client';
+import type { Package } from '../types';
 import ConfirmDeleteModal from '../modals/ConfirmDeleteModal';
 
 export default function Packages() {
     const navigate = useNavigate();
+    const [packages, setPackages] = useState<Package[]>([]);
+    const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [typeFilter, setTypeFilter] = useState('All Types');
     const [statusFilter, setStatusFilter] = useState('All Status');
-    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [deleteId, setDeleteId] = useState<string | null>(null);
 
-    const filtered = mockPackages.filter(pkg => {
+    const fetchPackages = async () => {
+        setLoading(true);
+        try {
+            const data = await packagesApi.list();
+            setPackages(data as unknown as Package[]);
+        } catch (err) { console.error('Failed to load packages:', err); }
+        finally { setLoading(false); }
+    };
+
+    useEffect(() => { fetchPackages(); }, []);
+
+    const handleDelete = async () => {
+        if (!deleteId) return;
+        try { await packagesApi.delete(deleteId); setDeleteId(null); fetchPackages(); }
+        catch (err) { console.error('Failed to delete package:', err); }
+    };
+
+    const filtered = packages.filter(pkg => {
         const matchesSearch = pkg.name.toLowerCase().includes(searchTerm.toLowerCase());
         const matchesType = typeFilter === 'All Types' || pkg.type === typeFilter;
         const matchesStatus = statusFilter === 'All Status' || pkg.status === statusFilter;
@@ -24,14 +44,16 @@ export default function Packages() {
 
     return (
         <div>
-            {showDeleteModal && (
+            {deleteId && (
                 <ConfirmDeleteModal
                     title="Delete Package"
                     message="Are you sure you want to delete this package? All associated data will be affected."
-                    onClose={() => setShowDeleteModal(false)}
-                    onConfirm={() => console.log('Deleted package')}
+                    onClose={() => setDeleteId(null)}
+                    onConfirm={handleDelete}
                 />
             )}
+
+            {loading && <div className="loading-indicator" style={{ textAlign: 'center', padding: '2rem' }}>Loading packages...</div>}
 
             <div className="page-header">
                 <div className="page-header-left">
@@ -113,7 +135,7 @@ export default function Packages() {
                                             <button className="btn-icon edit" title="Edit" onClick={() => navigate(`/edit-package/${pkg.id}`)}>
                                                 <EditIcon style={{ fontSize: 16 }} />
                                             </button>
-                                            <button className="btn-icon delete" title="Delete" onClick={() => setShowDeleteModal(true)}>
+                                            <button className="btn-icon delete" title="Delete" onClick={() => setDeleteId(pkg.id)}>
                                                 <DeleteIcon style={{ fontSize: 16 }} />
                                             </button>
                                         </div>

@@ -1,25 +1,31 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import ReceiptIcon from '@mui/icons-material/Receipt';
 import AddIcon from '@mui/icons-material/Add';
 import SearchIcon from '@mui/icons-material/Search';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import PrintIcon from '@mui/icons-material/Print';
 import DeleteIcon from '@mui/icons-material/Delete';
-import { mockInvoices } from '../data/mockData';
+import { invoicesApi } from '../api/client';
+import type { Invoice } from '../types';
 
 export default function Invoices() {
+    const [invoices, setInvoices] = useState<Invoice[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('All');
 
-    const filtered = mockInvoices.filter(inv => {
+    useEffect(() => {
+        invoicesApi.list().then(res => setInvoices((res.data || []) as unknown as Invoice[])).catch(console.error);
+    }, []);
+
+    const filtered = invoices.filter(inv => {
         const matchSearch = inv.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase()) || inv.client.toLowerCase().includes(searchTerm.toLowerCase());
         const matchStatus = statusFilter === 'All' || inv.status === statusFilter;
         return matchSearch && matchStatus;
     });
 
-    const totalPaid = mockInvoices.filter(i => i.status === 'Paid').reduce((s, i) => s + i.amount, 0);
-    const totalUnpaid = mockInvoices.filter(i => i.status === 'Unpaid').reduce((s, i) => s + i.amount, 0);
-    const totalOverdue = mockInvoices.filter(i => i.status === 'Overdue').reduce((s, i) => s + i.amount, 0);
+    const totalPaid = invoices.filter(i => i.status === 'Paid').reduce((s, i) => s + i.amount, 0);
+    const totalUnpaid = invoices.filter(i => i.status === 'Unpaid').reduce((s, i) => s + i.amount, 0);
+    const totalOverdue = invoices.filter(i => i.status === 'Overdue').reduce((s, i) => s + i.amount, 0);
 
     return (
         <div>
@@ -45,17 +51,17 @@ export default function Invoices() {
                 <div className="card card-body" style={{ borderLeft: '4px solid var(--secondary)' }}>
                     <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Total Paid</div>
                     <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--secondary)', marginTop: 4 }}>{totalPaid.toLocaleString()} TZS</div>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{mockInvoices.filter(i => i.status === 'Paid').length} invoices</div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{invoices.filter(i => i.status === 'Paid').length} invoices</div>
                 </div>
                 <div className="card card-body" style={{ borderLeft: '4px solid var(--warning)' }}>
                     <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Unpaid</div>
                     <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--warning)', marginTop: 4 }}>{totalUnpaid.toLocaleString()} TZS</div>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{mockInvoices.filter(i => i.status === 'Unpaid').length} invoices</div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{invoices.filter(i => i.status === 'Unpaid').length} invoices</div>
                 </div>
                 <div className="card card-body" style={{ borderLeft: '4px solid var(--danger)' }}>
                     <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Overdue</div>
                     <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--danger)', marginTop: 4 }}>{totalOverdue.toLocaleString()} TZS</div>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{mockInvoices.filter(i => i.status === 'Overdue').length} invoices</div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{invoices.filter(i => i.status === 'Overdue').length} invoices</div>
                 </div>
             </div>
 

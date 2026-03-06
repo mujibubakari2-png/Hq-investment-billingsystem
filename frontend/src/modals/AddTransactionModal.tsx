@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import AddCircleIcon from '@mui/icons-material/AddCircle';
 import CloseIcon from '@mui/icons-material/Close';
 import CheckIcon from '@mui/icons-material/Check';
-import { mockPackages, mockRouters } from '../data/mockData';
+import { packagesApi, routersApi } from '../api/client';
+import type { Package, Router } from '../types';
 
 interface AddTransactionModalProps {
     onClose: () => void;
@@ -10,6 +11,8 @@ interface AddTransactionModalProps {
 }
 
 export default function AddTransactionModal({ onClose, onSave }: AddTransactionModalProps) {
+    const [routersList, setRoutersList] = useState<Router[]>([]);
+    const [packagesList, setPackagesList] = useState<Package[]>([]);
     const [username, setUsername] = useState('');
     const [planId, setPlanId] = useState('');
     const [amount, setAmount] = useState('');
@@ -19,11 +22,16 @@ export default function AddTransactionModal({ onClose, onSave }: AddTransactionM
     const [router, setRouter] = useState('');
     const [notes, setNotes] = useState('');
 
-    const selectedPlan = mockPackages.find(p => p.id === planId);
+    useEffect(() => {
+        routersApi.list().then(d => setRoutersList(d as unknown as Router[])).catch(console.error);
+        packagesApi.list().then(d => setPackagesList(d as unknown as Package[])).catch(console.error);
+    }, []);
+
+    const selectedPlan = packagesList.find(p => p.id === planId);
 
     const handlePlanChange = (id: string) => {
         setPlanId(id);
-        const plan = mockPackages.find(p => p.id === id);
+        const plan = packagesList.find(p => p.id === id);
         if (plan) setAmount(String(plan.price));
     };
 
@@ -60,7 +68,7 @@ export default function AddTransactionModal({ onClose, onSave }: AddTransactionM
                             <label className="form-label">Router</label>
                             <select className="form-select" value={router} onChange={e => setRouter(e.target.value)}>
                                 <option value="">Select Router</option>
-                                {mockRouters.map(r => (
+                                {routersList.map(r => (
                                     <option key={r.id} value={r.name}>{r.name}</option>
                                 ))}
                             </select>
@@ -72,7 +80,7 @@ export default function AddTransactionModal({ onClose, onSave }: AddTransactionM
                             <label className="form-label">Plan Name <span className="required">*</span></label>
                             <select className="form-select" value={planId} onChange={e => handlePlanChange(e.target.value)}>
                                 <option value="">Select Plan</option>
-                                {mockPackages.map(p => (
+                                {packagesList.map(p => (
                                     <option key={p.id} value={p.id}>{p.name}</option>
                                 ))}
                             </select>

@@ -95,4 +95,12 @@ export default function App() {
             <Route path="/bank-payment-config" element={<BankPaymentConfig />} />
             <Route path="/mpesa-till-config" element={<MpesaTillConfig />} />
             <Route path="/harakapay-config" element={<HarakaPayConfig />} />
-            <Route path="/mpesa-paybill-config" el
+            <Route path="/mpesa-paybill-config" element={<MpesaPaybillConfig />} />
+            <Route path="/palmpesa-config" element={<PalmPesaConfig />} />
+            <Route path="/zenopay-config" element={<ZenoPayConfig />} />
+          </Route>
+        </Route>
+      </Routes>
+    </BrowserRouter>
+  );
+}

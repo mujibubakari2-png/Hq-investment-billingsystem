@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import ConfirmationNumberIcon from '@mui/icons-material/ConfirmationNumber';
 import AddIcon from '@mui/icons-material/Add';
 import SearchIcon from '@mui/icons-material/Search';
@@ -8,11 +8,13 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import PrintIcon from '@mui/icons-material/Print';
 import CheckBoxIcon from '@mui/icons-material/CheckBox';
 import CheckBoxOutlineBlankIcon from '@mui/icons-material/CheckBoxOutlineBlank';
-import { mockVouchers } from '../data/mockData';
+import { vouchersApi } from '../api/client';
+import type { Voucher } from '../types';
 import GenerateVouchersModal from '../modals/GenerateVouchersModal';
 import ConfirmDeleteModal from '../modals/ConfirmDeleteModal';
 
 export default function VoucherCodes() {
+    const [vouchers, setVouchers] = useState<Voucher[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('All');
     const [routerFilter, setRouterFilter] = useState('All Routers');
@@ -21,17 +23,21 @@ export default function VoucherCodes() {
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [selected, setSelected] = useState<string[]>([]);
 
-    const uniqueRouters = Array.from(new Set(mockVouchers.map(v => v.router)));
+    useEffect(() => {
+        vouchersApi.list().then(res => setVouchers((res.data || []) as unknown as Voucher[])).catch(console.error);
+    }, []);
 
-    const filtered = mockVouchers.filter(v => {
+    const uniqueRouters = Array.from(new Set(vouchers.map(v => v.router)));
+
+    const filtered = vouchers.filter(v => {
         const matchSearch = v.code.includes(searchTerm) || v.plan.toLowerCase().includes(searchTerm.toLowerCase());
         const matchStatus = statusFilter === 'All' || v.status === statusFilter;
         const matchRouter = routerFilter === 'All Routers' || v.router === routerFilter;
         return matchSearch && matchStatus && matchRouter;
     });
 
-    const unusedCount = mockVouchers.filter(v => v.status === 'Unused').length;
-    const usedCount = mockVouchers.filter(v => v.status === 'Used').length;
+    const unusedCount = vouchers.filter(v => v.status === 'Unused').length;
+    const usedCount = vouchers.filter(v => v.status === 'Used').length;
 
     const toggleSelect = (id: string) => {
         setSelected(prev => prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id]);
@@ -110,7 +116,7 @@ export default function VoucherCodes() {
                                 className={`filter-chip ${routerFilter === r ? 'active' : ''}`}
                                 onClick={() => setRouterFilter(r)}
                             >
-                                {r} {r === 'All Routers' ? `(${mockVouchers.length})` : `(${mockVouchers.filter(v => v.router === r).length})`}
+                                {r} {r === 'All Routers' ? `(${vouchers.length})` : `(${vouchers.filter(v => v.router === r).length})`}
                             </button>
                         ))}
                     </div>
@@ -202,7 +208,7 @@ export default function VoucherCodes() {
                 </div>
 
                 <div className="pagination">
-                    <div className="pagination-info">Showing 1 to {filtered.length} of {mockVouchers.length} entries</div>
+                    <div className="pagination-info">Showing 1 to {filtered.length} of {vouchers.length} entries</div>
                     <div className="pagination-buttons">
                         <button className="pagination-btn">Previous</button>
                         <button className="pagination-btn active">1</button>

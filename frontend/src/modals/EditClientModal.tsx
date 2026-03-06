@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import EditIcon from '@mui/icons-material/Edit';
 import CloseIcon from '@mui/icons-material/Close';
 import CheckIcon from '@mui/icons-material/Check';
-import { mockRouters, mockPackages } from '../data/mockData';
-import type { Client } from '../types';
+import { routersApi, packagesApi } from '../api/client';
+import type { Client, Router, Package } from '../types';
 
 interface EditClientModalProps {
     client: Client;
@@ -19,6 +19,13 @@ export default function EditClientModal({ client, onClose, onSave }: EditClientM
     const [status, setStatus] = useState(client.status);
     const [router, setRouter] = useState(client.router || '');
     const [plan, setPlan] = useState(client.plan || '');
+    const [routersList, setRoutersList] = useState<Router[]>([]);
+    const [packagesList, setPackagesList] = useState<Package[]>([]);
+
+    useEffect(() => {
+        routersApi.list().then(d => setRoutersList(d as unknown as Router[])).catch(console.error);
+        packagesApi.list().then(d => setPackagesList(d as unknown as Package[])).catch(console.error);
+    }, []);
 
     const handleSave = () => {
         if (onSave) {
@@ -92,14 +99,14 @@ export default function EditClientModal({ client, onClose, onSave }: EditClientM
                             <label className="form-label">Router</label>
                             <select className="form-select" value={router} onChange={e => setRouter(e.target.value)}>
                                 <option value="">No Router</option>
-                                {mockRouters.map(r => <option key={r.id} value={r.name}>{r.name}</option>)}
+                                {routersList.map(r => <option key={r.id} value={r.name}>{r.name}</option>)}
                             </select>
                         </div>
                         <div className="form-group">
                             <label className="form-label">Plan</label>
                             <select className="form-select" value={plan} onChange={e => setPlan(e.target.value)}>
                                 <option value="">No Plan</option>
-                                {mockPackages.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
+                                {packagesList.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
                             </select>
                         </div>
                     </div>

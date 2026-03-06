@@ -97,4 +97,26 @@ export default function Login() {
                                 {showPass ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
                             </button>
                         </div>
-                    </di
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.85rem', cursor: 'pointer' }}>
+                            <input type="checkbox" checked={remember} onChange={e => setRemember(e.target.checked)} />
+                            Remember me
+                        </label>
+                        <a href="#" style={{ fontSize: '0.85rem', color: 'var(--primary)' }}>Forgot password?</a>
+                    </div>
+
+                    <button type="submit" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '12px', fontSize: '0.95rem' }} disabled={loading}>
+                        <LockIcon fontSize="small" />
+                        {loading ? 'Signing in...' : 'Sign In'}
+                    </button>
+                </form>
+
+                <div style={{ textAlign: 'center', marginTop: 24, fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                    &copy; {new Date().getFullYear()} HQ Investment · ISP Billing System
+                </div>
+            </div>
+        </div>
+    );
+}

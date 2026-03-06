@@ -1,11 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import InventoryIcon from '@mui/icons-material/Inventory';
 import CloseIcon from '@mui/icons-material/Close';
 import CheckIcon from '@mui/icons-material/Check';
 import SpeedIcon from '@mui/icons-material/Speed';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import SettingsIcon from '@mui/icons-material/Settings';
-import { mockRouters } from '../data/mockData';
+import { routersApi } from '../api/client';
+import type { Router } from '../types';
 
 interface AddPackageModalProps {
     onClose: () => void;
@@ -29,6 +30,8 @@ export default function AddPackageModal({ onClose, onSave }: AddPackageModalProp
     const [devices, setDevices] = useState(1);
     const [payStatus, setPayStatus] = useState('Prepaid');
     const [paymentType, setPaymentType] = useState('Prepaid');
+    const [routersList, setRoutersList] = useState<Router[]>([]);
+    useEffect(() => { routersApi.list().then(d => setRoutersList(d as unknown as Router[])).catch(console.error); }, []);
 
     const handleSave = () => {
         if (onSave) onSave({ packageType, accountType, name, price: Number(price), duration: Number(duration), durationUnit, router, uploadSpeed, uploadUnit, downloadSpeed, downloadUnit, burstEnabled, hotspotType, devices, payStatus, paymentType });
@@ -114,7 +117,7 @@ export default function AddPackageModal({ onClose, onSave }: AddPackageModalProp
                             <label className="form-label">Router <span className="required">*</span></label>
                             <select className="form-select" value={router} onChange={e => setRouter(e.target.value)}>
                                 <option value="">Select Router</option>
-                                {mockRouters.map(r => <option key={r.id} value={r.name}>{r.name}</option>)}
+                                {routersList.map(r => <option key={r.id} value={r.name}>{r.name}</option>)}
                             </select>
                             <div className="form-hint">Select which router will provide this service</div>
                         </div>
