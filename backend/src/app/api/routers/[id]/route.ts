@@ -11,6 +11,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
                 packages: true,
                 subscriptions: { include: { client: true, package: true } },
                 equipments: true,
+                _count: { select: { logs: true } },
             },
         });
         if (!router) return errorResponse("Router not found", 404);
@@ -25,15 +26,26 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         const { id } = await params;
         const body = await req.json();
 
-        const router = await prisma.router.update({
-            where: { id },
+        const data: any = {};
+        if (body.name) data.name = body.name;
+        if (body.host) data.host = body.host;
+        if (body.username !== undefined) data.username = body.username;
+        if (body.password !== undefined) data.password = body.password;
+        if (body.port) data.port = parseInt(body.port);
+        if (body.apiPort) data.apiPort = parseInt(body.apiPort);
+        if (body.vpnMode) data.vpnMode = body.vpnMode;
+        if (body.description !== undefined) data.description = body.description;
+        if (body.status) data.status = body.status.toUpperCase();
+
+        const router = await prisma.router.update({ where: { id }, data });
+
+        // Log the update
+        await prisma.routerLog.create({
             data: {
-                name: body.name,
-                host: body.host,
-                username: body.username,
-                password: body.password,
-                port: body.port ? parseInt(body.port) : undefined,
-                status: body.status?.toUpperCase(),
+                routerId: id,
+                action: "router_updated",
+                details: `Router "${router.name}" settings updated`,
+                status: "success",
             },
         });
 

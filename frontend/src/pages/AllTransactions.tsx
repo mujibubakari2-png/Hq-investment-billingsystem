@@ -7,6 +7,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import { transactionsApi } from '../api/client';
 import type { Transaction } from '../types';
 import AddTransactionModal from '../modals/AddTransactionModal';
+import ViewTransactionModal from '../modals/ViewTransactionModal';
 import ConfirmDeleteModal from '../modals/ConfirmDeleteModal';
 
 export default function AllTransactions() {
@@ -16,7 +17,19 @@ export default function AllTransactions() {
     const [methodFilter, setMethodFilter] = useState('All');
     const [statusFilter, setStatusFilter] = useState('All');
     const [showAddModal, setShowAddModal] = useState(false);
-    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [viewTransaction, setViewTransaction] = useState<Transaction | null>(null);
+    const [deleteId, setDeleteId] = useState<string | null>(null);
+
+    const handleAddTransaction = async (data: any) => {
+        try {
+            await transactionsApi.create(data);
+            setShowAddModal(false);
+            fetchTransactions();
+        } catch (err) {
+            console.error('Failed to create transaction:', err);
+            alert('Failed to create transaction. Please check your inputs.');
+        }
+    };
 
     const fetchTransactions = async () => {
         setLoading(true);
@@ -39,14 +52,29 @@ export default function AllTransactions() {
 
     return (
         <div>
-            {showAddModal && <AddTransactionModal onClose={() => setShowAddModal(false)} />}
-            {showDeleteModal && (
+            {showAddModal && <AddTransactionModal onClose={() => setShowAddModal(false)} onSave={handleAddTransaction} />}
+            {viewTransaction && (
+                <ViewTransactionModal
+                    transaction={viewTransaction}
+                    onClose={() => setViewTransaction(null)}
+                />
+            )}
+            {deleteId && (
                 <ConfirmDeleteModal
                     title="Delete Transaction"
                     message="Are you sure you want to delete this transaction record?"
                     confirmLabel="Delete"
-                    onClose={() => setShowDeleteModal(false)}
-                    onConfirm={() => console.log('Deleted transaction')}
+                    onClose={() => setDeleteId(null)}
+                    onConfirm={async () => {
+                        try {
+                            await transactionsApi.delete(deleteId);
+                            setDeleteId(null);
+                            fetchTransactions();
+                        } catch (err) {
+                            console.error('Failed to delete transaction:', err);
+                            alert('Failed to delete transaction.');
+                        }
+                    }}
                 />
             )}
 
@@ -127,34 +155,48 @@ export default function AllTransactions() {
                             </tr>
                         </thead>
                         <tbody>
-                            {filtered.map(tx => (
-                                <tr key={tx.id}>
-                                    <td style={{ fontWeight: 500 }}>{tx.user}</td>
-                                    <td>{tx.planName || '—'}</td>
-                                    <td style={{ fontWeight: 600 }}>{tx.amount.toLocaleString()} TZS</td>
-                                    <td>
-                                        <span className={`badge ${tx.type === 'Mobile' ? 'hotspot' : tx.type === 'Voucher' ? 'pppoe' : 'inactive'}`}>
-                                            {tx.type || 'Manual'}
-                                        </span>
-                                    </td>
-                                    <td>{tx.date}</td>
-                                    <td>{tx.expiryDate || '—'}</td>
-                                    <td style={{ textTransform: 'capitalize' }}>{tx.method}</td>
-                                    <td>
-                                        <span className={`badge ${tx.status === 'Completed' ? 'active' : tx.status === 'Pending' ? 'expired' : 'suspended'}`}>
-                                            {tx.status}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <div className="table-actions">
-                                            <button className="btn-icon view" title="View"><VisibilityIcon style={{ fontSize: 16 }} /></button>
-                                            <button className="btn-icon delete" title="Delete" onClick={() => setShowDeleteModal(true)}>
-                                                <DeleteIcon style={{ fontSize: 16 }} />
-                                            </button>
-                                        </div>
+                            {loading ? (
+                                <tr>
+                                    <td colSpan={9} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
+                                        Loading transactions...
                                     </td>
                                 </tr>
-                            ))}
+                            ) : filtered.length === 0 ? (
+                                <tr>
+                                    <td colSpan={9} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
+                                        No transactions found matching your criteria.
+                                    </td>
+                                </tr>
+                            ) : (
+                                filtered.map(tx => (
+                                    <tr key={tx.id}>
+                                        <td style={{ fontWeight: 500 }}>{tx.user}</td>
+                                        <td>{tx.planName || '—'}</td>
+                                        <td style={{ fontWeight: 600 }}>{tx.amount.toLocaleString()} TZS</td>
+                                        <td>
+                                            <span className={`badge ${tx.type === 'Mobile' ? 'hotspot' : tx.type === 'Voucher' ? 'pppoe' : 'inactive'}`}>
+                                                {tx.type || 'Manual'}
+                                            </span>
+                                        </td>
+                                        <td>{tx.date}</td>
+                                        <td>{tx.expiryDate || '—'}</td>
+                                        <td style={{ textTransform: 'capitalize' }}>{tx.method}</td>
+                                        <td>
+                                            <span className={`badge ${tx.status === 'Completed' ? 'active' : tx.status === 'Pending' ? 'expired' : 'suspended'}`}>
+                                                {tx.status}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <div className="table-actions">
+                                                <button className="btn-icon view" title="View" onClick={() => setViewTransaction(tx)}><VisibilityIcon style={{ fontSize: 16 }} /></button>
+                                                <button className="btn-icon delete" title="Delete" onClick={() => setDeleteId(tx.id)}>
+                                                    <DeleteIcon style={{ fontSize: 16 }} />
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
                         </tbody>
                     </table>
                 </div>

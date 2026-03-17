@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import ExtensionIcon from '@mui/icons-material/Extension';
 import CloseIcon from '@mui/icons-material/Close';
 import CheckIcon from '@mui/icons-material/Check';
-import { mockPackages } from '../data/mockData';
-import type { ExpiredSubscriber } from '../types';
+import { packagesApi } from '../api/client';
+import type { ExpiredSubscriber, Package } from '../types';
 
 interface ExtendSubscriberModalProps {
     subscriber: ExpiredSubscriber;
@@ -12,16 +12,21 @@ interface ExtendSubscriberModalProps {
 }
 
 export default function ExtendSubscriberModal({ subscriber, onClose, onSave }: ExtendSubscriberModalProps) {
+    const [packagesList, setPackagesList] = useState<Package[]>([]);
     const [planId, setPlanId] = useState('');
     const [method, setMethod] = useState('Cash');
     const [reference, setReference] = useState('');
     const [amount, setAmount] = useState('');
 
-    const selectedPlan = mockPackages.find(p => p.id === planId);
+    useEffect(() => {
+        packagesApi.list().then(d => setPackagesList(d as unknown as Package[])).catch(console.error);
+    }, []);
+
+    const selectedPlan = packagesList.find(p => p.id === planId);
 
     const handlePlanChange = (id: string) => {
         setPlanId(id);
-        const plan = mockPackages.find(p => p.id === id);
+        const plan = packagesList.find(p => p.id === id);
         if (plan) setAmount(String(plan.price));
     };
 
@@ -30,7 +35,7 @@ export default function ExtendSubscriberModal({ subscriber, onClose, onSave }: E
         onClose();
     };
 
-    const filteredPackages = mockPackages.filter(p => p.type === subscriber.type);
+    const filteredPackages = packagesList.filter(p => p.type === subscriber.type);
 
     return (
         <div className="modal-overlay" onClick={onClose}>

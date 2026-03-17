@@ -33,9 +33,12 @@ import MpesaPaybillConfig from './pages/MpesaPaybillConfig';
 import PalmPesaConfig from './pages/PalmPesaConfig';
 import ZenoPayConfig from './pages/ZenoPayConfig';
 import Login from './pages/Login';
+import Register from './pages/Register';
+import ForgotPassword from './pages/ForgotPassword';
 import Reports from './pages/Reports';
 import TutorialVideos from './pages/TutorialVideos';
 import Invoices from './pages/Invoices';
+import Profile from './pages/Profile';
 
 export default function App() {
   return (
@@ -43,6 +46,8 @@ export default function App() {
       <Routes>
         {/* Standalone pages (no sidebar layout) */}
         <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
 
         {/* Protected pages with sidebar layout */}
         <Route element={<ProtectedRoute />}>
@@ -86,6 +91,7 @@ export default function App() {
             <Route path="/technical-support" element={<TechnicalSupport />} />
 
             {/* ADDITIONAL PAGES */}
+            <Route path="/profile" element={<Profile />} />
             <Route path="/recharge" element={<RechargeAccount />} />
             <Route path="/edit-plan/:id" element={<EditPlan />} />
             <Route path="/add-package" element={<AddPackage />} />

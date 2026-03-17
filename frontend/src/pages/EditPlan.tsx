@@ -4,13 +4,12 @@ import InfoIcon from '@mui/icons-material/Info';
 import PersonIcon from '@mui/icons-material/Person';
 import SettingsIcon from '@mui/icons-material/Settings';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 
 export default function EditPlan() {
-    const { id: _id } = useParams();
     const navigate = useNavigate();
 
-    const [servicePlan, _setServicePlan] = useState('INVESTMENT-123 ● masaa 24');
+    const [servicePlan] = useState('INVESTMENT-123 ● masaa 24');
     const [createdDate, setCreatedDate] = useState('23/02/2026');
     const [createdTime, setCreatedTime] = useState('22:34:11');
     const [expiresDate, setExpiresDate] = useState('24/02/2026');

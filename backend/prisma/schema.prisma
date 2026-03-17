@@ -12,6 +12,7 @@ datasource db {
 model User {
   id        String   @id @default(cuid())
   username  String   @unique
+  fullName  String?
   email     String   @unique
   password  String
   phone     String?
@@ -23,8 +24,27 @@ model User {
 
   vouchers  Voucher[]
   expenses  Expense[]
+  otps      UserOtp[]
+
+    tenantId String?
+  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("users")
+}
+
+model UserOtp {
+  id        String   @id @default(cuid())
+  email     String
+  otp       String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  used      Boolean  @default(false)
+  user      User?    @relation(fields: [email], references: [email])
+
+    tenantId String?
+  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("user_otps")
 }
 
 enum Role {
@@ -58,6 +78,9 @@ model Client {
   transactions  Transaction[]
   invoices      Invoice[]
   smsMessages   SmsMessage[]
+
+    tenantId String?
+  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("clients")
 }
@@ -109,6 +132,9 @@ model Package {
   subscriptions Subscription[]
   vouchers      Voucher[]
 
+    tenantId String?
+  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
   @@map("packages")
 }
 
@@ -153,6 +179,9 @@ model Subscription {
   createdAt   DateTime           @default(now())
   updatedAt   DateTime           @updatedAt
 
+    tenantId String?
+  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
   @@map("subscriptions")
 }
 
@@ -183,6 +212,9 @@ model Transaction {
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
 
+    tenantId String?
+  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
   @@map("transactions")
 }
 
@@ -203,10 +235,13 @@ model Router {
   id          String       @id @default(cuid())
   name        String       @unique
   host        String
-  username    String?
+  username    String?      @default("admin")
   password    String?
   port        Int?         @default(8728)
+  apiPort     Int?         @default(8728)
   type        String       @default("MikroTik")
+  vpnMode     String?      @default("hybrid")
+  description String?
   status      RouterStatus @default(OFFLINE)
   activeUsers Int          @default(0)
   cpuLoad     Float        @default(0)
@@ -220,6 +255,11 @@ model Router {
   subscriptions Subscription[]
   equipments    Equipment[]
   vouchers      Voucher[]
+  logs          RouterLog[]
+  hotspotSettings HotspotSettings?
+
+  tenantId String?
+  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("routers")
 }
@@ -227,6 +267,46 @@ model Router {
 enum RouterStatus {
   ONLINE
   OFFLINE
+}
+
+// ─── ROUTER ACTION LOGS ────────────────────────────────────────────────────
+model RouterLog {
+  id        String   @id @default(cuid())
+  routerId  String
+  router    Router   @relation(fields: [routerId], references: [id], onDelete: Cascade)
+  action    String
+  details   String?
+  status    String   @default("success")
+  username  String?
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  tenantId String?
+  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("router_logs")
+}
+
+model HotspotSettings {
+  id                  String   @id @default(cuid())
+  routerId            String   @unique
+  router              Router   @relation(fields: [routerId], references: [id], onDelete: Cascade)
+  primaryColor        String   @default("#1a1a2e")
+  accentColor         String   @default("#6366f1")
+  selectedFont        String   @default("Inter")
+  layout              String   @default("grid")
+  enableAds           Boolean  @default(false)
+  enableAnnouncement  Boolean  @default(true)
+  enableRememberMe    Boolean  @default(true)
+  companyName         String?
+  customerCareNumber  String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  tenantId            String?
+  tenant              Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("hotspot_settings")
 }
 
 // ─── EQUIPMENT ──────────────────────────────────────────────────────────────
@@ -244,6 +324,9 @@ model Equipment {
   router       Router?         @relation(fields: [routerId], references: [id])
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
+
+    tenantId String?
+  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("equipments")
 }
@@ -271,6 +354,9 @@ model Voucher {
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
 
+    tenantId String?
+  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
   @@map("vouchers")
 }
 
@@ -296,6 +382,9 @@ model Expense {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+    tenantId String?
+  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
   @@map("expenses")
 }
 
@@ -313,6 +402,9 @@ model Invoice {
   updatedAt     DateTime      @updatedAt
 
   items InvoiceItem[]
+
+    tenantId String?
+  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("invoices")
 }
@@ -349,6 +441,9 @@ model SmsMessage {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
+    tenantId String?
+  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
   @@map("sms_messages")
 }
 
@@ -372,6 +467,9 @@ model MessageTemplate {
   variables String[]
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
+
+    tenantId String?
+  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("message_templates")
 }
@@ -397,6 +495,9 @@ model PaymentChannel {
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
+    tenantId String?
+  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
   @@map("payment_channels")
 }
 
@@ -412,5 +513,114 @@ model SystemSetting {
   value String
   group String @default("general")
 
+    tenantId String?
+  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
   @@map("system_settings")
+}
+
+
+// ─── SAAS TENANT MODELS ───────────────────────────────────────────────────
+model Tenant {
+  id          String       @id @default(cuid())
+  name        String
+  email       String       @unique
+  phone       String?
+  status      TenantStatus @default(ACTIVE)
+  planId      String
+  plan        SaasPlan     @relation(fields: [planId], references: [id])
+  trialStart  DateTime?
+  trialEnd    DateTime?
+
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  users             User[]
+  clients           Client[]
+  packages          Package[]
+  subscriptions     Subscription[]
+  transactions      Transaction[]
+  routers           Router[]
+  equipments        Equipment[]
+  vouchers          Voucher[]
+  expenses          Expense[]
+  invoices          Invoice[]
+  smsMessages       SmsMessage[]
+  messageTemplates  MessageTemplate[]
+  paymentChannels   PaymentChannel[]
+  systemSettings    SystemSetting[]
+  tenantInvoices    TenantInvoice[]
+  tenantPayments    TenantPayment[]
+  userOtps          UserOtp[]
+  routerLogs        RouterLog[]
+  hotspotSettings   HotspotSettings[]
+
+  @@map("tenants")
+}
+
+enum TenantStatus {
+  TRIALLING
+  ACTIVE
+  SUSPENDED
+  CANCELLED
+}
+
+model SaasPlan {
+  id          String   @id @default(cuid())
+  name        String
+  price       Float
+  clientLimit Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenants     Tenant[]
+  invoices    TenantInvoice[]
+
+  @@map("saas_plans")
+}
+
+model TenantInvoice {
+  id            String              @id @default(cuid())
+  invoiceNumber String              @unique
+  tenantId      String
+  tenant        Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  planId        String
+  plan          SaasPlan            @relation(fields: [planId], references: [id])
+  amount        Float
+  status        TenantInvoiceStatus @default(PENDING)
+  dueDate       DateTime
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  payments      TenantPayment[]
+
+  @@map("tenant_invoices")
+}
+
+enum TenantInvoiceStatus {
+  PENDING
+  PAID
+  EXPIRED
+}
+
+model TenantPayment {
+  id            String         @id @default(cuid())
+  invoiceId     String
+  invoice       TenantInvoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  tenantId      String
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  amount        Float
+  transactionId String?        @unique
+  paymentMethod String         @default("PALMPESA") // e.g. MIX_BY_YAS, AIRTEL_MONEY, HALOPESA, MPESA
+  status        PaymentStatus  @default(PENDING)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@map("tenant_payments")
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
 }

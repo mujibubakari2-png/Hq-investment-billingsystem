@@ -35,6 +35,8 @@ export async function GET(req: NextRequest) {
             prisma.transaction.count({ where }),
         ]);
 
+        const isValidDate = (d: any) => d instanceof Date && !isNaN(d.getTime());
+
         const mapped = transactions.map((t: {
             id: string;
             client: { username: string; fullName: string };
@@ -54,7 +56,7 @@ export async function GET(req: NextRequest) {
             type: t.type.charAt(0) + t.type.slice(1).toLowerCase(),
             method: t.method,
             status: t.status.charAt(0) + t.status.slice(1).toLowerCase(),
-            date: t.createdAt.toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" }),
+            date: isValidDate(t.createdAt) ? t.createdAt.toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "N/A",
             expiryDate: t.expiryDate,
             reference: t.reference,
         }));

@@ -21,11 +21,63 @@ export default function VoucherCodes() {
     const [showGenerateModal, setShowGenerateModal] = useState(false);
     const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
     const [selected, setSelected] = useState<string[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    const fetchVouchers = async () => {
+        setLoading(true);
+        try {
+            const res = await vouchersApi.list();
+            setVouchers((res.data || []) as unknown as Voucher[]);
+        } catch (err) {
+            console.error('Failed to fetch vouchers', err);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
-        vouchersApi.list().then(res => setVouchers((res.data || []) as unknown as Voucher[])).catch(console.error);
+        fetchVouchers();
     }, []);
+
+    const handleGenerate = async (data: any) => {
+        try {
+            await vouchersApi.generate(data);
+            setShowGenerateModal(false);
+            fetchVouchers();
+        } catch (err) {
+            console.error('Failed to generate vouchers', err);
+        }
+    };
+
+    const handleRevoke = async () => {
+        if (!deleteTargetId) return;
+        try {
+            await vouchersApi.delete(deleteTargetId);
+            setDeleteTargetId(null);
+            setShowDeleteModal(false);
+            fetchVouchers();
+            alert('Voucher revoked successfully!');
+        } catch (err) {
+            console.error('Failed to revoke voucher', err);
+            alert('Failed to revoke voucher');
+        }
+    };
+
+    const handleDeleteAllUsed = async () => {
+        try {
+            // Note: in a real environment this would be a custom API method, here we loop delete for MVP
+            const usedVouchers = vouchers.filter(v => v.status === 'Used');
+            await Promise.all(usedVouchers.map(v => vouchersApi.delete(v.id)));
+            setShowDeleteAllModal(false);
+            fetchVouchers();
+            alert('Used vouchers deleted successfully!');
+        } catch (err) {
+            console.error('Failed to mass-delete used vouchers', err);
+            alert('Failed to mass-delete used vouchers');
+        }
+    };
 
     const uniqueRouters = Array.from(new Set(vouchers.map(v => v.router)));
 
@@ -48,14 +100,14 @@ export default function VoucherCodes() {
 
     return (
         <div>
-            {showGenerateModal && <GenerateVouchersModal onClose={() => setShowGenerateModal(false)} />}
+            {showGenerateModal && <GenerateVouchersModal onClose={() => setShowGenerateModal(false)} onGenerate={handleGenerate} />}
             {showDeleteAllModal && (
                 <ConfirmDeleteModal
                     title="Delete All Used Vouchers"
                     message="This will permanently delete all used vouchers. This action cannot be undone."
                     confirmLabel="Delete All Used"
                     onClose={() => setShowDeleteAllModal(false)}
-                    onConfirm={() => console.log('Deleted all used')}
+                    onConfirm={handleDeleteAllUsed}
                 />
             )}
             {showDeleteModal && (
@@ -64,7 +116,7 @@ export default function VoucherCodes() {
                     message="Are you sure you want to revoke this voucher?"
                     confirmLabel="Revoke"
                     onClose={() => setShowDeleteModal(false)}
-                    onConfirm={() => console.log('Revoked voucher')}
+                    onConfirm={handleRevoke}
                 />
             )}
 
@@ -82,7 +134,25 @@ export default function VoucherCodes() {
                     <button className="btn btn-primary" onClick={() => setShowGenerateModal(true)}>
                         <AddIcon fontSize="small" /> Add Voucher
                     </button>
-                    <button className="btn btn-secondary">
+                    <button className="btn btn-secondary" onClick={() => {
+                        const printVouchers = selected.length > 0 ? filtered.filter(v => selected.includes(v.id)) : filtered;
+                        const rows = printVouchers.map(v =>
+                            '<tr><td>' + v.code + '</td><td>' + v.plan + '</td><td>' + v.router + '</td><td>' + v.status + '</td></tr>'
+                        ).join('');
+                        const html = `<html><head><title>Voucher Codes</title><style>
+                            body { font-family: 'Segoe UI', sans-serif; padding: 20px; }
+                            table { width: 100%; border-collapse: collapse; }
+                            th, td { padding: 8px 12px; border: 1px solid #ddd; text-align: left; }
+                            th { background: #f5f5f5; font-weight: 600; }
+                            .code { font-family: monospace; font-weight: 700; letter-spacing: 2px; }
+                        </style></head><body>
+                            <h2>Voucher Codes</h2>
+                            <table><thead><tr><th>Code</th><th>Plan</th><th>Router</th><th>Status</th></tr></thead>
+                            <tbody>${rows}</tbody></table>
+                        </body></html>`;
+                        const w = window.open('', '_blank');
+                        if (w) { w.document.write(html); w.document.close(); w.print(); }
+                    }}>
                         <PrintIcon fontSize="small" /> Print
                     </button>
                     <button className="btn btn-secondary" style={{ color: 'var(--danger)' }} onClick={() => setShowDeleteAllModal(true)}>
@@ -163,46 +233,67 @@ export default function VoucherCodes() {
                             </tr>
                         </thead>
                         <tbody>
-                            {filtered.map(v => (
-                                <tr key={v.id}>
-                                    <td>
-                                        <button className="btn-icon" onClick={() => toggleSelect(v.id)} style={{ background: 'none' }}>
-                                            {selected.includes(v.id) ? <CheckBoxIcon style={{ fontSize: 18, color: 'var(--primary)' }} /> : <CheckBoxOutlineBlankIcon style={{ fontSize: 18 }} />}
-                                        </button>
-                                    </td>
-                                    <td><span className="badge hotspot">{v.packageType || 'Hotspot'}</span></td>
-                                    <td style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                        <span style={{ fontSize: 16 }}>🖥️</span>{v.router}
-                                    </td>
-                                    <td>
-                                        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>🎫 {v.plan}</span>
-                                    </td>
-                                    <td>
-                                        <span style={{ display: 'inline-block', background: '#222', color: '#fff', padding: '2px 14px', borderRadius: 3, fontFamily: 'monospace', fontWeight: 700, letterSpacing: 2 }}>
-                                            {v.code}
-                                        </span>
-                                    </td>
-                                    <td><span className={`badge ${v.status === 'Used' ? 'expired' : v.status === 'Unused' ? 'active' : 'inactive'}`}>{v.status}</span></td>
-                                    <td>{v.customer ?? '—'}</td>
-                                    <td>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                            {v.createdBy}
-                                            <span className="badge active" style={{ padding: '1px 6px', fontSize: '0.65rem' }}>A</span>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <div className="table-actions">
-                                            <button className="btn-icon sync" title="Copy Code" onClick={() => navigator.clipboard.writeText(v.code)}>
-                                                <ContentCopyIcon style={{ fontSize: 16 }} />
-                                            </button>
-                                            <button className="btn-icon edit" title="Edit"><EditIcon style={{ fontSize: 16 }} /></button>
-                                            <button className="btn-icon delete" title="Revoke" onClick={() => setShowDeleteModal(true)}>
-                                                <DeleteIcon style={{ fontSize: 16 }} />
-                                            </button>
-                                        </div>
+                            {loading ? (
+                                <tr>
+                                    <td colSpan={9} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
+                                        Loading vouchers...
                                     </td>
                                 </tr>
-                            ))}
+                            ) : filtered.length === 0 ? (
+                                <tr>
+                                    <td colSpan={9} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
+                                        No vouchers found.
+                                    </td>
+                                </tr>
+                            ) : (
+                                filtered.map(v => (
+                                    <tr key={v.id}>
+                                        <td>
+                                            <button className="btn-icon" onClick={() => toggleSelect(v.id)} style={{ background: 'none' }}>
+                                                {selected.includes(v.id) ? <CheckBoxIcon style={{ fontSize: 18, color: 'var(--primary)' }} /> : <CheckBoxOutlineBlankIcon style={{ fontSize: 18 }} />}
+                                            </button>
+                                        </td>
+                                        <td><span className="badge hotspot">{v.packageType || 'Hotspot'}</span></td>
+                                        <td style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                            <span style={{ fontSize: 16 }}>🖥️</span>{v.router}
+                                        </td>
+                                        <td>
+                                            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>🎫 {v.plan}</span>
+                                        </td>
+                                        <td>
+                                            <span style={{ display: 'inline-block', background: '#222', color: '#fff', padding: '2px 14px', borderRadius: 3, fontFamily: 'monospace', fontWeight: 700, letterSpacing: 2 }}>
+                                                {v.code}
+                                            </span>
+                                        </td>
+                                        <td><span className={`badge ${v.status === 'Used' ? 'expired' : v.status === 'Unused' ? 'active' : 'inactive'}`}>{v.status}</span></td>
+                                        <td>{v.customer ?? '—'}</td>
+                                        <td>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                {v.createdBy}
+                                                <span className="badge active" style={{ padding: '1px 6px', fontSize: '0.65rem' }}>A</span>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div className="table-actions">
+                                                <button className="btn-icon sync" title="Copy Code" onClick={() => navigator.clipboard.writeText(v.code)}>
+                                                    <ContentCopyIcon style={{ fontSize: 16 }} />
+                                                </button>
+                                                <button className="btn-icon edit" title="Edit" onClick={() => alert(`Voucher ${v.code} - Plan: ${v.plan}, Router: ${v.router}, Status: ${v.status}`)}><EditIcon style={{ fontSize: 16 }} /></button>
+                                                <button
+                                                    className="btn-icon delete"
+                                                    title="Revoke"
+                                                    onClick={() => {
+                                                        setDeleteTargetId(v.id);
+                                                        setShowDeleteModal(true);
+                                                    }}
+                                                >
+                                                    <DeleteIcon style={{ fontSize: 16 }} />
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
                         </tbody>
                     </table>
                 </div>

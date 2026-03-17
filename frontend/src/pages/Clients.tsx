@@ -63,12 +63,32 @@ export default function Clients() {
         }
     };
 
+    const handleAddClient = async (data: Record<string, unknown>) => {
+        try {
+            await clientsApi.create(data);
+            setShowAddModal(false);
+            fetchClients();
+        } catch (err) {
+            console.error('Failed to add client:', err);
+        }
+    };
+
+    const handleEditClient = async (updated: Client) => {
+        try {
+            await clientsApi.update(updated.id, updated as unknown as Record<string, unknown>);
+            setEditClient(null);
+            fetchClients();
+        } catch (err) {
+            console.error('Failed to edit client:', err);
+        }
+    };
+
     const totalPages = Math.ceil(total / entriesPerPage);
 
     return (
         <div>
             {viewClient && <ViewClientModal client={viewClient} onClose={() => setViewClient(null)} onEdit={() => { setEditClient(viewClient); setViewClient(null); }} />}
-            {editClient && <EditClientModal client={editClient} onClose={() => { setEditClient(null); fetchClients(); }} />}
+            {editClient && <EditClientModal client={editClient} onClose={() => { setEditClient(null); fetchClients(); }} onSave={handleEditClient} />}
             {deleteClient && <ConfirmDeleteModal title="Delete Client" message="Are you sure you want to delete this client? This will permanently remove all associated data." onClose={() => setDeleteClient(null)} onConfirm={handleDelete} />}
             {/* Page Header */}
             <div className="page-header">
@@ -122,7 +142,17 @@ export default function Clients() {
                         </div>
                     </div>
                     <div className="table-toolbar-right">
-                        <button className="btn btn-secondary btn-sm">
+                        <button className="btn btn-secondary btn-sm" onClick={() => {
+                            const csvContent = 'Full Name,Phone,Service Type,Status,Created On\n' +
+                                clients.map(c => `"${c.fullName}","${c.phone}","${c.serviceType || ''}","${c.status || ''}","${c.createdOn}"`).join('\n');
+                            const blob = new Blob([csvContent], { type: 'text/csv' });
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = 'clients_export.csv';
+                            a.click();
+                            URL.revokeObjectURL(url);
+                        }}>
                             <FileDownloadIcon fontSize="small" /> Export
                         </button>
                         <div className="search-input">
@@ -179,8 +209,8 @@ export default function Clients() {
                                             </div>
                                         </td>
                                         <td>
-                                            <span className={`badge ${client.serviceType.toLowerCase()}`}>
-                                                {client.serviceType}
+                                            <span className={`badge ${client.serviceType ? client.serviceType.toLowerCase() : 'unknown'}`}>
+                                                {client.serviceType || 'Unknown'}
                                             </span>
                                         </td>
                                         <td>
@@ -225,7 +255,7 @@ export default function Clients() {
             </div>
 
             {/* Add Client Modal */}
-            {showAddModal && <AddClientModal onClose={() => { setShowAddModal(false); fetchClients(); }} />}
+            {showAddModal && <AddClientModal onClose={() => setShowAddModal(false)} onSave={handleAddClient} />}
         </div>
     );
 }

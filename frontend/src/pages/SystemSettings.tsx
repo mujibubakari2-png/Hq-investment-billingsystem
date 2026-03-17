@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import { settingsApi } from '../api/client';
 
 export default function SystemSettings() {
+    const [saving, setSaving] = useState(false);
     const [activeTab, setActiveTab] = useState<'general' | 'sms' | 'whatsapp' | 'email'>('general');
     const [companyName, setCompanyName] = useState('HQ INVESTMENT');
     const [phoneNumber, setPhoneNumber] = useState('0621085215');
@@ -11,6 +13,19 @@ export default function SystemSettings() {
         { key: 'whatsapp' as const, label: 'WhatsApp' },
         { key: 'email' as const, label: 'Email' },
     ];
+
+    const handleSaveSettings = async () => {
+        setSaving(true);
+        try {
+            await settingsApi.update({ companyName, phoneNumber });
+            alert('Settings saved successfully!');
+        } catch (err) {
+            console.error('Failed to save settings:', err);
+            alert('Failed to save settings.');
+        } finally {
+            setSaving(false);
+        }
+    };
 
     return (
         <div>
@@ -106,8 +121,10 @@ export default function SystemSettings() {
                             width: '100%', padding: '12px 0', fontSize: '1rem',
                             borderRadius: 'var(--radius-sm)',
                         }}
+                        onClick={handleSaveSettings}
+                        disabled={saving}
                     >
-                        Save Changes
+                        {saving ? 'Saving...' : 'Save Changes'}
                     </button>
                 </div>
             )}
@@ -135,8 +152,8 @@ export default function SystemSettings() {
                         <label className="form-label" style={{ color: 'var(--primary)', fontWeight: 600 }}>Sender ID</label>
                         <input type="text" className="form-input" defaultValue="HQ-ISP" />
                     </div>
-                    <button className="btn" style={{ background: 'var(--primary)', color: '#fff', fontWeight: 700, width: '100%', padding: '12px 0', fontSize: '1rem' }}>
-                        Save Changes
+                    <button className="btn" style={{ background: 'var(--primary)', color: '#fff', fontWeight: 700, width: '100%', padding: '12px 0', fontSize: '1rem' }} onClick={handleSaveSettings} disabled={saving}>
+                        {saving ? 'Saving...' : 'Save Changes'}
                     </button>
                 </div>
             )}
@@ -160,8 +177,8 @@ export default function SystemSettings() {
                         <label className="form-label" style={{ color: 'var(--primary)', fontWeight: 600 }}>WhatsApp Phone Number ID</label>
                         <input type="text" className="form-input" placeholder="Enter phone number ID" />
                     </div>
-                    <button className="btn" style={{ background: 'var(--primary)', color: '#fff', fontWeight: 700, width: '100%', padding: '12px 0', fontSize: '1rem' }}>
-                        Save Changes
+                    <button className="btn" style={{ background: 'var(--primary)', color: '#fff', fontWeight: 700, width: '100%', padding: '12px 0', fontSize: '1rem' }} onClick={handleSaveSettings} disabled={saving}>
+                        {saving ? 'Saving...' : 'Save Changes'}
                     </button>
                 </div>
             )}
@@ -195,8 +212,8 @@ export default function SystemSettings() {
                         <label className="form-label" style={{ color: 'var(--primary)', fontWeight: 600 }}>Email Password</label>
                         <input type="password" className="form-input" placeholder="Enter email password" />
                     </div>
-                    <button className="btn" style={{ background: 'var(--primary)', color: '#fff', fontWeight: 700, width: '100%', padding: '12px 0', fontSize: '1rem' }}>
-                        Save Changes
+                    <button className="btn" style={{ background: 'var(--primary)', color: '#fff', fontWeight: 700, width: '100%', padding: '12px 0', fontSize: '1rem' }} onClick={handleSaveSettings} disabled={saving}>
+                        {saving ? 'Saving...' : 'Save Changes'}
                     </button>
                 </div>
             )}

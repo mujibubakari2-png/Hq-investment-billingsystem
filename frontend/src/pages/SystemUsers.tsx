@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
@@ -8,6 +8,9 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 
+import { usersApi } from '../api/client';
+import type { SystemUser } from '../types';
+
 export default function SystemUsers() {
     const [showAddUser, setShowAddUser] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
@@ -16,17 +19,23 @@ export default function SystemUsers() {
     const [filterRoles, setFilterRoles] = useState('all');
     const [filterStatus, setFilterStatus] = useState('all');
 
-    const users = [
-        {
-            id: '1', name: 'Mujibu rashid bakari', phone: '0621085215',
-            email: 'mujtbubakari2@gmail.com', contact: 'mujtbubakari2@gmail.com',
-            role: 'SuperAdmin', status: 'Active', onlineStatus: 'Offline',
-            sessions: 0, lastActivity: '43 minutes ago',
-        },
-    ];
+    const [users, setUsers] = useState<SystemUser[]>([]);
+
+    const fetchUsers = async () => {
+        try {
+            const data = await usersApi.list();
+            setUsers(data as unknown as SystemUser[]);
+        } catch (err) {
+            console.error('Failed to load users:', err);
+        }
+    };
+
+    useEffect(() => {
+        fetchUsers();
+    }, []);
 
     const filtered = users.filter(u =>
-        u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        u.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
         u.email.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
@@ -275,7 +284,7 @@ export default function SystemUsers() {
                                     <td></td>
                                     <td>
                                         <div>
-                                            <div style={{ fontWeight: 500 }}>{user.name}</div>
+                                            <div style={{ fontWeight: 500 }}>{user.username}</div>
                                             <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
                                                 📧 {user.email}
                                             </div>
@@ -284,7 +293,7 @@ export default function SystemUsers() {
                                     <td>
                                         <div style={{ fontSize: '0.82rem' }}>
                                             <div>📱 {user.phone}</div>
-                                            <div>📧 {user.contact}</div>
+                                            <div>📧 {user.email}</div>
                                         </div>
                                     </td>
                                     <td>
@@ -292,15 +301,16 @@ export default function SystemUsers() {
                                             padding: '3px 10px', borderRadius: 4, fontWeight: 600, fontSize: '0.72rem',
                                             background: '#7c3aed', color: '#fff',
                                         }}>
-                                            SuperAdmin
+                                            {user.role}
                                         </span>
                                     </td>
                                     <td>
                                         <span style={{
                                             padding: '3px 10px', borderRadius: 4, fontWeight: 500, fontSize: '0.72rem',
-                                            background: '#d1fae5', color: '#065f46',
+                                            background: user.status === 'Active' ? '#d1fae5' : '#fee2e2',
+                                            color: user.status === 'Active' ? '#065f46' : '#dc2626',
                                         }}>
-                                            ✓ Active
+                                            {user.status === 'Active' ? '✓ Active' : '✕ Inactive'}
                                         </span>
                                     </td>
                                     <td>
@@ -317,7 +327,7 @@ export default function SystemUsers() {
                                     </td>
                                     <td>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                                            <AccessTimeIcon style={{ fontSize: 14 }} /> {user.lastActivity}
+                                            <AccessTimeIcon style={{ fontSize: 14 }} /> {user.lastLogin ? new Date(user.lastLogin).toLocaleString() : 'Never'}
                                         </div>
                                     </td>
                                     <td>

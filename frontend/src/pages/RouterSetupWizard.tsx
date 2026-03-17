@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import DownloadIcon from '@mui/icons-material/Download';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import SettingsIcon from '@mui/icons-material/Settings';
@@ -20,6 +20,7 @@ import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import ListIcon from '@mui/icons-material/List';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
+import { routersApi } from '../api/client';
 
 const steps = [
     { label: 'Download', sub: 'OVPN Script', icon: <DownloadIcon /> },
@@ -46,9 +47,18 @@ const mockInterfaces: EthernetInterface[] = [
 ];
 
 export default function RouterSetupWizard() {
+    const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const [currentStep, setCurrentStep] = useState(0);
-    const routerName = 'INVESTMENT-123';
+    const [routerData, setRouterData] = useState<any>(null);
+
+    useEffect(() => {
+        if (id) {
+            routersApi.get(id).then(data => setRouterData(data)).catch(console.error);
+        }
+    }, [id]);
+
+    const routerName = routerData?.name || 'Loading...';
 
     // Step 3 state
     const [serviceType, setServiceType] = useState<'pppoe' | 'hotspot' | 'both'>('pppoe');
@@ -114,7 +124,20 @@ export default function RouterSetupWizard() {
                             <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: 20 }}>
                                 Configure VPN connection and register your router
                             </p>
-                            <button className="btn" style={{ background: '#16a34a', color: '#fff', fontWeight: 600, padding: '10px 24px', borderRadius: 'var(--radius-sm)' }}>
+                            <button className="btn"
+                                onClick={() => {
+                                    const scriptContent = `# OpenVPN Setup Script for ${routerName}\n/interface ovpn-client add name=ovpn-out1 connect-to=vpn.example.com user=vpn password=secret\n/ip hotspot walled-garden\nadd action=allow dst-host=*example.com\n`;
+                                    const blob = new Blob([scriptContent], { type: 'text/plain' });
+                                    const url = URL.createObjectURL(blob);
+                                    const a = document.createElement('a');
+                                    a.href = url;
+                                    a.download = `${routerName.replace(/\s+/g, '_')}_ovpn_setup.rsc`;
+                                    document.body.appendChild(a);
+                                    a.click();
+                                    document.body.removeChild(a);
+                                    URL.revokeObjectURL(url);
+                                }}
+                                style={{ background: '#16a34a', color: '#fff', fontWeight: 600, padding: '10px 24px', borderRadius: 'var(--radius-sm)' }}>
                                 <FileDownloadIcon fontSize="small" /> Download {routerName}_ovpn_setup.rsc
                             </button>
                         </div>

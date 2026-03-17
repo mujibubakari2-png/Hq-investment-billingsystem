@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { dashboardApi, routersApi } from '../api/client';
 import type { DashboardResponse } from '../api/client';
+import { useNavigate } from 'react-router-dom';
 import authStore from '../stores/authStore';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
@@ -36,6 +37,7 @@ function fmt(n: number) { return `TSH ${n.toLocaleString('en-US', { minimumFract
 
 export default function Dashboard() {
     const { user } = authStore.useAuth();
+    const navigate = useNavigate();
     const [hiddenCards, setHiddenCards] = useState<Set<number>>(new Set());
     const [stats, setStats] = useState<DashboardResponse | null>(null);
     const [routers, setRouters] = useState<Array<{ name: string; host: string; status: string; lastSeen: string }>>([]);
@@ -57,6 +59,7 @@ export default function Dashboard() {
         }
     };
 
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     useEffect(() => { fetchData(); }, []);
 
     const toggleCardVisibility = (index: number) => {
@@ -68,7 +71,13 @@ export default function Dashboard() {
         });
     };
 
-    const now = new Date();
+    const [now, setNow] = useState(new Date());
+
+    useEffect(() => {
+        const timer = setInterval(() => setNow(new Date()), 1000);
+        return () => clearInterval(timer);
+    }, []);
+
     const dateStr = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     const timeStr = now.toLocaleTimeString('en-US', { hour12: false });
 
@@ -124,11 +133,11 @@ export default function Dashboard() {
                         <p>{greeting}</p>
                     </div>
                 </div>
-                <div className="dash-welcome-right">
+                <div className="dash-welcome-right" style={{ cursor: 'pointer' }} onClick={() => navigate('/mikrotiks')}>
                     <div className="dash-welcome-filter">
-                        <span>⚙ Filter by Router</span>
+                        <span>⚙ Manage Routers</span>
                         <div className="dash-router-select">
-                            All Routers
+                            Config
                             <KeyboardArrowDownIcon fontSize="small" />
                         </div>
                     </div>
@@ -152,10 +161,32 @@ export default function Dashboard() {
                         <RefreshIcon style={{ fontSize: 16 }} />
                         Refresh Data
                     </button>
-                    <button className="dash-notif-btn">
-                        <NotificationsIcon style={{ fontSize: 18 }} />
-                        <span className="notif-badge">1</span>
-                    </button>
+                    <div style={{ position: 'relative' }}>
+                        <button className="dash-notif-btn" onClick={() => {
+                            const notifEl = document.getElementById('dash-notif-dropdown');
+                            if (notifEl) notifEl.style.display = notifEl.style.display === 'none' ? 'block' : 'none';
+                        }}>
+                            <NotificationsIcon style={{ fontSize: 18 }} />
+                            <span className="notif-badge">1</span>
+                        </button>
+                        <div id="dash-notif-dropdown" style={{
+                            display: 'none', position: 'absolute', top: '110%', right: 0,
+                            background: 'var(--bg-card, #fff)', border: '1px solid var(--border, #e5e7eb)',
+                            borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,.12)',
+                            minWidth: 280, zIndex: 999, overflow: 'hidden',
+                        }}>
+                            <div style={{ padding: '12px 16px', fontWeight: 600, borderBottom: '1px solid var(--border-light)' }}>
+                                Notifications
+                            </div>
+                            <div style={{ padding: '16px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                                <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+                                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#e53935', display: 'inline-block' }} />
+                                    <span>System updated successfully</span>
+                                </div>
+                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Just now</div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -390,7 +421,7 @@ export default function Dashboard() {
                             <ReceiptLongIcon style={{ fontSize: 18, color: '#4caf50' }} />
                             Recent Transactions
                         </div>
-                        <button className="dash-view-all-btn">
+                        <button className="dash-view-all-btn" onClick={() => navigate('/all-transactions')}>
                             <ViewListIcon style={{ fontSize: 14 }} />
                             View All
                         </button>
@@ -442,7 +473,7 @@ export default function Dashboard() {
                 </div>
                 <div className="dash-card-body">
                     <div className="service-tabs">
-                        <button className="service-tab active">
+                        <button className="service-tab active" onClick={() => navigate('/packages')}>
                             ❤️ Hotspot Plans <span className="service-tab-count">{stats?.activeSubscribers ?? 0}</span>
                         </button>
                     </div>
@@ -537,17 +568,22 @@ export default function Dashboard() {
                     </div>
                     <div className="dash-card-body no-pad">
                         <div className="system-activity-list">
-                            {(stats?.recentTransactions ?? []).slice(0, 5).map((tx: { id: string; user: string; amount: number; method: string; status: string; date: string }, i: number) => (
+                            {(stats?.systemActivities ?? []).slice(0, 5).map((act: { id: string; title: string; description: string; date: string; type: string; status: string }, i: number) => (
                                 <div className="sys-activity-item" key={i}>
-                                    <div className="sys-activity-dot" style={{ background: tx.status === 'Completed' ? '#4caf50' : tx.status === 'Failed' ? '#e53935' : '#ff9800' }} />
+                                    <div className="sys-activity-icon-wrap" style={{ 
+                                        background: act.type === 'login' ? 'rgba(244, 67, 54, 0.12)' : 'rgba(76, 175, 80, 0.12)', 
+                                        color: act.type === 'login' ? '#f44336' : '#4caf50' 
+                                    }}>
+                                        {act.type === 'login' ? <BoltIcon style={{ fontSize: 16 }} /> : <ReceiptLongIcon style={{ fontSize: 16 }} />}
+                                    </div>
                                     <div className="sys-activity-content">
-                                        <div className="sys-activity-role" style={{ color: tx.status === 'Completed' ? '#4caf50' : '#e53935' }}>
-                                            {tx.user}
+                                        <div className="sys-activity-role">
+                                            {act.title}
                                         </div>
                                         <div className="sys-activity-desc">
-                                            {tx.method} - {fmt(tx.amount)}
+                                            {act.description}
                                         </div>
-                                        <div className="sys-activity-time">{tx.date}</div>
+                                        <div className="sys-activity-time">{act.date}</div>
                                     </div>
                                 </div>
                             ))}

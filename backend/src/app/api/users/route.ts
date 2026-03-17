@@ -1,10 +1,17 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
-import { hashPassword, jsonResponse, errorResponse } from "@/lib/auth";
+import { hashPassword, jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 
-// GET /api/users - list system users
-export async function GET() {
+// GET /api/users - list system users (Admin only)
+export async function GET(req: NextRequest) {
     try {
+        const userPayload = getUserFromRequest(req);
+        if (!userPayload) return errorResponse("Unauthorized", 401);
+
+        if (userPayload.role !== "SUPER_ADMIN" && userPayload.role !== "ADMIN") {
+            return errorResponse("Forbidden: Admin access required", 403);
+        }
+
         const users = await prisma.user.findMany({
             select: {
                 id: true,
@@ -44,9 +51,16 @@ export async function GET() {
     }
 }
 
-// POST /api/users - create system user
+// POST /api/users - create system user (Admin only)
 export async function POST(req: NextRequest) {
     try {
+        const userPayload = getUserFromRequest(req);
+        if (!userPayload) return errorResponse("Unauthorized", 401);
+
+        if (userPayload.role !== "SUPER_ADMIN" && userPayload.role !== "ADMIN") {
+            return errorResponse("Forbidden: Admin access required", 403);
+        }
+
         const body = await req.json();
 
         if (!body.username || !body.email || !body.password) {

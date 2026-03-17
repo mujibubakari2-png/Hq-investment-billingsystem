@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import InventoryIcon from '@mui/icons-material/Inventory';
 import SettingsIcon from '@mui/icons-material/Settings';
@@ -6,7 +6,8 @@ import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import SpeedIcon from '@mui/icons-material/Speed';
 import CloseIcon from '@mui/icons-material/Close';
 import CheckIcon from '@mui/icons-material/Check';
-import { mockRouters } from '../data/mockData';
+import { routersApi, packagesApi } from '../api/client';
+import type { Router } from '../types';
 
 export default function AddPackage() {
     const navigate = useNavigate();
@@ -27,9 +28,40 @@ export default function AddPackage() {
     const [payStatus, setPayStatus] = useState('Prepaid');
     const [paymentType, setPaymentType] = useState('Prepaid');
 
-    const handleSave = () => {
-        console.log('Add package:', { packageType, accountType, name, price, duration, durationUnit, router, uploadSpeed, uploadUnit, downloadSpeed, downloadUnit, burstEnabled, hotspotType, devices, payStatus, paymentType });
-        navigate('/packages');
+    const [routersList, setRoutersList] = useState<Router[]>([]);
+    const [submitting, setSubmitting] = useState(false);
+
+    useEffect(() => {
+        routersApi.list().then(d => setRoutersList(d as unknown as Router[])).catch(console.error);
+    }, []);
+
+    const handleSave = async () => {
+        setSubmitting(true);
+        try {
+            await packagesApi.create({
+                name,
+                type: packageType,
+                category: accountType,
+                price: Number(price),
+                duration: Number(duration),
+                durationUnit,
+                router,
+                uploadSpeed: Number(uploadSpeed),
+                uploadUnit,
+                downloadSpeed: Number(downloadSpeed),
+                downloadUnit,
+                burstEnabled,
+                hotspotType,
+                devices: Number(devices),
+                paymentType,
+                payStatus
+            });
+            navigate('/packages');
+        } catch (error) {
+            console.error('Failed to create package:', error);
+            alert('Failed to create package');
+            setSubmitting(false);
+        }
     };
 
     return (
@@ -110,7 +142,7 @@ export default function AddPackage() {
                             <label className="form-label">Router <span className="required">*</span></label>
                             <select className="form-select" value={router} onChange={e => setRouter(e.target.value)}>
                                 <option value="">Select Router</option>
-                                {mockRouters.map(r => <option key={r.id} value={r.name}>{r.name}</option>)}
+                                {routersList.map(r => <option key={r.id} value={r.name}>{r.name}</option>)}
                             </select>
                             <div className="form-hint">Select which router will provide this service</div>
                         </div>
@@ -209,8 +241,8 @@ export default function AddPackage() {
                         <button className="btn btn-secondary" onClick={() => navigate('/packages')}>
                             <CloseIcon fontSize="small" /> Cancel
                         </button>
-                        <button className="btn btn-primary" onClick={handleSave} disabled={!name || !price || !duration || !router}>
-                            <CheckIcon fontSize="small" /> Add Package
+                        <button className="btn btn-primary" onClick={handleSave} disabled={!name || !price || !duration || !router || submitting}>
+                            <CheckIcon fontSize="small" /> {submitting ? 'Adding...' : 'Add Package'}
                         </button>
                     </div>
                 </div>

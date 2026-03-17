@@ -34,6 +34,7 @@ export async function POST(req: NextRequest) {
             userId: user.id,
             username: user.username,
             role: user.role,
+            tenantId: user.tenantId,
         });
 
         return jsonResponse({
@@ -44,9 +45,11 @@ export async function POST(req: NextRequest) {
                 email: user.email,
                 role: user.role,
                 phone: user.phone,
+                tenantId: user.tenantId,
             },
         });
-    } catch {
+    } catch (e) {
+        console.error("LOGIN ERROR:", e);
         return errorResponse("Internal server error", 500);
     }
 }

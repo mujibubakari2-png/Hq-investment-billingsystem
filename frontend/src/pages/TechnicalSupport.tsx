@@ -24,7 +24,7 @@ export default function TechnicalSupport() {
                         <EmailIcon style={{ fontSize: 48, color: 'var(--info)', marginBottom: 12 }} />
                         <h3 style={{ marginBottom: 8 }}>Email Support</h3>
                         <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: 16 }}>Send us an email and we'll respond within 24 hours</p>
-                        <button className="btn btn-primary">support@hqinvestment.co.tz</button>
+                        <button className="btn btn-primary" onClick={() => window.location.href = 'mailto:support@hqinvestment.co.tz'}>support@hqinvestment.co.tz</button>
                     </div>
                 </div>
                 <div className="card">
@@ -32,7 +32,7 @@ export default function TechnicalSupport() {
                         <PhoneIcon style={{ fontSize: 48, color: 'var(--secondary)', marginBottom: 12 }} />
                         <h3 style={{ marginBottom: 8 }}>Phone Support</h3>
                         <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: 16 }}>Call us during business hours (8AM - 6PM EAT)</p>
-                        <button className="btn btn-success">+255 xxx xxx xxx</button>
+                        <button className="btn btn-success" onClick={() => window.location.href = 'tel:+255621085215'}>+255 621 085 215 <br /> +255 766 487 125</button>
                     </div>
                 </div>
                 <div className="card">
@@ -40,7 +40,7 @@ export default function TechnicalSupport() {
                         <ChatIcon style={{ fontSize: 48, color: 'var(--purple)', marginBottom: 12 }} />
                         <h3 style={{ marginBottom: 8 }}>Live Chat</h3>
                         <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: 16 }}>Chat with our support team in real-time</p>
-                        <button className="btn btn-secondary">Start Chat</button>
+                        <button className="btn btn-secondary" onClick={() => alert('Live chat is coming soon! Please use email or phone for now.')}>Start Chat</button>
                     </div>
                 </div>
             </div>

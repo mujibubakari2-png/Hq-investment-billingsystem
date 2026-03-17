@@ -7,32 +7,21 @@ export async function GET() {
     try {
         const routers = await prisma.router.findMany({
             include: {
-                _count: { select: { packages: true, subscriptions: true } },
+                _count: { select: { packages: true, subscriptions: true, logs: true } },
             },
             orderBy: { createdAt: "desc" },
         });
 
-        const mapped = routers.map((r: {
-            id: string;
-            name: string;
-            host: string;
-            username: string | null;
-            port: number | null;
-            type: string;
-            status: string;
-            activeUsers: number;
-            cpuLoad: number;
-            memoryUsed: number;
-            uptime: string | null;
-            lastSeen: string | null;
-            _count: { packages: number; subscriptions: number };
-        }) => ({
+        const mapped = routers.map((r) => ({
             id: r.id,
             name: r.name,
             host: r.host,
             username: r.username,
             port: r.port,
+            apiPort: r.apiPort,
             type: r.type,
+            vpnMode: r.vpnMode,
+            description: r.description,
             status: r.status === "ONLINE" ? "Online" : "Offline",
             activeUsers: r.activeUsers,
             cpuLoad: r.cpuLoad,
@@ -55,6 +44,10 @@ export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
 
+        if (!body.name || !body.host) {
+            return errorResponse("Router name and host IP are required");
+        }
+
         const existing = await prisma.router.findUnique({ where: { name: body.name } });
         if (existing) return errorResponse("Router name already exists");
 
@@ -62,10 +55,23 @@ export async function POST(req: NextRequest) {
             data: {
                 name: body.name,
                 host: body.host,
-                username: body.username,
-                password: body.password,
+                username: body.username || "admin",
+                password: body.password || "",
                 port: body.port ? parseInt(body.port) : 8728,
+                apiPort: body.apiPort ? parseInt(body.apiPort) : 8728,
                 type: body.type || "MikroTik",
+                vpnMode: body.vpnMode || "hybrid",
+                description: body.description || "",
+            },
+        });
+
+        // Log the creation
+        await prisma.routerLog.create({
+            data: {
+                routerId: router.id,
+                action: "router_created",
+                details: `Router "${router.name}" added (${router.host}:${router.apiPort})`,
+                status: "success",
             },
         });
 

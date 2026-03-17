@@ -8,6 +8,7 @@ export interface JwtPayload {
     userId: string;
     username: string;
     role: string;
+    tenantId?: string | null;
 }
 
 export function hashPassword(password: string): Promise<string> {

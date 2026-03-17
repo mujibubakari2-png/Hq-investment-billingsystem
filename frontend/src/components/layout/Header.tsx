@@ -72,7 +72,7 @@ export default function Header({ onToggleSidebar, darkMode, onToggleDarkMode }: 
                                 </div>
                             </div>
                             <button
-                                onClick={() => { setShowMenu(false); }}
+                                onClick={() => { setShowMenu(false); navigate('/profile'); }}
                                 style={{
                                     display: 'flex', alignItems: 'center', gap: 8,
                                     width: '100%', padding: '10px 16px',

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import PhoneAndroidIcon from '@mui/icons-material/PhoneAndroid';
 import SearchIcon from '@mui/icons-material/Search';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
@@ -12,61 +12,43 @@ import TuneIcon from '@mui/icons-material/Tune';
 import PendingIcon from '@mui/icons-material/Pending';
 import BlockIcon from '@mui/icons-material/Block';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
-
-interface MobileTransaction {
-    id: string;
-    user: string;
-    userId: string;
-    plan: string;
-    planId: string;
-    amount: number;
-    transactionId: string;
-    method: string;
-    created: string;
-    paid: string;
-    status: 'Paid' | 'Unpaid' | 'Pending' | 'Failed';
-}
-
-const mockMobileTransactions: MobileTransaction[] = [
-    { id: '1', user: 'HSQH94565', userId: 'ID', plan: 'masaa 6', planId: 'ID: 9', amount: 500, transactionId: 'MTRDSHTUDHJDNWM', method: 'PalmPesa Mobile Money', created: '23 Feb 2026 12:19', paid: '23 Feb 2026 12:19', status: 'Paid' },
-    { id: '2', user: 'HS W810605', userId: 'ID', plan: 'siku 3', planId: 'ID: 11', amount: 2450, transactionId: 'FBLLF3TGSKBDDJBMW4', method: 'PalmPesa Mobile Money', created: '23 Feb 2026 12:21', paid: '23 Feb 2026 12:21', status: 'Paid' },
-    { id: '3', user: 'MS-QH54060', userId: 'ID', plan: 'masaa 9', planId: 'ID: 1', amount: 500, transactionId: 'BANKMTANZANIA01', method: 'Pal-Pesa Mobile/Online', created: '01 Mar 2026', paid: '01 Mar 2026', status: 'Paid' },
-    { id: '4', user: 'MS-KR710063', userId: 'ID', plan: 'wiki 3', planId: 'ID: 11', amount: 2400, transactionId: 'BANKMTANZANIA01', method: 'Pal-Pesa Mobile/Online', created: '01 Mar 2026', paid: '', status: 'Unpaid' },
-    { id: '5', user: 'HS-QI861610', userId: 'ID', plan: 'masaa 6', planId: 'ID: 1', amount: 500, transactionId: 'BANKMTANZANIA01', method: 'Pal-Pesa Mobile/Online', created: '01 Mar 2026', paid: '01 Mar 2026', status: 'Paid' },
-    { id: '6', user: 'HS-ZZ70240', userId: 'ID', plan: 'masaa 9', planId: 'ID: 1', amount: 500, transactionId: '', method: '', created: '01 Mar 2026', paid: '', status: 'Unpaid' },
-    { id: '7', user: 'MS-LM83636', userId: 'ID', plan: 'masaa 6', planId: 'ID: 1', amount: 500, transactionId: '', method: '', created: '01 Mar 2026', paid: '', status: 'Unpaid' },
-    { id: '8', user: 'HS-G4412456', userId: 'ID', plan: 'masaa 6', planId: 'ID: 1', amount: 500, transactionId: 'BANKMTANZANIA01', method: 'Pal-Pesa Mobile/Online', created: '01 Mar 2026', paid: '01 Mar 2026', status: 'Paid' },
-    { id: '9', user: 'MS-AZ21421', userId: 'ID', plan: 'masaa 9', planId: 'ID: 1', amount: 500, transactionId: '', method: '', created: '', paid: '', status: 'Unpaid' },
-    { id: '10', user: 'MS-EV10889', userId: 'ID', plan: 'masaa 24', planId: 'ID: 13', amount: 1000, transactionId: 'BANKMTANZANIA01', method: '', created: '', paid: '', status: 'Unpaid' },
-    { id: '11', user: 'HS-CX59147', userId: 'ID', plan: 'masaa 6', planId: 'ID: 1', amount: 500, transactionId: 'BANKMTANZANIA01', method: '', created: '', paid: '', status: 'Unpaid' },
-    { id: '12', user: 'HS-QI861791', userId: 'ID', plan: 'masaa 24', planId: 'ID: 13', amount: 1000, transactionId: '', method: '', created: '', paid: '', status: 'Unpaid' },
-    { id: '13', user: 'HS-AB12345', userId: 'ID', plan: 'wiki 1', planId: 'ID: 5', amount: 800, transactionId: 'PALMTX001', method: 'PalmPesa Mobile Money', created: '28 Feb 2026', paid: '28 Feb 2026', status: 'Paid' },
-    { id: '14', user: 'MS-CD67890', userId: 'ID', plan: 'masaa 12', planId: 'ID: 7', amount: 600, transactionId: 'PALMTX002', method: 'PalmPesa Mobile Money', created: '28 Feb 2026', paid: '28 Feb 2026', status: 'Paid' },
-    { id: '15', user: 'HS-EF11223', userId: 'ID', plan: 'masaa 6', planId: 'ID: 1', amount: 500, transactionId: 'PALMTX003', method: 'PalmPesa Mobile Money', created: '27 Feb 2026', paid: '27 Feb 2026', status: 'Paid' },
-    { id: '16', user: 'MS-GH44556', userId: 'ID', plan: 'siku 1', planId: 'ID: 3', amount: 1000, transactionId: 'PALMTX004', method: 'PalmPesa Mobile Money', created: '27 Feb 2026', paid: '27 Feb 2026', status: 'Paid' },
-    { id: '17', user: 'HS-IJ77889', userId: 'ID', plan: 'masaa 9', planId: 'ID: 1', amount: 500, transactionId: 'PALMTX005', method: 'PalmPesa Mobile Money', created: '26 Feb 2026', paid: '26 Feb 2026', status: 'Paid' },
-    { id: '18', user: 'MS-KL00112', userId: 'ID', plan: 'masaa 24', planId: 'ID: 13', amount: 1000, transactionId: 'PALMTX006', method: 'PalmPesa Mobile Money', created: '26 Feb 2026', paid: '26 Feb 2026', status: 'Paid' },
-    { id: '19', user: 'HS-MN33445', userId: 'ID', plan: 'masaa 6', planId: 'ID: 1', amount: 500, transactionId: 'PALMTX007', method: 'PalmPesa Mobile Money', created: '25 Feb 2026', paid: '25 Feb 2026', status: 'Paid' },
-    { id: '20', user: 'MS-OP66778', userId: 'ID', plan: 'wiki 1', planId: 'ID: 5', amount: 800, transactionId: 'PALMTX008', method: 'PalmPesa Mobile Money', created: '25 Feb 2026', paid: '25 Feb 2026', status: 'Paid' },
-    { id: '21', user: 'HS-QR99001', userId: 'ID', plan: 'masaa 6', planId: 'ID: 1', amount: 500, transactionId: '', method: '', created: '24 Feb 2026', paid: '', status: 'Unpaid' },
-    { id: '22', user: 'MS-ST22334', userId: 'ID', plan: 'siku 3', planId: 'ID: 11', amount: 2450, transactionId: '', method: '', created: '24 Feb 2026', paid: '', status: 'Pending' },
-];
+import { transactionsApi } from '../api/client';
 
 export default function MobileTransactions() {
     const [searchTerm, setSearchTerm] = useState('');
     const [entriesPerPage, setEntriesPerPage] = useState(25);
     const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+    const [transactions, setTransactions] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
 
-    const totalTransactions = mockMobileTransactions.length;
-    const paidCount = mockMobileTransactions.filter(t => t.status === 'Paid').length;
-    const unpaidCount = mockMobileTransactions.filter(t => t.status === 'Unpaid').length;
-    const pendingCount = mockMobileTransactions.filter(t => t.status === 'Pending').length;
-    const cancelledCount = mockMobileTransactions.filter(t => t.status === 'Failed').length;
-    const paidAmount = mockMobileTransactions.filter(t => t.status === 'Paid').reduce((sum, t) => sum + t.amount, 0);
+    const fetchTransactions = async () => {
+        setLoading(true);
+        try {
+            // using the method filter if there was one, or just fetching all mobile tx
+            const res = await transactionsApi.list({ type: 'Mobile' });
+            setTransactions((res.data || []) as any[]);
+        } catch (err) {
+            console.error('Failed to load mobile transactions:', err);
+        } finally {
+            setLoading(false);
+        }
+    };
+    
+    useEffect(() => {
+        fetchTransactions();
+    }, []);
 
-    const filtered = mockMobileTransactions.filter(tx =>
-        tx.user.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        tx.plan.toLowerCase().includes(searchTerm.toLowerCase())
+    const totalTransactions = transactions.length;
+    const paidCount = transactions.filter(t => t.status === 'Completed' || t.status === 'Paid').length;
+    const unpaidCount = transactions.filter(t => t.status === 'Unpaid').length;
+    const pendingCount = transactions.filter(t => t.status === 'Pending').length;
+    const cancelledCount = transactions.filter(t => t.status === 'Failed').length;
+    const paidAmount = transactions.filter(t => t.status === 'Completed' || t.status === 'Paid').reduce((sum, t) => sum + (t.amount || 0), 0);
+
+    const filtered = transactions.filter(tx =>
+        (tx.user || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (tx.planName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (tx.reference || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     return (
@@ -228,37 +210,49 @@ export default function MobileTransactions() {
                             </tr>
                         </thead>
                         <tbody>
-                            {filtered.slice(0, entriesPerPage).map((tx) => (
-                                <tr key={tx.id}>
-                                    <td>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                            <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                <PhoneAndroidIcon style={{ fontSize: 14, color: '#e11d48' }} />
+                            {loading ? (
+                                <tr>
+                                    <td colSpan={9} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
+                                        Loading mobile transactions...
+                                    </td>
+                                </tr>
+                            ) : filtered.length === 0 ? (
+                                <tr>
+                                    <td colSpan={9} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
+                                        No mobile transactions found.
+                                    </td>
+                                </tr>
+                            ) : (
+                                filtered.slice(0, entriesPerPage).map((tx) => (
+                                    <tr key={tx.id}>
+                                        <td>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                    <PhoneAndroidIcon style={{ fontSize: 14, color: '#e11d48' }} />
+                                                </div>
+                                                <div>
+                                                    <div style={{ fontWeight: 500, fontSize: '0.85rem' }}>{tx.user}</div>
+                                                </div>
                                             </div>
-                                            <div>
-                                                <div style={{ fontWeight: 500, fontSize: '0.85rem' }}>{tx.user}</div>
-                                                <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>{tx.userId}</div>
-                                            </div>
-                                        </div>
+                                        </td>
+                                    <td>
+                                        <div style={{ fontWeight: 500, fontSize: '0.85rem' }}>{tx.planName || tx.plan || '—'}</div>
+                                        <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>{tx.planId || ''}</div>
                                     </td>
                                     <td>
-                                        <div style={{ fontWeight: 500, fontSize: '0.85rem' }}>{tx.plan}</div>
-                                        <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>{tx.planId}</div>
+                                        <span style={{ fontWeight: 600, color: '#16a34a' }}>💰 TSH {(tx.amount || 0).toLocaleString()}</span>
                                     </td>
-                                    <td>
-                                        <span style={{ fontWeight: 600, color: '#16a34a' }}>💰 TSH {tx.amount.toLocaleString()}</span>
-                                    </td>
-                                    <td style={{ fontFamily: 'monospace', fontSize: '0.78rem', color: tx.transactionId ? '#6366f1' : '#9ca3af' }}>
-                                        {tx.transactionId || '—'}
+                                    <td style={{ fontFamily: 'monospace', fontSize: '0.78rem', color: (tx.transactionId || tx.reference) ? '#6366f1' : '#9ca3af' }}>
+                                        {tx.transactionId || tx.reference || '—'}
                                     </td>
                                     <td style={{ fontSize: '0.82rem' }}>{tx.method || '—'}</td>
-                                    <td style={{ fontSize: '0.82rem' }}>{tx.created || '—'}</td>
-                                    <td style={{ fontSize: '0.82rem' }}>{tx.paid || '—'}</td>
+                                    <td style={{ fontSize: '0.82rem' }}>{tx.date || tx.created || '—'}</td>
+                                    <td style={{ fontSize: '0.82rem' }}>{tx.status === 'Paid' || tx.status === 'Completed' ? (tx.date || tx.paid) : '—'}</td>
                                     <td>
                                         <span style={{
                                             padding: '3px 10px', borderRadius: 12, fontWeight: 500, fontSize: '0.75rem',
-                                            background: tx.status === 'Paid' ? '#d1fae5' : tx.status === 'Pending' ? '#fef3c7' : '#fef2f2',
-                                            color: tx.status === 'Paid' ? '#065f46' : tx.status === 'Pending' ? '#92400e' : '#b91c1c',
+                                            background: (tx.status === 'Paid' || tx.status === 'Completed') ? '#d1fae5' : tx.status === 'Pending' ? '#fef3c7' : '#fef2f2',
+                                            color: (tx.status === 'Paid' || tx.status === 'Completed') ? '#065f46' : tx.status === 'Pending' ? '#92400e' : '#b91c1c',
                                         }}>
                                             {tx.status}
                                         </span>
@@ -289,9 +283,10 @@ export default function MobileTransactions() {
                                                 </div>
                                             )}
                                         </div>
-                                    </td>
-                                </tr>
-                            ))}
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
                         </tbody>
                     </table>
                 </div>

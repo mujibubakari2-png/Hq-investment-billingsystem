@@ -6,13 +6,38 @@ import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import SpeedIcon from '@mui/icons-material/Speed';
 import CloseIcon from '@mui/icons-material/Close';
 import CheckIcon from '@mui/icons-material/Check';
-import { mockPackages, mockRouters } from '../data/mockData';
+import { packagesApi, routersApi } from '../api/client';
+import type { Package, Router } from '../types';
 
 export default function EditPackage() {
     const { id } = useParams();
     const navigate = useNavigate();
 
-    const pkg = mockPackages.find(p => p.id === id);
+    const [pkg, setPkg] = useState<Package | null>(null);
+    const [routersList, setRoutersList] = useState<Router[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [submitting, setSubmitting] = useState(false);
+
+    useEffect(() => {
+        const fetchAll = async () => {
+            setLoading(true);
+            try {
+                const r = await routersApi.list();
+                setRoutersList(r as unknown as Router[]);
+
+                if (id) {
+                    const p = await packagesApi.list();
+                    const found = (p as unknown as Package[]).find(x => x.id === id);
+                    if (found) setPkg(found);
+                }
+            } catch (err) {
+                console.error(err);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchAll();
+    }, [id]);
 
     const [packageType, setPackageType] = useState('Hotspot');
     const [accountType, setAccountType] = useState('Personal');
@@ -52,10 +77,43 @@ export default function EditPackage() {
         }
     }, [pkg]);
 
-    const handleSave = () => {
-        console.log('Update package:', { id, packageType, accountType, name, price, duration, durationUnit, router, uploadSpeed, uploadUnit, downloadSpeed, downloadUnit, burstEnabled, hotspotType, devices, payStatus, paymentType });
-        navigate('/packages');
+    const handleSave = async () => {
+        if (!id) return;
+        setSubmitting(true);
+        try {
+            await packagesApi.update(id, {
+                name,
+                type: packageType,
+                category: accountType,
+                price: Number(price),
+                duration: Number(duration),
+                durationUnit,
+                router,
+                uploadSpeed: Number(uploadSpeed),
+                uploadUnit,
+                downloadSpeed: Number(downloadSpeed),
+                downloadUnit,
+                burstEnabled,
+                hotspotType,
+                devices: Number(devices),
+                paymentType,
+                payStatus
+            });
+            navigate('/packages');
+        } catch (error) {
+            console.error('Failed to update package:', error);
+            alert('Failed to update package');
+            setSubmitting(false);
+        }
     };
+
+    if (loading) {
+        return (
+            <div style={{ textAlign: 'center', padding: '4rem 0', color: 'var(--text-secondary)' }}>
+                Loading package details...
+            </div>
+        );
+    }
 
     if (!pkg) {
         return (
@@ -159,7 +217,7 @@ export default function EditPackage() {
                             <label className="form-label">Router <span className="required">*</span></label>
                             <select className="form-select" value={router} onChange={e => setRouter(e.target.value)}>
                                 <option value="">Select Router</option>
-                                {mockRouters.map(r => <option key={r.id} value={r.name}>{r.name}</option>)}
+                                {routersList.map(r => <option key={r.id} value={r.name}>{r.name}</option>)}
                             </select>
                             <div className="form-hint">Select which router will provide this service</div>
                         </div>
@@ -258,8 +316,8 @@ export default function EditPackage() {
                         <button className="btn btn-secondary" onClick={() => navigate('/packages')}>
                             <CloseIcon fontSize="small" /> Cancel
                         </button>
-                        <button className="btn btn-primary" onClick={handleSave} disabled={!name || !price || !duration || !router}>
-                            <CheckIcon fontSize="small" /> Update Package
+                        <button className="btn btn-primary" onClick={handleSave} disabled={!name || !price || !duration || !router || submitting}>
+                            <CheckIcon fontSize="small" /> {submitting ? 'Updating...' : 'Update Package'}
                         </button>
                     </div>
                 </div>

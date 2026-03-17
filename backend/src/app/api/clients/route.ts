@@ -43,6 +43,8 @@ export async function GET(req: NextRequest) {
             prisma.client.count({ where }),
         ]);
 
+        const isValidDate = (d: any) => d instanceof Date && !isNaN(d.getTime());
+
         // Map to a flat format the frontend expects
         const mapped = clients.map((c: {
             id: string;
@@ -68,7 +70,7 @@ export async function GET(req: NextRequest) {
                 serviceType: c.serviceType === "HOTSPOT" ? "Hotspot" : "PPPoE",
                 status: c.status.charAt(0) + c.status.slice(1).toLowerCase(),
                 accountType: c.accountType === "PERSONAL" ? "Personal" : "Business",
-                createdOn: c.createdAt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+                createdOn: isValidDate(c.createdAt) ? c.createdAt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "N/A",
                 plan: activeSub?.package?.name,
                 router: activeSub?.router?.name,
                 device: c.device,

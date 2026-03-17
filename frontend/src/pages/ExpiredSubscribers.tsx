@@ -9,21 +9,36 @@ import TimerOffIcon from '@mui/icons-material/TimerOff';
 import TodayIcon from '@mui/icons-material/Today';
 import WifiIcon from '@mui/icons-material/Wifi';
 import PersonIcon from '@mui/icons-material/Person';
+import { useNavigate } from 'react-router-dom';
 import { subscriptionsApi } from '../api/client';
 import type { ExpiredSubscriber } from '../types';
+import ExtendSubscriberModal from '../modals/ExtendSubscriberModal';
 
 type TabFilter = 'All' | 'PPPoE' | 'Hotspot';
 
 export default function ExpiredSubscribers() {
+    const navigate = useNavigate();
     const [subs, setSubs] = useState<ExpiredSubscriber[]>([]);
+    const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<TabFilter>('All');
     const [searchTerm, setSearchTerm] = useState('');
     const [entriesPerPage, setEntriesPerPage] = useState(25);
+    const [extendSub, setExtendSub] = useState<ExpiredSubscriber | null>(null);
+
+    const fetchSubs = async () => {
+        setLoading(true);
+        try {
+            const res = await subscriptionsApi.list({ status: 'EXPIRED' });
+            setSubs((res.data || []) as unknown as ExpiredSubscriber[]);
+        } catch (err) {
+            console.error('Failed to fetch expired subscriptions:', err);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
-        subscriptionsApi.list({ status: 'EXPIRED' }).then(res => {
-            setSubs((res.data || []) as unknown as ExpiredSubscriber[]);
-        }).catch(console.error);
+        fetchSubs();
     }, []);
 
     const stats = {
@@ -43,6 +58,23 @@ export default function ExpiredSubscribers() {
 
     return (
         <div>
+            {extendSub && (
+                <ExtendSubscriberModal
+                    subscriber={extendSub}
+                    onClose={() => setExtendSub(null)}
+                    onSave={async (data) => {
+                        try {
+                            await subscriptionsApi.create(data as Record<string, unknown>);
+                            setExtendSub(null);
+                            fetchSubs();
+                            alert('Subscription extended successfully!');
+                        } catch (err) {
+                            console.error('Failed to extend subscription:', err);
+                            alert('Failed to extend subscription.');
+                        }
+                    }}
+                />
+            )}
             {/* Page Header */}
             <div className="page-header">
                 <div className="page-header-left">
@@ -140,10 +172,12 @@ export default function ExpiredSubscribers() {
                         <button className="btn btn-secondary btn-sm">
                             🔍
                         </button>
-                        <button className="btn btn-secondary btn-sm">
+                        <button className="btn btn-secondary btn-sm" onClick={() => fetchSubs()}>
                             <RefreshIcon fontSize="small" /> Refresh
                         </button>
-                        <button className="btn btn-primary btn-sm">
+                        <button className="btn btn-primary btn-sm" onClick={() => {
+                            if (filtered.length > 0) setExtendSub(filtered[0]);
+                        }}>
                             Blk Extend →
                         </button>
                     </div>
@@ -181,49 +215,63 @@ export default function ExpiredSubscribers() {
                             </tr>
                         </thead>
                         <tbody>
-                            {filtered.map((sub) => (
-                                <tr key={sub.id}>
-                                    <td>
-                                        <input type="checkbox" className="checkbox" />
-                                    </td>
-                                    <td style={{ color: 'var(--primary)', fontWeight: 500 }}>{sub.username}</td>
-                                    <td>{sub.plan}</td>
-                                    <td>
-                                        <span className={`badge ${sub.type.toLowerCase()}`}>{sub.type}</span>
-                                    </td>
-                                    <td>{sub.router}</td>
-                                    <td>{sub.expiredDate}</td>
-                                    <td>
-                                        <span
-                                            style={{
-                                                display: 'inline-block',
-                                                width: 24,
-                                                height: 24,
-                                                borderRadius: '50%',
-                                                background: sub.days > 5 ? '#ff9800' : sub.days > 0 ? '#4caf50' : '#2196f3',
-                                                color: 'white',
-                                                textAlign: 'center',
-                                                lineHeight: '24px',
-                                                fontSize: '0.75rem',
-                                                fontWeight: 600,
-                                            }}
-                                        >
-                                            {sub.days}
-                                        </span>
-                                    </td>
-                                    <td style={{ fontSize: '0.8rem' }}>{sub.method}</td>
-                                    <td>
-                                        <div className="table-actions">
-                                            <button className="btn-icon edit" title="Edit">
-                                                <EditIcon style={{ fontSize: 16 }} />
-                                            </button>
-                                            <button className="btn-icon view" title="Extend">
-                                                <VisibilityIcon style={{ fontSize: 16 }} />
-                                            </button>
-                                        </div>
+                            {loading ? (
+                                <tr>
+                                    <td colSpan={9} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
+                                        Loading expired subscriptions...
                                     </td>
                                 </tr>
-                            ))}
+                            ) : filtered.length === 0 ? (
+                                <tr>
+                                    <td colSpan={9} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
+                                        No expired subscriptions found matching your criteria.
+                                    </td>
+                                </tr>
+                            ) : (
+                                filtered.map((sub) => (
+                                    <tr key={sub.id}>
+                                        <td>
+                                            <input type="checkbox" className="checkbox" />
+                                        </td>
+                                        <td style={{ color: 'var(--primary)', fontWeight: 500 }}>{sub.username}</td>
+                                        <td>{sub.plan}</td>
+                                        <td>
+                                            <span className={`badge ${sub.type.toLowerCase()}`}>{sub.type}</span>
+                                        </td>
+                                        <td>{sub.router}</td>
+                                        <td>{sub.expiredDate}</td>
+                                        <td>
+                                            <span
+                                                style={{
+                                                    display: 'inline-block',
+                                                    width: 24,
+                                                    height: 24,
+                                                    borderRadius: '50%',
+                                                    background: sub.days > 5 ? '#ff9800' : sub.days > 0 ? '#4caf50' : '#2196f3',
+                                                    color: 'white',
+                                                    textAlign: 'center',
+                                                    lineHeight: '24px',
+                                                    fontSize: '0.75rem',
+                                                    fontWeight: 600,
+                                                }}
+                                            >
+                                                {sub.days}
+                                            </span>
+                                        </td>
+                                        <td style={{ fontSize: '0.8rem' }}>{sub.method}</td>
+                                        <td>
+                                            <div className="table-actions">
+                                                <button className="btn-icon edit" title="Edit" onClick={() => navigate('/edit-plan/' + sub.id)}>
+                                                    <EditIcon style={{ fontSize: 16 }} />
+                                                </button>
+                                                <button className="btn-icon view" title="Extend" onClick={() => setExtendSub(sub)}>
+                                                    <VisibilityIcon style={{ fontSize: 16 }} />
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
                         </tbody>
                     </table>
                 </div>

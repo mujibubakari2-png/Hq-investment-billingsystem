@@ -8,11 +8,13 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import { packagesApi } from '../api/client';
 import type { Package } from '../types';
 import ConfirmDeleteModal from '../modals/ConfirmDeleteModal';
+import AddPackageModal from '../modals/AddPackageModal';
 
 export default function Packages() {
     const navigate = useNavigate();
     const [packages, setPackages] = useState<Package[]>([]);
     const [loading, setLoading] = useState(true);
+    const [showAddModal, setShowAddModal] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [typeFilter, setTypeFilter] = useState('All Types');
     const [statusFilter, setStatusFilter] = useState('All Status');
@@ -35,6 +37,17 @@ export default function Packages() {
         catch (err) { console.error('Failed to delete package:', err); }
     };
 
+    const handleAddPackage = async (data: any) => {
+        try {
+            await packagesApi.create(data);
+            setShowAddModal(false);
+            fetchPackages();
+        } catch (err) {
+            console.error('Failed to create package:', err);
+            alert('Failed to create package. Check required fields.');
+        }
+    };
+
     const filtered = packages.filter(pkg => {
         const matchesSearch = pkg.name.toLowerCase().includes(searchTerm.toLowerCase());
         const matchesType = typeFilter === 'All Types' || pkg.type === typeFilter;
@@ -44,6 +57,7 @@ export default function Packages() {
 
     return (
         <div>
+            {showAddModal && <AddPackageModal onClose={() => setShowAddModal(false)} onSave={handleAddPackage} />}
             {deleteId && (
                 <ConfirmDeleteModal
                     title="Delete Package"
@@ -66,7 +80,7 @@ export default function Packages() {
                     </div>
                 </div>
                 <div className="page-header-right">
-                    <button className="btn btn-primary" onClick={() => navigate('/add-package')}>
+                    <button className="btn btn-primary" onClick={() => setShowAddModal(true)}>
                         <AddIcon fontSize="small" /> Add Package
                     </button>
                 </div>

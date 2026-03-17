@@ -10,9 +10,10 @@ import { generatePassword, generateUsername } from '../utils/formatters';
 
 interface AddClientModalProps {
     onClose: () => void;
+    onSave?: (data: Record<string, unknown>) => void;
 }
 
-export default function AddClientModal({ onClose }: AddClientModalProps) {
+export default function AddClientModal({ onClose, onSave }: AddClientModalProps) {
     const [username] = useState(generateUsername());
     const [fullName, setFullName] = useState('');
     const [accountType, setAccountType] = useState('Personal');
@@ -26,6 +27,21 @@ export default function AddClientModal({ onClose }: AddClientModalProps) {
 
     const handleRefreshPassword = () => {
         setLoginPassword(generatePassword());
+    };
+
+    const handleSave = () => {
+        if (onSave) {
+            onSave({
+                fullName,
+                email,
+                phone: phoneNumber,
+                accountType,
+                password: loginPassword,
+                serviceType: enablePPPoE ? 'PPPoE' : 'Unknown', // Hotspot vs PPPoE depends
+                status: activateNow ? 'Active' : 'Inactive',
+            });
+        }
+        onClose();
     };
 
     return (
@@ -194,7 +210,7 @@ export default function AddClientModal({ onClose }: AddClientModalProps) {
                         <button className="btn btn-secondary" onClick={onClose}>
                             Cancel
                         </button>
-                        <button className="btn btn-primary">
+                        <button className="btn btn-primary" onClick={handleSave} disabled={!fullName}>
                             <CheckIcon fontSize="small" /> Create Client
                         </button>
                     </div>

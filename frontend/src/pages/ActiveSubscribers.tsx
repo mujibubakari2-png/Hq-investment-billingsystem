@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import PersonIcon from '@mui/icons-material/Person';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import AddIcon from '@mui/icons-material/Add';
@@ -6,51 +6,57 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 
 import { useNavigate } from 'react-router-dom';
-
-const mockActiveSubs = [
-    {
-        id: '1',
-        user: 'HS-CW99147',
-        plan: 'masaa 24',
-        type: 'Hotspot' as const,
-        device: 'Mobile',
-        macAddress: 'AE:5C:88:12:67:98',
-        created: '23 Feb 2026 12:34',
-        expires: '24 Feb 2026 22:34',
-        method: 'voucher - 43121815',
-        router: 'INVESTMENT-123',
-        status: 'Active' as const,
-        online: 'Online' as const,
-        sync: 'S',
-    },
-    {
-        id: '2',
-        user: 'HS-WS10605',
-        plan: 'siku 3',
-        type: 'Hotspot' as const,
-        device: 'Mobile',
-        macAddress: '08:5E:23:12:88:76',
-        created: '23 Feb 2026 12:26',
-        expires: '26 Feb 2026 12:26',
-        method: 'voucher - Y0CUW',
-        router: 'INVESTMENT-123',
-        status: 'Active' as const,
-        online: 'Online' as const,
-        sync: 'S',
-    },
-];
+import { subscriptionsApi } from '../api/client';
+import type { ActiveSubscriber } from '../types';
+import ConfirmDeleteModal from '../modals/ConfirmDeleteModal';
 
 export default function ActiveSubscribers() {
     const [filter, setFilter] = useState<'All' | 'Online' | 'Offline'>('All');
+    const [subs, setSubs] = useState<ActiveSubscriber[]>([]);
+    const [loading, setLoading] = useState(true);
     const navigate = useNavigate();
+    const [deleteId, setDeleteId] = useState<string | null>(null);
 
-    const filtered = mockActiveSubs.filter((sub) => {
+    const fetchSubs = async () => {
+        setLoading(true);
+        try {
+            const res = await subscriptionsApi.list({ status: 'ACTIVE' });
+            setSubs((res.data || []) as unknown as ActiveSubscriber[]);
+        } catch (err) {
+            console.error('Failed to fetch active subscriptions:', err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchSubs();
+    }, []);
+
+    const filtered = subs.filter((sub) => {
         if (filter === 'All') return true;
         return sub.online === filter;
     });
 
     return (
         <div>
+            {deleteId && (
+                <ConfirmDeleteModal
+                    title="Delete Subscription"
+                    message="Are you sure you want to delete this subscription? This action cannot be undone."
+                    onClose={() => setDeleteId(null)}
+                    onConfirm={async () => {
+                        try {
+                            await subscriptionsApi.delete(deleteId);
+                            setDeleteId(null);
+                            fetchSubs();
+                        } catch (err) {
+                            console.error('Failed to delete subscription:', err);
+                            alert('Failed to delete subscription.');
+                        }
+                    }}
+                />
+            )}
             {/* Page Header */}
             <div className="page-header">
                 <div className="page-header-left">
@@ -83,7 +89,7 @@ export default function ActiveSubscribers() {
                             🔴 Offline
                         </button>
                     </div>
-                    <button className="btn btn-secondary">
+                    <button className="btn btn-secondary" onClick={() => fetchSubs()}>
                         <RefreshIcon fontSize="small" /> Refresh Status
                     </button>
                     <button className="btn btn-primary" onClick={() => navigate('/recharge')}>
@@ -116,48 +122,62 @@ export default function ActiveSubscribers() {
                             </tr>
                         </thead>
                         <tbody>
-                            {filtered.map((sub) => (
-                                <tr key={sub.id}>
-                                    <td>
-                                        <input type="checkbox" className="checkbox" />
-                                    </td>
-                                    <td style={{ fontWeight: 500 }}>{sub.user}</td>
-                                    <td>{sub.plan}</td>
-                                    <td>
-                                        <span className={`badge ${sub.type.toLowerCase()}`}>{sub.type}</span>
-                                    </td>
-                                    <td>
-                                        <div>
-                                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                                                {sub.macAddress}
-                                            </span>
-                                            <br />
-                                            {sub.device}
-                                        </div>
-                                    </td>
-                                    <td>{sub.created}</td>
-                                    <td>{sub.expires}</td>
-                                    <td style={{ fontSize: '0.8rem' }}>{sub.method}</td>
-                                    <td>{sub.router}</td>
-                                    <td>
-                                        <span className={`badge ${sub.status.toLowerCase()}`}>{sub.status}</span>
-                                    </td>
-                                    <td>
-                                        <span className={`badge ${sub.online.toLowerCase()}`}>{sub.online}</span>
-                                    </td>
-                                    <td>{sub.sync}</td>
-                                    <td>
-                                        <div className="table-actions">
-                                            <button className="btn-icon edit" title="Edit" onClick={() => navigate('/edit-plan/' + sub.id)}>
-                                                <EditIcon style={{ fontSize: 16 }} />
-                                            </button>
-                                            <button className="btn-icon delete" title="Delete">
-                                                <DeleteIcon style={{ fontSize: 16 }} />
-                                            </button>
-                                        </div>
+                            {loading ? (
+                                <tr>
+                                    <td colSpan={13} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
+                                        Loading active subscriptions...
                                     </td>
                                 </tr>
-                            ))}
+                            ) : filtered.length === 0 ? (
+                                <tr>
+                                    <td colSpan={13} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
+                                        No active subscriptions found matching your criteria.
+                                    </td>
+                                </tr>
+                            ) : (
+                                filtered.map((sub) => (
+                                    <tr key={sub.id}>
+                                        <td>
+                                            <input type="checkbox" className="checkbox" />
+                                        </td>
+                                        <td style={{ fontWeight: 500 }}>{sub.user}</td>
+                                        <td>{sub.plan}</td>
+                                        <td>
+                                            <span className={`badge ${sub.type.toLowerCase()}`}>{sub.type}</span>
+                                        </td>
+                                        <td>
+                                            <div>
+                                                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                                    {sub.macAddress}
+                                                </span>
+                                                <br />
+                                                {sub.device}
+                                            </div>
+                                        </td>
+                                        <td>{sub.created}</td>
+                                        <td>{sub.expires}</td>
+                                        <td style={{ fontSize: '0.8rem' }}>{sub.method}</td>
+                                        <td>{sub.router}</td>
+                                        <td>
+                                            <span className={`badge ${sub.status.toLowerCase()}`}>{sub.status}</span>
+                                        </td>
+                                        <td>
+                                            <span className={`badge ${sub.online.toLowerCase()}`}>{sub.online}</span>
+                                        </td>
+                                        <td>{sub.sync}</td>
+                                        <td>
+                                            <div className="table-actions">
+                                                <button className="btn-icon edit" title="Edit" onClick={() => navigate('/edit-plan/' + sub.id)}>
+                                                    <EditIcon style={{ fontSize: 16 }} />
+                                                </button>
+                                                <button className="btn-icon delete" title="Delete" onClick={() => setDeleteId(sub.id)}>
+                                                    <DeleteIcon style={{ fontSize: 16 }} />
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
                         </tbody>
                     </table>
                 </div>

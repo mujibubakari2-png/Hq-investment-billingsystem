@@ -38,6 +38,9 @@ export default function LicenseManagement() {
                         background: 'transparent', border: '1px solid var(--border)',
                         borderRadius: 'var(--radius-sm)', padding: '6px 8px', cursor: 'pointer',
                         color: 'var(--text-secondary)', display: 'flex', alignItems: 'center',
+                    }} onClick={() => {
+                        navigator.clipboard.writeText('LTC-26608396');
+                        alert('License key copied to clipboard!');
                     }}>
                         <ContentCopyIcon style={{ fontSize: 14 }} />
                     </button>

@@ -1,10 +1,16 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
-import { jsonResponse, errorResponse } from "@/lib/auth";
+import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 
 // GET /api/invoices
 export async function GET(req: NextRequest) {
     try {
+        const userPayload = getUserFromRequest(req);
+        if (!userPayload) return errorResponse("Unauthorized", 401);
+        if (userPayload.role !== "SUPER_ADMIN" && userPayload.role !== "ADMIN") {
+            return errorResponse("Forbidden", 403);
+        }
+
         const { searchParams } = new URL(req.url);
         const status = searchParams.get("status") || "";
         const search = searchParams.get("search") || "";
@@ -65,6 +71,12 @@ export async function GET(req: NextRequest) {
 // POST /api/invoices
 export async function POST(req: NextRequest) {
     try {
+        const userPayload = getUserFromRequest(req);
+        if (!userPayload) return errorResponse("Unauthorized", 401);
+        if (userPayload.role !== "SUPER_ADMIN" && userPayload.role !== "ADMIN") {
+            return errorResponse("Forbidden", 403);
+        }
+
         const body = await req.json();
 
         const invoice = await prisma.invoice.create({

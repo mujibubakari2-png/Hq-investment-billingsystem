@@ -63,7 +63,10 @@ export interface Router {
   username?: string;
   password?: string;
   port?: number;
+  apiPort?: number;
   type: 'MikroTik';
+  vpnMode?: string;
+  description?: string;
   status: 'Online' | 'Offline';
   activeUsers: number;
   cpuLoad: number;
@@ -136,6 +139,22 @@ export interface DashboardStats {
   onlineRouters: number;
 }
 
+export interface ActiveSubscriber {
+  id: string;
+  user: string;
+  plan: string;
+  type: 'Hotspot' | 'PPPoE';
+  device: string;
+  macAddress: string;
+  created: string;
+  expires: string;
+  method: string;
+  router: string;
+  status: 'Active' | 'Suspended';
+  online: 'Online' | 'Offline';
+  sync: string;
+}
+
 export interface ExpiredSubscriber {
   id: string;
   username: string;
@@ -156,6 +175,7 @@ export interface Expense {
   date: string;
   reference?: string;
   receipt?: string;
+  status?: string;
   createdBy: string;
 }
 

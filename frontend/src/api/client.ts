@@ -55,11 +55,23 @@ function del<T>(path: string) {
 
 export const authApi = {
     login: (username: string, password: string) =>
-        post<{ token: string; user: { id: string; username: string; email: string; role: string; phone: string } }>(
+        post<{ token: string; user: { id: string; username: string; email: string; role: string; phone: string; fullName?: string } }>(
             '/auth/login',
             { username, password },
         ),
-    me: () => get<{ id: string; username: string; email: string; role: string; phone: string; status: string }>('/auth/me'),
+    me: () => get<{ id: string; username: string; email: string; role: string; phone: string; status: string; fullName?: string }>('/auth/me'),
+
+    // Registration
+    requestRegisterOtp: (data: { email: string; fullName: string }) =>
+        post<{ message: string; otp: string }>('/auth/register/request-otp', data),
+    register: (data: any) =>
+        post<{ message: string; token: string; user: any }>('/auth/register', data),
+
+    // Forgot Password
+    requestPasswordResetOtp: (data: { email: string }) =>
+        post<{ message: string; otp: string }>('/auth/forgot-password/request-otp', data),
+    resetPassword: (data: any) =>
+        post<{ message: string }>('/auth/forgot-password/reset', data),
 };
 
 // ── Dashboard ───────────────────────────────────────────────────────────────
@@ -75,6 +87,7 @@ export interface DashboardResponse {
     onlineRouters: number;
     revenueChartData: { name: string; value: number }[];
     subscriberGrowthData: { month: string; clients: number }[];
+    systemActivities: { id: string; title: string; description: string; date: string; type: string; status: string }[];
     recentTransactions: { id: string; user: string; amount: number; method: string; status: string; date: string }[];
     recentSubscriptions: { id: string; username: string; plan: string; status: string; expiresAt: string }[];
 }
@@ -150,14 +163,54 @@ export const transactionsApi = {
 
 export const routersApi = {
     list: () => get<Array<{
-        id: string; name: string; host: string; username: string; port: number;
-        type: string; status: string; activeUsers: number; cpuLoad: number;
-        memoryUsed: number; uptime: string; lastSeen: string;
+        id: string; name: string; host: string; username: string; port: number; apiPort: number;
+        type: string; vpnMode: string; description: string; status: string; activeUsers: number;
+        cpuLoad: number; memoryUsed: number; uptime: string; lastSeen: string;
     }>>('/routers'),
     get: (id: string) => get<Record<string, unknown>>(`/routers/${id}`),
     create: (data: Record<string, unknown>) => post<Record<string, unknown>>('/routers', data),
     update: (id: string, data: Record<string, unknown>) => put<Record<string, unknown>>(`/routers/${id}`, data),
     delete: (id: string) => del<{ message: string }>(`/routers/${id}`),
+
+    // Test connection
+    testConnection: (id: string) => post<{ success: boolean; message: string; info?: any }>(`/routers/${id}/test`, {}),
+
+    // PPPoE
+    pppoe: {
+        list: (routerId: string) => get<Array<any>>(`/routers/${routerId}/pppoe`),
+        create: (routerId: string, data: any) => post<any>(`/routers/${routerId}/pppoe`, data),
+        update: (routerId: string, userId: string, data: any) => put<any>(`/routers/${routerId}/pppoe/${userId}`, data),
+        delete: (routerId: string, userId: string) => del<any>(`/routers/${routerId}/pppoe/${userId}`),
+    },
+
+    // Hotspot
+    hotspot: {
+        list: (routerId: string) => get<Array<any>>(`/routers/${routerId}/hotspot`),
+        create: (routerId: string, data: any) => post<any>(`/routers/${routerId}/hotspot`, data),
+        update: (routerId: string, userId: string, data: any) => put<any>(`/routers/${routerId}/hotspot/${userId}`, data),
+        delete: (routerId: string, userId: string) => del<any>(`/routers/${routerId}/hotspot/${userId}`),
+    },
+
+    // Sessions
+    sessions: {
+        list: (routerId: string) => get<Array<any>>(`/routers/${routerId}/sessions`),
+        disconnect: (routerId: string, data: { sessionId: string; service: string; username?: string }) =>
+            post<any>(`/routers/${routerId}/sessions/disconnect`, data),
+    },
+
+    // Profiles
+    profiles: {
+        list: (routerId: string, type?: string) => get<any>(`/routers/${routerId}/profiles${type ? `?type=${type}` : ''}`),
+        create: (routerId: string, data: any) => post<any>(`/routers/${routerId}/profiles`, data),
+    },
+
+    // Logs
+    logs: {
+        list: (params?: Record<string, string>) => {
+            const qs = params ? '?' + new URLSearchParams(params).toString() : '';
+            return get<{ data: Array<any>; total: number }>(`/routers/logs${qs}`);
+        },
+    },
 };
 
 // ── Equipment ───────────────────────────────────────────────────────────────
@@ -177,6 +230,7 @@ export const vouchersApi = {
         return get<{ data: Array<Record<string, unknown>>; total: number }>(`/vouchers${qs}`);
     },
     generate: (data: Record<string, unknown>) => post<Record<string, unknown>>('/vouchers/generate', data),
+    delete: (id: string) => del<{ message: string }>(`/vouchers/${id}`),
 };
 
 // ── SMS ─────────────────────────────────────────────────────────────────────
@@ -243,6 +297,13 @@ export const paymentChannelsApi = {
 export const settingsApi = {
     get: () => get<Record<string, string>>('/settings'),
     update: (data: Record<string, string>) => put<{ message: string }>('/settings', data),
+};
+
+// ── Hotspot Settings ────────────────────────────────────────────────────────
+
+export const hotspotSettingsApi = {
+    get: (routerId: string) => get<any>(`/hotspot-settings?routerId=${routerId}`),
+    update: (data: any) => post<any>('/hotspot-settings', data),
 };
 
 // ── Reports ─────────────────────────────────────────────────────────────────

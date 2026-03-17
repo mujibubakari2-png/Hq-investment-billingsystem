@@ -7,15 +7,83 @@ import PrintIcon from '@mui/icons-material/Print';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { invoicesApi } from '../api/client';
 import type { Invoice } from '../types';
+import CreateInvoiceModal from '../modals/CreateInvoiceModal';
+import ViewInvoiceModal from '../modals/ViewInvoiceModal';
+import ConfirmDeleteModal from '../modals/ConfirmDeleteModal';
 
 export default function Invoices() {
     const [invoices, setInvoices] = useState<Invoice[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('All');
+    const [loading, setLoading] = useState(true);
+    const [showCreateModal, setShowCreateModal] = useState(false);
+    const [viewInvoice, setViewInvoice] = useState<Invoice | null>(null);
+    const [deleteInvoice, setDeleteInvoice] = useState<Invoice | null>(null);
+
+    const fetchInvoices = async () => {
+        setLoading(true);
+        try {
+            const res = await invoicesApi.list();
+            setInvoices((res.data || []) as unknown as Invoice[]);
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
-        invoicesApi.list().then(res => setInvoices((res.data || []) as unknown as Invoice[])).catch(console.error);
+        fetchInvoices();
     }, []);
+
+    const handleDelete = async (id: string) => {
+        try {
+            await invoicesApi.delete(id);
+            setDeleteInvoice(null);
+            fetchInvoices();
+        } catch (err) {
+            console.error('Failed to delete invoice:', err);
+        }
+    };
+
+    const handleCreateInvoice = async (data: Record<string, unknown>) => {
+        try {
+            await invoicesApi.create(data);
+            setShowCreateModal(false);
+            fetchInvoices();
+        } catch (err) {
+            console.error('Failed to create invoice:', err);
+            alert('Failed to create invoice.');
+        }
+    };
+
+    const handlePrintInvoice = (inv: Invoice) => {
+        const itemsHtml = (inv.items || []).map(item =>
+            '<tr><td>' + item.description + '</td><td>' + item.quantity + '</td><td>' + item.unitPrice.toLocaleString() + ' TZS</td><td>' + item.total.toLocaleString() + ' TZS</td></tr>'
+        ).join('');
+        const printContent = `
+            <html><head><title>Invoice ${inv.invoiceNumber}</title>
+            <style>
+                body { font-family: 'Segoe UI', sans-serif; padding: 40px; color: #333; }
+                h1 { font-size: 1.8rem; margin-bottom: 4px; }
+                table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+                th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #e0e0e0; }
+                th { background: #f5f5f5; font-weight: 600; font-size: 0.85rem; }
+                .total { font-weight: 700; font-size: 1.1rem; text-align: right; margin-top: 16px; }
+            </style></head><body>
+            <h1>Invoice ${inv.invoiceNumber}</h1>
+            <p>Client: <strong>${inv.client}</strong> | Status: ${inv.status}</p>
+            <p>Issued: ${inv.issuedDate} | Due: ${inv.dueDate}</p>
+            <table>
+                <thead><tr><th>Description</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr></thead>
+                <tbody>${itemsHtml}</tbody>
+            </table>
+            <div class="total">Total: ${inv.amount.toLocaleString()} TZS</div>
+            </body></html>
+        `;
+        const w = window.open('', '_blank');
+        if (w) { w.document.write(printContent); w.document.close(); w.print(); }
+    };
 
     const filtered = invoices.filter(inv => {
         const matchSearch = inv.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase()) || inv.client.toLowerCase().includes(searchTerm.toLowerCase());
@@ -29,6 +97,27 @@ export default function Invoices() {
 
     return (
         <div>
+            {showCreateModal && (
+                <CreateInvoiceModal
+                    onClose={() => setShowCreateModal(false)}
+                    onSave={handleCreateInvoice}
+                />
+            )}
+            {viewInvoice && (
+                <ViewInvoiceModal
+                    invoice={viewInvoice}
+                    onClose={() => setViewInvoice(null)}
+                />
+            )}
+            {deleteInvoice && (
+                <ConfirmDeleteModal
+                    title="Delete Invoice"
+                    message={`Are you sure you want to delete invoice ${deleteInvoice.invoiceNumber}? This action cannot be undone.`}
+                    onClose={() => setDeleteInvoice(null)}
+                    onConfirm={() => handleDelete(deleteInvoice.id)}
+                />
+            )}
+
             <div className="page-header">
                 <div className="page-header-left">
                     <div className="page-header-icon" style={{ background: 'var(--info-light)', color: 'var(--info)' }}>
@@ -40,7 +129,7 @@ export default function Invoices() {
                     </div>
                 </div>
                 <div className="page-header-right">
-                    <button className="btn btn-primary">
+                    <button className="btn btn-primary" onClick={() => setShowCreateModal(true)}>
                         <AddIcon fontSize="small" /> Create Invoice
                     </button>
                 </div>
@@ -98,27 +187,43 @@ export default function Invoices() {
                             </tr>
                         </thead>
                         <tbody>
-                            {filtered.map(inv => (
-                                <tr key={inv.id}>
-                                    <td><span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{inv.invoiceNumber}</span></td>
-                                    <td style={{ fontWeight: 500 }}>{inv.client}</td>
-                                    <td style={{ fontWeight: 600 }}>{inv.amount.toLocaleString()} TZS</td>
-                                    <td>
-                                        <span className={`badge ${inv.status === 'Paid' ? 'active' : inv.status === 'Overdue' ? 'expired' : 'inactive'}`}>
-                                            {inv.status}
-                                        </span>
-                                    </td>
-                                    <td>{inv.issuedDate}</td>
-                                    <td style={{ color: inv.status === 'Overdue' ? 'var(--danger)' : 'inherit' }}>{inv.dueDate}</td>
-                                    <td>
-                                        <div className="table-actions">
-                                            <button className="btn-icon view" title="View"><VisibilityIcon style={{ fontSize: 16 }} /></button>
-                                            <button className="btn-icon sync" title="Print"><PrintIcon style={{ fontSize: 16 }} /></button>
-                                            <button className="btn-icon delete" title="Delete"><DeleteIcon style={{ fontSize: 16 }} /></button>
-                                        </div>
+                            {loading ? (
+                                <tr>
+                                    <td colSpan={7} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
+                                        Loading invoices...
                                     </td>
                                 </tr>
-                            ))}
+                            ) : filtered.length === 0 ? (
+                                <tr>
+                                    <td colSpan={7} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
+                                        No invoices found matching your criteria.
+                                    </td>
+                                </tr>
+                            ) : (
+                                filtered.map(inv => (
+                                    <tr key={inv.id}>
+                                        <td><span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{inv.invoiceNumber}</span></td>
+                                        <td style={{ fontWeight: 500 }}>{inv.client}</td>
+                                        <td style={{ fontWeight: 600 }}>{inv.amount.toLocaleString()} TZS</td>
+                                        <td>
+                                            <span className={`badge ${inv.status === 'Paid' ? 'active' : inv.status === 'Overdue' ? 'expired' : 'inactive'}`}>
+                                                {inv.status}
+                                            </span>
+                                        </td>
+                                        <td>{inv.issuedDate}</td>
+                                        <td style={{ color: inv.status === 'Overdue' ? 'var(--danger)' : 'inherit' }}>{inv.dueDate}</td>
+                                        <td>
+                                            <div className="table-actions">
+                                                <button className="btn-icon view" title="View" onClick={() => setViewInvoice(inv)}><VisibilityIcon style={{ fontSize: 16 }} /></button>
+                                                <button className="btn-icon sync" title="Print" onClick={() => handlePrintInvoice(inv)}><PrintIcon style={{ fontSize: 16 }} /></button>
+                                                <button className="btn-icon delete" title="Delete" onClick={() => setDeleteInvoice(inv)}>
+                                                    <DeleteIcon style={{ fontSize: 16 }} />
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
                         </tbody>
                     </table>
                 </div>

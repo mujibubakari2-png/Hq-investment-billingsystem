@@ -1,4 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import JSZip from 'jszip';
+import { saveAs } from 'file-saver';
 import PaletteIcon from '@mui/icons-material/Palette';
 import TextFieldsIcon from '@mui/icons-material/TextFields';
 import ViewModuleIcon from '@mui/icons-material/ViewModule';
@@ -6,15 +9,17 @@ import CampaignIcon from '@mui/icons-material/Campaign';
 import AnnouncementIcon from '@mui/icons-material/Announcement';
 import PersonIcon from '@mui/icons-material/Person';
 import BusinessIcon from '@mui/icons-material/Business';
-import PreviewIcon from '@mui/icons-material/Preview';
 import DownloadIcon from '@mui/icons-material/Download';
+import PreviewIcon from '@mui/icons-material/Preview';
 import ViewListIcon from '@mui/icons-material/ViewList';
 import ViewColumnIcon from '@mui/icons-material/ViewColumn';
 import GridViewIcon from '@mui/icons-material/GridView';
 import WifiIcon from '@mui/icons-material/Wifi';
-import PaymentIcon from '@mui/icons-material/Payment';
-import LinkIcon from '@mui/icons-material/Link';
-import SupportAgentIcon from '@mui/icons-material/SupportAgent';
+import RouterIcon from '@mui/icons-material/Router';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import { routersApi, settingsApi, packagesApi, hotspotSettingsApi } from '../api/client';
+import authStore from '../stores/authStore';
+import type { Router } from '../types';
 
 const fonts = [
     { name: 'Inter', description: 'Modern & Clean - Perfect for professional look', provider: "Google's Font" },
@@ -27,6 +32,18 @@ const fonts = [
 ];
 
 export default function HotspotLoginCustomizer() {
+    const [searchParams] = useSearchParams();
+    const { user } = authStore.useAuth();
+
+    // Router selection
+    const [routers, setRouters] = useState<Router[]>([]);
+    const [selectedRouterId, setSelectedRouterId] = useState('');
+    const [loadingRouters, setLoadingRouters] = useState(true);
+
+    // Packages for the selected router
+    const [routerPackages, setRouterPackages] = useState<any[]>([]);
+
+    // Customization options
     const [primaryColor, setPrimaryColor] = useState('#1a1a2e');
     const [accentColor, setAccentColor] = useState('#6366f1');
     const [selectedFont, setSelectedFont] = useState('Inter');
@@ -34,8 +51,663 @@ export default function HotspotLoginCustomizer() {
     const [enableAds, setEnableAds] = useState(false);
     const [enableAnnouncement, setEnableAnnouncement] = useState(true);
     const [enableRememberMe, setEnableRememberMe] = useState(true);
-    const [companyName, setCompanyName] = useState('HQ INVESTMENT');
-    const [customerCareNumber, setCustomerCareNumber] = useState('0621085215');
+    const [companyName, setCompanyName] = useState('');
+    const [customerCareNumber, setCustomerCareNumber] = useState('');
+    const [saving, setSaving] = useState(false);
+
+    // Live preview
+    const [showPreview, setShowPreview] = useState(true);
+    const [previewPaymentPkg, setPreviewPaymentPkg] = useState<any | null>(null);
+    const [previewPaymentStep, setPreviewPaymentStep] = useState<'initial' | 'waiting' | 'success'>('initial');
+    const [previewPhone, setPreviewPhone] = useState('');
+
+    // Load routers
+    useEffect(() => {
+        const load = async () => {
+            setLoadingRouters(true);
+            try {
+                const data = await routersApi.list();
+                setRouters(data as unknown as Router[]);
+                // Auto-select router from URL param or first router
+                const routerIdParam = searchParams.get('routerId');
+                if (routerIdParam && data.some(r => r.id === routerIdParam)) {
+                    setSelectedRouterId(routerIdParam);
+                } else if (data.length > 0) {
+                    setSelectedRouterId(data[0].id);
+                }
+            } catch (err) {
+                console.error('Failed to load routers:', err);
+            } finally {
+                setLoadingRouters(false);
+            }
+        };
+        load();
+    }, [searchParams]);
+
+    // Load user profile / settings for company info
+    useEffect(() => {
+        const loadSettings = async () => {
+            try {
+                const settings = await settingsApi.get();
+                setCompanyName(settings.companyName || user?.username || 'My ISP');
+                setCustomerCareNumber(settings.supportPhone || user?.phone || '');
+            } catch {
+                // Fallback to user profile details
+                setCompanyName(user?.username || 'My ISP');
+                setCustomerCareNumber(user?.phone || '');
+            }
+        };
+        loadSettings();
+    }, [user]);
+
+    // Load packages for the selected router
+    useEffect(() => {
+        if (!selectedRouterId) return;
+        const loadPackages = async () => {
+            try {
+                const pkgs = await packagesApi.list({ routerId: selectedRouterId, status: 'Active' });
+                const list = Array.isArray(pkgs) ? pkgs : [];
+                // Map the packages to the format expected by the preview and generated HTML
+                const mapped = list.map((p: any) => ({
+                    id: p.id,
+                    name: p.name,
+                    price: p.price || 0,
+                    duration: p.duration,
+                    durationUnit: p.durationUnit,
+                    validity: p.validity,
+                    bandwidth: p.bandwidth
+                }));
+                setRouterPackages(mapped);
+            } catch (err) {
+                console.error('Failed to load packages:', err);
+                setRouterPackages([]);
+            }
+        };
+        loadPackages();
+    }, [selectedRouterId, routers]);
+ 
+    // Load existing settings for the selected router
+    useEffect(() => {
+        if (!selectedRouterId) return;
+        const loadCustomSettings = async () => {
+            try {
+                const settings = await hotspotSettingsApi.get(selectedRouterId);
+                if (settings) {
+                    if (settings.primaryColor) setPrimaryColor(settings.primaryColor);
+                    if (settings.accentColor) setAccentColor(settings.accentColor);
+                    if (settings.selectedFont) setSelectedFont(settings.selectedFont);
+                    if (settings.layout) setLayout(settings.layout);
+                    if (settings.enableAds !== undefined) setEnableAds(settings.enableAds);
+                    if (settings.enableAnnouncement !== undefined) setEnableAnnouncement(settings.enableAnnouncement);
+                    if (settings.enableRememberMe !== undefined) setEnableRememberMe(settings.enableRememberMe);
+                    if (settings.companyName) setCompanyName(settings.companyName);
+                    if (settings.customerCareNumber) setCustomerCareNumber(settings.customerCareNumber);
+                }
+            } catch (err) {
+                console.error('Failed to load hotspot settings:', err);
+            }
+        };
+        loadCustomSettings();
+    }, [selectedRouterId]);
+
+    const selectedRouter = routers.find(r => r.id === selectedRouterId);
+
+    const generateHtml = () => {
+        const layoutClass = layout === 'horizontal' ? 'packages-horizontal' : layout === 'vertical' ? 'packages-vertical' : 'packages-grid';
+
+        return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>${companyName} Hotspot</title>
+    <link href="https://fonts.googleapis.com/css2?family=${selectedFont.replace(/ /g, '+')}:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: '${selectedFont}', sans-serif;
+            background: linear-gradient(175deg, ${accentColor}18 0%, #f0f4f8 40%, #ffffff 100%);
+            min-height: 100vh; padding: 0;
+        }
+        .page { max-width: 480px; margin: 0 auto; min-height: 100vh; background: #fff; }
+
+        /* ── Header ── */
+        .header {
+            background: linear-gradient(135deg, ${primaryColor}, ${accentColor});
+            padding: 20px 16px 16px; text-align: center; color: #fff;
+            border-radius: 0 0 20px 20px;
+        }
+        .header-brand { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 12px; }
+        .header-brand svg { width: 24px; height: 24px; fill: #fff; }
+        .header-brand h1 { font-size: 1.2rem; font-weight: 700; letter-spacing: 0.5px; }
+        .networks-title { font-size: 0.82rem; font-weight: 600; margin-bottom: 8px; opacity: 0.9; }
+        .networks-row { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+        .networks-row img { height: 28px; object-fit: contain; filter: brightness(1.1); }
+        .network-badge {
+            background: rgba(255,255,255,0.2); border-radius: 8px; padding: 4px 10px;
+            font-size: 0.72rem; font-weight: 600; color: #fff;
+        }
+        .steps { display: flex; justify-content: center; gap: 12px; font-size: 0.78rem; margin-bottom: 10px; }
+        .steps span { opacity: 0.85; }
+        .steps .dot { opacity: 0.5; }
+        .support-bar {
+            background: ${accentColor}40; border-radius: 20px; padding: 8px 16px;
+            font-size: 0.82rem; display: inline-flex; align-items: center; gap: 6px;
+        }
+
+        /* ── Section Shared ── */
+        .section { padding: 16px; }
+        .section-title {
+            font-size: 0.92rem; font-weight: 700; color: ${primaryColor};
+            margin-bottom: 12px; display: flex; align-items: center; gap: 6px;
+        }
+        .section-card {
+            background: #f8fafb; border: 1px solid #e8ecf0; border-radius: 12px;
+            padding: 14px; margin-bottom: 14px;
+        }
+
+        /* ── Packages Grid ── */
+        .packages-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+        .packages-horizontal { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 8px; }
+        .packages-horizontal .pkg-card { min-width: 140px; flex-shrink: 0; }
+        .packages-vertical { display: flex; flex-direction: column; gap: 8px; }
+
+        .pkg-card {
+            background: linear-gradient(135deg, ${accentColor}08, ${accentColor}15);
+            border: 1.5px solid ${accentColor}30; border-radius: 12px;
+            padding: 12px 8px; text-align: center; cursor: pointer;
+            transition: all 0.2s;
+        }
+        .pkg-card:hover { transform: translateY(-2px); box-shadow: 0 6px 20px ${accentColor}25; border-color: ${accentColor}; }
+        .pkg-name { font-size: 0.78rem; font-weight: 700; color: ${accentColor}; margin-bottom: 4px; text-transform: uppercase; }
+        .pkg-price { font-size: 1.3rem; font-weight: 700; color: ${primaryColor}; line-height: 1; }
+        .pkg-price small { font-size: 0.7rem; font-weight: 500; color: #888; }
+        .pkg-duration {
+            font-size: 0.72rem; color: #e74c3c; margin-top: 4px;
+            display: flex; align-items: center; justify-content: center; gap: 3px;
+        }
+
+        /* ── Input fields ── */
+        .field-group { margin-bottom: 12px; }
+        .field-group label { display: block; font-size: 0.78rem; color: #666; margin-bottom: 4px; font-weight: 500; }
+        .field-input {
+            width: 100%; padding: 10px 14px; border: 1.5px solid #d1d5db; border-radius: 8px;
+            font-size: 0.9rem; font-family: '${selectedFont}', sans-serif;
+            transition: border-color 0.2s;
+        }
+        .field-input:focus { outline: none; border-color: ${accentColor}; box-shadow: 0 0 0 3px ${accentColor}15; }
+
+        /* ── Buttons ── */
+        .btn-primary {
+            width: 100%; padding: 12px; background: ${accentColor}; color: #fff;
+            border: none; border-radius: 8px; font-size: 0.92rem; font-weight: 700;
+            cursor: pointer; font-family: '${selectedFont}', sans-serif;
+            display: flex; align-items: center; justify-content: center; gap: 6px;
+            transition: all 0.2s;
+        }
+        .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+        .btn-accent {
+            width: 100%; padding: 12px; background: linear-gradient(135deg, #e53935, #c62828);
+            color: #fff; border: none; border-radius: 8px; font-size: 0.92rem; font-weight: 700;
+            cursor: pointer; font-family: '${selectedFont}', sans-serif;
+            display: flex; align-items: center; justify-content: center; gap: 6px;
+        }
+        .btn-connect {
+            padding: 10px 24px; background: ${accentColor}; color: #fff;
+            border: none; border-radius: 8px; font-size: 0.88rem; font-weight: 700;
+            cursor: pointer; white-space: nowrap;
+        }
+        .login-row { display: flex; gap: 8px; align-items: center; }
+        .login-row .field-input { flex: 1; }
+
+        /* ── Remember me / MAC ── */
+        .remember-row {
+            margin-top: 8px; display: flex; align-items: center; gap: 6px;
+            font-size: 0.78rem; color: #777;
+        }
+        .remember-row input[type="checkbox"] { width: 15px; height: 15px; accent-color: ${accentColor}; }
+        .mac-bar {
+            background: ${accentColor}10; border: 1px solid ${accentColor}25;
+            border-radius: 8px; padding: 8px 14px; margin-top: 10px;
+            font-size: 0.78rem; color: ${primaryColor}; display: flex; align-items: center; gap: 6px;
+        }
+
+        /* ── Footer ── */
+        .footer {
+            text-align: center; padding: 16px; font-size: 0.72rem; color: #bbb;
+            border-top: 1px solid #f0f0f0; margin-top: 8px;
+        }
+
+        /* ── Ads ── */
+        ${enableAds ? `.ad-banner {
+            background: linear-gradient(90deg, ${accentColor}10, ${primaryColor}10);
+            padding: 10px 16px; text-align: center; font-size: 0.82rem; color: ${primaryColor};
+            font-weight: 500; animation: slideAd 6s infinite;
+        }
+        @keyframes slideAd { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }` : ''}
+
+        /* ── Announcement ── */
+        ${enableAnnouncement ? `.announcement-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex;
+            align-items: center; justify-content: center; z-index: 1000;
+        }
+        .announcement-box {
+            background: #fff; border-radius: 16px; padding: 28px; max-width: 360px;
+            width: 90%; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        .announcement-box h3 { color: ${primaryColor}; font-size: 1.1rem; margin-bottom: 10px; }
+        .announcement-box p { color: #666; font-size: 0.85rem; line-height: 1.5; margin-bottom: 18px; }
+        .announcement-box button {
+            background: ${accentColor}; color: #fff; border: none; padding: 10px 32px;
+            border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 0.92rem;
+        }` : ''}
+
+        .pkg-loading { text-align: center; padding: 20px; color: #888; font-size: 0.85rem; }
+        @media (max-width: 380px) {
+            .packages-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        /* ── Payment Overlay ── */
+        .payment-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
+            display: none; align-items: center; justify-content: center; z-index: 2000; padding: 20px;
+        }
+        .payment-box {
+            background: #fff; border-radius: 20px; width: 100%; max-width: 360px;
+            overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
+            animation: modalUp 0.3s ease-out;
+        }
+        @keyframes modalUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .payment-header {
+            background: linear-gradient(135deg, ${primaryColor}, ${accentColor});
+            padding: 20px; color: #fff; text-align: center;
+        }
+        .payment-body { padding: 24px; }
+        .status-badge {
+            display: inline-block; padding: 4px 12px; border-radius: 20px;
+            font-size: 0.72rem; font-weight: 700; margin-bottom: 12px;
+            background: #f1f5f9; color: #64748b;
+        }
+        .status-loading { color: ${accentColor}; background: ${accentColor}15; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+    </style>
+</head>
+<body>
+    ${enableAnnouncement ? `<div class="announcement-overlay" id="announcementOverlay">
+        <div class="announcement-box">
+            <h3>📢 Welcome!</h3>
+            <p>Welcome to ${companyName} WiFi. Browse our packages below and pay via mobile money to get connected instantly!</p>
+            <button onclick="document.getElementById('announcementOverlay').style.display='none'">OK, Got It!</button>
+        </div>
+    </div>` : ''}
+
+    <!-- Payment Modal -->
+    <div class="payment-overlay" id="paymentOverlay">
+        <div class="payment-box">
+            <div class="payment-header">
+                <div style="font-size: 0.8rem; opacity: 0.9; margin-bottom: 4px;">Confirm Purchase</div>
+                <div id="selectedPkgName" style="font-size: 1.1rem; font-weight: 700;">Package Name</div>
+                <div id="selectedPkgPrice" style="font-size: 1.2rem; font-weight: 700; margin-top: 4px;">TSH 0</div>
+            </div>
+            <div class="payment-body" id="paymentInitial">
+                <div class="field-group">
+                    <label>Enter Mobile Money Number</label>
+                    <input type="tel" class="field-input" id="phoneInput" placeholder="0XXXXXXXXX" maxlength="10" />
+                    <div style="font-size: 0.68rem; color: #888; margin-top: 6px; line-height: 1.4;">
+                        Ensure your phone is ON and unlocked to receive the PIN prompt.
+                    </div>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn-primary" style="flex: 2;" onclick="initiatePurchase()" id="btnPay">Pay Now</button>
+                    <button class="btn-primary" style="flex: 1; background: #94a3b8;" onclick="closePayment()">Cancel</button>
+                </div>
+            </div>
+            <div class="payment-body" id="paymentWait" style="display: none; text-align: center; padding: 40px 24px;">
+                <div class="status-badge status-loading" id="pollStatus">Waiting for payment...</div>
+                <div style="font-size: 0.85rem; color: #475569; margin-bottom: 20px;" id="pollMessage">
+                    Please check your phone for the payment prompt and enter your PIN.
+                </div>
+                <div style="width: 40px; height: 40px; border: 3px solid ${accentColor}20; border-top-color: ${accentColor}; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto;"></div>
+                <button class="btn-primary" style="margin-top: 30px; background: #94a3b8;" onclick="closePayment()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <style> @keyframes spin { to { transform: rotate(360deg); } } </style>
+
+    <div class="page">
+        <!-- Header -->
+        <div class="header">
+            <div class="header-brand">
+                <svg viewBox="0 0 24 24"><path d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9zm8 8l3 3 3-3a4.237 4.237 0 00-6 0zm-4-4l2 2a7.074 7.074 0 0110 0l2-2C15.14 9.14 8.87 9.14 5 13z"/></svg>
+                <h1>${companyName}</h1>
+            </div>
+            <div class="networks-title">Supported Mobile Networks</div>
+            <div class="networks-row">
+                <span class="network-badge">M-Pesa</span>
+                <span class="network-badge">Airtel Money</span>
+                <span class="network-badge">T-Pesa</span>
+                <span class="network-badge">HaloPesa</span>
+            </div>
+            <div class="steps">
+                <span>📦 Select</span> <span class="dot">•</span>
+                <span>💳 Pay</span> <span class="dot">•</span>
+                <span>🌐 Connect</span>
+            </div>
+            <div class="support-bar">📞 Support: ${customerCareNumber}</div>
+        </div>
+
+        ${enableAds ? `<div class="ad-banner">🎉 Special offer! Get extra data on all packages today!</div>` : ''}
+
+        <!-- Packages -->
+        <div class="section">
+            <div class="section-title">📦 Packages</div>
+            <div id="packagesContainer" class="${layoutClass}">
+                <div class="pkg-loading">⏳ Loading packages...</div>
+            </div>
+        </div>
+
+        <!-- Redeem Voucher -->
+        <div class="section">
+            <div class="section-title">🎟️ Redeem Voucher</div>
+            <div class="section-card">
+                <form name="voucher_form" action="$(link-login-only)" method="post" onsubmit="return doVoucher();">
+                    <input type="hidden" name="dst" value="$(link-orig)" />
+                    <div class="login-row">
+                        <input type="text" class="field-input" name="username" id="voucher-code" placeholder="Voucher code" />
+                        <button type="submit" class="btn-connect" style="background: #e53935;">Redeem</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Reconnect -->
+        <div class="section">
+            <div class="section-title">🔄 Reconnect</div>
+            <div class="section-card">
+                <label style="font-size: 0.78rem; color: #666; margin-bottom: 6px; display: block;">Enter ZenoPay reference</label>
+                <div class="login-row">
+                    <input type="text" class="field-input" id="zenopay-ref" placeholder="ZenoPay reference (ZP...)" />
+                </div>
+                <button class="btn-accent" style="margin-top: 10px;" onclick="doReconnect()">
+                    💳 Reconnect
+                </button>
+            </div>
+        </div>
+
+        <!-- Manual Login -->
+        <div class="section">
+            <div class="section-title">📶 Manual Login</div>
+            <div class="section-card">
+                <form name="login" action="$(link-login-only)" method="post">
+                    <input type="hidden" name="dst" value="$(link-orig)" />
+                    <div class="login-row">
+                        <input type="text" class="field-input" name="username" value="$(username)" placeholder="Username" />
+                        <input type="password" class="field-input" name="password" placeholder="••••" />
+                        <button type="submit" class="btn-connect">Connect</button>
+                    </div>
+                </form>
+                ${enableRememberMe ? `<div class="remember-row">
+                    <input type="checkbox" id="remember" />
+                    <label for="remember">Remember me (Auto-reconnect while subscribed)</label>
+                </div>` : ''}
+                <div class="mac-bar">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="${primaryColor}"><path d="M20 18c1.1 0 1.99-.9 1.99-2L22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z"/></svg>
+                    MAC: <strong>$(mac)</strong>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            Powered by ${companyName} • ${selectedRouter?.name || 'Router'}
+        </div>
+    </div>
+
+    <script>
+        // ── Configuration ──
+        var API_BASE = window.location.protocol + '//' + window.location.hostname + ':3001';
+        var ROUTER_ID = '${selectedRouterId}';
+        var ACCENT = '${accentColor}';
+        var PRIMARY = '${primaryColor}';
+        var currentPkg = null;
+        var pollInterval = null;
+
+        // ── Fallback packages (baked at generation time) ──
+        var fallbackPackages = ${JSON.stringify(
+            routerPackages.length > 0
+                ? routerPackages.map(p => ({
+                    id: p.id, name: p.name, price: p.price || 0,
+                    validity: p.validity || '',
+                }))
+                : [
+                    { id: 'p1', name: 'MASAA 6', price: 450, validity: '6 Hours' },
+                    { id: 'p2', name: 'MASAA 24', price: 950, validity: '24 Hours' },
+                    { id: 'p3', name: 'SIKU 3', price: 2450, validity: '3 Days' },
+                    { id: 'p4', name: 'SIKU 7', price: 5000, validity: '7 Days' },
+                ]
+        )};
+
+        function renderPackages(packages) {
+            var c = document.getElementById('packagesContainer');
+            if (!packages || packages.length === 0) { c.innerHTML = '<div class="pkg-loading">No packages available</div>'; return; }
+            c.innerHTML = packages.map(function(p) {
+                return '<div class="pkg-card" onclick=\\'showPayment(' + JSON.stringify(p).replace(/"/g, "&quot;") + ')\\'>' +
+                    '<div class="pkg-name">' + p.name + '</div>' +
+                    '<div class="pkg-price"><small>TSH</small> ' + Number(p.price).toLocaleString() + '</div>' +
+                    '<div class="pkg-duration">⏱ ' + (p.validity||'') + '</div>' +
+                '</div>';
+            }).join('');
+        }
+
+        function showPayment(pkg) {
+            currentPkg = pkg;
+            document.getElementById('selectedPkgName').innerText = pkg.name;
+            document.getElementById('selectedPkgPrice').innerText = 'TSH ' + Number(pkg.price).toLocaleString();
+            document.getElementById('paymentInitial').style.display = 'block';
+            document.getElementById('paymentWait').style.display = 'none';
+            document.getElementById('paymentOverlay').style.display = 'flex';
+        }
+
+        function closePayment() {
+            document.getElementById('paymentOverlay').style.display = 'none';
+            if (pollInterval) clearInterval(pollInterval);
+        }
+
+        function initiatePurchase() {
+            var phone = document.getElementById('phoneInput').value;
+            if (!phone || phone.length < 10) { alert('Please enter a valid phone number'); return; }
+            
+            var btn = document.getElementById('btnPay');
+            btn.disabled = true;
+            btn.innerText = 'Processing...';
+
+            fetch(API_BASE + '/api/hotspot/purchase', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    packageId: currentPkg.id,
+                    phone: phone,
+                    macAddress: '$(mac)',
+                    routerId: ROUTER_ID
+                })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                if (d.error) { throw new Error(d.error); }
+                document.getElementById('paymentInitial').style.display = 'none';
+                document.getElementById('paymentWait').style.display = 'block';
+                startPolling(d.reference);
+            })
+            .catch(function(err) {
+                alert(err.message || 'Failed to initiate purchase');
+                btn.disabled = false;
+                btn.innerText = 'Pay Now';
+            });
+        }
+
+        function startPolling(ref) {
+            if (pollInterval) clearInterval(pollInterval);
+            pollInterval = setInterval(function() {
+                fetch(API_BASE + '/api/hotspot/status?reference=' + ref)
+                .then(function(r) { return r.json(); })
+                .then(function(d) {
+                    if (d.status === 'COMPLETED') {
+                        clearInterval(pollInterval);
+                        document.getElementById('pollStatus').innerText = 'PAID! Connecting...';
+                        document.getElementById('pollStatus').style.background = '#22c55e';
+                        document.getElementById('pollStatus').style.color = '#fff';
+                        document.getElementById('pollMessage').innerText = 'Your payment was successful. Getting you online now!';
+                        
+                        // Auto connect
+                        setTimeout(function() {
+                            connectUser(d.username, d.password);
+                        }, 2000);
+                    } else if (d.status === 'FAILED') {
+                        clearInterval(pollInterval);
+                        alert('Payment failed or cancelled. Please try again.');
+                        closePayment();
+                    }
+                });
+            }, 3000);
+        }
+
+        function connectUser(user, pass) {
+            var f = document.forms['login'];
+            f.username.value = user;
+            f.password.value = pass;
+            f.submit();
+        }
+
+        function doVoucher() {
+            var code = document.getElementById('voucher-code').value;
+            if (!code) { alert('Please enter a voucher code'); return false; }
+            
+            var btn = document.forms['voucher_form'].querySelector('button');
+            btn.disabled = true;
+            btn.innerText = 'Checking...';
+
+            fetch(API_BASE + '/api/hotspot/voucher/redeem', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    code: code,
+                    macAddress: '$(mac)',
+                    routerId: ROUTER_ID
+                })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                if (d.error) { throw new Error(d.error); }
+                alert('Voucher valid! Connecting...');
+                connectUser(d.username, d.password || '');
+            })
+            .catch(function(err) {
+                alert(err.message || 'Failed to redeem voucher');
+                btn.disabled = false;
+                btn.innerText = 'Redeem';
+            });
+
+            return false; // Prevent form submit
+        }
+
+        function doReconnect() {
+            var ref = document.getElementById('zenopay-ref').value;
+            if (!ref) { alert('Please enter your reference'); return; }
+            
+            var btn = document.querySelector('button[onclick="doReconnect()"]');
+            btn.disabled = true;
+            btn.innerText = 'Checking status...';
+
+            startPolling(ref);
+            
+            // Re-enable after 10s if nothing happens
+            setTimeout(function() { 
+                btn.disabled = false; 
+                btn.innerText = 'Reconnect'; 
+            }, 10000);
+        }
+
+        // Load packages and check for active subscription
+        (function() {
+            renderPackages(fallbackPackages);
+            if (!ROUTER_ID) return;
+
+            // 1. Fetch live packages
+            fetch(API_BASE + '/api/packages?routerId=' + ROUTER_ID + '&status=ACTIVE')
+                .then(function(r) { return r.json(); })
+                .then(function(d) { 
+                    var pkgs = Array.isArray(d) ? d : (d.data || []);
+                    if (pkgs.length > 0) renderPackages(pkgs); 
+                })
+                .catch(function() { console.log('Using baked-in packages'); });
+
+            // 2. Check for active subscription (Auto-reconnect)
+            var currentMac = '$(mac)';
+            if (currentMac && currentMac !== '' && currentMac.indexOf('$') === -1) {
+                fetch(API_BASE + '/api/hotspot/check-mac?mac=' + encodeURIComponent(currentMac))
+                    .then(function(r) { return r.json(); })
+                    .then(function(d) {
+                        if (d.active) {
+                            console.log('Active subscription found for MAC. Connecting...');
+                            connectUser(d.username, d.password);
+                        }
+                    })
+                    .catch(function(e) { console.log('MAC check failed', e); });
+            }
+        })();
+    </script>
+</body>
+</html>`;
+    };
+ 
+    const handleSaveSettings = async () => {
+        if (!selectedRouterId) return;
+        setSaving(true);
+        try {
+            await hotspotSettingsApi.update({
+                routerId: selectedRouterId,
+                primaryColor,
+                accentColor,
+                selectedFont,
+                layout,
+                enableAds,
+                enableAnnouncement,
+                enableRememberMe,
+                companyName,
+                customerCareNumber
+            });
+            alert('Customization settings saved successfully!');
+        } catch (err) {
+            console.error('Failed to save settings:', err);
+            alert('Failed to save settings. Please try again.');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleDownloadZip = async () => {
+        if (!selectedRouterId) {
+            alert('Please select a router first.');
+            return;
+        }
+        const zip = new JSZip();
+        zip.file("login.html", generateHtml());
+        zip.file("alogin.html", `<html><body><script>window.location='login.html';</script></body></html>`);
+        zip.file("redirect.html", `<html><body><script>window.location='login.html';</script></body></html>`);
+        zip.file("README.txt", `Hotspot Login Page for ${companyName}\nRouter: ${selectedRouter?.name || 'N/A'} (${selectedRouter?.host || ''})\n\nUpload these files to your MikroTik router's hotspot directory.\n1. Connect to your router via FTP or Winbox\n2. Navigate to /hotspot folder\n3. Replace the existing files with these\n4. Test by connecting to the hotspot`);
+        const content = await zip.generateAsync({ type: "blob" });
+        saveAs(content, `hotspot-${(selectedRouter?.name || 'template').replace(/\s+/g, '-').toLowerCase()}.zip`);
+    };
+
+    const handlePreview = () => {
+        const htmlContent = generateHtml();
+        const previewWindow = window.open('', '_blank', 'width=420,height=700');
+        if (previewWindow) {
+            previewWindow.document.write(htmlContent);
+            previewWindow.document.close();
+        }
+    };
 
     return (
         <div>
@@ -48,12 +720,57 @@ export default function HotspotLoginCustomizer() {
                     <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Customize and download your hotspot login page</p>
                 </div>
                 <div style={{ textAlign: 'right', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                    <div>Company: <strong>HQ INVESTMENT</strong></div>
-                    <div>Router: <strong>INVESTMENT-123</strong></div>
+                    <div>Company: <strong style={{ color: 'var(--text-primary)' }}>{companyName}</strong></div>
+                    <div>User: <strong style={{ color: 'var(--text-primary)' }}>{user?.username || 'Admin'}</strong></div>
+                    <div>Role: <strong style={{ color: 'var(--text-primary)' }}>{user?.role || 'User'}</strong></div>
                 </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: 24 }}>
+            {/* Router Selector */}
+            <div className="card" style={{ padding: 16, marginBottom: 20 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                    <RouterIcon style={{ color: '#d97706', fontSize: 22 }} />
+                    <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>Select Router:</span>
+                    {loadingRouters ? (
+                        <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Loading routers...</span>
+                    ) : routers.length === 0 ? (
+                        <span style={{ fontSize: '0.85rem', color: '#dc2626' }}>No routers found. Add a router first in the Mikrotiks page.</span>
+                    ) : (
+                        <select
+                            className="select-field"
+                            style={{ minWidth: 280, fontWeight: 500 }}
+                            value={selectedRouterId}
+                            onChange={e => setSelectedRouterId(e.target.value)}
+                        >
+                            {routers.map(r => (
+                                <option key={r.id} value={r.id}>
+                                    {r.name} — {r.host} ({r.status})
+                                </option>
+                            ))}
+                        </select>
+                    )}
+                    {selectedRouter && (
+                        <span style={{
+                            padding: '4px 12px', borderRadius: 20, fontSize: '0.75rem', fontWeight: 600,
+                            background: selectedRouter.status === 'Online' ? '#d1fae5' : '#fee2e2',
+                            color: selectedRouter.status === 'Online' ? '#065f46' : '#dc2626',
+                        }}>
+                            {selectedRouter.status === 'Online' ? '● Online' : '○ Offline'}
+                        </span>
+                    )}
+                    <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                        <InfoOutlinedIcon style={{ fontSize: 14 }} />
+                        Each router gets its own customized login page
+                    </div>
+                </div>
+                {routerPackages.length > 0 && (
+                    <div style={{ marginTop: 10, fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                        📦 <strong>{routerPackages.length}</strong> packages found for this router — they will appear on the login page
+                    </div>
+                )}
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: showPreview ? '1fr 400px' : '1fr', gap: 24 }}>
                 {/* Left: Customization Options */}
                 <div>
                     <div className="card" style={{ padding: 24 }}>
@@ -201,11 +918,14 @@ export default function HotspotLoginCustomizer() {
                         </div>
 
                         {/* Action buttons */}
-                        <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
-                            <button className="btn" style={{ background: 'var(--info)', color: '#fff', fontWeight: 600, padding: '10px 20px', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 24 }}>
+                            <button className="btn" onClick={handleSaveSettings} disabled={saving} style={{ background: '#4f46e5', color: '#fff', fontWeight: 600, padding: '10px 20px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                                {saving ? 'Saving...' : 'Save Customization'}
+                            </button>
+                            <button className="btn" onClick={handlePreview} style={{ background: '#2563eb', color: '#fff', fontWeight: 600, padding: '10px 20px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
                                 <PreviewIcon fontSize="small" /> Preview Changes
                             </button>
-                            <button className="btn" style={{ background: '#16a34a', color: '#fff', fontWeight: 600, padding: '10px 20px', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                            <button className="btn" onClick={handleDownloadZip} style={{ background: '#16a34a', color: '#fff', fontWeight: 600, padding: '10px 20px', gridColumn: 'span 2', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
                                 <DownloadIcon fontSize="small" /> Download ZIP File
                             </button>
                         </div>
@@ -213,81 +933,247 @@ export default function HotspotLoginCustomizer() {
                 </div>
 
                 {/* Right: Live Preview */}
-                <div>
-                    <div className="card" style={{ padding: 0, overflow: 'hidden', position: 'sticky', top: 20 }}>
-                        <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-light)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <PreviewIcon style={{ fontSize: 16, color: '#16a34a' }} /> Live Preview
-                        </div>
-
-                        {/* Preview area */}
-                        <div style={{
-                            background: `linear-gradient(135deg, ${primaryColor}, ${accentColor})`,
-                            padding: 20, minHeight: 400,
-                        }}>
-                            <div style={{
-                                background: '#fff', borderRadius: 12, padding: 20,
-                                boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
-                            }}>
-                                {/* Hotspot header */}
-                                <div style={{
-                                    background: accentColor, borderRadius: 8, padding: '12px 16px',
-                                    color: '#fff', textAlign: 'center', marginBottom: 16,
-                                }}>
-                                    <h4 style={{ fontFamily: selectedFont, margin: 0, fontSize: '0.95rem' }}>{companyName} HOTSPOT</h4>
-                                    <div style={{ display: 'flex', justifyContent: 'center', gap: 12, marginTop: 6, fontSize: '0.7rem' }}>
-                                        <span>📶 Select</span> <span><PaymentIcon style={{ fontSize: 12 }} /> Pay</span> <span><LinkIcon style={{ fontSize: 12 }} /> Connect</span>
-                                    </div>
-                                    <div style={{ fontSize: '0.7rem', marginTop: 4 }}>
-                                        <SupportAgentIcon style={{ fontSize: 12 }} /> Support: {customerCareNumber}
-                                    </div>
-                                </div>
-
-                                {/* Packages */}
-                                <div style={{ fontSize: '0.78rem', fontWeight: 600, marginBottom: 8 }}>Available Packages</div>
-
-                                <div style={{ border: '1px solid #e5e7eb', borderRadius: 6, padding: '8px 10px', marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <div>
-                                        <div style={{ fontWeight: 600, fontSize: '0.78rem' }}>⚡ 1 Hour Package</div>
-                                        <div style={{ fontSize: '0.68rem', color: '#6b7280' }}>Idha 500 • 1 Hour</div>
-                                    </div>
-                                    <button style={{ background: accentColor, color: '#fff', border: 'none', borderRadius: 4, padding: '4px 12px', fontSize: '0.68rem', fontWeight: 600, cursor: 'pointer' }}>Buy Now</button>
-                                </div>
-
-                                <div style={{ border: '1px solid #e5e7eb', borderRadius: 6, padding: '8px 10px', marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <div>
-                                        <div style={{ fontWeight: 600, fontSize: '0.78rem' }}>⚡ Daily Package</div>
-                                        <div style={{ fontSize: '0.68rem', color: '#6b7280' }}>Idha 1000 • 24 Hours</div>
-                                    </div>
-                                    <button style={{ background: accentColor, color: '#fff', border: 'none', borderRadius: 4, padding: '4px 12px', fontSize: '0.68rem', fontWeight: 600, cursor: 'pointer' }}>Buy Now</button>
-                                </div>
-
-                                {/* Active Package Login */}
-                                <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 10 }}>
-                                    <div style={{ fontWeight: 600, fontSize: '0.72rem', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
-                                        <WifiIcon style={{ fontSize: 12 }} /> Active Package Login
-                                    </div>
-                                    <div style={{ display: 'flex', gap: 4 }}>
-                                        <input type="text" placeholder="mg@hotako@3ges..." style={{ flex: 1, fontSize: '0.68rem', padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: 4 }} />
-                                        <input type="password" placeholder="••••" style={{ width: 50, fontSize: '0.68rem', padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: 4 }} />
-                                        <button style={{ background: accentColor, color: '#fff', border: 'none', borderRadius: 4, padding: '4px 10px', fontSize: '0.65rem', fontWeight: 600, cursor: 'pointer' }}>Connect</button>
-                                    </div>
-                                    <div style={{ fontSize: '0.6rem', color: '#9ca3af', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
-                                        <input type="checkbox" style={{ width: 10, height: 10 }} /> Remember me (auto reconnect while subscribed)
-                                    </div>
-                                </div>
+                {showPreview && (
+                    <div>
+                        <div className="card" style={{ position: 'sticky', top: 20 }}>
+                            <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <h3 style={{ fontSize: '0.9rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    <PreviewIcon style={{ fontSize: 16, color: 'var(--info)' }} /> Live Preview
+                                </h3>
+                                <button
+                                    className="btn btn-secondary"
+                                    style={{ fontSize: '0.72rem', padding: '4px 10px' }}
+                                    onClick={() => setShowPreview(false)}
+                                >
+                                    Hide
+                                </button>
                             </div>
+                            {/* MikroTik-style Preview */}
+                            <div style={{ background: '#f0f4f8', borderRadius: '0 0 12px 12px', overflow: 'hidden' }}>
+                                {/* Header */}
+                                <div style={{
+                                    background: `linear-gradient(135deg, ${primaryColor}, ${accentColor})`,
+                                    padding: '14px 12px 12px', textAlign: 'center', color: '#fff',
+                                    borderRadius: '0 0 14px 14px',
+                                }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 8 }}>
+                                        <span style={{ fontSize: '0.9rem' }}>📶</span>
+                                        <span style={{ fontWeight: 700, fontSize: '0.82rem', letterSpacing: 0.3, fontFamily: selectedFont }}>{companyName}</span>
+                                    </div>
+                                    <div style={{ fontSize: '0.6rem', fontWeight: 600, opacity: 0.9, marginBottom: 6 }}>Supported Mobile Networks</div>
+                                    <div style={{ display: 'flex', justifyContent: 'center', gap: 4, flexWrap: 'wrap', marginBottom: 8 }}>
+                                        {['M-Pesa', 'Airtel', 'T-Pesa', 'HaloPesa'].map(n => (
+                                            <span key={n} style={{
+                                                background: 'rgba(255,255,255,0.2)', borderRadius: 5, padding: '2px 6px',
+                                                fontSize: '0.52rem', fontWeight: 600,
+                                            }}>{n}</span>
+                                        ))}
+                                    </div>
+                                    <div style={{ fontSize: '0.58rem', opacity: 0.85, marginBottom: 6 }}>
+                                        📦 Select · 💳 Pay · 🌐 Connect
+                                    </div>
+                                    <div style={{
+                                        background: `${accentColor}40`, borderRadius: 12, padding: '4px 10px',
+                                        fontSize: '0.6rem', display: 'inline-flex', alignItems: 'center', gap: 4,
+                                    }}>
+                                        📞 Support: {customerCareNumber || '0621085215'}
+                                    </div>
+                                </div>
 
-                            {/* Preview note */}
-                            <div style={{
-                                marginTop: 12, padding: '8px 12px', background: 'rgba(255,255,255,0.9)',
-                                borderRadius: 6, fontSize: '0.68rem', color: '#374151',
-                            }}>
-                                <strong style={{ color: 'var(--primary)' }}>Preview Note:</strong> This is a simplified preview. The actual downloaded ZIP file will include all functionality including the improved announcement popup with close/ok icons and support for multiple image formats (JPG, PNG, WEBP, GIF, AVIF, SVG).
+                                <div style={{ padding: '10px 12px', fontFamily: selectedFont }}>
+                                    {/* Packages */}
+                                    <div style={{ fontWeight: 700, color: primaryColor, fontSize: '0.68rem', marginBottom: 6 }}>📦 Packages</div>
+                                    <div style={{
+                                        display: 'grid',
+                                        gridTemplateColumns: layout === 'horizontal' ? 'repeat(4, 1fr)' : layout === 'vertical' ? '1fr' : 'repeat(3, 1fr)',
+                                        gap: 5, marginBottom: 10,
+                                    }}>
+                                        {(routerPackages.length > 0 ? routerPackages.slice(0, 4) : [
+                                            { name: 'MASAA 6', price: 450, duration: 6, durationUnit: 'Hrs' },
+                                            { name: 'MASAA 24', price: 950, duration: 24, durationUnit: 'Hrs' },
+                                            { name: 'SIKU 3', price: 2450, duration: 3, durationUnit: 'Days' },
+                                            { name: 'SIKU 7', price: 5000, duration: 7, durationUnit: 'Days' },
+                                        ]).map((pkg: any, i: number) => (
+                                            <div key={i} 
+                                                onClick={() => {
+                                                    setPreviewPaymentPkg(pkg);
+                                                    setPreviewPaymentStep('initial');
+                                                    setPreviewPhone('');
+                                                }}
+                                                style={{
+                                                    background: `linear-gradient(135deg, ${accentColor}08, ${accentColor}15)`,
+                                                    border: `1.5px solid ${accentColor}30`, borderRadius: 8,
+                                                    padding: '6px 4px', textAlign: 'center', cursor: 'pointer',
+                                                    transition: 'all 0.2s',
+                                                }}>
+                                                <div style={{ fontSize: '0.52rem', fontWeight: 700, color: accentColor, textTransform: 'uppercase' }}>{pkg.name}</div>
+                                                <div style={{ fontSize: '0.82rem', fontWeight: 700, color: primaryColor, lineHeight: 1 }}>
+                                                    <span style={{ fontSize: '0.48rem', color: '#888' }}>TSH </span>{(pkg.price || 0).toLocaleString()}
+                                                </div>
+                                                <div style={{ fontSize: '0.48rem', color: '#e74c3c', marginTop: 2 }}>⏱ {pkg.validity}</div>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {/* Voucher */}
+                                    <div style={{ fontWeight: 700, color: primaryColor, fontSize: '0.62rem', marginBottom: 4 }}>🎟️ Redeem Voucher</div>
+                                    <div style={{ background: '#f8fafb', border: '1px solid #e8ecf0', borderRadius: 8, padding: 8, marginBottom: 8 }}>
+                                        <div style={{ display: 'flex', gap: 4 }}>
+                                            <input placeholder="Voucher code" readOnly style={{
+                                                flex: 1, padding: '4px 6px', border: '1px solid #d1d5db', borderRadius: 5, fontSize: '0.56rem',
+                                            }} />
+                                            <button style={{
+                                                background: '#e53935', color: '#fff', border: 'none', padding: '4px 8px',
+                                                borderRadius: 5, fontSize: '0.52rem', fontWeight: 700,
+                                            }}>Redeem</button>
+                                        </div>
+                                    </div>
+
+                                    {/* Reconnect */}
+                                    <div style={{ fontWeight: 700, color: primaryColor, fontSize: '0.62rem', marginBottom: 4 }}>🔄 Reconnect</div>
+                                    <div style={{ background: '#f8fafb', border: '1px solid #e8ecf0', borderRadius: 8, padding: 8, marginBottom: 8 }}>
+                                        <input placeholder="ZenoPay reference (ZP...)" readOnly style={{
+                                            width: '100%', padding: '4px 6px', border: '1px solid #d1d5db', borderRadius: 5,
+                                            fontSize: '0.56rem', marginBottom: 4,
+                                        }} />
+                                        <button style={{
+                                            width: '100%', background: 'linear-gradient(135deg, #e53935, #c62828)', color: '#fff',
+                                            border: 'none', padding: '5px', borderRadius: 5, fontSize: '0.56rem', fontWeight: 700,
+                                        }}>💳 Reconnect</button>
+                                    </div>
+
+                                    {/* Manual Login */}
+                                    <div style={{ fontWeight: 700, color: primaryColor, fontSize: '0.62rem', marginBottom: 4 }}>📶 Manual Login</div>
+                                    <div style={{ background: '#f8fafb', border: '1px solid #e8ecf0', borderRadius: 8, padding: 8, marginBottom: 6 }}>
+                                        <div style={{ display: 'flex', gap: 4 }}>
+                                            <input placeholder="HS-TI07956" readOnly style={{
+                                                flex: 1, padding: '4px 6px', border: '1px solid #d1d5db', borderRadius: 5, fontSize: '0.56rem',
+                                            }} />
+                                            <input placeholder="••••" type="password" readOnly style={{
+                                                flex: 1, padding: '4px 6px', border: '1px solid #d1d5db', borderRadius: 5, fontSize: '0.56rem',
+                                            }} />
+                                            <button style={{
+                                                background: accentColor, color: '#fff', border: 'none', padding: '4px 10px',
+                                                borderRadius: 5, fontSize: '0.52rem', fontWeight: 700, whiteSpace: 'nowrap',
+                                            }}>Connect</button>
+                                        </div>
+                                        {enableRememberMe && (
+                                            <div style={{ marginTop: 4, fontSize: '0.48rem', color: '#888', display: 'flex', alignItems: 'center', gap: 3 }}>
+                                                <input type="checkbox" readOnly style={{ width: 8, height: 8 }} />
+                                                Remember me (Auto-reconnect while subscribed)
+                                            </div>
+                                        )}
+                                        <div style={{
+                                            background: `${accentColor}10`, border: `1px solid ${accentColor}25`,
+                                            borderRadius: 5, padding: '4px 8px', marginTop: 6,
+                                            fontSize: '0.52rem', color: primaryColor, display: 'flex', alignItems: 'center', gap: 4,
+                                        }}>
+                                            🖥️ MAC: <strong>62:C4:BB:A5:6B:DA</strong>
+                                        </div>
+                                    </div>
+
+                                    <div style={{ textAlign: 'center', fontSize: '0.48rem', color: '#bbb', marginTop: 6 }}>
+                                        Powered by {companyName} • {selectedRouter?.name || 'Router'}
+                                    </div>
+                                </div>
+
+                                {/* Preview Payment Simulation Overlay */}
+                                {previewPaymentPkg && (
+                                    <div style={{
+                                        position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', 
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 15,
+                                        zIndex: 10, borderRadius: '0 0 12px 12px',
+                                        fontFamily: selectedFont
+                                    }}>
+                                        <div style={{ background: '#fff', borderRadius: 12, width: '100%', overflow: 'hidden', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}>
+                                            <div style={{ background: `linear-gradient(135deg, ${primaryColor}, ${accentColor})`, padding: 12, color: '#fff', textAlign: 'center' }}>
+                                                <div style={{ fontSize: '0.55rem', opacity: 0.9 }}>Confirm Purchase</div>
+                                                <div style={{ fontSize: '0.75rem', fontWeight: 700 }}>{previewPaymentPkg.name}</div>
+                                                <div style={{ fontSize: '0.85rem', fontWeight: 700 }}>TSH {previewPaymentPkg.price.toLocaleString()}</div>
+                                            </div>
+                                            
+                                            {previewPaymentStep === 'initial' && (
+                                                <div style={{ padding: 15 }}>
+                                                    <div style={{ marginBottom: 10 }}>
+                                                        <label style={{ display: 'block', fontSize: '0.6rem', color: '#666', marginBottom: 4 }}>Enter Mobile Number</label>
+                                                        <input 
+                                                            type="tel" 
+                                                            placeholder="0XXXXXXXXX" 
+                                                            value={previewPhone}
+                                                            onChange={e => setPreviewPhone(e.target.value)}
+                                                            style={{ width: '100%', padding: '6px 8px', border: '1px solid #ddd', borderRadius: 6, fontSize: '0.7rem' }} 
+                                                        />
+                                                    </div>
+                                                    <div style={{ display: 'flex', gap: 6 }}>
+                                                        <button 
+                                                            onClick={() => setPreviewPaymentStep('waiting')}
+                                                            style={{ flex: 2, background: accentColor, color: '#fff', border: 'none', padding: '6px', borderRadius: 6, fontSize: '0.65rem', fontWeight: 700, cursor: 'pointer' }}
+                                                        >Pay Now</button>
+                                                        <button 
+                                                            onClick={() => setPreviewPaymentPkg(null)}
+                                                            style={{ flex: 1, background: '#94a3b8', color: '#fff', border: 'none', padding: '6px', borderRadius: 6, fontSize: '0.65rem', fontWeight: 700, cursor: 'pointer' }}
+                                                        >Cancel</button>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {previewPaymentStep === 'waiting' && (
+                                                <div style={{ padding: '25px 15px', textAlign: 'center' }}>
+                                                    <div style={{ display: 'inline-block', padding: '3px 10px', borderRadius: 15, fontSize: '0.55rem', fontWeight: 700, background: `${accentColor}15`, color: accentColor, marginBottom: 8 }}>
+                                                        Waiting for payment...
+                                                    </div>
+                                                    <div style={{ fontSize: '0.65rem', color: '#475569', marginBottom: 12 }}>Please enter your PIN on your phone.</div>
+                                                    <div className="preview-spinner" style={{ width: 20, height: 20, border: `2px solid ${accentColor}20`, borderTopColor: accentColor, borderRadius: '50%', margin: '0 auto' }}></div>
+                                                    <button 
+                                                        onClick={() => {
+                                                            setPreviewPaymentStep('success');
+                                                            setTimeout(() => setPreviewPaymentPkg(null), 2500);
+                                                        }}
+                                                        style={{ marginTop: 15, background: 'none', border: 'none', color: accentColor, fontSize: '0.5rem', fontWeight: 600, cursor: 'pointer' }}
+                                                    >(Simulate Success)</button>
+                                                </div>
+                                            )}
+
+                                            {previewPaymentStep === 'success' && (
+                                                <div style={{ padding: '25px 15px', textAlign: 'center' }}>
+                                                    <div style={{ display: 'inline-block', padding: '3px 10px', borderRadius: 15, fontSize: '0.55rem', fontWeight: 700, background: '#22c55e', color: '#fff', marginBottom: 8 }}>
+                                                        PAID!
+                                                    </div>
+                                                    <div style={{ fontSize: '0.65rem', color: '#065f46', fontWeight: 600 }}>Connecting you online now...</div>
+                                                    <div style={{ fontSize: '0.8rem', marginTop: 8 }}>✅</div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                            <style>{`
+                                @keyframes previewSpin { to { transform: rotate(360deg); } }
+                                .preview-spinner { animation: previewSpin 0.8s linear infinite; }
+                            `}</style>
+                            <div style={{ padding: '8px 12px', fontSize: '0.72rem', color: '#dc2626' }}>
+                                <strong>Preview Note:</strong> This is a simplified preview. Click "Preview Changes" for the full page, or "Download ZIP" to get the complete template.
                             </div>
                         </div>
                     </div>
-                </div>
+                )}
             </div>
+
+            {/* Show Preview Toggle (when hidden) */}
+            {!showPreview && (
+                <button
+                    className="btn"
+                    style={{
+                        position: 'fixed', bottom: 20, right: 20,
+                        background: '#2563eb', color: '#fff', fontWeight: 600,
+                        padding: '10px 20px', borderRadius: 20, boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                        display: 'flex', alignItems: 'center', gap: 6, zIndex: 100,
+                    }}
+                    onClick={() => setShowPreview(true)}
+                >
+                    <PreviewIcon fontSize="small" /> Show Preview
+                </button>
+            )}
         </div>
     );
 }

@@ -165,7 +165,7 @@ export default function MpesaPaybillConfig() {
 
                 <div className="form-hint" style={{ marginBottom: 16 }}>
                     <InfoOutlinedIcon style={{ fontSize: 12, marginRight: 4 }} />
-                    contact admin@suruchbilling.com for other configurations
+                    contact admin@hqinvestmentbilling.com for other configurations
                 </div>
 
                 {/* Prompt Configuration */}

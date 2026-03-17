@@ -1,9 +1,15 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
-import { jsonResponse, errorResponse } from "@/lib/auth";
+import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
+        const userPayload = getUserFromRequest(req);
+        if (!userPayload) return errorResponse("Unauthorized", 401);
+        if (userPayload.role !== "SUPER_ADMIN" && userPayload.role !== "ADMIN") {
+            return errorResponse("Forbidden", 403);
+        }
+
         const { id } = await params;
         const invoice = await prisma.invoice.findUnique({
             where: { id },
@@ -18,6 +24,12 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
+        const userPayload = getUserFromRequest(req);
+        if (!userPayload) return errorResponse("Unauthorized", 401);
+        if (userPayload.role !== "SUPER_ADMIN" && userPayload.role !== "ADMIN") {
+            return errorResponse("Forbidden", 403);
+        }
+
         const { id } = await params;
         const body = await req.json();
 
@@ -36,8 +48,14 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     }
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
+        const userPayload = getUserFromRequest(req);
+        if (!userPayload) return errorResponse("Unauthorized", 401);
+        if (userPayload.role !== "SUPER_ADMIN" && userPayload.role !== "ADMIN") {
+            return errorResponse("Forbidden", 403);
+        }
+
         const { id } = await params;
         await prisma.invoice.delete({ where: { id } });
         return jsonResponse({ message: "Invoice deleted" });

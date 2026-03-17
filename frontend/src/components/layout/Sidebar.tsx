@@ -22,6 +22,7 @@ import BarChartIcon from '@mui/icons-material/BarChart';
 import PlayCircleIcon from '@mui/icons-material/PlayCircle';
 import ReceiptIcon from '@mui/icons-material/Receipt';
 import CloseIcon from '@mui/icons-material/Close';
+import authStore from '../../stores/authStore';
 import './Sidebar.css';
 
 const navSections = [
@@ -136,10 +137,23 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                 </div>
 
                 <nav className="sidebar-nav">
-                    {navSections.map((section) => (
-                        <div key={section.title} className="nav-section">
-                            <div className="nav-section-title">{section.title}</div>
-                            {section.items.map((item) => (
+                    {navSections.map((section) => {
+                        const { user } = authStore.useAuth();
+                        const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
+
+                        const filteredItems = section.items.filter(item => {
+                            if (item.label === 'Invoices' || item.label === 'System Users') {
+                                return isAdmin;
+                            }
+                            return true;
+                        });
+
+                        if (filteredItems.length === 0) return null;
+
+                        return (
+                            <div key={section.title} className="nav-section">
+                                <div className="nav-section-title">{section.title}</div>
+                                {filteredItems.map((item) => (
                                 <NavLink
                                     key={item.path}
                                     to={item.path}
@@ -151,7 +165,8 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                                 </NavLink>
                             ))}
                         </div>
-                    ))}
+                    );
+                })}
                 </nav>
             </aside>
         </>

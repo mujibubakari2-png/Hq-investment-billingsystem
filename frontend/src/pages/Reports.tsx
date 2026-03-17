@@ -1,20 +1,40 @@
+import { useState, useEffect } from 'react';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import GroupIcon from '@mui/icons-material/Group';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { revenueChartData, subscriberGrowthData, mockExpenses } from '../data/mockData';
+import { reportsApi } from '../api/client';
 
 const COLORS = ['#e53935', '#4caf50', '#2196f3', '#ff9800', '#9c27b0'];
 
-const expenseByCategory = mockExpenses.reduce<Record<string, number>>((acc, e) => {
-    acc[e.category] = (acc[e.category] || 0) + e.amount;
-    return acc;
-}, {});
-
-const expensePieData = Object.entries(expenseByCategory).map(([name, value]) => ({ name, value }));
-
 export default function Reports() {
+    const [reportData, setReportData] = useState<any>(null);
+    const [loading, setLoading] = useState(true);
+
+    const fetchReports = async () => {
+        setLoading(true);
+        try {
+            const data = await reportsApi.get({ period: 'monthly' });
+            setReportData(data);
+        } catch (err) {
+            console.error('Failed to load reports:', err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchReports();
+    }, []);
+
+    if (loading || !reportData) {
+        return <div style={{ padding: '2rem', textAlign: 'center' }}>Loading reports...</div>;
+    }
+
+    // Prepare Pie Chart data from expense breakdown if available
+    const expenseByCategory = reportData.expensesByCategory || {};
+    const expensePieData = Object.entries(expenseByCategory).map(([name, value]) => ({ name, value: value as number }));
     return (
         <div>
             <div className="page-header">
@@ -33,26 +53,26 @@ export default function Reports() {
             <div className="stat-cards" style={{ marginBottom: 24 }}>
                 <div className="stat-card blue">
                     <div className="stat-card-label">Total Revenue</div>
-                    <div className="stat-card-value">150,000</div>
+                    <div className="stat-card-value">{reportData.totalRevenue?.toLocaleString() || 0}</div>
                     <div style={{ fontSize: '0.8rem', opacity: 0.8 }}>TZS All-time</div>
                     <div className="stat-card-icon"><AttachMoneyIcon style={{ fontSize: 48 }} /></div>
                 </div>
                 <div className="stat-card green">
                     <div className="stat-card-label">Monthly Revenue</div>
-                    <div className="stat-card-value">45,000</div>
-                    <div style={{ fontSize: '0.8rem', opacity: 0.8 }}>TZS Feb 2026</div>
+                    <div className="stat-card-value">{reportData.monthlyRevenue?.toLocaleString() || 0}</div>
+                    <div style={{ fontSize: '0.8rem', opacity: 0.8 }}>TZS This Month</div>
                     <div className="stat-card-icon"><TrendingUpIcon style={{ fontSize: 48 }} /></div>
                 </div>
                 <div className="stat-card purple">
                     <div className="stat-card-label">Total Clients</div>
-                    <div className="stat-card-value">95</div>
-                    <div style={{ fontSize: '0.8rem', opacity: 0.8 }}>+12 this month</div>
+                    <div className="stat-card-value">{reportData.totalClients || 0}</div>
+                    <div style={{ fontSize: '0.8rem', opacity: 0.8 }}>Active Users</div>
                     <div className="stat-card-icon"><GroupIcon style={{ fontSize: 48 }} /></div>
                 </div>
                 <div className="stat-card orange">
                     <div className="stat-card-label">Total Expenses</div>
                     <div className="stat-card-value">
-                        {(mockExpenses.reduce((s, e) => s + e.amount, 0) / 1000).toFixed(0)}K
+                        {((reportData.totalExpenses || 0) / 1000).toFixed(0)}K
                     </div>
                     <div style={{ fontSize: '0.8rem', opacity: 0.8 }}>TZS this period</div>
                     <div className="stat-card-icon"><BarChartIcon style={{ fontSize: 48 }} /></div>
@@ -64,7 +84,7 @@ export default function Reports() {
                 <div className="card card-body">
                     <h3 style={{ marginBottom: 16, fontWeight: 600 }}>Daily Revenue (TZS)</h3>
                     <ResponsiveContainer width="100%" height={220}>
-                        <AreaChart data={revenueChartData}>
+                        <AreaChart data={reportData.revenueChartData || []}>
                             <defs>
                                 <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
                                     <stop offset="5%" stopColor="#e53935" stopOpacity={0.15} />
@@ -84,7 +104,7 @@ export default function Reports() {
                 <div className="card card-body">
                     <h3 style={{ marginBottom: 16, fontWeight: 600 }}>Subscriber Growth</h3>
                     <ResponsiveContainer width="100%" height={220}>
-                        <BarChart data={subscriberGrowthData}>
+                        <BarChart data={reportData.subscriberGrowthData || []}>
                             <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                             <XAxis dataKey="month" tick={{ fontSize: 11 }} />
                             <YAxis tick={{ fontSize: 11 }} />

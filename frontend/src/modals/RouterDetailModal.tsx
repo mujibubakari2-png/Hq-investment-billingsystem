@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import CloseIcon from '@mui/icons-material/Close';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -8,15 +9,29 @@ import EditIcon from '@mui/icons-material/Edit';
 import LoginIcon from '@mui/icons-material/Login';
 import DeleteIcon from '@mui/icons-material/Delete';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import MikrotikScriptModal from './MikrotikScriptModal';
+import WireGuardConfigModal from './WireGuardConfigModal';
 import type { Router } from '../types';
 
 interface RouterDetailModalProps {
     router: Router;
     onClose: () => void;
+    onEdit?: (router: Router) => void;
+    onDelete?: (router: Router) => void;
 }
 
-export default function RouterDetailModal({ router, onClose }: RouterDetailModalProps) {
+export default function RouterDetailModal({ router, onClose, onEdit, onDelete }: RouterDetailModalProps) {
     const navigate = useNavigate();
+    const [showScript, setShowScript] = useState(false);
+    const [showWireGuard, setShowWireGuard] = useState(false);
+
+    if (showScript) {
+        return <MikrotikScriptModal router={router} onClose={() => setShowScript(false)} />;
+    }
+    if (showWireGuard) {
+        return <WireGuardConfigModal router={router} onClose={() => setShowWireGuard(false)} />;
+    }
+
     return (
         <div className="modal-overlay" onClick={onClose}>
             <div className="modal" style={{ maxWidth: 520, overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
@@ -66,13 +81,13 @@ export default function RouterDetailModal({ router, onClose }: RouterDetailModal
                             <button className="btn" style={{
                                 background: '#fef3c7', color: '#d97706', fontWeight: 600, border: '1px solid #fbbf24',
                                 padding: '10px 16px', borderRadius: 'var(--radius-sm)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                            }}>
+                            }} onClick={() => setShowWireGuard(true)}>
                                 <VpnLockIcon fontSize="small" /> WireGuard
                             </button>
                             <button className="btn" style={{
                                 background: '#fef3c7', color: '#d97706', fontWeight: 600, border: '1px solid #fbbf24',
                                 padding: '10px 16px', borderRadius: 'var(--radius-sm)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                            }}>
+                            }} onClick={() => setShowScript(true)}>
                                 <DescriptionIcon fontSize="small" /> MikroTik Script
                             </button>
                         </div>
@@ -87,7 +102,7 @@ export default function RouterDetailModal({ router, onClose }: RouterDetailModal
                             <button className="btn" style={{
                                 background: '#ecfdf5', color: '#16a34a', fontWeight: 600, border: '1px solid #86efac',
                                 padding: '10px 16px', borderRadius: 'var(--radius-sm)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                            }}>
+                            }} onClick={() => { if (onEdit) { onClose(); onEdit(router); } }}>
                                 <EditIcon fontSize="small" /> Edit Router
                             </button>
                             <button className="btn" style={{
@@ -108,8 +123,8 @@ export default function RouterDetailModal({ router, onClose }: RouterDetailModal
                             background: '#fef2f2', color: '#dc2626', fontWeight: 600, border: '1px solid #fecaca',
                             padding: '10px 16px', borderRadius: 'var(--radius-sm)', width: '100%',
                             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                        }}>
-                            <DeleteIcon fontSize="small" /> Delete Route
+                        }} onClick={() => { if (onDelete) { onClose(); onDelete(router); } }}>
+                            <DeleteIcon fontSize="small" /> Delete Router
                         </button>
                     </div>
                 </div>

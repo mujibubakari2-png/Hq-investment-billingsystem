@@ -1,9 +1,15 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
-import { hashPassword, jsonResponse, errorResponse } from "@/lib/auth";
+import { hashPassword, jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
+        const userPayload = getUserFromRequest(req);
+        if (!userPayload) return errorResponse("Unauthorized", 401);
+        if (userPayload.role !== "SUPER_ADMIN" && userPayload.role !== "ADMIN") {
+            return errorResponse("Forbidden", 403);
+        }
+
         const { id } = await params;
         const user = await prisma.user.findUnique({
             where: { id },
@@ -27,6 +33,12 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
+        const userPayload = getUserFromRequest(req);
+        if (!userPayload) return errorResponse("Unauthorized", 401);
+        if (userPayload.role !== "SUPER_ADMIN" && userPayload.role !== "ADMIN") {
+            return errorResponse("Forbidden", 403);
+        }
+
         const { id } = await params;
         const body = await req.json();
 
@@ -63,8 +75,14 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     }
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
+        const userPayload = getUserFromRequest(req);
+        if (!userPayload) return errorResponse("Unauthorized", 401);
+        if (userPayload.role !== "SUPER_ADMIN" && userPayload.role !== "ADMIN") {
+            return errorResponse("Forbidden", 403);
+        }
+
         const { id } = await params;
         await prisma.user.delete({ where: { id } });
         return jsonResponse({ message: "User deleted" });
