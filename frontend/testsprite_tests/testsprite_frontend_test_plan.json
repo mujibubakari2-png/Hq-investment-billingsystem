@@ -1,0 +1,2396 @@
+[
+  {
+    "id": "TC001",
+    "title": "Successful login redirects to dashboard",
+    "description": "Verifies a user can log in with valid credentials and is redirected to the dashboard.",
+    "category": "Authentication",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Login\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the username input"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password input"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/dashboard\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Dashboard\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC002",
+    "title": "Invalid password shows error on login page",
+    "description": "Verifies an invalid login attempt displays an error and does not navigate away from the login page.",
+    "category": "Authentication",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"fake.user@example.com\" into the username input"
+      },
+      {
+        "type": "action",
+        "description": "Type \"wrong-password-123\" into the password input"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/login\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Invalid\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC003",
+    "title": "Login validation: required fields prevent submission",
+    "description": "Verifies the login form shows a visible validation message when required fields are missing.",
+    "category": "Authentication",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Login\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/login\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"required\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC004",
+    "title": "Navigate from login to registration page",
+    "description": "Verifies users can reach the registration page from the login screen.",
+    "category": "Authentication",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Login\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Register\" link"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/register\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Register\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC005",
+    "title": "Registration success shows confirmation/onboarding state",
+    "description": "Verifies a user can submit the registration form and see a success confirmation/onboarding indicator.",
+    "category": "Authentication",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /register"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Register\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Type \"Test Admin\" into the full name field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"new.admin+e2e@example.com\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"StrongPass!234\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Register\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"success\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC006",
+    "title": "Navigate from login to forgot password page",
+    "description": "Verifies users can reach the forgot password page from the login screen.",
+    "category": "Authentication",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Login\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Forgot Password\" link"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/forgot-password\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Forgot Password\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC007",
+    "title": "Forgot password: request reset without email/phone shows validation",
+    "description": "Verifies the forgot password form requires an email/phone before submission and shows a visible error if missing.",
+    "category": "Authentication",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /forgot-password"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Forgot Password\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Submit\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/forgot-password\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"required\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC008",
+    "title": "Add a new client and verify it appears in the client list",
+    "description": "Verifies a user can create a new client and immediately see the new entry in the clients list.",
+    "category": "Client Registration & Management",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/dashboard\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Clients\" in the main navigation menu"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/clients\""
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Add Client\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Add Client\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Fill \"Test Client\" into the client name field"
+      },
+      {
+        "type": "action",
+        "description": "Fill \"testclient+e2e@example.com\" into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Fill \"0700000000\" into the phone field"
+      },
+      {
+        "type": "action",
+        "description": "Select \"Hotspot\" from the client type dropdown"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Save\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Test Client\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC009",
+    "title": "Client creation form shows validation when required fields are missing",
+    "description": "Verifies the add client form blocks saving and shows a visible validation message when required data is omitted.",
+    "category": "Client Registration & Management",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/dashboard\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Clients\" in the main navigation menu"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/clients\""
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Add Client\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Add Client\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Fill \"Validation Client\" into the client name field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Save\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"required\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC010",
+    "title": "Ban an existing client from the list and verify status changes to Banned",
+    "description": "Verifies an admin can ban a client via the Actions menu and the client status updates in the list.",
+    "category": "Client Registration & Management",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/dashboard\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Clients\" in the main navigation menu"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/clients\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Clients\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Actions\" button/menu for the first client row in the list"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Ban\" option"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Confirm\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Banned\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC011",
+    "title": "Cancel banning a client and verify status does not change to Banned",
+    "description": "Verifies that choosing cancel/close on the ban confirmation does not apply the status change.",
+    "category": "Client Registration & Management",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/dashboard\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Clients\" in the main navigation menu"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/clients\""
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Actions\" button/menu for the first client row in the list"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Ban\" option"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Confirm\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Cancel\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Banned\" is not visible"
+      }
+    ]
+  },
+  {
+    "id": "TC012",
+    "title": "Filter clients by Expired and extend an expired subscription",
+    "description": "Verifies an admin can filter to expired subscribers, extend a subscription, and see the updated expiry information.",
+    "category": "Client Registration & Management",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/dashboard\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Clients\" in the main navigation menu"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/clients\""
+      },
+      {
+        "type": "action",
+        "description": "Select \"Expired\" from the status filter dropdown"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Expired\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click the first client row in the filtered results"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Extend\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Extend\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Extend\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Fill \"30\" into the extension days field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Save\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Expiry\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC013",
+    "title": "Extend subscription shows validation when extension details are missing",
+    "description": "Verifies the extend subscription workflow prevents saving and shows a visible validation message when required extension inputs are empty.",
+    "category": "Client Registration & Management",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/dashboard\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Clients\" in the main navigation menu"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/clients\""
+      },
+      {
+        "type": "action",
+        "description": "Select \"Expired\" from the status filter dropdown"
+      },
+      {
+        "type": "action",
+        "description": "Click the first client row in the filtered results"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Extend\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Extend\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Save\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"required\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC014",
+    "title": "Change client status to Disabled from Actions menu",
+    "description": "Verifies an admin can change a client status to Disabled and see the updated status in the list.",
+    "category": "Client Registration & Management",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/dashboard\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Clients\" in the main navigation menu"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/clients\""
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Actions\" button/menu for the first client row in the list"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Disable\" option"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Confirm\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Disabled\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC015",
+    "title": "Change client status to Suspended from Actions menu",
+    "description": "Verifies an admin can suspend a client and see status reflected as Suspended in the client list.",
+    "category": "Client Registration & Management",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/dashboard\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Clients\" in the main navigation menu"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/clients\""
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Actions\" button/menu for the first client row in the list"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Suspend\" option"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Confirm\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Suspended\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC016",
+    "title": "Dashboard shows revenue analytics and subscriber growth summary on initial load",
+    "description": "Verifies that the dashboard loads and displays key revenue and subscriber growth widgets.",
+    "category": "Dashboard Visualization",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/dashboard\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Revenue\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Subscriber\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Subscriber growth\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC017",
+    "title": "Dashboard displays revenue charts widget",
+    "description": "Verifies that the revenue charts area is visible after successful login and dashboard load.",
+    "category": "Dashboard Visualization",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/dashboard\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Revenue chart\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Revenue\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC018",
+    "title": "Dashboard shows router status summary with Online and Offline counts",
+    "description": "Verifies that router status summary section is present and includes Online/Offline indicators.",
+    "category": "Dashboard Visualization",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/dashboard\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Router\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Online\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Offline\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC019",
+    "title": "Dashboard system monitor section is visible (CPU, Memory, Disk, Traffic)",
+    "description": "Verifies the system monitor widget is present and displays the key resource labels.",
+    "category": "Dashboard Visualization",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/dashboard\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"CPU\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Memory\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Disk\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC020",
+    "title": "Dashboard network traffic values appear after loading",
+    "description": "Verifies that network traffic values in the system monitor load and are visible to the user.",
+    "category": "Dashboard Visualization",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/dashboard\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Network\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Wait for element \"Traffic\" to be visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Traffic value\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC021",
+    "title": "Filter dashboard metrics by router using 'Filter by Router' dropdown",
+    "description": "Verifies that selecting a specific router in the filter updates the dashboard view to a filtered state.",
+    "category": "Dashboard Visualization",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/dashboard\""
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Filter by Router\" dropdown"
+      },
+      {
+        "type": "action",
+        "description": "Select the first non-default router option from the dropdown"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Filtered\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC022",
+    "title": "Filter by Router can be changed to another router selection",
+    "description": "Verifies that changing the router filter selection updates the dashboard again (second refresh).",
+    "category": "Dashboard Visualization",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/dashboard\""
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Filter by Router\" dropdown"
+      },
+      {
+        "type": "action",
+        "description": "Select the first non-default router option from the dropdown"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Filter by Router\" dropdown"
+      },
+      {
+        "type": "action",
+        "description": "Select a different router option from the dropdown"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Revenue chart\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC023",
+    "title": "Dashboard shows error/fallback UI and Retry button when data load fails",
+    "description": "Verifies that the dashboard displays an error state with a Retry control when the dashboard data cannot be loaded.",
+    "category": "Dashboard Visualization",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/dashboard\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Error\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Retry\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC024",
+    "title": "Retry reloads dashboard after an error state",
+    "description": "Verifies that clicking Retry re-attempts loading and returns to a normal dashboard view when successful.",
+    "category": "Dashboard Visualization",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/dashboard\""
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Retry\" button"
+      },
+      {
+        "type": "action",
+        "description": "Wait for element \"Revenue chart\" to be visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Revenue\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC025",
+    "title": "Create a new router with a selected VPN mode and view setup instructions",
+    "description": "Verifies a router can be created from the Routers page and the setup instructions/download links are shown after creation.",
+    "category": "Router Management (Mikrotiks)",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/dashboard\""
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Routers\" in the main navigation menu"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/routers\""
+      },
+      {
+        "type": "action",
+        "description": "Click the \"+ Add New Router\" button"
+      }
+    ]
+  },
+  {
+    "id": "TC026",
+    "title": "Complete router creation form and confirm setup wizard content is displayed",
+    "description": "Verifies the add-router dialog accepts valid inputs, creates the router, and shows setup wizard instructions and configuration links.",
+    "category": "Router Management (Mikrotiks)",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Routers\" in the main navigation menu"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"+ Add New Router\" button"
+      },
+      {
+        "type": "action",
+        "description": "Type \"AC-123456\" into the \"Access Code\" field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"Core-Router-1\" into the \"Router Name\" field"
+      }
+    ]
+  },
+  {
+    "id": "TC027",
+    "title": "Select VPN configuration mode and create router",
+    "description": "Verifies VPN mode selection works and the router can be created, resulting in visible setup instructions.",
+    "category": "Router Management (Mikrotiks)",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Routers\" in the main navigation menu"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"+ Add New Router\" button"
+      },
+      {
+        "type": "action",
+        "description": "Select \"WireGuard\" from the \"VPN Configuration Mode\" dropdown"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Create Router\" button"
+      }
+    ]
+  },
+  {
+    "id": "TC028",
+    "title": "Router name validation rejects invalid characters",
+    "description": "Verifies entering a router name with invalid characters prevents creation and shows a visible validation error.",
+    "category": "Router Management (Mikrotiks)",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Routers\" in the main navigation menu"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"+ Add New Router\" button"
+      },
+      {
+        "type": "action",
+        "description": "Type \"Bad/Name@@@\" into the \"Router Name\" field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Create Router\" button"
+      }
+    ]
+  },
+  {
+    "id": "TC029",
+    "title": "Router name validation error is displayed and router is not created",
+    "description": "Verifies a clear error message is shown for invalid router name and the add-router flow does not proceed to setup instructions.",
+    "category": "Router Management (Mikrotiks)",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Routers\" in the main navigation menu"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"+ Add New Router\" button"
+      },
+      {
+        "type": "action",
+        "description": "Type \"Bad/Name@@@\" into the \"Router Name\" field"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"invalid\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC030",
+    "title": "Create a new Hotspot package and verify it appears in the package list",
+    "description": "Verifies a user can create a Hotspot service package with price, duration, router, and bandwidth settings and then see it listed.",
+    "category": "Package Management",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/dashboard\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Packages\" in the main navigation menu"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/packages\""
+      },
+      {
+        "type": "action",
+        "description": "Click the \"+ Add Package\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Package Type\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Select \"Hotspot\" from the Package Type options"
+      },
+      {
+        "type": "action",
+        "description": "Type \"Hotspot Basic Plan\" into the Name field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"10\" into the Price field"
+      },
+      {
+        "type": "action",
+        "description": "Select an option from the Router dropdown"
+      },
+      {
+        "type": "action",
+        "description": "Select an option from the Duration dropdown"
+      },
+      {
+        "type": "action",
+        "description": "Type \"5\" into the Upload Speed field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"10\" into the Download Speed field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"+ Add Package\" button on the form"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Hotspot Basic Plan\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC031",
+    "title": "Create a new PPPoE package and verify it appears in the package list",
+    "description": "Verifies a user can create a PPPoE service package and see it listed after submission.",
+    "category": "Package Management",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/dashboard\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Packages\" in the main navigation menu"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/packages\""
+      },
+      {
+        "type": "action",
+        "description": "Click the \"+ Add Package\" button"
+      },
+      {
+        "type": "action",
+        "description": "Select \"PPPoE\" from the Package Type options"
+      },
+      {
+        "type": "action",
+        "description": "Type \"PPPoE Standard\" into the Name field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"25\" into the Price field"
+      },
+      {
+        "type": "action",
+        "description": "Select an option from the Router dropdown"
+      },
+      {
+        "type": "action",
+        "description": "Select an option from the Duration dropdown"
+      },
+      {
+        "type": "action",
+        "description": "Type \"10\" into the Upload Speed field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"20\" into the Download Speed field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"+ Add Package\" button on the form"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"PPPoE Standard\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC032",
+    "title": "Create a new Static IP package and verify it appears in the package list",
+    "description": "Verifies a user can create a Static IP service package and confirm it is shown in the list.",
+    "category": "Package Management",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/dashboard\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Packages\" in the main navigation menu"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/packages\""
+      },
+      {
+        "type": "action",
+        "description": "Click the \"+ Add Package\" button"
+      },
+      {
+        "type": "action",
+        "description": "Select \"Static\" from the Package Type options"
+      },
+      {
+        "type": "action",
+        "description": "Type \"Static IP Bronze\" into the Name field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"40\" into the Price field"
+      },
+      {
+        "type": "action",
+        "description": "Select an option from the Router dropdown"
+      },
+      {
+        "type": "action",
+        "description": "Select an option from the Duration dropdown"
+      },
+      {
+        "type": "action",
+        "description": "Type \"15\" into the Upload Speed field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"30\" into the Download Speed field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"+ Add Package\" button on the form"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Static IP Bronze\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC033",
+    "title": "Show validation error when creating a package with missing price",
+    "description": "Verifies the form blocks submission and shows a required-field error when Price is left empty.",
+    "category": "Package Management",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/dashboard\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Packages\" in the main navigation menu"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/packages\""
+      },
+      {
+        "type": "action",
+        "description": "Click the \"+ Add Package\" button"
+      },
+      {
+        "type": "action",
+        "description": "Type \"No Price Plan\" into the Name field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"+ Add Package\" button on the form"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Price is required\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC034",
+    "title": "Edit an existing package upload speed and verify the update is reflected in the list",
+    "description": "Verifies a user can edit a package, save changes, and see updated upload speed in the package list.",
+    "category": "Package Management",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/dashboard\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Packages\" in the main navigation menu"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/packages\""
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Edit\" action for the first package in the package list"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Save\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Type \"12\" into the Upload Speed field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Save\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"12\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC035",
+    "title": "Filter packages by Inactive status",
+    "description": "Verifies selecting the Inactive status filter limits results to inactive packages.",
+    "category": "Package Management",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/dashboard\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Packages\" in the main navigation menu"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/packages\""
+      },
+      {
+        "type": "action",
+        "description": "Click the \"AllStatus\" filter control"
+      },
+      {
+        "type": "action",
+        "description": "Select \"Inactive\" from the status filter options"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Inactive\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC036",
+    "title": "Enable M-Pesa gateway with valid credentials and save",
+    "description": "Verifies that a user can enable the M-Pesa gateway, enter required credentials, save, and see a success confirmation.",
+    "category": "Payment Gateways & Channels",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/dashboard\""
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Transactions\" in the main navigation menu"
+      },
+      {
+        "type": "action",
+        "description": "Scroll to the \"Payment Setup\" section"
+      },
+      {
+        "type": "action",
+        "description": "Click the M-Pesa gateway toggle to set it to \"Enable\""
+      },
+      {
+        "type": "action",
+        "description": "Type \"valid-consumer-key\" into the \"Consumer Key\" field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"valid-consumer-secret\" into the \"Consumer Secret\" field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Save\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Gateway enabled\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC037",
+    "title": "M-Pesa enablement shows validation error when Consumer Key is missing",
+    "description": "Verifies that saving M-Pesa configuration with an empty Consumer Key shows a required-field validation error.",
+    "category": "Payment Gateways & Channels",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/dashboard\""
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Transactions\" in the main navigation menu"
+      },
+      {
+        "type": "action",
+        "description": "Scroll to the \"Payment Setup\" section"
+      },
+      {
+        "type": "action",
+        "description": "Click the M-Pesa gateway toggle to set it to \"Enable\""
+      },
+      {
+        "type": "action",
+        "description": "Type \"\" into the \"Consumer Key\" field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Save\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Consumer Key is required\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC038",
+    "title": "Register C2B URL from Payment Setup shows success message",
+    "description": "Verifies that the user can initiate C2B URL registration and see a successful registration message.",
+    "category": "Payment Gateways & Channels",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/dashboard\""
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Transactions\" in the main navigation menu"
+      },
+      {
+        "type": "action",
+        "description": "Scroll to the \"Payment Setup\" section"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Register C2B URL\" button"
+      },
+      {
+        "type": "action",
+        "description": "Wait for a registration result message to appear"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"C2B URL registered\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC039",
+    "title": "Configure HarakaPay API key, save, and run Test Payment to see response",
+    "description": "Verifies that HarakaPay can be configured, saved, and a test payment can be initiated with visible response and verification status.",
+    "category": "Payment Gateways & Channels",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/dashboard\""
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Transactions\" in the main navigation menu"
+      },
+      {
+        "type": "action",
+        "description": "Scroll to the \"Payment Setup\" section"
+      },
+      {
+        "type": "action",
+        "description": "Type \"harakapay-test-api-key\" into the \"HarakaPay API Key\" field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Save\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Saved\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Test Payment\" button"
+      },
+      {
+        "type": "action",
+        "description": "Wait for the test payment result to appear"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Verification\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC040",
+    "title": "Create a new voucher and verify it appears in the vouchers table",
+    "description": "Verifies an authenticated user can add a voucher with plan name, code, and router and then see it listed.",
+    "category": "Voucher Codes",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign in\" or \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/dashboard\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Transactions\" in the main navigation menu"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Vouchers\" section/tab on the Transactions page"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Add voucher\" button"
+      },
+      {
+        "type": "action",
+        "description": "Type \"Test Plan A\" into the \"Plan Name\" field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"AUTO-VOUCHER-001\" into the \"Voucher Code\" field"
+      },
+      {
+        "type": "action",
+        "description": "Select the first available option from the \"Router\" dropdown"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Save\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"AUTO-VOUCHER-001\" is visible in the Vouchers table"
+      }
+    ]
+  },
+  {
+    "id": "TC041",
+    "title": "Filter vouchers by a specific router",
+    "description": "Verifies filtering by a router updates the vouchers list to that router's vouchers.",
+    "category": "Voucher Codes",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign in\" or \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/dashboard\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Transactions\" in the main navigation menu"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Vouchers\" section/tab on the Transactions page"
+      },
+      {
+        "type": "action",
+        "description": "Select a specific router (not \"(all routers)\") from the Router filter dropdown"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Vouchers table\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC042",
+    "title": "Clear router filter by selecting (all routers)",
+    "description": "Verifies selecting (all routers) shows vouchers across routers after previously filtering.",
+    "category": "Voucher Codes",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign in\" or \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/dashboard\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Transactions\" in the main navigation menu"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Vouchers\" section/tab on the Transactions page"
+      },
+      {
+        "type": "action",
+        "description": "Select a specific router (not \"(all routers)\") from the Router filter dropdown"
+      },
+      {
+        "type": "action",
+        "description": "Select \"(all routers)\" from the Router filter dropdown"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Vouchers table\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC043",
+    "title": "Validate required fields when adding a voucher (missing plan name and code)",
+    "description": "Verifies the add voucher form blocks saving and shows validation messages when required fields are empty.",
+    "category": "Voucher Codes",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign in\" or \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/dashboard\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Transactions\" in the main navigation menu"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Vouchers\" section/tab on the Transactions page"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Add voucher\" button"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Save\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Plan Name\" is visible near a validation message or error state"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Voucher Code\" is visible near a validation message or error state"
+      }
+    ]
+  },
+  {
+    "id": "TC044",
+    "title": "Cancel out of Add voucher without saving",
+    "description": "Verifies a user can exit the add voucher dialog/form without creating a voucher.",
+    "category": "Voucher Codes",
+    "priority": "Low",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Sign in\" or \"Login\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/dashboard\""
+      },
+      {
+        "type": "action",
+        "description": "Click \"Transactions\" in the main navigation menu"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Vouchers\" section/tab on the Transactions page"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Add voucher\" button"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Cancel\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Vouchers table\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC045",
+    "title": "View transactions table and open a transaction details modal",
+    "description": "Verifies the transactions log page loads a records table and that clicking a row opens a visible detail modal.",
+    "category": "Transactions Log & Mobile Transactions",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Transactions\" in the main navigation menu"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify a transactions table is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click on the first transaction row in the table"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Transaction details\" modal is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC046",
+    "title": "Filter transactions by Failed status and verify only failed results are shown",
+    "description": "Verifies filtering by status narrows the table results to Failed transactions.",
+    "category": "Transactions Log & Mobile Transactions",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Transactions\" in the main navigation menu"
+      },
+      {
+        "type": "action",
+        "description": "Select \"Failed\" from the Status filter dropdown"
+      },
+      {
+        "type": "action",
+        "description": "Wait for the transactions table to update"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Failed\" is visible in the transactions table"
+      }
+    ]
+  },
+  {
+    "id": "TC047",
+    "title": "Manually add a new transaction and verify it appears in the table",
+    "description": "Verifies a user can add a transaction via the add transaction flow and see it listed in the transactions table.",
+    "category": "Transactions Log & Mobile Transactions",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Transactions\" in the main navigation menu"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"+ Add Transaction\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Add Transaction\" form is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Save\" button"
+      }
+    ]
+  },
+  {
+    "id": "TC048",
+    "title": "Search by Transaction ID with no matches",
+    "description": "Verifies searching with an invalid/non-existent Transaction ID shows a zero-results state message.",
+    "category": "Transactions Log & Mobile Transactions",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Transactions\" in the main navigation menu"
+      },
+      {
+        "type": "action",
+        "description": "Type \"NON_EXISTENT_TXN_000000\" into the search field"
+      },
+      {
+        "type": "action",
+        "description": "Press \"Enter\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Showing 0 entries\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC049",
+    "title": "Close transaction details modal after opening it",
+    "description": "Verifies the transaction detail modal can be dismissed after being opened from a row.",
+    "category": "Transactions Log & Mobile Transactions",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Transactions\" in the main navigation menu"
+      },
+      {
+        "type": "action",
+        "description": "Click on the first transaction row in the table"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Transaction details\" modal is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Close\" button in the modal"
+      }
+    ]
+  },
+  {
+    "id": "TC050",
+    "title": "Clear status filter to return to full transaction list",
+    "description": "Verifies the user can remove the Failed filter and see the table return to an unfiltered or broader result set.",
+    "category": "Transactions Log & Mobile Transactions",
+    "priority": "Low",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_USER}}\" into the email/username field"
+      },
+      {
+        "type": "action",
+        "description": "Type \"{{LOGIN_PASSWORD}}\" into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Login\" button"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Transactions\" in the main navigation menu"
+      },
+      {
+        "type": "action",
+        "description": "Select \"Failed\" from the Status filter dropdown"
+      },
+      {
+        "type": "action",
+        "description": "Select \"All\" from the Status filter dropdown"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify a transactions table is visible"
+      }
+    ]
+  }
+]

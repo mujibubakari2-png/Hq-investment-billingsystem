@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { settingsApi } from '../api/client';
 import PaymentIcon from '@mui/icons-material/Payment';
 import SaveIcon from '@mui/icons-material/Save';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
@@ -24,6 +25,37 @@ export default function PaymentChannels() {
         { id: '5', name: 'Palmpesa', description: 'Additional payment gateway', isDefault: true, enabled: false, number: 5 },
         { id: '6', name: 'Zenopay', description: 'Additional payment gateway', isDefault: false, enabled: false, number: 6 },
     ]);
+
+    const [saving, setSaving] = useState(false);
+
+    useEffect(() => {
+        settingsApi.get().then((res: any) => {
+            const data = res.data || res;
+            if (data?.paymentGateways) {
+                try {
+                    const parsed = JSON.parse(data.paymentGateways);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        setGateways(parsed);
+                    }
+                } catch (e) {
+                    console.error('Failed to parse gateway settings', e);
+                }
+            }
+        }).catch(console.error);
+    }, []);
+
+    const handleSave = async () => {
+        setSaving(true);
+        try {
+            await settingsApi.update({ paymentGateways: JSON.stringify(gateways) });
+            alert('Payment channels saved successfully!');
+        } catch (err) {
+            console.error('Failed to save payment channels', err);
+            alert('Failed to save payment channels.');
+        } finally {
+            setSaving(false);
+        }
+    };
 
     const activeCount = gateways.filter(g => g.enabled).length;
     const inactiveCount = gateways.filter(g => !g.enabled).length;
@@ -174,11 +206,17 @@ export default function PaymentChannels() {
                     <InfoOutlinedIcon style={{ fontSize: 14 }} />
                     Toggle gateways on/off and select one as default for customers
                 </div>
-                <button className="btn" style={{
-                    background: '#e11d48', color: '#fff', fontWeight: 600,
-                    padding: '8px 20px', display: 'flex', alignItems: 'center', gap: 6,
-                }}>
-                    <SaveIcon fontSize="small" /> Save Changes
+                <button 
+                    className="btn" 
+                    onClick={handleSave}
+                    disabled={saving}
+                    style={{
+                        background: '#e11d48', color: '#fff', fontWeight: 600,
+                        padding: '8px 20px', display: 'flex', alignItems: 'center', gap: 6,
+                        opacity: saving ? 0.7 : 1, cursor: saving ? 'not-allowed' : 'pointer'
+                    }}
+                >
+                    <SaveIcon fontSize="small" /> {saving ? 'Saving...' : 'Save Changes'}
                 </button>
             </div>
         </div>

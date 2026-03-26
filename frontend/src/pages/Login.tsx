@@ -28,7 +28,7 @@ export default function Login() {
                 localStorage.setItem('remember', 'true');
             }
 
-            navigate('/', { replace: true });
+            navigate('/dashboard', { replace: true });
         } catch (err: unknown) {
             const message = err instanceof Error ? err.message : 'Login failed';
             setError(message);

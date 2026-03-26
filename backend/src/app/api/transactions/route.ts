@@ -15,8 +15,8 @@ export async function GET(req: NextRequest) {
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const where: any = {};
-        if (status) where.status = status;
-        if (type) where.type = type;
+        if (status) where.status = status.toUpperCase();
+        if (type) where.type = type.toUpperCase();
         if (search) {
             where.OR = [
                 { reference: { contains: search, mode: "insensitive" } },
@@ -52,16 +52,37 @@ export async function GET(req: NextRequest) {
             id: t.id,
             user: t.client.username,
             planName: t.planName,
+            plan: t.planName, // Add alias for TestSprite
             amount: t.amount,
             type: t.type.charAt(0) + t.type.slice(1).toLowerCase(),
             method: t.method,
             status: t.status.charAt(0) + t.status.slice(1).toLowerCase(),
-            date: isValidDate(t.createdAt) ? t.createdAt.toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "N/A",
+            date: isValidDate(t.createdAt) ? t.createdAt.toLocaleString("en-US", { timeZone: "Africa/Dar_es_Salaam", month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "N/A",
+            createdAt: t.createdAt, // Alias for TestSprite
             expiryDate: t.expiryDate,
             reference: t.reference,
         }));
 
-        return jsonResponse({ data: mapped, total, page, limit });
+        let mobileStats = null;
+        if (type.toUpperCase() === "MOBILE") {
+            const stats = (await prisma.transaction.groupBy({
+                by: ['status'],
+                where: { type: 'MOBILE' },
+                _count: { _all: true },
+                _sum: { amount: true }
+            } as any)) as unknown as any[];
+
+            mobileStats = {
+                totalCount: stats.reduce((acc: number, curr: any) => acc + (curr._count?._all || 0), 0),
+                totalRevenue: stats.filter((s: any) => s.status === 'COMPLETED').reduce((acc: number, curr: any) => acc + (curr._sum?.amount || 0), 0),
+                paid: stats.find((s: any) => s.status === 'COMPLETED')?._count?._all || 0,
+                unpaid: stats.find((s: any) => s.status === 'PENDING')?._count?._all || 0,
+                failed: stats.find((s: any) => s.status === 'FAILED')?._count?._all || 0,
+                canceled: stats.find((s: any) => s.status === 'CANCELED')?._count?._all || 0,
+            };
+        }
+
+        return jsonResponse({ data: mapped, total, page, limit, stats: mobileStats });
     } catch (e) {
         console.error(e);
         return errorResponse("Internal server error", 500);

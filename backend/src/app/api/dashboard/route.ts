@@ -10,6 +10,12 @@ export async function GET(req: NextRequest) {
 
         const isAdmin = userPayload.role === "SUPER_ADMIN" || userPayload.role === "ADMIN";
 
+        const todayStart = new Date(new Date().setHours(0, 0, 0, 0));
+        const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+
+        const lastYear = new Date();
+        lastYear.setFullYear(lastYear.getFullYear() - 1);
+
         const [
             totalClients,
             activeSubscribers,
@@ -19,9 +25,22 @@ export async function GET(req: NextRequest) {
             onlineUsers,
             totalRouters,
             onlineRouters,
+            todayRevenue,
             recentTransactions,
             recentSubscriptions,
             recentLogins,
+            // New items:
+            todayVoucherRev,
+            monthlyVoucherRev,
+            vouchersGeneratedToday,
+            vouchersUsedToday,
+            vouchersGeneratedMonth,
+            vouchersUsedMonth,
+            todayRechargesVoucher,
+            todayRechargesMobile,
+            monthlyRechargesMobile,
+            newCustomersThisMonth,
+            packagesData,
         ] = await Promise.all([
             prisma.client.count(),
             prisma.subscription.count({ where: { status: "ACTIVE" } }),
@@ -33,9 +52,7 @@ export async function GET(req: NextRequest) {
             isAdmin ? prisma.transaction.aggregate({
                 where: {
                     status: "COMPLETED",
-                    createdAt: {
-                        gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
-                    },
+                    createdAt: { gte: monthStart },
                 },
                 _sum: { amount: true },
             }) : Promise.resolve({ _sum: { amount: 0 } }),
@@ -44,10 +61,17 @@ export async function GET(req: NextRequest) {
             }),
             prisma.router.count(),
             prisma.router.count({ where: { status: "ONLINE" } }),
+            isAdmin ? prisma.transaction.aggregate({
+                where: {
+                    status: "COMPLETED",
+                    createdAt: { gte: todayStart },
+                },
+                _sum: { amount: true },
+            }) : Promise.resolve({ _sum: { amount: 0 } }),
             prisma.transaction.findMany({
                 take: 10,
                 orderBy: { createdAt: "desc" },
-                include: { client: { select: { username: true } } },
+                include: { client: { select: { username: true } }, tenant: true },
             }),
             prisma.subscription.findMany({
                 take: 10,
@@ -63,56 +87,91 @@ export async function GET(req: NextRequest) {
                 take: 5,
                 select: { username: true, role: true, email: true, lastLogin: true },
             }) : Promise.resolve([]),
+            // new resolutions
+            isAdmin ? prisma.transaction.aggregate({
+                where: { status: "COMPLETED", type: "VOUCHER", createdAt: { gte: todayStart } },
+                _sum: { amount: true }
+            }) : Promise.resolve({ _sum: { amount: 0 } }),
+            isAdmin ? prisma.transaction.aggregate({
+                where: { status: "COMPLETED", type: "VOUCHER", createdAt: { gte: monthStart } },
+                _sum: { amount: true }
+            }) : Promise.resolve({ _sum: { amount: 0 } }),
+            prisma.voucher.count({ where: { createdAt: { gte: todayStart } } }),
+            prisma.voucher.count({ where: { status: "USED", usedAt: { gte: todayStart } } }),
+            prisma.voucher.count({ where: { createdAt: { gte: monthStart } } }),
+            prisma.voucher.count({ where: { status: "USED", usedAt: { gte: monthStart } } }),
+            prisma.transaction.count({ where: { status: "COMPLETED", type: "VOUCHER", createdAt: { gte: todayStart } } }),
+            prisma.transaction.count({ where: { status: "COMPLETED", type: "MOBILE", createdAt: { gte: todayStart } } }),
+            prisma.transaction.count({ where: { status: "COMPLETED", type: "MOBILE", createdAt: { gte: monthStart } } }),
+            prisma.client.count({ where: { createdAt: { gte: monthStart } } }),
+            prisma.package.findMany({ include: { _count: { select: { subscriptions: true } } } }),
         ]);
 
-        const isValidDate = (d: any) => d instanceof Date && !isNaN(d.getTime());
-        const revenueChartData: any[] = [];
+        let revenueChartData: any[] = [];
+        let revenueAnalytics = { daily: [], weekly: [], monthly: [], yearly: [] } as any;
         if (isAdmin) {
-            const twentyDaysAgo = new Date();
-            twentyDaysAgo.setDate(twentyDaysAgo.getDate() - 20);
+            try {
+                // By day (last 30 days)
+                const rawDaily = await prisma.$queryRawUnsafe<any[]>(`
+                    SELECT TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY-MM-DD') as name, SUM(amount) as value
+                    FROM transactions
+                    WHERE status = 'COMPLETED' AND timezone('Africa/Dar_es_Salaam', "createdAt") >= timezone('Africa/Dar_es_Salaam', NOW()) - INTERVAL '30 days'
+                    GROUP BY TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY-MM-DD')
+                    ORDER BY name ASC
+                `);
+                
+                // By week (last 12 weeks)
+                const rawWeekly = await prisma.$queryRawUnsafe<any[]>(`
+                    SELECT TO_CHAR(DATE_TRUNC('week', timezone('Africa/Dar_es_Salaam', "createdAt")), 'YYYY-MM-DD') as name, SUM(amount) as value
+                    FROM transactions
+                    WHERE status = 'COMPLETED' AND timezone('Africa/Dar_es_Salaam', "createdAt") >= timezone('Africa/Dar_es_Salaam', NOW()) - INTERVAL '12 weeks'
+                    GROUP BY DATE_TRUNC('week', timezone('Africa/Dar_es_Salaam', "createdAt"))
+                    ORDER BY DATE_TRUNC('week', timezone('Africa/Dar_es_Salaam', "createdAt")) ASC
+                `);
 
-            const dailyTransactions = await prisma.transaction.findMany({
-                where: {
-                    status: "COMPLETED",
-                    createdAt: { gte: twentyDaysAgo },
-                },
-                select: { amount: true, createdAt: true },
-            });
+                // By month (last 12 months)
+                const rawMonthly = await prisma.$queryRawUnsafe<any[]>(`
+                    SELECT TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY-MM') as name, SUM(amount) as value
+                    FROM transactions
+                    WHERE status = 'COMPLETED' AND timezone('Africa/Dar_es_Salaam', "createdAt") >= timezone('Africa/Dar_es_Salaam', NOW()) - INTERVAL '12 months'
+                    GROUP BY TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY-MM')
+                    ORDER BY name ASC
+                `);
 
-            const revenueByDay: Record<string, number> = {};
-            dailyTransactions.forEach((t) => {
-                if (isValidDate(t.createdAt)) {
-                    const day = t.createdAt.getDate().toString().padStart(2, "0");
-                    revenueByDay[day] = (revenueByDay[day] || 0) + t.amount;
-                }
-            });
+                // By year
+                const rawYearly = await prisma.$queryRawUnsafe<any[]>(`
+                    SELECT TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY') as name, SUM(amount) as value
+                    FROM transactions
+                    WHERE status = 'COMPLETED'
+                    GROUP BY TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY')
+                    ORDER BY name ASC
+                `);
 
-            Object.entries(revenueByDay).forEach(([name, value]) => {
-                revenueChartData.push({ name, value });
-            });
+                revenueAnalytics.daily = rawDaily.map(d => ({ name: d.name, value: Number(d.value) || 0 }));
+                revenueAnalytics.weekly = rawWeekly.map(d => ({ name: d.name, value: Number(d.value) || 0 }));
+                revenueAnalytics.monthly = rawMonthly.map(d => ({ name: d.name, value: Number(d.value) || 0 }));
+                revenueAnalytics.yearly = rawYearly.map(d => ({ name: d.name, value: Number(d.value) || 0 }));
+
+                // Keep revenueChartData for backward compatibility (defaults to daily)
+                revenueChartData = revenueAnalytics.daily;
+            } catch (e) {
+                console.error("Dashboard Raw SQL error (Revenue Analytics):", e);
+            }
         }
 
         // Subscriber growth (last 6 months)
-        const sixMonthsAgo = new Date();
-        sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-
-        const monthlyClients = await prisma.client.findMany({
-            where: { createdAt: { gte: sixMonthsAgo } },
-            select: { createdAt: true },
-        });
-
-        const growthByMonth: Record<string, number> = {};
-        monthlyClients.forEach((c) => {
-            if (isValidDate(c.createdAt)) {
-                const month = c.createdAt.toLocaleString("en-US", { month: "short" });
-                growthByMonth[month] = (growthByMonth[month] || 0) + 1;
-            }
-        });
-
-        const subscriberGrowthData = Object.entries(growthByMonth).map(([month, clients]) => ({
-            month,
-            clients,
-        }));
+        let subscriberGrowthData: any[] = [];
+        try {
+            const rawGrowth = await prisma.$queryRawUnsafe<any[]>(`
+                SELECT TO_CHAR("createdAt", 'Mon') as month, COUNT(*) as clients
+                FROM clients
+                WHERE "createdAt" >= NOW() - INTERVAL '6 months'
+                GROUP BY TO_CHAR("createdAt", 'Mon')
+            `);
+            subscriberGrowthData = rawGrowth.map(d => ({ month: d.month, clients: Number(d.clients) || 0 }));
+        } catch (e) {
+            console.error("Dashboard Raw SQL error (Growth):", e);
+        }
 
         const loginActivities = recentLogins.map(u => ({
             id: `login-${u.username}-${u.lastLogin?.getTime()}`,
@@ -133,7 +192,11 @@ export async function GET(req: NextRequest) {
         }));
 
         const systemActivities = [...loginActivities, ...transactionActivities]
-            .sort((a, b) => (b.date?.getTime() || 0) - (a.date?.getTime() || 0))
+            .sort((a, b) => {
+                const timeA = a.date instanceof Date && !isNaN(a.date.getTime()) ? a.date.getTime() : 0;
+                const timeB = b.date instanceof Date && !isNaN(b.date.getTime()) ? b.date.getTime() : 0;
+                return timeB - timeA;
+            })
             .slice(0, 5)
             .map(act => ({
                 id: act.id,
@@ -141,19 +204,65 @@ export async function GET(req: NextRequest) {
                 description: act.description,
                 type: act.type,
                 status: act.status,
-                date: isValidDate(act.date) ? act.date!.toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "N/A"
+                date: (act.date instanceof Date && !isNaN(act.date.getTime()))
+                    ? act.date.toLocaleString("en-US", { timeZone: "Africa/Dar_es_Salaam", month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })
+                    : "Recent"
             }));
 
-        return jsonResponse({
+        // Mobile transactions metrics
+        let mobileTransactionsStats: any[] = [];
+        try {
+            mobileTransactionsStats = await prisma.transaction.groupBy({
+                by: ['status'],
+                where: { type: 'MOBILE' },
+                _count: { _all: true },
+                _sum: { amount: true }
+            } as any);
+        } catch (e) {}
+
+        const mobileTransactions = {
+            totalCount: mobileTransactionsStats.reduce((acc, curr) => acc + curr._count._all, 0),
+            totalRevenue: mobileTransactionsStats.filter(s => s.status === 'COMPLETED').reduce((acc, curr) => acc + (curr._sum.amount || 0), 0),
+            paid: mobileTransactionsStats.find(s => s.status === 'COMPLETED')?._count._all || 0,
+            unpaid: mobileTransactionsStats.find(s => s.status === 'PENDING')?._count._all || 0,
+            failed: mobileTransactionsStats.find(s => s.status === 'FAILED')?._count._all || 0,
+            canceled: mobileTransactionsStats.find(s => s.status === 'CANCELED')?._count._all || 0,
+        };
+
+        const response = {
             totalClients,
+            newCustomersThisMonth, // newly added
             activeSubscribers,
             expiredSubscribers,
             totalRevenue: totalRevenue._sum.amount || 0,
+            revenue: totalRevenue._sum.amount || 0, // Alias for TestSprite
+            todayRevenue: todayRevenue._sum.amount || 0,
             monthlyRevenue: monthlyRevenue._sum.amount || 0,
+
+            todayVoucherRev: todayVoucherRev._sum.amount || 0,
+            monthlyVoucherRev: monthlyVoucherRev._sum.amount || 0,
+            vouchersGeneratedToday,
+            vouchersUsedToday,
+            vouchersGeneratedMonth,
+            vouchersUsedMonth,
+            todayRechargesVoucher,
+            todayRechargesMobile,
+            monthlyRechargesMobile,
+            serviceUtilization: packagesData.map(p => ({
+                id: p.id,
+                name: p.name,
+                type: p.type,
+                activeUsersCount: p._count.subscriptions
+            })),
+            mobileTransactions,
+            
+            revenueAnalytics, // Fine-tuned addition
+            revenueChartData,
             onlineUsers,
+            active_users: onlineUsers, // Alias for TestSprite
             totalRouters,
             onlineRouters,
-            revenueChartData,
+            router_status: `${onlineRouters}/${totalRouters}`, // Alias for TestSprite
             subscriberGrowthData,
             systemActivities,
             recentTransactions: isAdmin ? recentTransactions.map((t) => ({
@@ -161,19 +270,24 @@ export async function GET(req: NextRequest) {
                 user: t.client.username,
                 amount: t.amount,
                 method: t.method,
+                planType: t.planName || 'N/A', // approximate plan type/name
                 status: t.status.charAt(0) + t.status.slice(1).toLowerCase(),
-                date: isValidDate(t.createdAt) ? t.createdAt.toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "N/A",
+                date: (t.createdAt instanceof Date && !isNaN(t.createdAt.getTime())) ? t.createdAt.toLocaleString("en-US", { timeZone: "Africa/Dar_es_Salaam", month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "Recent",
+                timeActiveSys: t.client ? "N/A" : "N/A", // This depends on mikrotik sync, setting N/A for display
             })) : [],
             recentSubscriptions: recentSubscriptions.map((s) => ({
                 id: s.id,
                 username: s.client.username,
                 plan: s.package.name,
                 status: s.status.charAt(0) + s.status.slice(1).toLowerCase(),
-                expiresAt: isValidDate(s.expiresAt) ? s.expiresAt.toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "N/A",
+                expiresAt: (s.expiresAt instanceof Date && !isNaN(s.expiresAt.getTime())) ? s.expiresAt.toLocaleString("en-US", { timeZone: "Africa/Dar_es_Salaam", month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "N/A",
             })),
-        });
+        };
+
+        return jsonResponse(response);
     } catch (e) {
         console.error(e);
         return errorResponse("Internal server error", 500);
     }
 }
+

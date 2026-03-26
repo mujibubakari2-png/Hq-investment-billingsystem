@@ -34,7 +34,7 @@ export default function MainLayout() {
 
     return (
         <div className="app-layout">
-            <Sidebar isOpen={isMobile ? sidebarOpen : true} onClose={() => setSidebarOpen(false)} />
+            <Sidebar isOpen={isMobile ? sidebarOpen : sidebarVisible} onClose={() => setSidebarOpen(false)} />
 
             <div
                 className={`main-content ${!sidebarVisible && !isMobile ? 'sidebar-collapsed' : ''}`}

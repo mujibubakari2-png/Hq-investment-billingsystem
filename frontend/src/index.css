@@ -35,10 +35,10 @@
   --border: #e9ecef;
   --border-light: #f0f1f5;
 
-  --radius-sm: 4px;
-  --radius: 8px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
+  --radius-sm: 8px;
+  --radius: 14px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
 
   --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
   --shadow: 0 1px 3px rgba(0,0,0,0.08);
@@ -226,11 +226,17 @@ table {
 }
 
 .stat-card {
-  border-radius: var(--radius);
-  padding: 16px 20px;
+  border-radius: var(--radius-lg);
+  padding: 18px 22px;
   color: white;
   position: relative;
   overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.15);
 }
 
 .stat-card.red { background: linear-gradient(135deg, #e53935, #ef5350); }
@@ -271,7 +277,7 @@ table {
   align-items: center;
   gap: 6px;
   padding: 8px 16px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius);
   font-size: 0.85rem;
   font-weight: 500;
   transition: all 0.2s ease;
@@ -315,7 +321,7 @@ table {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius);
   transition: all 0.2s ease;
 }
 
@@ -351,6 +357,7 @@ table {
 /* Table */
 .table-container {
   overflow-x: auto;
+  border-radius: var(--radius);
 }
 
 .data-table {
@@ -441,7 +448,7 @@ table {
 .show-entries select {
   padding: 4px 8px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius);
   background: var(--bg-input);
   font-size: 0.85rem;
 }
@@ -454,7 +461,7 @@ table {
 .search-input input {
   padding: 8px 12px 8px 36px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius);
   background: var(--bg-input);
   font-size: 0.85rem;
   width: 220px;
@@ -478,7 +485,7 @@ table {
 .select-field {
   padding: 8px 12px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius);
   background: var(--bg-input);
   font-size: 0.85rem;
   color: var(--text-primary);
@@ -502,7 +509,7 @@ table {
 .status-dropdown select {
   padding: 6px 12px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius);
   background: var(--bg-input);
   font-size: 0.85rem;
   min-width: 100px;
@@ -530,7 +537,7 @@ table {
 .pagination-btn {
   padding: 6px 12px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius);
   background: var(--bg-card);
   font-size: 0.82rem;
   color: var(--text-secondary);
@@ -635,7 +642,7 @@ table {
   width: 100%;
   padding: 10px 14px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius);
   background: var(--bg-input);
   font-size: 0.9rem;
   color: var(--text-primary);
@@ -654,7 +661,7 @@ table {
   width: 100%;
   padding: 10px 14px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius);
   background: var(--bg-input);
   font-size: 0.9rem;
   color: var(--text-primary);
@@ -736,7 +743,7 @@ table {
   padding: 10px 12px;
   border: 1px solid var(--border);
   border-right: none;
-  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+  border-radius: var(--radius) 0 0 var(--radius);
   background: var(--bg-hover);
   font-size: 0.9rem;
   color: var(--text-primary);
@@ -744,7 +751,7 @@ table {
 }
 
 .phone-input .form-input {
-  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  border-radius: 0 var(--radius) var(--radius) 0;
 }
 
 /* Password Field */
@@ -754,14 +761,14 @@ table {
 }
 
 .password-field .form-input {
-  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+  border-radius: var(--radius) 0 0 var(--radius);
 }
 
 .password-refresh-btn {
   padding: 10px 14px;
   border: 1px solid var(--border);
   border-left: none;
-  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  border-radius: 0 var(--radius) var(--radius) 0;
   background: var(--bg-card);
   color: var(--text-secondary);
   transition: all 0.2s;
@@ -791,7 +798,7 @@ table {
 
 .modal {
   background: var(--bg-card);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-xl);
   width: 90%;
   max-width: 680px;
   max-height: 90vh;

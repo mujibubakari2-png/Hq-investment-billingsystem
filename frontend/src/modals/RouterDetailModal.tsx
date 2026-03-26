@@ -34,7 +34,7 @@ export default function RouterDetailModal({ router, onClose, onEdit, onDelete }:
 
     return (
         <div className="modal-overlay" onClick={onClose}>
-            <div className="modal" style={{ maxWidth: 520, overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
+            <div className="modal" style={{ maxWidth: 520, maxHeight: '90vh', overflow: 'auto' }} onClick={e => e.stopPropagation()}>
                 {/* Green Header */}
                 <div style={{
                     background: '#16a34a', color: '#fff', padding: '14px 20px',
@@ -70,6 +70,31 @@ export default function RouterDetailModal({ router, onClose, onEdit, onDelete }:
                             <CheckCircleIcon style={{ fontSize: 14 }} />
                             {router.status === 'Online' ? 'Connected' : 'Disconnected'}
                         </span>
+                    </div>
+
+                    {/* Router Details */}
+                    <div style={{
+                        marginBottom: 20, borderRadius: 'var(--radius-sm)',
+                        border: '1px solid var(--border-light)', overflow: 'hidden',
+                    }}>
+                        {([
+                            { label: 'IP Address', value: router.host, mono: true },
+                            { label: 'API Port', value: String(router.port || 8728), mono: true },
+                            { label: 'Type', value: router.type || 'RouterOS', mono: false },
+                            { label: 'Active Users', value: String(router.activeUsers || 0), mono: false },
+                            { label: 'CPU Load', value: `${router.cpuLoad || 0}%`, mono: false },
+                            { label: 'Uptime', value: router.uptime || 'N/A', mono: false },
+                            { label: 'Last Seen', value: router.lastSeen && !isNaN(new Date(router.lastSeen).getTime()) ? new Date(router.lastSeen).toLocaleString() : 'Never', mono: false },
+                            { label: 'Description', value: router.description || '—', mono: false },
+                        ]).map(row => (
+                            <div key={row.label} style={{
+                                display: 'flex', justifyContent: 'space-between', padding: '8px 14px',
+                                borderBottom: '1px solid var(--border-light)', fontSize: '0.83rem',
+                            }}>
+                                <span style={{ color: 'var(--text-secondary)' }}>{row.label}</span>
+                                <strong style={row.mono ? { fontFamily: 'monospace' } : undefined}>{row.value}</strong>
+                            </div>
+                        ))}
                     </div>
 
                     {/* VPN Configuration */}

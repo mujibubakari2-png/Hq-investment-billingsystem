@@ -51,7 +51,7 @@ export default function Register() {
         otp: ['', '', '', '', '', ''],
         companyName: '', city: '', country: '', termsAccepted: false, planId: ''
     });
-    const [plans, setPlans] = useState<any[]>([]);
+    const [_, setPlans] = useState<any[]>([]);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
 

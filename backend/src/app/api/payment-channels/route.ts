@@ -1,10 +1,13 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
-import { jsonResponse, errorResponse } from "@/lib/auth";
+import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 
 // GET /api/payment-channels
-export async function GET() {
+export async function GET(req: NextRequest) {
     try {
+        const userPayload = getUserFromRequest(req);
+        if (!userPayload) return errorResponse("Unauthorized", 401);
+
         const channels = await prisma.paymentChannel.findMany({
             orderBy: { createdAt: "desc" },
         });
@@ -23,7 +26,7 @@ export async function GET() {
             provider: ch.provider,
             accountNumber: ch.accountNumber,
             status: ch.status === "ACTIVE" ? "Active" : "Inactive",
-            createdAt: ch.createdAt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+            createdAt: ch.createdAt.toLocaleDateString("en-US", { timeZone: "Africa/Dar_es_Salaam", month: "short", day: "numeric", year: "numeric" }),
             config: ch.config,
         }));
 

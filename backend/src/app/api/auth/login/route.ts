@@ -4,13 +4,22 @@ import { comparePassword, signToken, jsonResponse, errorResponse } from "@/lib/a
 
 export async function POST(req: NextRequest) {
     try {
-        const { username, password } = await req.json();
+        const body = await req.json();
+        const username = body.username || body.email;
+        const password = body.password;
 
         if (!username || !password) {
             return errorResponse("Username and password are required");
         }
 
-        const user = await prisma.user.findUnique({ where: { username } });
+        const user = await prisma.user.findFirst({
+            where: {
+                OR: [
+                    { username },
+                    { email: username }
+                ]
+            }
+        });
         if (!user) {
             return errorResponse("Invalid credentials", 401);
         }

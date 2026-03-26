@@ -1,0 +1,141 @@
+version: "2"
+type: backend
+tech_stack:
+  - TypeScript
+  - Next.js (App Router)
+  - Prisma
+  - PostgreSQL
+  - JWT
+routes:
+  - path: /api/auth/login
+    file: src/app/api/auth/login/route.ts
+    auth_required: false
+    description: User login with username and password
+  - path: /api/auth/register
+    file: src/app/api/auth/register/route.ts
+    auth_required: false
+    description: User registration
+  - path: /api/auth/me
+    file: src/app/api/auth/me/route.ts
+    auth_required: true
+    description: Get current user profile
+  - path: /api/dashboard
+    file: src/app/api/dashboard/route.ts
+    auth_required: true
+    description: Get dashboard summary and charts
+  - path: /api/clients
+    file: src/app/api/clients/route.ts
+    auth_required: true
+    description: List and create clients
+  - path: /api/clients/[id]
+    file: src/app/api/clients/[id]/route.ts
+    auth_required: true
+    description: Get, update, and delete a client
+  - path: /api/routers
+    file: src/app/api/routers/route.ts
+    auth_required: true
+    description: List and create routers
+  - path: /api/packages
+    file: src/app/api/packages/route.ts
+    auth_required: true
+    description: List and create packages
+  - path: /api/subscriptions
+    file: src/app/api/subscriptions/route.ts
+    auth_required: true
+    description: List and create subscriptions
+  - path: /api/transactions
+    file: src/app/api/transactions/route.ts
+    auth_required: true
+    description: List and create transactions
+  - path: /api/vouchers/generate
+    file: src/app/api/vouchers/generate/route.ts
+    auth_required: true
+    description: Generate voucher codes for a package
+  - path: /api/expenses
+    file: src/app/api/expenses/route.ts
+    auth_required: true
+    description: List and create expenses
+  - path: /api/reports
+    file: src/app/api/reports/route.ts
+    auth_required: true
+    description: System analytics and reports
+  - path: /api/sms/bulk
+    file: src/app/api/sms/bulk/route.ts
+    auth_required: true
+    description: Send bulk SMS
+  - path: /api/equipment
+    file: src/app/api/equipment/route.ts
+    auth_required: true
+    description: Inventory and equipment management
+  - path: /api/auth/forgot-password/request-otp
+    file: src/app/api/auth/forgot-password/request-otp/route.ts
+    auth_required: false
+    description: Request OTP for password reset
+  - path: /api/settings
+    file: src/app/api/settings/route.ts
+    auth_required: true
+    description: System settings configuration
+  - path: /api/payment-channels
+    file: src/app/api/payment-channels/route.ts
+    auth_required: true
+    description: List and manage payment gateways
+  - path: /api/auth/login
+    file: src/app/api/auth/login/route.ts
+    auth_required: false
+    description: User login with username and password. Default admin: admin@example.com / admin123. Payload: { "username": "...", "password": "..." }
+features:
+  - name: Authentication
+    description: User login, registration, and token verification
+    files:
+      - src/app/api/auth/login/route.ts
+      - src/app/api/auth/register/route.ts
+      - src/lib/auth.ts
+    api_calls:
+      - method: POST
+        endpoint: /api/auth/login
+        payload: { "username": "...", "password": "..." }
+      - method: POST
+        endpoint: /api/auth/register
+    auth_required: false
+  - name: Client Management
+    description: CRUD operations for clients
+    files:
+      - src/app/api/clients/route.ts
+      - src/app/api/clients/[id]/route.ts
+    api_calls:
+      - method: GET
+        endpoint: /api/clients
+      - method: POST
+        endpoint: /api/clients
+    auth_required: true
+  - name: Router Management
+    description: CRUD operations for MikroTik routers
+    files:
+      - src/app/api/routers/route.ts
+      - src/lib/mikrotik.ts
+    api_calls:
+      - method: GET
+        endpoint: /api/routers
+    auth_required: true
+  - name: Hotspot Integration
+    description: Hotspot callback, status, and purchase
+    files:
+      - src/app/api/hotspot/callback/route.ts
+      - src/app/api/hotspot/purchase/route.ts
+    api_calls:
+      - method: POST
+        endpoint: /api/hotspot/purchase
+    auth_required: false
+  - name: Financial & Inventory
+    description: Tracking expenses, equipment, and generating vouchers
+    files:
+      - src/app/api/expenses/route.ts
+      - src/app/api/equipment/route.ts
+      - src/app/api/vouchers/generate/route.ts
+    api_calls:
+      - method: POST
+        endpoint: /api/vouchers/generate
+      - method: GET
+        endpoint: /api/expenses
+    auth_required: true
+known_limitations: []

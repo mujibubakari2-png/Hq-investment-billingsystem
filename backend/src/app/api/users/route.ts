@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
             role: u.role === "SUPER_ADMIN" ? "Super Admin" : u.role.charAt(0) + u.role.slice(1).toLowerCase(),
             status: u.status === "ACTIVE" ? "Active" : "Inactive",
             phone: u.phone,
-            lastLogin: u.lastLogin?.toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" }) || "Never",
+            lastLogin: u.lastLogin?.toLocaleString("en-US", { timeZone: "Africa/Dar_es_Salaam", month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" }) || "Never",
         }));
 
         return jsonResponse(mapped);

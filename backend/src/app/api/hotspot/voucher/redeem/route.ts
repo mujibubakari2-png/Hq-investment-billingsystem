@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
+import { getMikroTikService } from "@/lib/mikrotik";
 
 /**
  * POST /api/hotspot/voucher/redeem
@@ -79,7 +80,7 @@ export async function POST(req: NextRequest) {
         }
 
         // Update voucher status and subscription in a transaction
-        await prisma.$transaction([
+        const [updatedVoucher, newSub, updatedClient] = await prisma.$transaction([
             // 1. Mark voucher as USED
             prisma.voucher.update({
                 where: { id: voucher.id },
@@ -100,7 +101,7 @@ export async function POST(req: NextRequest) {
                     activatedAt: now,
                     expiresAt,
                     onlineStatus: "ONLINE",
-                    syncStatus: "SYNCED",
+                    syncStatus: "PENDING",
                 },
             }),
             // 3. Update client
@@ -110,11 +111,53 @@ export async function POST(req: NextRequest) {
             }),
         ]);
 
+        // 4. Activate the user on MikroTik
+        const rId = routerId || pkg.routerId;
+        let finalSyncStatus = "PENDING";
+        if (rId) {
+            try {
+                const mikrotik = await getMikroTikService(rId);
+                // For vouchers, user is typically username = code, password = "" or code.
+                // We've created the client with username `V-${code}` or used an existing one. Let's use `client.username`
+                await mikrotik.activateService(client.username, code, pkg.name, "hotspot");
+
+                finalSyncStatus = "SYNCED";
+                await prisma.routerLog.create({
+                    data: {
+                        routerId: rId,
+                        action: "HOTSPOT_VOUCHER_REDEEMED",
+                        details: `Voucher redeemed: ${code} | MAC: ${macAddress || "N/A"}`,
+                        status: "success",
+                        username: client.username,
+                    },
+                });
+            } catch (logErr: any) {
+                console.error("Router/MikroTik voucher redeem error:", logErr);
+                finalSyncStatus = "FAILED_SYNC";
+                await prisma.routerLog.create({
+                    data: {
+                        routerId: rId,
+                        action: "HOTSPOT_VOUCHER_REDEEM_FAILED",
+                        details: `Mikrotik offline: ${logErr?.message || "Error"} | MAC: ${macAddress || "N/A"}`,
+                        status: "error",
+                        username: client.username,
+                    },
+                });
+            }
+
+            if (newSub?.id) {
+                await prisma.subscription.update({
+                    where: { id: newSub.id },
+                    data: { syncStatus: finalSyncStatus }
+                });
+            }
+        }
+
         return jsonResponse({
             success: true,
             message: "Voucher redeemed successfully!",
             username: client.username,
-            password: "", // Vouchers usually don't have passwords in this flow, or it's the code itself
+            password: code, // Vouchers usually don't have passwords in this flow, or it's the code itself
             expiresAt: expiresAt.toISOString(),
         });
 

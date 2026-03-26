@@ -39,6 +39,8 @@ import Reports from './pages/Reports';
 import TutorialVideos from './pages/TutorialVideos';
 import Invoices from './pages/Invoices';
 import Profile from './pages/Profile';
+import VpnManagement from './pages/VpnManagement';
+
 
 export default function App() {
   return (
@@ -54,6 +56,7 @@ export default function App() {
           <Route element={<MainLayout />}>
             {/* MAIN */}
             <Route path="/" element={<Dashboard />} />
+            <Route path="/dashboard" element={<Dashboard />} />
 
             {/* CLIENT MANAGEMENT */}
             <Route path="/clients" element={<Clients />} />
@@ -72,6 +75,8 @@ export default function App() {
 
             {/* NETWORK MANAGEMENT */}
             <Route path="/mikrotiks" element={<Mikrotiks />} />
+            <Route path="/vpn-management" element={<VpnManagement />} />
+
             <Route path="/equipments" element={<Equipments />} />
 
             {/* COMMUNICATIONS */}

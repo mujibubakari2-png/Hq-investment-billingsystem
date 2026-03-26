@@ -40,11 +40,15 @@ export default function Dashboard() {
     const navigate = useNavigate();
     const [hiddenCards, setHiddenCards] = useState<Set<number>>(new Set());
     const [stats, setStats] = useState<DashboardResponse | null>(null);
-    const [routers, setRouters] = useState<Array<{ name: string; host: string; status: string; lastSeen: string }>>([]);
+    const [routers, setRouters] = useState<Array<{ id: string; name: string; host: string; status: string; lastSeen: string }>>([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [selectedRouter, setSelectedRouter] = useState<string>('All');
+    const [analyticsPeriod, setAnalyticsPeriod] = useState<'daily'|'weekly'|'monthly'|'yearly'>('daily');
 
     const fetchData = async () => {
         setLoading(true);
+        setError(null);
         try {
             const [dashData, routerData] = await Promise.all([
                 dashboardApi.getStats(),
@@ -54,6 +58,7 @@ export default function Dashboard() {
             setRouters(routerData as unknown as typeof routers);
         } catch (err) {
             console.error('Dashboard fetch error:', err);
+            setError('Failed to load dashboard data. Please try again.');
         } finally {
             setLoading(false);
         }
@@ -78,35 +83,35 @@ export default function Dashboard() {
         return () => clearInterval(timer);
     }, []);
 
-    const dateStr = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-    const timeStr = now.toLocaleTimeString('en-US', { hour12: false });
+    const dateStr = now.toLocaleDateString('en-US', { timeZone: 'Africa/Dar_es_Salaam', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    const timeStr = now.toLocaleTimeString('en-US', { timeZone: 'Africa/Dar_es_Salaam', hour12: false });
 
     const greetName = user?.username || 'User';
     const hour = now.getHours();
     const greeting = hour < 12 ? '☀️ Good morning!' : hour < 18 ? '🌤️ Good afternoon!' : '🌙 Good night!';
 
     const revenueCards = [
-        { label: "Today's Revenue", value: fmt(0), change: null, color: '#e53935', icon: '💰' },
-        { label: 'Monthly Revenue', value: fmt(stats?.monthlyRevenue ?? 0), change: null, color: '#00bcd4', icon: '📊' },
-        { label: 'Active Users', value: String(stats?.activeSubscribers ?? 0), subtitle: `⚡ ${stats?.onlineUsers ?? 0} online`, change: null, color: '#4caf50', icon: '👥' },
-        { label: 'Total Clients', value: String(stats?.totalClients ?? 0), change: null, color: '#9c27b0', icon: '🔋' },
+        { label: "Today's Revenue", value: fmt(stats?.todayRevenue ?? 0), subtitle: `${stats?.todayRechargesMobile || 0} users paid via payment channel`, change: null, color: '#e53935', icon: '💰' },
+        { label: 'Monthly Revenue', value: fmt(stats?.monthlyRevenue ?? 0), subtitle: `${stats?.monthlyRechargesMobile || 0} users paid via payment channel`, change: null, color: '#00bcd4', icon: '📊' },
+        { label: 'Active Users', value: String(stats?.activeSubscribers ?? 0), subtitle: `⚡ ${stats?.onlineUsers ?? 0} currently online`, change: null, color: '#4caf50', icon: '👥' },
+        { label: 'Total Customers', value: String(stats?.totalClients ?? 0), subtitle: `${stats?.newCustomersThisMonth || 0} active users within month`, change: null, color: '#9c27b0', icon: '🔋' },
     ];
 
     const voucherCards = [
-        { label: 'Total Revenue', value: fmt(stats?.totalRevenue ?? 0), change: null, color: '#2196f3' },
-        { label: 'Expired Subscribers', value: String(stats?.expiredSubscribers ?? 0), change: null, color: '#e91e63' },
+        { label: 'Today Voucher Rev', value: fmt(stats?.todayVoucherRev ?? 0), subtitle: `${stats?.vouchersUsedToday || 0}/${stats?.vouchersGeneratedToday || 0} generated / ${stats?.vouchersUsedToday || 0} used`, change: null, color: '#2196f3' },
+        { label: 'Monthly Voucher Rev', value: fmt(stats?.monthlyVoucherRev ?? 0), subtitle: `${stats?.vouchersUsedMonth || 0}/${stats?.vouchersGeneratedMonth || 0} generated / ${stats?.vouchersUsedMonth || 0} used`, change: null, color: '#e91e63' },
     ];
 
     const recentTransactions = (stats?.recentTransactions ?? []).map(t => ({
         user: t.user,
         time: t.date,
-        plan: '',
-        type: '',
+        planType: t.planType,
+        timeActive: t.timeActiveSys,
         amount: fmt(t.amount),
         method: t.method,
     }));
 
-    const revenueAnalyticsData = (stats?.revenueChartData ?? []).map(d => ({
+    const revenueAnalyticsData = (stats?.revenueAnalytics?.[analyticsPeriod] ?? []).map(d => ({
         date: d.name,
         revenue: d.value,
     }));
@@ -122,6 +127,18 @@ export default function Dashboard() {
         return <div style={{ padding: 60, textAlign: 'center', color: 'var(--text-muted)' }}>Loading dashboard...</div>;
     }
 
+    if (error && !stats) {
+        return (
+            <div style={{ padding: 60, textAlign: 'center', color: 'var(--text-muted)' }}>
+                <ErrorIcon style={{ fontSize: 48, color: '#e53935', marginBottom: 16 }} />
+                <h3>{error}</h3>
+                <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={() => fetchData()}>
+                    <RefreshIcon style={{ fontSize: 16, marginRight: 8 }} /> Retry
+                </button>
+            </div>
+        );
+    }
+
     return (
         <div className="dashboard-new">
             {/* ===== DARK WELCOME HEADER ===== */}
@@ -133,11 +150,24 @@ export default function Dashboard() {
                         <p>{greeting}</p>
                     </div>
                 </div>
-                <div className="dash-welcome-right" style={{ cursor: 'pointer' }} onClick={() => navigate('/mikrotiks')}>
+                <div className="dash-welcome-right">
                     <div className="dash-welcome-filter">
-                        <span>⚙ Manage Routers</span>
+                        <span>Filter by Router:</span>
                         <div className="dash-router-select">
-                            Config
+                            <select
+                                value={selectedRouter}
+                                onChange={(e) => setSelectedRouter(e.target.value)}
+                                style={{
+                                    border: 'none', background: 'transparent', color: 'inherit',
+                                    fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer', outline: 'none',
+                                    padding: '0 4px', width: '100%', appearance: 'none',
+                                }}
+                            >
+                                <option value="All">All Routers</option>
+                                {routers.map(r => (
+                                    <option key={r.id} value={r.id}>{r.name}</option>
+                                ))}
+                            </select>
                             <KeyboardArrowDownIcon fontSize="small" />
                         </div>
                     </div>
@@ -255,6 +285,9 @@ export default function Dashboard() {
                             {hiddenCards.has(100 + i) ? '•••••' : card.value}
                         </div>
                         <div className="dash-stat-label">{card.label}</div>
+                        {card.subtitle && (
+                            <div className="dash-stat-subtitle" style={{ fontSize: '0.8rem', opacity: 0.8, marginTop: 4 }}>{card.subtitle}</div>
+                        )}
                         {card.change !== null && card.change !== undefined && (
                             <div className={`dash-stat-change ${(card.change ?? 0) >= 0 ? 'up' : 'down'}`}>
                                 {(card.change ?? 0) >= 0 ? (
@@ -398,19 +431,37 @@ export default function Dashboard() {
                 </div>
             </div>
 
-            {/* ===== TOP DATA USERS + RECENT TRANSACTIONS ===== */}
+            {/* ===== TODAY'S RECHARGE RECORDS + RECENT TRANSACTIONS ===== */}
             <div className="dash-two-col">
-                {/* Top Data Users */}
+                {/* Today's Recharge Records */}
                 <div className="dash-card">
                     <div className="dash-card-header">
                         <div className="dash-card-title">
-                            <DataUsageIcon style={{ fontSize: 18 }} />
-                            Top Data Users
+                            <DataUsageIcon style={{ fontSize: 18, color: '#2196f3' }} />
+                            Today's Recharge Records
                         </div>
                     </div>
-                    <div className="dash-card-body dash-empty-state">
-                        <div className="empty-icon">📊</div>
-                        <p>No data usage recorded today.</p>
+                    <div className="dash-card-body" style={{ display: 'flex', flexDirection: 'column', gap: '16px', justifyContent: 'center' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', background: 'var(--bg-lighter, rgba(0,0,0,0.03))', borderRadius: '8px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                <SettingsInputAntennaIcon style={{ color: '#00bcd4', fontSize: '24px' }} />
+                                <div>
+                                    <div style={{ fontWeight: 600, fontSize: '1.1rem' }}>Voucher Subscriptions</div>
+                                    <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Users paid via Voucher</div>
+                                </div>
+                            </div>
+                            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#00bcd4' }}>{stats?.todayRechargesVoucher ?? 0}</div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', background: 'var(--bg-lighter, rgba(0,0,0,0.03))', borderRadius: '8px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                <BoltIcon style={{ color: '#e53935', fontSize: '24px' }} />
+                                <div>
+                                    <div style={{ fontWeight: 600, fontSize: '1.1rem' }}>Payment Channel</div>
+                                    <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Users paid via Mpesa/Mobile</div>
+                                </div>
+                            </div>
+                            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#e53935' }}>{stats?.todayRechargesMobile ?? 0}</div>
+                        </div>
                     </div>
                 </div>
 
@@ -448,8 +499,8 @@ export default function Dashboard() {
                                             </div>
                                         </td>
                                         <td>
-                                            <div className="tx-plan">{tx.plan}</div>
-                                            <div className="tx-type">{tx.type}</div>
+                                            <div className="tx-plan">{tx.planType}</div>
+                                            <div className="tx-type" style={{ fontSize: '0.75rem', opacity: 0.8 }}>Time Active: {tx.timeActive}</div>
                                         </td>
                                         <td>
                                             <div className="tx-amount">{tx.amount}</div>
@@ -479,17 +530,17 @@ export default function Dashboard() {
                     </div>
 
                     <div className="service-plan-grid">
-                        {(stats?.recentSubscriptions ?? []).slice(0, 5).map((sub: { id: string; username: string; plan: string; status: string }, i: number) => (
+                        {(stats?.serviceUtilization ?? []).map((pkg, i: number) => (
                             <div className="service-plan-item" key={i}>
                                 <div className="service-plan-left">
                                     <FiberManualRecordIcon style={{ fontSize: 10, color: ['#e53935', '#e91e63', '#9c27b0', '#2196f3', '#4caf50'][i % 5] }} />
                                     <div>
-                                        <div className="service-plan-name">{sub.plan}</div>
-                                        <div className="service-plan-type">{sub.username}</div>
+                                        <div className="service-plan-name">{pkg.name}</div>
+                                        <div className="service-plan-type" style={{fontSize: '0.8rem', opacity: 0.8}}>{pkg.type} Plan</div>
                                     </div>
                                 </div>
                                 <div className="service-plan-count">
-                                    <span className={`badge ${sub.status.toLowerCase()}`}>{sub.status}</span>
+                                    <span className={`badge active`} style={{ fontWeight: 'bold' }}>{pkg.activeUsersCount} Users</span>
                                 </div>
                             </div>
                         ))}
@@ -506,7 +557,12 @@ export default function Dashboard() {
                             <TimelineIcon style={{ fontSize: 18, color: '#e53935' }} />
                             Revenue Analytics
                         </div>
-                        <span className="dash-card-filter-label">Last 7 Days</span>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                            <button onClick={() => setAnalyticsPeriod('daily')} style={{ padding: '2px 8px', borderRadius: '4px', border: '1px solid var(--border)', background: analyticsPeriod === 'daily' ? 'var(--primary)' : 'transparent', color: analyticsPeriod === 'daily' ? '#fff' : 'inherit', fontSize: '0.75rem', cursor: 'pointer' }}>Day</button>
+                            <button onClick={() => setAnalyticsPeriod('weekly')} style={{ padding: '2px 8px', borderRadius: '4px', border: '1px solid var(--border)', background: analyticsPeriod === 'weekly' ? 'var(--primary)' : 'transparent', color: analyticsPeriod === 'weekly' ? '#fff' : 'inherit', fontSize: '0.75rem', cursor: 'pointer' }}>Week</button>
+                            <button onClick={() => setAnalyticsPeriod('monthly')} style={{ padding: '2px 8px', borderRadius: '4px', border: '1px solid var(--border)', background: analyticsPeriod === 'monthly' ? 'var(--primary)' : 'transparent', color: analyticsPeriod === 'monthly' ? '#fff' : 'inherit', fontSize: '0.75rem', cursor: 'pointer' }}>Month</button>
+                            <button onClick={() => setAnalyticsPeriod('yearly')} style={{ padding: '2px 8px', borderRadius: '4px', border: '1px solid var(--border)', background: analyticsPeriod === 'yearly' ? 'var(--primary)' : 'transparent', color: analyticsPeriod === 'yearly' ? '#fff' : 'inherit', fontSize: '0.75rem', cursor: 'pointer' }}>Year</button>
+                        </div>
                     </div>
                     <div className="dash-card-body" style={{ height: 300 }}>
                         <ResponsiveContainer width="100%" height="100%">
@@ -570,9 +626,9 @@ export default function Dashboard() {
                         <div className="system-activity-list">
                             {(stats?.systemActivities ?? []).slice(0, 5).map((act: { id: string; title: string; description: string; date: string; type: string; status: string }, i: number) => (
                                 <div className="sys-activity-item" key={i}>
-                                    <div className="sys-activity-icon-wrap" style={{ 
-                                        background: act.type === 'login' ? 'rgba(244, 67, 54, 0.12)' : 'rgba(76, 175, 80, 0.12)', 
-                                        color: act.type === 'login' ? '#f44336' : '#4caf50' 
+                                    <div className="sys-activity-icon-wrap" style={{
+                                        background: act.type === 'login' ? 'rgba(244, 67, 54, 0.12)' : 'rgba(76, 175, 80, 0.12)',
+                                        color: act.type === 'login' ? '#f44336' : '#4caf50'
                                     }}>
                                         {act.type === 'login' ? <BoltIcon style={{ fontSize: 16 }} /> : <ReceiptLongIcon style={{ fontSize: 16 }} />}
                                     </div>

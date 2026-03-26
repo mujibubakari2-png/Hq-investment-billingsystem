@@ -119,7 +119,7 @@ export default function AddRouterModal({ onClose, onSave, initialData }: AddRout
                                 />
                             </div>
                             <div className="form-group">
-                                <label className="form-label" style={{ fontSize: '0.82rem' }}>API Password</label>
+                                <label className="form-label" style={{ fontSize: '0.82rem' }}>Access Code / API Password</label>
                                 <div style={{ position: 'relative' }}>
                                     <input
                                         type={showAccessCode ? 'text' : 'password'}

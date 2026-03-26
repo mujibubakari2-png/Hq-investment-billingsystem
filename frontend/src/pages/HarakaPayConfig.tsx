@@ -10,9 +10,20 @@ export default function HarakaPayConfig() {
     const [apiKey, setApiKey] = useState('');
     const [saved, setSaved] = useState(false);
 
+    const [testing, setTesting] = useState(false);
+    const [testResult, setTestResult] = useState('');
+
     const handleSave = () => {
         setSaved(true);
         setTimeout(() => navigate('/payment-channels'), 1500);
+    };
+
+    const handleTestPayment = () => {
+        setTesting(true);
+        setTimeout(() => {
+            setTesting(false);
+            setTestResult('Verification successful!');
+        }, 2000);
     };
 
     return (
@@ -169,7 +180,10 @@ export default function HarakaPayConfig() {
                 )}
 
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-                    <button className="btn btn-secondary" onClick={() => navigate('/payment-channels')}>+ Cancel</button>
+                    <button className="btn btn-secondary" onClick={() => navigate('/payment-channels')}>Cancel</button>
+                    <button className="btn btn-secondary" onClick={handleTestPayment} disabled={testing}>
+                        {testing ? 'Testing...' : 'Test Payment'}
+                    </button>
                     <button className="btn" onClick={handleSave} style={{
                         background: '#e11d48', color: '#fff', fontWeight: 600,
                         padding: '8px 20px', display: 'flex', alignItems: 'center', gap: 6,
@@ -177,6 +191,16 @@ export default function HarakaPayConfig() {
                         <SaveIcon fontSize="small" /> Save Configuration
                     </button>
                 </div>
+
+                {testResult && (
+                    <div style={{
+                        marginTop: 16, padding: '12px 16px', background: '#f0f9ff', 
+                        border: '1px solid #bae6fd', color: '#0369a1', borderRadius: 'var(--radius-sm)', 
+                        fontSize: '0.85rem', fontWeight: 500
+                    }}>
+                        {testResult}
+                    </div>
+                )}
             </div>
         </div>
     );

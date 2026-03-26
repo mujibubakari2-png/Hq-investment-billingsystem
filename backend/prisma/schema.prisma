@@ -1,4 +1,3 @@
-// Kenge ISP Billing System - Database Schema
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
@@ -8,26 +7,23 @@ datasource db {
   provider = "postgresql"
 }
 
-// ─── SYSTEM USERS (login accounts for admins/agents) ─────────────────────────
 model User {
-  id        String   @id @default(cuid())
-  username  String   @unique
+  id        String     @id @default(cuid())
+  username  String     @unique
   fullName  String?
-  email     String   @unique
+  email     String     @unique
   password  String
   phone     String?
-  role      Role     @default(AGENT)
+  role      Role       @default(AGENT)
   status    UserStatus @default(ACTIVE)
   lastLogin DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  vouchers  Voucher[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  tenantId  String?
   expenses  Expense[]
   otps      UserOtp[]
-
-    tenantId String?
-  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant    Tenant?    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  vouchers  Voucher[]
 
   @@map("users")
 }
@@ -39,12 +35,471 @@ model UserOtp {
   expiresAt DateTime
   createdAt DateTime @default(now())
   used      Boolean  @default(false)
-  user      User?    @relation(fields: [email], references: [email])
-
-    tenantId String?
-  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId  String?
+  user      User     @relation(fields: [email], references: [email])
+  tenant    Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("user_otps")
+}
+
+model Client {
+  id            String         @id @default(cuid())
+  username      String         @unique
+  fullName      String
+  phone         String?
+  email         String?
+  serviceType   ServiceType
+  status        ClientStatus   @default(ACTIVE)
+  accountType   AccountType    @default(PERSONAL)
+  macAddress    String?
+  device        String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  tenantId      String?
+  tenant        Tenant?        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  invoices      Invoice[]
+  smsMessages   SmsMessage[]
+  subscriptions Subscription[]
+  transactions  Transaction[]
+
+  @@map("clients")
+}
+
+model Package {
+  id            String         @id @default(cuid())
+  name          String
+  type          ServiceType
+  category      AccountType    @default(PERSONAL)
+  uploadSpeed   Float
+  uploadUnit    String         @default("Mbps")
+  downloadSpeed Float
+  downloadUnit  String         @default("Mbps")
+  price         Float
+  duration      Int
+  durationUnit  DurationUnit
+  status        PackageStatus  @default(ACTIVE)
+  burstEnabled  Boolean        @default(false)
+  hotspotType   HotspotType?
+  devices       Int?           @default(1)
+  paymentType   PaymentType    @default(PREPAID)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  routerId      String?
+  tenantId      String?
+  router        Router?        @relation(fields: [routerId], references: [id])
+  tenant        Tenant?        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  subscriptions Subscription[]
+  vouchers      Voucher[]
+
+  @@map("packages")
+}
+
+model Subscription {
+  id           String             @id @default(cuid())
+  clientId     String
+  packageId    String
+  routerId     String?
+  status       SubscriptionStatus @default(ACTIVE)
+  method       String?
+  activatedAt  DateTime           @default(now())
+  expiresAt    DateTime
+  dataUsed     String?
+  onlineStatus OnlineStatus?      @default(OFFLINE)
+  syncStatus   String?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  tenantId     String?
+  client       Client             @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  package      Package            @relation(fields: [packageId], references: [id])
+  router       Router?            @relation(fields: [routerId], references: [id])
+  tenant       Tenant?            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("subscriptions")
+}
+
+model Transaction {
+  id         String            @id @default(cuid())
+  clientId   String
+  planName   String?
+  amount     Float
+  type       TransactionType   @default(MOBILE)
+  method     String
+  status     TransactionStatus @default(PENDING)
+  reference  String            @unique
+  expiryDate String?
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+  tenantId   String?
+  client     Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  tenant     Tenant?           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("transactions")
+}
+
+model Router {
+  id              String           @id @default(cuid())
+  name            String           @unique
+  host            String
+  username        String?          @default("admin")
+  password        String?
+  port            Int?             @default(8728)
+  type            String           @default("MikroTik")
+  status          RouterStatus     @default(OFFLINE)
+  activeUsers     Int              @default(0)
+  cpuLoad         Float            @default(0)
+  memoryUsed      Float            @default(0)
+  uptime          String?
+  lastSeen        String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  tenantId        String?
+  apiPort         Int?             @default(8728)
+  description     String?
+  vpnMode         String?          @default("hybrid")
+  equipments      Equipment[]
+  hotspotSettings HotspotSettings?
+  packages        Package[]
+  logs            RouterLog[]
+  tenant          Tenant?          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  subscriptions   Subscription[]
+  vouchers        Voucher[]
+  vpnUsers        VpnUser[]
+
+  @@map("routers")
+}
+
+model RouterLog {
+  id        String   @id @default(cuid())
+  routerId  String
+  action    String
+  details   String?
+  status    String   @default("success")
+  username  String?
+  ipAddress String?
+  createdAt DateTime @default(now())
+  tenantId  String?
+  router    Router   @relation(fields: [routerId], references: [id], onDelete: Cascade)
+  tenant    Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("router_logs")
+}
+
+model HotspotSettings {
+  id                 String   @id @default(cuid())
+  routerId           String   @unique
+  primaryColor       String   @default("#1a1a2e")
+  accentColor        String   @default("#6366f1")
+  selectedFont       String   @default("Inter")
+  layout             String   @default("grid")
+  enableAds          Boolean  @default(false)
+  enableAnnouncement Boolean  @default(true)
+  enableRememberMe   Boolean  @default(true)
+  companyName        String?
+  customerCareNumber String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  tenantId           String?
+  router             Router   @relation(fields: [routerId], references: [id], onDelete: Cascade)
+  tenant             Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("hotspot_settings")
+}
+
+model Equipment {
+  id           String          @id @default(cuid())
+  name         String
+  type         String
+  serialNumber String          @unique
+  status       EquipmentStatus @default(ACTIVE)
+  location     String?
+  assignedTo   String?
+  purchaseDate DateTime?
+  notes        String?
+  routerId     String?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  tenantId     String?
+  router       Router?         @relation(fields: [routerId], references: [id])
+  tenant       Tenant?         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("equipments")
+}
+
+model Voucher {
+  id          String        @id @default(cuid())
+  code        String        @unique
+  packageId   String
+  routerId    String?
+  status      VoucherStatus @default(UNUSED)
+  createdById String
+  usedBy      String?
+  usedAt      DateTime?
+  customer    Int?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  tenantId    String?
+  createdBy   User          @relation(fields: [createdById], references: [id])
+  package     Package       @relation(fields: [packageId], references: [id])
+  router      Router?       @relation(fields: [routerId], references: [id])
+  tenant      Tenant?       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("vouchers")
+}
+
+model Expense {
+  id          String   @id @default(cuid())
+  category    String
+  description String
+  amount      Float
+  date        DateTime
+  reference   String?
+  receipt     String?
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  tenantId    String?
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  tenant      Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("expenses")
+}
+
+model Invoice {
+  id            String        @id @default(cuid())
+  invoiceNumber String        @unique
+  clientId      String
+  amount        Float
+  status        InvoiceStatus @default(DRAFT)
+  dueDate       DateTime
+  issuedDate    DateTime
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  tenantId      String?
+  items         InvoiceItem[]
+  client        Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  tenant        Tenant?       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id          String  @id @default(cuid())
+  invoiceId   String
+  description String
+  quantity    Int
+  unitPrice   Float
+  total       Float
+  invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@map("invoice_items")
+}
+
+model SmsMessage {
+  id        String    @id @default(cuid())
+  clientId  String?
+  recipient String
+  message   String
+  status    SmsStatus @default(PENDING)
+  type      SmsType   @default(INDIVIDUAL)
+  sentAt    DateTime  @default(now())
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  tenantId  String?
+  client    Client?   @relation(fields: [clientId], references: [id])
+  tenant    Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("sms_messages")
+}
+
+model MessageTemplate {
+  id        String       @id @default(cuid())
+  name      String
+  content   String
+  type      TemplateType @default(CUSTOM)
+  variables String[]
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  tenantId  String?
+  tenant    Tenant?      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("message_templates")
+}
+
+model PaymentChannel {
+  id            String        @id @default(cuid())
+  name          String
+  provider      String
+  accountNumber String?
+  apiKey        String?
+  apiSecret     String?
+  status        ChannelStatus @default(ACTIVE)
+  config        Json?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  tenantId      String?
+  tenant        Tenant?       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("payment_channels")
+}
+
+model SystemSetting {
+  id       String  @id @default(cuid())
+  key      String  @unique
+  value    String
+  group    String  @default("general")
+  tenantId String?
+  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("system_settings")
+}
+
+model Tenant {
+  id               String            @id @default(cuid())
+  name             String
+  email            String            @unique
+  phone            String?
+  status           TenantStatus      @default(ACTIVE)
+  planId           String
+  trialStart       DateTime?
+  trialEnd         DateTime?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  clients          Client[]
+  equipments       Equipment[]
+  expenses         Expense[]
+  hotspotSettings  HotspotSettings[]
+  invoices         Invoice[]
+  messageTemplates MessageTemplate[]
+  packages         Package[]
+  paymentChannels  PaymentChannel[]
+  routerLogs       RouterLog[]
+  routers          Router[]
+  smsMessages      SmsMessage[]
+  subscriptions    Subscription[]
+  systemSettings   SystemSetting[]
+  tenantInvoices   TenantInvoice[]
+  tenantPayments   TenantPayment[]
+  plan             SaasPlan          @relation(fields: [planId], references: [id])
+  transactions     Transaction[]
+  userOtps         UserOtp[]
+  users            User[]
+  vouchers         Voucher[]
+  vpnUsers         VpnUser[]
+  radiusUsers      RadiusUser[]
+  radiusNas        RadiusNas[]
+
+  @@map("tenants")
+}
+
+model SaasPlan {
+  id          String          @id @default(cuid())
+  name        String
+  price       Float
+  clientLimit Int
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  invoices    TenantInvoice[]
+  tenants     Tenant[]
+
+  @@map("saas_plans")
+}
+
+model TenantInvoice {
+  id            String              @id @default(cuid())
+  invoiceNumber String              @unique
+  tenantId      String
+  planId        String
+  amount        Float
+  status        TenantInvoiceStatus @default(PENDING)
+  dueDate       DateTime
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  plan          SaasPlan            @relation(fields: [planId], references: [id])
+  tenant        Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  payments      TenantPayment[]
+
+  @@map("tenant_invoices")
+}
+
+model TenantPayment {
+  id            String        @id @default(cuid())
+  invoiceId     String
+  tenantId      String
+  amount        Float
+  transactionId String?       @unique
+  paymentMethod String        @default("PALMPESA")
+  status        PaymentStatus @default(PENDING)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  invoice       TenantInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  tenant        Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("tenant_payments")
+}
+
+model VpnUser {
+  id             String    @id @default(cuid())
+  username       String    @unique
+  password       String
+  fullName       String?
+  protocol       String    @default("L2TP")
+  profile        String    @default("default")
+  service        String    @default("l2tp")
+  localAddress   String?
+  remoteAddress  String?
+  status         String    @default("Active")
+  routerId       String
+  uptime         String?
+  bytesIn        String?
+  bytesOut       String?
+  connectedAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  tenantId       String?
+  router         Router    @relation(fields: [routerId], references: [id])
+  tenant         Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("vpn_users")
+}
+
+model RadiusUser {
+  id               String    @id @default(cuid())
+  username         String    @unique
+  password         String
+  fullName         String?
+  authType         String    @default("PAP")
+  groupName        String    @default("default")
+  status           String    @default("Active")
+  speed            String?
+  dataLimit        String?
+  sessionTimeout   String?
+  simultaneousUse  Int       @default(1)
+  nasIpAddress     String?
+  framedIpAddress  String?
+  lastSeen         DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  tenantId         String?
+  tenant           Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("radius_users")
+}
+
+model RadiusNas {
+  id          String   @id @default(cuid())
+  nasName     String
+  shortName   String?
+  type        String   @default("other")
+  ports       Int      @default(0)
+  secret      String
+  server      String?
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  tenantId    String?
+  tenant      Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("radius_nas")
 }
 
 enum Role {
@@ -57,32 +512,6 @@ enum Role {
 enum UserStatus {
   ACTIVE
   INACTIVE
-}
-
-// ─── CLIENTS (ISP customers) ────────────────────────────────────────────────
-model Client {
-  id          String        @id @default(cuid())
-  username    String        @unique
-  fullName    String
-  phone       String?
-  email       String?
-  serviceType ServiceType
-  status      ClientStatus  @default(ACTIVE)
-  accountType AccountType   @default(PERSONAL)
-  macAddress  String?
-  device      String?
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-
-  subscriptions Subscription[]
-  transactions  Transaction[]
-  invoices      Invoice[]
-  smsMessages   SmsMessage[]
-
-    tenantId String?
-  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  @@map("clients")
 }
 
 enum ServiceType {
@@ -103,39 +532,6 @@ enum ClientStatus {
 enum AccountType {
   PERSONAL
   BUSINESS
-}
-
-// ─── PACKAGES (service plans) ───────────────────────────────────────────────
-model Package {
-  id            String      @id @default(cuid())
-  name          String
-  type          ServiceType
-  category      AccountType @default(PERSONAL)
-  uploadSpeed   Float
-  uploadUnit    String      @default("Mbps")
-  downloadSpeed Float
-  downloadUnit  String      @default("Mbps")
-  price         Float
-  duration      Int
-  durationUnit  DurationUnit
-  status        PackageStatus @default(ACTIVE)
-  burstEnabled  Boolean     @default(false)
-  hotspotType   HotspotType?
-  devices       Int?        @default(1)
-  paymentType   PaymentType @default(PREPAID)
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
-
-  routerId      String?
-  router        Router?     @relation(fields: [routerId], references: [id])
-
-  subscriptions Subscription[]
-  vouchers      Voucher[]
-
-    tenantId String?
-  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  @@map("packages")
 }
 
 enum DurationUnit {
@@ -160,31 +556,6 @@ enum PaymentType {
   POSTPAID
 }
 
-// ─── SUBSCRIPTIONS (active/expired plans for clients) ───────────────────────
-model Subscription {
-  id          String             @id @default(cuid())
-  clientId    String
-  client      Client             @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  packageId   String
-  package     Package            @relation(fields: [packageId], references: [id])
-  routerId    String?
-  router      Router?            @relation(fields: [routerId], references: [id])
-  status      SubscriptionStatus @default(ACTIVE)
-  method      String?
-  activatedAt DateTime           @default(now())
-  expiresAt   DateTime
-  dataUsed    String?
-  onlineStatus OnlineStatus?     @default(OFFLINE)
-  syncStatus  String?
-  createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
-
-    tenantId String?
-  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  @@map("subscriptions")
-}
-
 enum SubscriptionStatus {
   ACTIVE
   EXPIRED
@@ -195,27 +566,6 @@ enum SubscriptionStatus {
 enum OnlineStatus {
   ONLINE
   OFFLINE
-}
-
-// ─── TRANSACTIONS ───────────────────────────────────────────────────────────
-model Transaction {
-  id          String            @id @default(cuid())
-  clientId    String
-  client      Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  planName    String?
-  amount      Float
-  type        TransactionType   @default(MOBILE)
-  method      String
-  status      TransactionStatus @default(PENDING)
-  reference   String            @unique
-  expiryDate  String?
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
-
-    tenantId String?
-  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  @@map("transactions")
 }
 
 enum TransactionType {
@@ -230,134 +580,15 @@ enum TransactionStatus {
   FAILED
 }
 
-// ─── ROUTERS (MikroTik) ────────────────────────────────────────────────────
-model Router {
-  id          String       @id @default(cuid())
-  name        String       @unique
-  host        String
-  username    String?      @default("admin")
-  password    String?
-  port        Int?         @default(8728)
-  apiPort     Int?         @default(8728)
-  type        String       @default("MikroTik")
-  vpnMode     String?      @default("hybrid")
-  description String?
-  status      RouterStatus @default(OFFLINE)
-  activeUsers Int          @default(0)
-  cpuLoad     Float        @default(0)
-  memoryUsed  Float        @default(0)
-  uptime      String?
-  lastSeen    String?
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-
-  packages      Package[]
-  subscriptions Subscription[]
-  equipments    Equipment[]
-  vouchers      Voucher[]
-  logs          RouterLog[]
-  hotspotSettings HotspotSettings?
-
-  tenantId String?
-  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  @@map("routers")
-}
-
 enum RouterStatus {
   ONLINE
   OFFLINE
-}
-
-// ─── ROUTER ACTION LOGS ────────────────────────────────────────────────────
-model RouterLog {
-  id        String   @id @default(cuid())
-  routerId  String
-  router    Router   @relation(fields: [routerId], references: [id], onDelete: Cascade)
-  action    String
-  details   String?
-  status    String   @default("success")
-  username  String?
-  ipAddress String?
-  createdAt DateTime @default(now())
-
-  tenantId String?
-  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  @@map("router_logs")
-}
-
-model HotspotSettings {
-  id                  String   @id @default(cuid())
-  routerId            String   @unique
-  router              Router   @relation(fields: [routerId], references: [id], onDelete: Cascade)
-  primaryColor        String   @default("#1a1a2e")
-  accentColor         String   @default("#6366f1")
-  selectedFont        String   @default("Inter")
-  layout              String   @default("grid")
-  enableAds           Boolean  @default(false)
-  enableAnnouncement  Boolean  @default(true)
-  enableRememberMe    Boolean  @default(true)
-  companyName         String?
-  customerCareNumber  String?
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-
-  tenantId            String?
-  tenant              Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  @@map("hotspot_settings")
-}
-
-// ─── EQUIPMENT ──────────────────────────────────────────────────────────────
-model Equipment {
-  id           String          @id @default(cuid())
-  name         String
-  type         String
-  serialNumber String          @unique
-  status       EquipmentStatus @default(ACTIVE)
-  location     String?
-  assignedTo   String?
-  purchaseDate DateTime?
-  notes        String?
-  routerId     String?
-  router       Router?         @relation(fields: [routerId], references: [id])
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
-
-    tenantId String?
-  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  @@map("equipments")
 }
 
 enum EquipmentStatus {
   ACTIVE
   INACTIVE
   MAINTENANCE
-}
-
-// ─── VOUCHERS ───────────────────────────────────────────────────────────────
-model Voucher {
-  id         String        @id @default(cuid())
-  code       String        @unique
-  packageId  String
-  package    Package       @relation(fields: [packageId], references: [id])
-  routerId   String?
-  router     Router?       @relation(fields: [routerId], references: [id])
-  status     VoucherStatus @default(UNUSED)
-  createdById String
-  createdBy  User          @relation(fields: [createdById], references: [id])
-  usedBy     String?
-  usedAt     DateTime?
-  customer   Int?
-  createdAt  DateTime      @default(now())
-  updatedAt  DateTime      @updatedAt
-
-    tenantId String?
-  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  @@map("vouchers")
 }
 
 enum VoucherStatus {
@@ -368,83 +599,11 @@ enum VoucherStatus {
   REVOKED
 }
 
-// ─── EXPENSES ───────────────────────────────────────────────────────────────
-model Expense {
-  id          String   @id @default(cuid())
-  category    String
-  description String
-  amount      Float
-  date        DateTime
-  reference   String?
-  receipt     String?
-  createdById String
-  createdBy   User     @relation(fields: [createdById], references: [id])
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-    tenantId String?
-  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  @@map("expenses")
-}
-
-// ─── INVOICES ───────────────────────────────────────────────────────────────
-model Invoice {
-  id            String        @id @default(cuid())
-  invoiceNumber String        @unique
-  clientId      String
-  client        Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  amount        Float
-  status        InvoiceStatus @default(DRAFT)
-  dueDate       DateTime
-  issuedDate    DateTime
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-
-  items InvoiceItem[]
-
-    tenantId String?
-  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  @@map("invoices")
-}
-
-model InvoiceItem {
-  id          String  @id @default(cuid())
-  invoiceId   String
-  invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  description String
-  quantity    Int
-  unitPrice   Float
-  total       Float
-
-  @@map("invoice_items")
-}
-
 enum InvoiceStatus {
   PAID
   UNPAID
   OVERDUE
   DRAFT
-}
-
-// ─── SMS MESSAGES ───────────────────────────────────────────────────────────
-model SmsMessage {
-  id        String    @id @default(cuid())
-  clientId  String?
-  client    Client?   @relation(fields: [clientId], references: [id])
-  recipient String
-  message   String
-  status    SmsStatus @default(PENDING)
-  type      SmsType   @default(INDIVIDUAL)
-  sentAt    DateTime  @default(now())
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-
-    tenantId String?
-  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  @@map("sms_messages")
 }
 
 enum SmsStatus {
@@ -458,22 +617,6 @@ enum SmsType {
   INDIVIDUAL
 }
 
-// ─── MESSAGE TEMPLATES ──────────────────────────────────────────────────────
-model MessageTemplate {
-  id        String       @id @default(cuid())
-  name      String
-  content   String
-  type      TemplateType @default(CUSTOM)
-  variables String[]
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
-
-    tenantId String?
-  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  @@map("message_templates")
-}
-
 enum TemplateType {
   ACTIVATION
   EXPIRY
@@ -482,80 +625,9 @@ enum TemplateType {
   REMINDER
 }
 
-// ─── PAYMENT CHANNELS ───────────────────────────────────────────────────────
-model PaymentChannel {
-  id            String        @id @default(cuid())
-  name          String
-  provider      String
-  accountNumber String?
-  apiKey        String?
-  apiSecret     String?
-  status        ChannelStatus @default(ACTIVE)
-  config        Json?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-
-    tenantId String?
-  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  @@map("payment_channels")
-}
-
 enum ChannelStatus {
   ACTIVE
   INACTIVE
-}
-
-// ─── SYSTEM SETTINGS ────────────────────────────────────────────────────────
-model SystemSetting {
-  id    String @id @default(cuid())
-  key   String @unique
-  value String
-  group String @default("general")
-
-    tenantId String?
-  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  @@map("system_settings")
-}
-
-
-// ─── SAAS TENANT MODELS ───────────────────────────────────────────────────
-model Tenant {
-  id          String       @id @default(cuid())
-  name        String
-  email       String       @unique
-  phone       String?
-  status      TenantStatus @default(ACTIVE)
-  planId      String
-  plan        SaasPlan     @relation(fields: [planId], references: [id])
-  trialStart  DateTime?
-  trialEnd    DateTime?
-
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-
-  users             User[]
-  clients           Client[]
-  packages          Package[]
-  subscriptions     Subscription[]
-  transactions      Transaction[]
-  routers           Router[]
-  equipments        Equipment[]
-  vouchers          Voucher[]
-  expenses          Expense[]
-  invoices          Invoice[]
-  smsMessages       SmsMessage[]
-  messageTemplates  MessageTemplate[]
-  paymentChannels   PaymentChannel[]
-  systemSettings    SystemSetting[]
-  tenantInvoices    TenantInvoice[]
-  tenantPayments    TenantPayment[]
-  userOtps          UserOtp[]
-  routerLogs        RouterLog[]
-  hotspotSettings   HotspotSettings[]
-
-  @@map("tenants")
 }
 
 enum TenantStatus {
@@ -565,58 +637,10 @@ enum TenantStatus {
   CANCELLED
 }
 
-model SaasPlan {
-  id          String   @id @default(cuid())
-  name        String
-  price       Float
-  clientLimit Int
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  tenants     Tenant[]
-  invoices    TenantInvoice[]
-
-  @@map("saas_plans")
-}
-
-model TenantInvoice {
-  id            String              @id @default(cuid())
-  invoiceNumber String              @unique
-  tenantId      String
-  tenant        Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  planId        String
-  plan          SaasPlan            @relation(fields: [planId], references: [id])
-  amount        Float
-  status        TenantInvoiceStatus @default(PENDING)
-  dueDate       DateTime
-  createdAt     DateTime            @default(now())
-  updatedAt     DateTime            @updatedAt
-
-  payments      TenantPayment[]
-
-  @@map("tenant_invoices")
-}
-
 enum TenantInvoiceStatus {
   PENDING
   PAID
   EXPIRED
-}
-
-model TenantPayment {
-  id            String         @id @default(cuid())
-  invoiceId     String
-  invoice       TenantInvoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  tenantId      String
-  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  amount        Float
-  transactionId String?        @unique
-  paymentMethod String         @default("PALMPESA") // e.g. MIX_BY_YAS, AIRTEL_MONEY, HALOPESA, MPESA
-  status        PaymentStatus  @default(PENDING)
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-
-  @@map("tenant_payments")
 }
 
 enum PaymentStatus {

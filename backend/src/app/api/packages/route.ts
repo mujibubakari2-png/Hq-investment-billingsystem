@@ -12,8 +12,14 @@ export async function GET(req: NextRequest) {
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const where: any = {};
-        if (type) where.type = type;
-        if (status) where.status = status;
+        if (type) {
+            const mappedType = type.toUpperCase() === "HOTSPOT" ? "HOTSPOT" : (type.toUpperCase() === "PPPOE" ? "PPPOE" : type);
+            where.type = mappedType;
+        }
+        if (status) {
+            const mappedStatus = status.toUpperCase() === "ACTIVE" ? "ACTIVE" : (status.toUpperCase() === "INACTIVE" ? "INACTIVE" : status);
+            where.status = mappedStatus;
+        }
         if (routerId) where.routerId = routerId;
 
         const packages = await prisma.package.findMany({
@@ -74,33 +80,44 @@ export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
 
-        const router = body.router
-            ? await prisma.router.findUnique({ where: { name: body.router } })
-            : null;
+        // Validation
+        if (!body.name) return errorResponse("Package name is required");
+        if (!body.price) return errorResponse("Price is required");
+        if (!body.duration) return errorResponse("Duration is required");
+
+        let routerId = body.routerId || body.router;
+        if (routerId) {
+            const router = await prisma.router.findFirst({
+                where: {
+                    OR: [
+                        { id: routerId },
+                        { name: routerId }
+                    ]
+                }
+            });
+            routerId = router?.id;
+        }
 
         const pkg = await prisma.package.create({
             data: {
                 name: body.name,
-                type: body.type === "PPPoE" ? "PPPOE" : "HOTSPOT",
-                category: body.category === "Business" ? "BUSINESS" : "PERSONAL",
-                uploadSpeed: parseFloat(body.uploadSpeed),
-                uploadUnit: body.uploadUnit || "Mbps",
-                downloadSpeed: parseFloat(body.downloadSpeed),
-                downloadUnit: body.downloadUnit || "Mbps",
+                type: body.type === "PPPoE" || body.type === "PPPOE" ? "PPPOE" : "HOTSPOT",
+                category: body.category === "Business" || body.category === "BUSINESS" ? "BUSINESS" : "PERSONAL",
+                uploadSpeed: parseFloat(body.uploadSpeed) || 0,
+                uploadUnit: body.uploadUnit || "M",
+                downloadSpeed: parseFloat(body.downloadSpeed) || 0,
+                downloadUnit: body.downloadUnit || "M",
                 price: parseFloat(body.price),
                 duration: parseInt(body.duration),
-                durationUnit: (body.durationUnit || "Hours").toUpperCase(),
-                burstEnabled: body.burstEnabled || false,
-                hotspotType: body.hotspotType === "Data-capped" ? "DATA_CAPPED" : "UNLIMITED",
-                devices: parseInt(body.devices) || 1,
-                paymentType: body.paymentType === "Postpaid" ? "POSTPAID" : "PREPAID",
-                routerId: router?.id,
+                durationUnit: (body.durationUnit || "DAYS").toUpperCase() as any,
+                routerId: routerId || null,
+                status: "ACTIVE",
             },
         });
 
         return jsonResponse(pkg, 201);
     } catch (e) {
-        console.error(e);
+        console.error("PACKAGE POST ERROR:", e);
         return errorResponse("Internal server error", 500);
     }
 }

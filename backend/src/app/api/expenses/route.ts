@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
             category: e.category,
             description: e.description,
             amount: e.amount,
-            date: e.date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+            date: e.date.toLocaleDateString("en-US", { timeZone: "Africa/Dar_es_Salaam", month: "short", day: "numeric", year: "numeric" }),
             reference: e.reference,
             createdBy: e.createdBy.username,
         }));
@@ -55,21 +55,37 @@ export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
 
+        let createdById = body.createdById || body.created_by;
+        if (!createdById) {
+            const admin = await prisma.user.findFirst({ where: { role: "ADMIN" } });
+            createdById = admin?.id;
+        }
+
+        if (!createdById) {
+            return errorResponse("Creator user ID is required");
+        }
+
+        const amount = parseFloat(body.amount) || parseFloat(body.amount_value) || 0;
+
         const expense = await prisma.expense.create({
             data: {
-                category: body.category,
-                description: body.description,
-                amount: parseFloat(body.amount),
-                date: new Date(body.date),
+                category: body.category || "OTHER",
+                description: body.description || "N/A",
+                amount,
+                date: body.date ? new Date(body.date) : new Date(),
                 reference: body.reference || `EXP-${Date.now()}`,
                 receipt: body.receipt,
-                createdById: body.createdById,
+                createdById,
             },
         });
 
-        return jsonResponse(expense, 201);
+        return jsonResponse({
+            ...expense,
+            amount_value: expense.amount, // Alias
+            created_by: expense.createdById, // Alias
+        }, 201);
     } catch (e) {
-        console.error(e);
+        console.error("EXPENSE POST ERROR:", e);
         return errorResponse("Internal server error", 500);
     }
 }

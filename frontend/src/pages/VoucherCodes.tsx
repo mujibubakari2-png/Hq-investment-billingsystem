@@ -8,10 +8,12 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import PrintIcon from '@mui/icons-material/Print';
 import CheckBoxIcon from '@mui/icons-material/CheckBox';
 import CheckBoxOutlineBlankIcon from '@mui/icons-material/CheckBoxOutlineBlank';
+import RouterIcon from '@mui/icons-material/Router';
 import { vouchersApi } from '../api/client';
 import type { Voucher } from '../types';
 import GenerateVouchersModal from '../modals/GenerateVouchersModal';
 import ConfirmDeleteModal from '../modals/ConfirmDeleteModal';
+import EditVoucherModal from '../modals/EditVoucherModal';
 
 export default function VoucherCodes() {
     const [vouchers, setVouchers] = useState<Voucher[]>([]);
@@ -21,14 +23,24 @@ export default function VoucherCodes() {
     const [showGenerateModal, setShowGenerateModal] = useState(false);
     const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [showEditModal, setShowEditModal] = useState(false);
     const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+    const [editTargetId, setEditTargetId] = useState<string | null>(null);
+    const [bulkDeleteStatus, setBulkDeleteStatus] = useState('Used');
     const [selected, setSelected] = useState<string[]>([]);
     const [loading, setLoading] = useState(true);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [entriesPerPage, setEntriesPerPage] = useState<number | 'All'>(10);
+
+    // Reset pagination when filters change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, statusFilter, routerFilter, entriesPerPage]);
 
     const fetchVouchers = async () => {
         setLoading(true);
         try {
-            const res = await vouchersApi.list();
+            const res = await vouchersApi.list({ limit: '1000' });
             setVouchers((res.data || []) as unknown as Voucher[]);
         } catch (err) {
             console.error('Failed to fetch vouchers', err);
@@ -58,56 +70,85 @@ export default function VoucherCodes() {
             setDeleteTargetId(null);
             setShowDeleteModal(false);
             fetchVouchers();
-            alert('Voucher revoked successfully!');
         } catch (err) {
             console.error('Failed to revoke voucher', err);
             alert('Failed to revoke voucher');
         }
     };
 
-    const handleDeleteAllUsed = async () => {
+    const handleBulkDelete = async () => {
         try {
-            // Note: in a real environment this would be a custom API method, here we loop delete for MVP
-            const usedVouchers = vouchers.filter(v => v.status === 'Used');
-            await Promise.all(usedVouchers.map(v => vouchersApi.delete(v.id)));
+            const isCheckboxSelection = selected.length > 0;
+            const vouchersToDelete = isCheckboxSelection
+                ? vouchers.filter(v => selected.includes(v.id))
+                : vouchers.filter(v => v.status === bulkDeleteStatus);
+
+            if (vouchersToDelete.length === 0) {
+                alert(`No ${isCheckboxSelection ? 'selected' : bulkDeleteStatus} vouchers found to delete.`);
+                setShowDeleteAllModal(false);
+                return;
+            }
+
+            // Chunk deletions to avoid overwhelming backend/Prisma connection pool
+            const chunkSize = 5;
+            for (let i = 0; i < vouchersToDelete.length; i += chunkSize) {
+                const chunk = vouchersToDelete.slice(i, i + chunkSize);
+                await Promise.all(chunk.map(v => vouchersApi.delete(v.id)));
+            }
+
             setShowDeleteAllModal(false);
+            if (isCheckboxSelection) setSelected([]);
             fetchVouchers();
-            alert('Used vouchers deleted successfully!');
+            alert(`${isCheckboxSelection ? 'Selected' : bulkDeleteStatus} vouchers deleted successfully!`);
         } catch (err) {
-            console.error('Failed to mass-delete used vouchers', err);
-            alert('Failed to mass-delete used vouchers');
+            console.error('Failed to mass-delete vouchers', err);
+            alert('Failed to delete vouchers. Some may have been removed before the process failed.');
         }
     };
 
-    const uniqueRouters = Array.from(new Set(vouchers.map(v => v.router)));
+    const uniqueRouters = Array.from(new Set(vouchers.map(v => v.router || 'Unassigned')));
 
     const filtered = vouchers.filter(v => {
-        const matchSearch = v.code.includes(searchTerm) || v.plan.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchSearch = (v.code || '').includes(searchTerm) || (v.plan || '').toLowerCase().includes(searchTerm.toLowerCase());
         const matchStatus = statusFilter === 'All' || v.status === statusFilter;
-        const matchRouter = routerFilter === 'All Routers' || v.router === routerFilter;
+        const routerName = v.router || 'Unassigned';
+        const matchRouter = routerFilter === 'All Routers' || routerName === routerFilter;
         return matchSearch && matchStatus && matchRouter;
     });
 
     const unusedCount = vouchers.filter(v => v.status === 'Unused').length;
     const usedCount = vouchers.filter(v => v.status === 'Used').length;
 
+    // Pagination Calculation
+    const totalPages = entriesPerPage === 'All' ? 1 : Math.max(1, Math.ceil(filtered.length / entriesPerPage));
+    const paginatedVouchers = entriesPerPage === 'All'
+        ? filtered
+        : filtered.slice((currentPage - 1) * entriesPerPage, currentPage * entriesPerPage);
+
     const toggleSelect = (id: string) => {
         setSelected(prev => prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id]);
     };
     const toggleAll = () => {
-        setSelected(prev => prev.length === filtered.length ? [] : filtered.map(v => v.id));
+        setSelected(prev => prev.length === paginatedVouchers.length ? [] : paginatedVouchers.map(v => v.id));
     };
 
     return (
         <div>
             {showGenerateModal && <GenerateVouchersModal onClose={() => setShowGenerateModal(false)} onGenerate={handleGenerate} />}
+            {showEditModal && editTargetId && (
+                <EditVoucherModal
+                    voucher={vouchers.find(v => v.id === editTargetId) as Voucher}
+                    onClose={() => setShowEditModal(false)}
+                    onSave={fetchVouchers}
+                />
+            )}
             {showDeleteAllModal && (
                 <ConfirmDeleteModal
-                    title="Delete All Used Vouchers"
-                    message="This will permanently delete all used vouchers. This action cannot be undone."
-                    confirmLabel="Delete All Used"
+                    title={`Delete ${selected.length > 0 ? selected.length + ' Selected' : 'All ' + bulkDeleteStatus} Vouchers`}
+                    message={`This will permanently delete ${selected.length > 0 ? 'the selected' : 'all ' + bulkDeleteStatus.toLowerCase()} vouchers. This action cannot be undone.`}
+                    confirmLabel={`Delete ${selected.length > 0 ? 'Selected' : 'All ' + bulkDeleteStatus}`}
                     onClose={() => setShowDeleteAllModal(false)}
-                    onConfirm={handleDeleteAllUsed}
+                    onConfirm={handleBulkDelete}
                 />
             )}
             {showDeleteModal && (
@@ -155,9 +196,17 @@ export default function VoucherCodes() {
                     }}>
                         <PrintIcon fontSize="small" /> Print
                     </button>
-                    <button className="btn btn-secondary" style={{ color: 'var(--danger)' }} onClick={() => setShowDeleteAllModal(true)}>
-                        <DeleteIcon fontSize="small" /> Delete All Used
-                    </button>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <select className="select-field" value={bulkDeleteStatus} onChange={(e) => setBulkDeleteStatus(e.target.value)} style={{ height: 36, padding: '4px 8px' }} disabled={selected.length > 0}>
+                            <option value="Used">Used</option>
+                            <option value="Unused">Unused</option>
+                            <option value="Expired">Expired</option>
+                            <option value="Revoked">Revoked</option>
+                        </select>
+                        <button className="btn btn-secondary" style={{ color: 'var(--danger)' }} onClick={() => setShowDeleteAllModal(true)}>
+                            <DeleteIcon fontSize="small" /> {selected.length > 0 ? `Delete Selected (${selected.length})` : `Delete All ${bulkDeleteStatus}`}
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -176,27 +225,27 @@ export default function VoucherCodes() {
             </div>
 
             <div className="card">
-                {/* Filter by Router chips */}
-                <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--border-light)' }}>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: 8 }}>Filter by Router</div>
-                    <div className="filter-chips">
-                        {['All Routers', ...uniqueRouters].map(r => (
-                            <button
-                                key={r}
-                                className={`filter-chip ${routerFilter === r ? 'active' : ''}`}
-                                onClick={() => setRouterFilter(r)}
-                            >
-                                {r} {r === 'All Routers' ? `(${vouchers.length})` : `(${vouchers.filter(v => v.router === r).length})`}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-
                 <div className="table-toolbar">
                     <div className="table-toolbar-left">
                         <div className="show-entries">
-                            Show <select><option>10</option><option>25</option><option>50</option></select> entries
+                            Show
+                            <select
+                                value={entriesPerPage}
+                                onChange={e => setEntriesPerPage(e.target.value === 'All' ? 'All' : Number(e.target.value))}
+                            >
+                                <option value={10}>10</option>
+                                <option value={25}>25</option>
+                                <option value={50}>50</option>
+                                <option value="All">All</option>
+                            </select> entries
                         </div>
+                        <select className="select-field" value={routerFilter} onChange={e => setRouterFilter(e.target.value)}>
+                            {['All Routers', ...uniqueRouters].map(r => (
+                                <option key={r} value={r}>
+                                    {r} {r === 'All Routers' ? `(${vouchers.length})` : `(${vouchers.filter(v => (v.router || 'Unassigned') === r).length})`}
+                                </option>
+                            ))}
+                        </select>
                         <select className="select-field" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
                             <option value="All">All Status</option>
                             <option value="Unused">Unused</option>
@@ -219,7 +268,7 @@ export default function VoucherCodes() {
                             <tr>
                                 <th style={{ width: 40 }}>
                                     <button className="btn-icon" onClick={toggleAll} style={{ background: 'none' }}>
-                                        {selected.length === filtered.length && filtered.length > 0 ? <CheckBoxIcon style={{ fontSize: 18, color: 'var(--primary)' }} /> : <CheckBoxOutlineBlankIcon style={{ fontSize: 18 }} />}
+                                        {selected.length === paginatedVouchers.length && paginatedVouchers.length > 0 ? <CheckBoxIcon style={{ fontSize: 18, color: 'var(--primary)' }} /> : <CheckBoxOutlineBlankIcon style={{ fontSize: 18 }} />}
                                     </button>
                                 </th>
                                 <th>Type</th>
@@ -239,14 +288,14 @@ export default function VoucherCodes() {
                                         Loading vouchers...
                                     </td>
                                 </tr>
-                            ) : filtered.length === 0 ? (
+                            ) : paginatedVouchers.length === 0 ? (
                                 <tr>
                                     <td colSpan={9} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
                                         No vouchers found.
                                     </td>
                                 </tr>
                             ) : (
-                                filtered.map(v => (
+                                paginatedVouchers.map(v => (
                                     <tr key={v.id}>
                                         <td>
                                             <button className="btn-icon" onClick={() => toggleSelect(v.id)} style={{ background: 'none' }}>
@@ -254,8 +303,11 @@ export default function VoucherCodes() {
                                             </button>
                                         </td>
                                         <td><span className="badge hotspot">{v.packageType || 'Hotspot'}</span></td>
-                                        <td style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                            <span style={{ fontSize: 16 }}>🖥️</span>{v.router}
+                                        <td>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                <RouterIcon style={{ fontSize: 18, color: 'var(--text-secondary)' }} />
+                                                <span>{v.router}</span>
+                                            </div>
                                         </td>
                                         <td>
                                             <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>🎫 {v.plan}</span>
@@ -275,10 +327,26 @@ export default function VoucherCodes() {
                                         </td>
                                         <td>
                                             <div className="table-actions">
-                                                <button className="btn-icon sync" title="Copy Code" onClick={() => navigator.clipboard.writeText(v.code)}>
+                                                <button
+                                                    className="btn-icon sync"
+                                                    title="Copy Code"
+                                                    onClick={() => {
+                                                        navigator.clipboard.writeText(v.code);
+                                                        alert(`Voucher code ${v.code} copied!`);
+                                                    }}
+                                                >
                                                     <ContentCopyIcon style={{ fontSize: 16 }} />
                                                 </button>
-                                                <button className="btn-icon edit" title="Edit" onClick={() => alert(`Voucher ${v.code} - Plan: ${v.plan}, Router: ${v.router}, Status: ${v.status}`)}><EditIcon style={{ fontSize: 16 }} /></button>
+                                                <button
+                                                    className="btn-icon edit"
+                                                    title="Edit"
+                                                    onClick={() => {
+                                                        setEditTargetId(v.id);
+                                                        setShowEditModal(true);
+                                                    }}
+                                                >
+                                                    <EditIcon style={{ fontSize: 16 }} />
+                                                </button>
                                                 <button
                                                     className="btn-icon delete"
                                                     title="Revoke"
@@ -299,13 +367,37 @@ export default function VoucherCodes() {
                 </div>
 
                 <div className="pagination">
-                    <div className="pagination-info">Showing 1 to {filtered.length} of {vouchers.length} entries</div>
+                    <div className="pagination-info">
+                        Showing {filtered.length === 0 ? 0 : (currentPage - 1) * (entriesPerPage === 'All' ? filtered.length : entriesPerPage) + 1} to {entriesPerPage === 'All' ? filtered.length : Math.min(currentPage * entriesPerPage, filtered.length)} of {filtered.length} entries (filtered from {vouchers.length} total)
+                    </div>
                     <div className="pagination-buttons">
-                        <button className="pagination-btn">Previous</button>
-                        <button className="pagination-btn active">1</button>
-                        <button className="pagination-btn">2</button>
-                        <button className="pagination-btn">3</button>
-                        <button className="pagination-btn">Next</button>
+                        <button
+                            className="pagination-btn"
+                            disabled={currentPage === 1}
+                            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                            style={{ opacity: currentPage === 1 ? 0.5 : 1, cursor: currentPage === 1 ? 'not-allowed' : 'pointer' }}
+                        >
+                            Previous
+                        </button>
+
+                        {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                            <button
+                                key={page}
+                                className={`pagination-btn ${currentPage === page ? 'active' : ''}`}
+                                onClick={() => setCurrentPage(page)}
+                            >
+                                {page}
+                            </button>
+                        ))}
+
+                        <button
+                            className="pagination-btn"
+                            disabled={currentPage === totalPages}
+                            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                            style={{ opacity: currentPage === totalPages ? 0.5 : 1, cursor: currentPage === totalPages ? 'not-allowed' : 'pointer' }}
+                        >
+                            Next
+                        </button>
                     </div>
                 </div>
             </div>

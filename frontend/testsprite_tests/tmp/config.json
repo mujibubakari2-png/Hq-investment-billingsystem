@@ -1,0 +1,20 @@
+{
+  "status": "commited",
+  "type": "frontend",
+  "scope": "codebase",
+  "localEndpoint": "http://localhost:4173",
+  "loginUser": "admin@example.com",
+  "loginPassword": "admin123",
+  "executionArgs": {
+    "projectName": "kenge-frontend",
+    "projectPath": "c:\\Users\\hqbak\\kenge\\frontend",
+    "testIds": [],
+    "additionalInstruction": "Test the login, client registration, and dashboard features. Use admin@example.com / admin123 as the login credentials. Use the local server at http://localhost:4174/.",
+    "serverMode": "production",
+    "envs": {
+      "API_KEY": "sk-user-lNwmikzXyWZ-3hdqNjp8bKBJQOZcEvFLh-eTTH95mC12YOOsWCZn3UOyTyYYpNX3G_iQFCBNcNEz-l2Fw9A_TeZFyXhXQAQaFMAOXlTrvLNJ64ohPjQvmD4Qfvx3NcKgb40"
+    }
+  },
+  "serverPort": 54670,
+  "proxy": "http://443bf415-34f3-40e8-a9a3-ba70f6748dba:I6vvVEdHlQh4zXN84j7uF78Mz5Lj74Jm@tun.testsprite.com:8080"
+}

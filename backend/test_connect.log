@@ -1,0 +1,85 @@
+﻿[dotenv@17.3.1] injecting env (3) from .env -- tip: ≡ƒñû agentic secret storage: https://dotenvx.com/as2
+node.exe : C:\Users\hqbak\ken
+ge\backend\node_modules\@pris
+ma\client\src\runtime\getPris
+maClient.ts:260
+At line:1 char:1
++ & "C:\Program 
+Files\nodejs/node.exe" 
+"C:\Program 
+Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~
+    + CategoryInfo           
+   : NotSpecified: (C:\User  
+  s\hqbak\...maClient.ts:2   
+ 60:String) [], RemoteExc    
+eption
+    + FullyQualifiedErrorId  
+   : NativeCommandError
+ 
+        throw new PrismaClien
+tInitializationError(
+              ^
+
+PrismaClientInitializationErr
+or: `PrismaClient` needs to 
+be constructed with a 
+non-empty, valid 
+`PrismaClientOptions`:
+
+```
+new PrismaClient({
+  ...
+})
+```
+
+or
+
+```
+constructor() {
+  super({ ... });
+}
+```
+          
+    at new t (C:\Users\hqbak\
+kenge\backend\node_modules\@p
+risma\client\src\runtime\getP
+rismaClient.ts:260:15)
+    at <anonymous> (C:\Users\
+hqbak\kenge\backend\test_conn
+ect.ts:5:16)
+    at Object.<anonymous> (C:
+\Users\hqbak\kenge\backend\te
+st_connect.ts:15:4)
+    at Module._compile (node:
+internal/modules/cjs/loader:1
+811:14)
+    at Object.transformer (C:
+\Users\hqbak\kenge\backend\no
+de_modules\tsx\dist\register-
+D46fvsV_.cjs:3:1104)
+    at Module.load (node:inte
+rnal/modules/cjs/loader:1532:
+32)
+    at Module._load (node:int
+ernal/modules/cjs/loader:1334
+:12)
+    at wrapModuleLoad (node:i
+nternal/modules/cjs/loader:25
+5:19)
+    at 
+loadCJSModuleWithModuleLoad (
+node:internal/modules/esm/tra
+nslators:327:3)
+    at 
+ModuleWrap.<anonymous> (node:
+internal/modules/esm/translat
+ors:232:7) {
+  clientVersion: '7.4.2',
+  errorCode: undefined,
+  retryable: undefined
+}
+
+Node.js v25.6.1

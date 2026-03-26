@@ -35,9 +35,9 @@ export default function AddClientModal({ onClose, onSave }: AddClientModalProps)
                 fullName,
                 email,
                 phone: phoneNumber,
-                accountType,
+                accountType: accountType === 'Hotspot' ? 'PERSONAL' : accountType.toUpperCase(),
                 password: loginPassword,
-                serviceType: enablePPPoE ? 'PPPoE' : 'Unknown', // Hotspot vs PPPoE depends
+                serviceType: accountType === 'Hotspot' ? 'HOTSPOT' : (enablePPPoE ? 'PPPoE' : 'HOTSPOT'),
                 status: activateNow ? 'Active' : 'Inactive',
             });
         }
@@ -107,6 +107,7 @@ export default function AddClientModal({ onClose, onSave }: AddClientModalProps)
                             >
                                 <option value="Personal">Personal</option>
                                 <option value="Business">Business</option>
+                                <option value="Hotspot">Hotspot</option>
                             </select>
                             <div className="form-hint">Billing type and plans</div>
                         </div>

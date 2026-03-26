@@ -124,6 +124,7 @@ export default function Clients() {
                                 <option value="All">All</option>
                                 <option value="Banned">Banned</option>
                                 <option value="Disabled">Disabled</option>
+                                <option value="Expired">Expired</option>
                                 <option value="Inactive">Inactive</option>
                                 <option value="Limited">Limited</option>
                                 <option value="Suspended">Suspended</option>

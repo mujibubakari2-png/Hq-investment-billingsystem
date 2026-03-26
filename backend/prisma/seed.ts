@@ -24,9 +24,42 @@ async function main() {
     await prisma.paymentChannel.deleteMany();
     await prisma.messageTemplate.deleteMany();
     await prisma.systemSetting.deleteMany();
+    await prisma.userOtp.deleteMany();
     await prisma.user.deleteMany();
+    await prisma.tenant.deleteMany();
+    await prisma.saasPlan.deleteMany();
 
     console.log("  ✓ Cleared existing data");
+
+    // ─── Saas Plans ─────────────────────────────────────────────────────
+    const basicPlan = await prisma.saasPlan.create({
+        data: {
+            id: "plan_basic",
+            name: "Basic Plan",
+            price: 50000,
+            clientLimit: 100,
+        }
+    });
+
+    const standardPlan = await prisma.saasPlan.create({
+        data: {
+            id: "plan_standard",
+            name: "Standard Plan",
+            price: 150000,
+            clientLimit: 500,
+        }
+    });
+
+    const premiumPlan = await prisma.saasPlan.create({
+        data: {
+            id: "plan_premium",
+            name: "Premium Plan",
+            price: 500000,
+            clientLimit: 2000,
+        }
+    });
+
+    console.log("  ✓ Created Saas plans");
 
     // ─── System Users ───────────────────────────────────────────────────
     const hashedPassword = await bcrypt.hash("admin123", 12);
@@ -34,7 +67,7 @@ async function main() {
     const admin = await prisma.user.create({
         data: {
             username: "admin",
-            email: "admin@hqinvestment.co.tz",
+            email: "admin@example.com",
             password: hashedPassword,
             role: "SUPER_ADMIN",
             phone: "255700000001",
@@ -65,6 +98,81 @@ async function main() {
     });
 
     console.log("  ✓ Created system users (login: admin / admin123)");
+
+    // ─── Routers ────────────────────────────────────────────────────────
+    const router1 = await prisma.router.create({
+        data: {
+            name: "Core Router",
+            host: "192.168.88.1",
+            username: "admin",
+            password: "password",
+            port: 8728,
+            apiPort: 8728,
+            status: "ONLINE",
+        }
+    });
+
+    console.log("  ✓ Created routers");
+
+    // ─── Packages ───────────────────────────────────────────────────────
+    const package1 = await prisma.package.create({
+        data: {
+            name: "Hotspot 1GB",
+            type: "HOTSPOT",
+            price: 1000,
+            duration: 1,
+            durationUnit: "DAYS",
+            routerId: router1.id,
+            status: "ACTIVE",
+            uploadSpeed: 1,
+            downloadSpeed: 1,
+        }
+    });
+
+    const package2 = await prisma.package.create({
+        data: {
+            name: "PPPoE 10Mbps",
+            type: "PPPOE",
+            price: 30000,
+            duration: 30,
+            durationUnit: "DAYS",
+            routerId: router1.id,
+            status: "ACTIVE",
+            uploadSpeed: 10,
+            downloadSpeed: 10,
+        }
+    });
+
+    console.log("  ✓ Created packages");
+
+    // ─── Clients ────────────────────────────────────────────────────────
+    const client1 = await prisma.client.create({
+        data: {
+            username: "testclient1",
+            fullName: "Test Client One",
+            email: "client1@example.com",
+            phone: "255700000003",
+            serviceType: "HOTSPOT",
+            status: "ACTIVE",
+        }
+    });
+
+    console.log("  ✓ Created clients");
+
+    // ─── Transactions ───────────────────────────────────────────────────
+    await prisma.transaction.create({
+        data: {
+            clientId: client1.id,
+            amount: 1000,
+            type: "MOBILE",
+            method: "MPESA",
+            status: "COMPLETED",
+            reference: "TXN123456",
+            planName: "Hotspot 1GB",
+        }
+    });
+
+    console.log("  ✓ Created transactions");
 
     // ─── Router ─────────────────────────────────────────────────────────
     const router = await prisma.router.create({

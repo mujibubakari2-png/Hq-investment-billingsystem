@@ -10,9 +10,18 @@ export default function MpesaTillConfig() {
     const navigate = useNavigate();
     const [tillType, setTillType] = useState('Personal Till');
     const [tillNumber, setTillNumber] = useState('4975982');
+    const [consumerKey, setConsumerKey] = useState('');
+    const [consumerSecret, setConsumerSecret] = useState('');
     const [saved, setSaved] = useState(false);
 
+    const [error, setError] = useState('');
+
     const handleSave = () => {
+        if (tillType === 'Business Till' && !consumerKey) {
+            setError('Consumer Key is required');
+            return;
+        }
+        setError('');
         setSaved(true);
         setTimeout(() => navigate('/payment-channels'), 1500);
     };
@@ -27,6 +36,12 @@ export default function MpesaTillConfig() {
                 <h1 style={{ fontSize: '1.2rem', fontWeight: 700, margin: 0 }}>M-Pesa Till Configuration</h1>
                 <p style={{ fontSize: '0.82rem', opacity: 0.9, margin: 0 }}>Configure your M-Pesa Buy Goods Till payment gateway</p>
             </div>
+
+            {error && (
+                <div style={{ background: '#fef2f2', color: '#b91c1c', padding: '12px 16px', borderRadius: '6px', marginBottom: '20px', fontSize: '0.875rem', border: '1px solid #fca5a5' }}>
+                    {error}
+                </div>
+            )}
 
             {/* M-Pesa Buy Goods Till info */}
             <div style={{
@@ -56,30 +71,59 @@ export default function MpesaTillConfig() {
                     <div className="form-hint">{tillType === 'Personal Till' ? 'Business Till' : 'Personal Till'}</div>
                 </div>
 
-                {/* Personal Till Configuration */}
+                {/* Till Configuration */}
                 <h3 style={{ color: '#e11d48', fontWeight: 700, fontSize: '0.95rem', marginBottom: 16 }}>
-                    🏪 Personal Till Configuration
+                    🏪 {tillType === 'Personal Till' ? 'Personal Till Configuration' : 'Business Till Configuration'}
                 </h3>
 
-                <div className="form-group" style={{ marginBottom: 24 }}>
-                    <label className="form-label" style={{ fontWeight: 600 }}>
-                        📱 Personal Till Number <span style={{ color: '#e11d48' }}>*</span>
-                    </label>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ fontSize: '1.2rem' }}>🏪</span>
-                        <input
-                            type="text"
-                            className="form-input"
-                            value={tillNumber}
-                            onChange={e => setTillNumber(e.target.value)}
-                            style={{ flex: 1 }}
-                        />
+                {tillType === 'Personal Till' ? (
+                    <div className="form-group" style={{ marginBottom: 24 }}>
+                        <label className="form-label" style={{ fontWeight: 600 }}>
+                            📱 Personal Till Number <span style={{ color: '#e11d48' }}>*</span>
+                        </label>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{ fontSize: '1.2rem' }}>🏪</span>
+                            <input
+                                type="text"
+                                className="form-input"
+                                value={tillNumber}
+                                onChange={e => setTillNumber(e.target.value)}
+                                style={{ flex: 1 }}
+                            />
+                        </div>
+                        <div className="form-hint" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <InfoOutlinedIcon style={{ fontSize: 12 }} />
+                            Your personal M-Pesa Buy Goods till number
+                        </div>
                     </div>
-                    <div className="form-hint" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <InfoOutlinedIcon style={{ fontSize: 12 }} />
-                        Your personal M-Pesa Buy Goods till number
+                ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
+                        <div className="form-group">
+                            <label className="form-label" style={{ fontWeight: 600 }}>
+                                Consumer Key <span style={{ color: '#e11d48' }}>*</span>
+                            </label>
+                            <input
+                                type="text"
+                                className="form-input"
+                                value={consumerKey}
+                                onChange={e => setConsumerKey(e.target.value)}
+                                placeholder="Enter Consumer Key"
+                            />
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label" style={{ fontWeight: 600 }}>
+                                Consumer Secret <span style={{ color: '#e11d48' }}>*</span>
+                            </label>
+                            <input
+                                type="password"
+                                className="form-input"
+                                value={consumerSecret}
+                                onChange={e => setConsumerSecret(e.target.value)}
+                                placeholder="Enter Consumer Secret"
+                            />
+                        </div>
                     </div>
-                </div>
+                )}
 
                 {/* How M-Pesa Till Payments Work */}
                 <h3 style={{ color: '#1d4ed8', fontWeight: 700, fontSize: '0.95rem', marginBottom: 16 }}>

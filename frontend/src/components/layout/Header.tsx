@@ -19,9 +19,14 @@ export default function Header({ onToggleSidebar, darkMode, onToggleDarkMode }: 
     const navigate = useNavigate();
     const [showMenu, setShowMenu] = useState(false);
 
-    const initials = user?.username
-        ? user.username.slice(0, 2).toUpperCase()
-        : 'U';
+    const displayName = user?.fullName || user?.username || 'User';
+
+    const initials = displayName
+        .split(' ')
+        .map(n => n[0])
+        .join('')
+        .slice(0, 2)
+        .toUpperCase() || 'U';
 
     const handleLogout = () => {
         authStore.logout();
@@ -66,7 +71,7 @@ export default function Header({ onToggleSidebar, darkMode, onToggleDarkMode }: 
                             }}
                         >
                             <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border, #e5e7eb)' }}>
-                                <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{user?.username}</div>
+                                <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{displayName}</div>
                                 <div style={{ fontSize: '0.78rem', color: 'var(--text-muted, #888)', marginTop: 2 }}>
                                     {user?.role}
                                 </div>

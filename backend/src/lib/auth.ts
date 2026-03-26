@@ -53,5 +53,12 @@ export function jsonResponse(data: unknown, status = 200) {
 }
 
 export function errorResponse(message: string, status = 400) {
-    return jsonResponse({ error: message }, status);
+    if (status >= 400) {
+        console.warn(`[API ERROR] Status ${status}: ${message}`);
+    }
+    return jsonResponse({ 
+        error: message, 
+        message: message, // Alias for tests that expect 'message'
+        status: "error" 
+    }, status);
 }

@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
-import { jsonResponse, errorResponse } from "@/lib/auth";
+import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 
 // GET /api/vouchers
 export async function GET(req: NextRequest) {
@@ -26,9 +26,9 @@ export async function GET(req: NextRequest) {
             prisma.voucher.findMany({
                 where,
                 include: {
-                    package: { select: { name: true } },
+                    package: { select: { name: true, type: true } },
                     router: { select: { name: true } },
-                    createdBy: { select: { username: true } },
+                    createdBy: { select: { username: true, fullName: true } },
                 },
                 orderBy: { createdAt: "desc" },
                 skip,
@@ -40,10 +40,10 @@ export async function GET(req: NextRequest) {
         const mapped = vouchers.map((v: {
             id: string;
             code: string;
-            package: { name: string };
+            package: { name: string; type: string };
             router: { name: string } | null;
             status: string;
-            createdBy: { username: string };
+            createdBy: { username: string; fullName: string | null };
             createdAt: Date;
             usedBy: string | null;
             usedAt: Date | null;
@@ -53,12 +53,12 @@ export async function GET(req: NextRequest) {
             code: v.code,
             plan: v.package.name,
             router: v.router?.name || "",
-            packageType: v.package.name,
+            packageType: v.package.type,
             status: v.status.charAt(0) + v.status.slice(1).toLowerCase(),
-            createdBy: v.createdBy.username,
-            createdAt: v.createdAt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+            createdBy: v.createdBy.fullName || v.createdBy.username,
+            createdAt: v.createdAt.toLocaleDateString("en-US", { timeZone: "Africa/Dar_es_Salaam", month: "short", day: "numeric", year: "numeric" }),
             usedBy: v.usedBy,
-            usedAt: v.usedAt?.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+            usedAt: v.usedAt?.toLocaleDateString("en-US", { timeZone: "Africa/Dar_es_Salaam", month: "short", day: "numeric", year: "numeric" }),
             customer: v.customer,
         }));
 
@@ -73,19 +73,38 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
+        const { code, packageId, routerId, createdById } = body;
+
+        if (!packageId) return errorResponse("packageId is required");
+
+        let pkg = await prisma.package.findUnique({ where: { id: packageId } });
+        if (!pkg) pkg = await prisma.package.findFirst({ where: { name: packageId } });
+        if (!pkg) return errorResponse("Package not found", 404);
+
+        // Prefer logged-in user from JWT token, then body, then admin fallback
+        const currentUser = getUserFromRequest(req);
+        let finalCreatedById = currentUser?.userId || createdById;
+        if (!finalCreatedById) {
+            const admin = await prisma.user.findFirst({ where: { role: { in: ["ADMIN", "SUPER_ADMIN"] } } });
+            finalCreatedById = admin?.id;
+        }
+
+        if (!finalCreatedById) return errorResponse("Creator user ID is required");
+
+        const finalCode = code || Math.floor(100000 + Math.random() * 900000).toString();
 
         const voucher = await prisma.voucher.create({
             data: {
-                code: body.code,
-                packageId: body.packageId,
-                routerId: body.routerId,
-                createdById: body.createdById,
+                code: finalCode,
+                packageId: pkg.id,
+                routerId,
+                createdById: finalCreatedById,
             },
         });
 
         return jsonResponse(voucher, 201);
-    } catch (e) {
-        console.error(e);
-        return errorResponse("Internal server error", 500);
+    } catch (e: any) {
+        console.error("VOUCHER POST ERROR:", e);
+        return errorResponse(`Internal server error: ${e.message}`, 500);
     }
 }

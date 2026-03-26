@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import PeopleIcon from '@mui/icons-material/People';
@@ -21,8 +21,11 @@ import SupportAgentIcon from '@mui/icons-material/SupportAgent';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import PlayCircleIcon from '@mui/icons-material/PlayCircle';
 import ReceiptIcon from '@mui/icons-material/Receipt';
+import VpnKeyIcon from '@mui/icons-material/VpnKey';
+
 import CloseIcon from '@mui/icons-material/Close';
 import authStore from '../../stores/authStore';
+import { settingsApi } from '../../api/client';
 import './Sidebar.css';
 
 const navSections = [
@@ -60,6 +63,7 @@ const navSections = [
         title: 'NETWORK MANAGEMENT',
         items: [
             { label: 'Mikrotiks', icon: 'router', path: '/mikrotiks' },
+
             { label: 'Equipments', icon: 'devices', path: '/equipments' },
         ],
     },
@@ -111,6 +115,8 @@ const iconMap: Record<string, React.ReactNode> = {
     reports: <BarChartIcon fontSize="small" />,
     tutorial: <PlayCircleIcon fontSize="small" />,
     invoice: <ReceiptIcon fontSize="small" />,
+    vpn: <VpnKeyIcon fontSize="small" />,
+
 };
 
 interface SidebarProps {
@@ -121,6 +127,28 @@ interface SidebarProps {
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     const location = useLocation();
     const [collapsed] = useState(false);
+    const { user } = authStore.useAuth();
+    const [brand, setBrand] = useState({ main: 'HQ', sub: 'INVESTMENT' });
+
+    useEffect(() => {
+        const fetchBrand = () => {
+            settingsApi.get().then((res: any) => {
+                const data = res.data || res;
+                if (data?.companyName) {
+                    const parts = data.companyName.trim().split(' ');
+                    if (parts.length > 1) {
+                        setBrand({ main: parts[0], sub: parts.slice(1).join(' ') });
+                    } else {
+                        setBrand({ main: parts[0], sub: 'SYSTEM' }); // Fallback sub label if only one word
+                    }
+                }
+            }).catch(console.error);
+        };
+
+        fetchBrand();
+        window.addEventListener('settingsUpdated', fetchBrand);
+        return () => window.removeEventListener('settingsUpdated', fetchBrand);
+    }, []);
 
     return (
         <>
@@ -128,8 +156,8 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
             <aside className={`sidebar ${isOpen ? 'open' : ''} ${collapsed ? 'collapsed' : ''}`}>
                 <div className="sidebar-header">
                     <div className="sidebar-brand">
-                        <h1 className="brand-name">HQ</h1>
-                        <p className="brand-sub">INVESTMENT</p>
+                        <h1 className="brand-name">{brand.main}</h1>
+                        <p className="brand-sub">{brand.sub}</p>
                     </div>
                     <button className="sidebar-close-mobile" onClick={onClose}>
                         <CloseIcon fontSize="small" />
@@ -138,7 +166,6 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 
                 <nav className="sidebar-nav">
                     {navSections.map((section) => {
-                        const { user } = authStore.useAuth();
                         const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
 
                         const filteredItems = section.items.filter(item => {

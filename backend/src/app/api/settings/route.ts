@@ -30,7 +30,13 @@ export async function PUT(req: NextRequest) {
             });
         }
 
-        return jsonResponse({ message: "Settings updated" });
+        const allSettings = await prisma.systemSetting.findMany();
+        const mapped: Record<string, string> = {};
+        allSettings.forEach((s) => {
+            mapped[s.key] = s.value;
+        });
+
+        return jsonResponse({ message: "Settings updated", settings: mapped });
     } catch (e) {
         console.error(e);
         return errorResponse("Internal server error", 500);

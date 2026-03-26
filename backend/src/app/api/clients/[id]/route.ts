@@ -34,6 +34,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         const client = await prisma.client.update({
             where: { id },
             data: {
+                username: body.username, // Allow updating username
                 fullName: body.fullName,
                 phone: body.phone,
                 email: body.email,

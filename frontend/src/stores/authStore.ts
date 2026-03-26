@@ -8,6 +8,7 @@ export interface AuthUser {
     email: string;
     role: string;
     phone?: string;
+    fullName?: string;
 }
 
 export interface AuthState {
@@ -70,6 +71,15 @@ function logout() {
     notify();
 }
 
+/** Update the current user in-place (e.g. after profile edit) */
+function updateUser(partial: Partial<AuthUser>) {
+    if (!state.user) return;
+    const updated = { ...state.user, ...partial };
+    localStorage.setItem('user', JSON.stringify(updated));
+    state = { ...state, user: updated };
+    notify();
+}
+
 /** React hook – call inside a component to re-render on auth changes */
 export function useAuth(): AuthState {
     return useSyncExternalStore(subscribe, getState);
@@ -80,6 +90,7 @@ export const authStore = {
     subscribe,
     login,
     logout,
+    updateUser,
     useAuth,
 };
 

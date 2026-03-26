@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import PersonIcon from '@mui/icons-material/Person';
 import EmailIcon from '@mui/icons-material/Email';
 import PhoneIcon from '@mui/icons-material/Phone';
@@ -6,10 +6,11 @@ import BadgeIcon from '@mui/icons-material/Badge';
 import LockIcon from '@mui/icons-material/Lock';
 import SaveIcon from '@mui/icons-material/Save';
 import authStore from '../stores/authStore';
+import { profileApi } from '../api/client';
 
 export default function Profile() {
     const { user } = authStore.useAuth();
-    const [fullName, setFullName] = useState(user?.username || '');
+    const [fullName, setFullName] = useState(user?.fullName || user?.username || '');
     const [email, setEmail] = useState(user?.email || '');
     const [phone, setPhone] = useState(user?.phone || '');
     const [currentPassword, setCurrentPassword] = useState('');
@@ -18,19 +19,36 @@ export default function Profile() {
     const [saving, setSaving] = useState(false);
     const [activeTab, setActiveTab] = useState<'general' | 'security'>('general');
 
-    const initials = user?.username
-        ? user.username.slice(0, 2).toUpperCase()
-        : 'U';
+    const displayName = user?.fullName || user?.username || 'User';
+    
+    // Generate initials from display name (taking first letters of words)
+    const initials = displayName
+        .split(' ')
+        .map(n => n[0])
+        .join('')
+        .slice(0, 2)
+        .toUpperCase() || 'U';
+
+    // Fetch fresh profile data on mount
+    useEffect(() => {
+        profileApi.get().then(data => {
+            setFullName(data.fullName || data.username || '');
+            setEmail(data.email || '');
+            setPhone(data.phone || '');
+            authStore.updateUser({ fullName: data.fullName, email: data.email, phone: data.phone });
+        }).catch(console.error);
+    }, []);
 
     const handleSaveProfile = async () => {
         setSaving(true);
         try {
-            // Profile update would go to API here
-            await new Promise(resolve => setTimeout(resolve, 500));
+            await profileApi.update({ fullName, email, phone });
+            // Update the local auth store so changes reflect immediately
+            authStore.updateUser({ fullName, email, phone });
             alert('Profile updated successfully!');
-        } catch (err) {
+        } catch (err: any) {
             console.error('Failed to update profile:', err);
-            alert('Failed to update profile.');
+            alert(err?.message || 'Failed to update profile.');
         } finally {
             setSaving(false);
         }
@@ -47,7 +65,7 @@ export default function Profile() {
         }
         setSaving(true);
         try {
-            await new Promise(resolve => setTimeout(resolve, 500));
+            await profileApi.changePassword({ currentPassword, newPassword });
             alert('Password changed successfully!');
             setCurrentPassword('');
             setNewPassword('');
@@ -92,7 +110,7 @@ export default function Profile() {
                         {initials}
                     </div>
                     <div>
-                        <h2 style={{ fontSize: '1.3rem', fontWeight: 700, marginBottom: 4 }}>{user?.username || 'User'}</h2>
+                        <h2 style={{ fontSize: '1.3rem', fontWeight: 700, marginBottom: 4 }}>{displayName}</h2>
                         <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: 4 }}>{user?.email}</p>
                         <span className="badge active" style={{ fontSize: '0.75rem' }}>{user?.role || 'User'}</span>
                     </div>

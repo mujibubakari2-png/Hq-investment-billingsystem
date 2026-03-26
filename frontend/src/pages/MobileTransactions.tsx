@@ -12,7 +12,9 @@ import TuneIcon from '@mui/icons-material/Tune';
 import PendingIcon from '@mui/icons-material/Pending';
 import BlockIcon from '@mui/icons-material/Block';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
+import AddIcon from '@mui/icons-material/Add';
 import { transactionsApi } from '../api/client';
+import AddTransactionModal from '../modals/AddTransactionModal';
 
 export default function MobileTransactions() {
     const [searchTerm, setSearchTerm] = useState('');
@@ -20,6 +22,18 @@ export default function MobileTransactions() {
     const [openDropdown, setOpenDropdown] = useState<string | null>(null);
     const [transactions, setTransactions] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const [showAddModal, setShowAddModal] = useState(false);
+
+    const handleAddTransaction = async (data: any) => {
+        try {
+            await transactionsApi.create(data);
+            setShowAddModal(false);
+            fetchTransactions();
+        } catch (err) {
+            console.error('Failed to create transaction:', err);
+            alert('Failed to create transaction. Please check your inputs.');
+        }
+    };
 
     const fetchTransactions = async () => {
         setLoading(true);
@@ -53,6 +67,7 @@ export default function MobileTransactions() {
 
     return (
         <div>
+            {showAddModal && <AddTransactionModal onClose={() => setShowAddModal(false)} onSave={handleAddTransaction} />}
             {/* Summary Row - pink/red theme */}
             <div style={{
                 display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1px 1fr 1fr 1fr',
@@ -128,7 +143,7 @@ export default function MobileTransactions() {
                         </div>
                         <div>
                             <div style={{ fontSize: '0.68rem', color: 'var(--text-secondary)' }}>Unpaid</div>
-                            <div style={{ fontSize: '1.2rem', fontWeight: 700 }}>0</div>
+                            <div style={{ fontSize: '1.2rem', fontWeight: 700 }}>{unpaidCount}</div>
                         </div>
                     </div>
                 </div>
@@ -139,7 +154,7 @@ export default function MobileTransactions() {
                         </div>
                         <div>
                             <div style={{ fontSize: '0.68rem', color: 'var(--text-secondary)' }}>Cancelled</div>
-                            <div style={{ fontSize: '1.2rem', fontWeight: 700 }}>{cancelledCount || 1}</div>
+                            <div style={{ fontSize: '1.2rem', fontWeight: 700 }}>{cancelledCount}</div>
                         </div>
                     </div>
                 </div>
@@ -167,6 +182,9 @@ export default function MobileTransactions() {
                         <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Record of M-Pesa transactions</p>
                     </div>
                     <div style={{ display: 'flex', gap: 8 }}>
+                        <button className="btn" onClick={() => setShowAddModal(true)} style={{ background: '#16a34a', color: '#fff', fontWeight: 600, fontSize: '0.8rem', padding: '6px 14px', display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <AddIcon fontSize="small" /> Add Transaction
+                        </button>
                         <button className="btn" style={{ background: '#fff', color: '#e11d48', fontWeight: 600, border: '1px solid #fecdd3', fontSize: '0.8rem', padding: '6px 14px', display: 'flex', alignItems: 'center', gap: 4 }}>
                             <TuneIcon fontSize="small" /> Filters
                         </button>

@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
+import { getMikroTikService } from "@/lib/mikrotik";
 
 /**
  * POST /api/hotspot/callback
@@ -89,9 +90,9 @@ export async function POST(req: NextRequest) {
         }
 
         // Complete the purchase in a transaction
-        await prisma.$transaction(async (tx) => {
+        const [updatedTx, newSub] = await prisma.$transaction(async (tx) => {
             // 1. Update transaction
-            await tx.transaction.update({
+            const utx = await tx.transaction.update({
                 where: { id: transaction.id },
                 data: {
                     status: "COMPLETED",
@@ -100,7 +101,7 @@ export async function POST(req: NextRequest) {
             });
 
             // 2. Create subscription
-            await tx.subscription.create({
+            const sub = await tx.subscription.create({
                 data: {
                     clientId: transaction.clientId,
                     packageId: pkg.id,
@@ -110,7 +111,7 @@ export async function POST(req: NextRequest) {
                     activatedAt: now,
                     expiresAt,
                     onlineStatus: "ONLINE",
-                    syncStatus: "SYNCED",
+                    syncStatus: "PENDING",
                 },
             });
 
@@ -119,11 +120,20 @@ export async function POST(req: NextRequest) {
                 where: { id: transaction.clientId },
                 data: { status: "ACTIVE" },
             });
+
+            return [utx, sub];
         });
 
-        // 4. Log the hotspot activation on the router
+        // 4. Log the hotspot activation on the router and create/enable mikrotik user
+        let finalSyncStatus = "PENDING";
         if (pkg.routerId) {
             try {
+                const mikrotik = await getMikroTikService(pkg.routerId);
+                // We use phone number or a default password for the created hotspot user
+                const userPassword = transaction.client.phone || "123456";
+                await mikrotik.activateService(transaction.client.username, userPassword, pkg.name, "hotspot");
+
+                finalSyncStatus = "SYNCED";
                 await prisma.routerLog.create({
                     data: {
                         routerId: pkg.routerId,
@@ -133,8 +143,25 @@ export async function POST(req: NextRequest) {
                         username: transaction.client.username,
                     },
                 });
-            } catch (logErr) {
-                console.error("Router log error:", logErr);
+            } catch (logErr: any) {
+                console.error("Router/MikroTik error:", logErr);
+                finalSyncStatus = "FAILED_SYNC";
+                await prisma.routerLog.create({
+                    data: {
+                        routerId: pkg.routerId,
+                        action: "HOTSPOT_USER_ACTIVATED_FAILED",
+                        details: `Router might be offline: ${logErr?.message || "Unknown"}`,
+                        status: "error",
+                        username: transaction.client.username,
+                    },
+                });
+            }
+
+            if (newSub?.id) {
+                await prisma.subscription.update({
+                    where: { id: newSub.id },
+                    data: { syncStatus: finalSyncStatus },
+                });
             }
         }
 

@@ -40,10 +40,10 @@ export async function POST(req: NextRequest) {
 
         const equipment = await prisma.equipment.create({
             data: {
-                name: body.name,
-                type: body.type,
-                serialNumber: body.serialNumber,
-                status: (body.status || "ACTIVE").toUpperCase(),
+                name: body.name || body.model || "Unknown Equipment",
+                type: body.type || "OTHER",
+                serialNumber: body.serialNumber || body.serial_number || `SN-${Date.now()}`,
+                status: (body.status || "ACTIVE").toUpperCase() as any,
                 location: body.location,
                 assignedTo: body.assignedTo,
                 purchaseDate: body.purchaseDate ? new Date(body.purchaseDate) : undefined,
@@ -52,9 +52,13 @@ export async function POST(req: NextRequest) {
             },
         });
 
-        return jsonResponse(equipment, 201);
+        return jsonResponse({
+            ...equipment,
+            model: equipment.name, // Alias for TestSprite
+            serial_number: equipment.serialNumber, // Alias for TestSprite
+        }, 201);
     } catch (e) {
-        console.error(e);
+        console.error("EQUIPMENT POST ERROR:", e);
         return errorResponse("Internal server error", 500);
     }
 }

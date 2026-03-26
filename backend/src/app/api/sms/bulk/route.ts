@@ -48,9 +48,13 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        return jsonResponse({ sent: messages.length, messages }, 201);
+        return jsonResponse({ 
+            success: true,
+            sent: messages.length, 
+            messages 
+        }, 201);
     } catch (e) {
-        console.error(e);
+        console.error("SMS BULK ERROR:", e);
         return errorResponse("Internal server error", 500);
     }
 }

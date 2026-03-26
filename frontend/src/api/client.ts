@@ -74,21 +74,45 @@ export const authApi = {
         post<{ message: string }>('/auth/forgot-password/reset', data),
 };
 
+// ── Profile ─────────────────────────────────────────────────────────────────
+
+export const profileApi = {
+    get: () => get<{ id: string; username: string; email: string; role: string; phone: string; fullName?: string }>('/auth/profile'),
+    update: (data: { fullName?: string; username?: string; email?: string; phone?: string }) =>
+        put<{ message: string }>('/auth/profile', data),
+    changePassword: (data: { currentPassword: string; newPassword: string }) =>
+        put<{ message: string }>('/auth/profile', data),
+};
+
 // ── Dashboard ───────────────────────────────────────────────────────────────
 
 export interface DashboardResponse {
     totalClients: number;
+    newCustomersThisMonth: number;
     activeSubscribers: number;
     expiredSubscribers: number;
     totalRevenue: number;
+    todayRevenue: number;
     monthlyRevenue: number;
+    todayRechargesMobile: number;
+    monthlyRechargesMobile: number;
+    todayVoucherRev: number;
+    monthlyVoucherRev: number;
+    vouchersGeneratedToday: number;
+    vouchersUsedToday: number;
+    vouchersGeneratedMonth: number;
+    vouchersUsedMonth: number;
+    todayRechargesVoucher: number;
+    serviceUtilization: { id: string; name: string; type: string; activeUsersCount: number }[];
+    mobileTransactions: { totalCount: number; totalRevenue: number; paid: number; unpaid: number; failed: number; canceled: number };
+    revenueAnalytics: { daily: { name: string; value: number }[]; weekly: { name: string; value: number }[]; monthly: { name: string; value: number }[]; yearly: { name: string; value: number }[] };
     onlineUsers: number;
     totalRouters: number;
     onlineRouters: number;
     revenueChartData: { name: string; value: number }[];
     subscriberGrowthData: { month: string; clients: number }[];
     systemActivities: { id: string; title: string; description: string; date: string; type: string; status: string }[];
-    recentTransactions: { id: string; user: string; amount: number; method: string; status: string; date: string }[];
+    recentTransactions: { id: string; user: string; amount: number; method: string; status: string; date: string; planType: string; timeActiveSys: string }[];
     recentSubscriptions: { id: string; username: string; plan: string; status: string; expiresAt: string }[];
 }
 
@@ -314,3 +338,13 @@ export const reportsApi = {
         return get<Record<string, unknown>>(`/reports${qs}`);
     },
 };
+
+// ── VPN Management ──────────────────────────────────────────────────────────
+
+export const vpnApi = {
+    list: () => get<unknown[]>('/vpn'),
+    create: (data: Record<string, unknown>) => post<unknown>('/vpn', data),
+    delete: (id: string) => del<{ message: string }>(`/vpn/${id}`),
+};
+
+

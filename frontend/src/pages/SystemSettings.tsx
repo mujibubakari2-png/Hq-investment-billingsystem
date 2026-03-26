@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { settingsApi } from '../api/client';
 
 export default function SystemSettings() {
@@ -14,10 +14,19 @@ export default function SystemSettings() {
         { key: 'email' as const, label: 'Email' },
     ];
 
+    useEffect(() => {
+        settingsApi.get().then((res: any) => {
+            const data = res.data || res;
+            if (data?.companyName) setCompanyName(data.companyName);
+            if (data?.phoneNumber) setPhoneNumber(data.phoneNumber);
+        }).catch(console.error);
+    }, []);
+
     const handleSaveSettings = async () => {
         setSaving(true);
         try {
             await settingsApi.update({ companyName, phoneNumber });
+            window.dispatchEvent(new CustomEvent('settingsUpdated'));
             alert('Settings saved successfully!');
         } catch (err) {
             console.error('Failed to save settings:', err);

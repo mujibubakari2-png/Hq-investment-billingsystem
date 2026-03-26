@@ -1,0 +1,85 @@
+version: "2"
+type: frontend
+tech_stack:
+  - TypeScript
+  - React
+  - Vite
+  - Material UI (MUI)
+  - Axios
+  - Zustand
+  - React Router
+routes:
+  - path: /login
+    file: src/pages/Login.tsx
+    auth_required: false
+    description: User login page
+  - path: /register
+    file: src/pages/Register.tsx
+    auth_required: false
+    description: User registration and onboarding
+  - path: /forgot-password
+    file: src/pages/ForgotPassword.tsx
+    auth_required: false
+    description: Forgot password and OTP verification
+  - path: /dashboard
+    file: src/pages/Dashboard.tsx
+    auth_required: true
+    description: Main dashboard overview
+  - path: /clients
+    file: src/pages/Clients.tsx
+    auth_required: true
+    description: Client management page
+  - path: /routers
+    file: src/pages/Mikrotiks.tsx
+    auth_required: true
+    description: Router/Mikrotik management page
+  - path: /packages
+    file: src/pages/Packages.tsx
+    auth_required: true
+    description: Billing packages management
+  - path: /transactions
+    file: src/pages/AllTransactions.tsx
+    auth_required: true
+    description: Financial transactions log
+features:
+  - name: Authentication
+    description: Login and session management
+    files:
+      - src/pages/Login.tsx
+      - src/stores/authStore.ts
+    entry_route: /login
+    user_interactions:
+      - Fill username input
+      - Fill password input
+      - Click Login button
+    api_calls:
+      - method: POST
+        endpoint: /api/auth/login
+    auth_required: false
+  - name: Client Registration
+    description: Add new clients to the system
+    files:
+      - src/pages/Clients.tsx
+      - src/modals/AddClientModal.tsx
+    entry_route: /clients
+    user_interactions:
+      - Click Add Client button
+      - Fill client details form
+      - Click Save
+    api_calls:
+      - method: POST
+        endpoint: /api/clients
+    auth_required: true
+  - name: Dashboard Visualization
+    description: Charts and summary cards for business metrics
+    files:
+      - src/pages/Dashboard.tsx
+    entry_route: /dashboard
+    user_interactions:
+      - View revenue charts
+      - View subscriber growth
+    api_calls:
+      - method: GET
+        endpoint: /api/dashboard
+    auth_required: true
+known_limitations: []

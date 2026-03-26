@@ -51,8 +51,8 @@ export async function GET(req: NextRequest) {
             clientName: inv.client.fullName,
             amount: inv.amount,
             status: inv.status.charAt(0) + inv.status.slice(1).toLowerCase(),
-            dueDate: inv.dueDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
-            issuedDate: inv.issuedDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+            dueDate: inv.dueDate.toLocaleDateString("en-US", { timeZone: "Africa/Dar_es_Salaam", month: "short", day: "numeric", year: "numeric" }),
+            issuedDate: inv.issuedDate.toLocaleDateString("en-US", { timeZone: "Africa/Dar_es_Salaam", month: "short", day: "numeric", year: "numeric" }),
             items: inv.items.map((item) => ({
                 description: item.description,
                 quantity: item.quantity,

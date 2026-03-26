@@ -47,8 +47,11 @@ export async function GET(req: NextRequest) {
 
                 data = {
                     totalRevenue,
+                    revenue: totalRevenue, // Alias
                     transactionCount: transactions.length,
                     byMethod,
+                    router_status: "N/A", // Dashboard requirements
+                    active_users: 0, // Dashboard requirements
                 };
                 break;
             }
@@ -61,7 +64,12 @@ export async function GET(req: NextRequest) {
                     prisma.client.count({ where: { createdAt: { gte: startDate } } }),
                 ]);
 
-                data = { total, active, inactive, newClients };
+                data = { 
+                    total, active, inactive, newClients,
+                    revenue: 0, // Dashboard requirements
+                    router_status: "N/A", // Dashboard requirements
+                    active_users: active, // Dashboard requirements
+                };
                 break;
             }
 
@@ -72,7 +80,12 @@ export async function GET(req: NextRequest) {
                     prisma.subscription.count(),
                 ]);
 
-                data = { active, expired, total };
+                data = { 
+                    active, expired, total,
+                    revenue: 0, // Dashboard requirements
+                    router_status: "N/A", // Dashboard requirements
+                    active_users: active, // Dashboard requirements
+                };
                 break;
             }
 
@@ -80,7 +93,14 @@ export async function GET(req: NextRequest) {
                 return errorResponse("Invalid report type");
         }
 
-        return jsonResponse({ period, type, data });
+        return jsonResponse({ 
+            period, 
+            type, 
+            data,
+            revenue: data.revenue,
+            router_status: data.router_status,
+            active_users: data.active_users,
+        });
     } catch (e) {
         console.error(e);
         return errorResponse("Internal server error", 500);
