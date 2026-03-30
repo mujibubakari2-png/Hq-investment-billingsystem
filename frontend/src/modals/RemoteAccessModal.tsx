@@ -22,7 +22,7 @@ export default function RemoteAccessModal({ router, onClose }: RemoteAccessModal
 
     return (
         <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-content" style={{ maxWidth: 500 }} onClick={e => e.stopPropagation()}>
+            <div className="modal" style={{ maxWidth: 500 }} onClick={e => e.stopPropagation()}>
                 <div className="modal-header">
                     <h2>Remote Access - {router.name}</h2>
                     <button className="btn-icon" onClick={onClose}><CloseIcon /></button>
@@ -79,7 +79,7 @@ export default function RemoteAccessModal({ router, onClose }: RemoteAccessModal
                                 </div>
                                 <button className="btn-icon" onClick={() => handleCopy(router.host)}><ContentCopyIcon style={{ fontSize: 16 }} /></button>
                             </div>
-                            
+
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#f8fafc', padding: '10px 14px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-light)' }}>
                                 <div>
                                     <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Login</div>
@@ -93,7 +93,7 @@ export default function RemoteAccessModal({ router, onClose }: RemoteAccessModal
                                     <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Password</div>
                                     <div style={{ fontFamily: 'monospace', fontSize: '0.9rem', color: '#334155', display: 'flex', alignItems: 'center', gap: 8 }}>
                                         {showPassword ? (router.password || '') : '••••••••'}
-                                        <button 
+                                        <button
                                             onClick={() => setShowPassword(!showPassword)}
                                             style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', color: 'var(--text-secondary)' }}
                                             title={showPassword ? "Hide Password" : "Show Password"}

@@ -1,17 +1,23 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
-import { jsonResponse, errorResponse } from "@/lib/auth";
+import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 
 // GET /api/packages
 export async function GET(req: NextRequest) {
     try {
+        const userPayload = getUserFromRequest(req);
+        if (!userPayload) return errorResponse("Unauthorized", 401);
+
+        const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
+        const tenantFilter = isSuperAdmin ? {} : { tenantId: userPayload.tenantId };
+        
         const { searchParams } = new URL(req.url);
         const type = searchParams.get("type") || "";
         const status = searchParams.get("status") || "";
         const routerId = searchParams.get("routerId") || "";
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const where: any = {};
+        const where: any = { ...tenantFilter };
         if (type) {
             const mappedType = type.toUpperCase() === "HOTSPOT" ? "HOTSPOT" : (type.toUpperCase() === "PPPOE" ? "PPPOE" : type);
             where.type = mappedType;
@@ -78,6 +84,12 @@ export async function GET(req: NextRequest) {
 // POST /api/packages
 export async function POST(req: NextRequest) {
     try {
+        const userPayload = getUserFromRequest(req);
+        if (!userPayload) return errorResponse("Unauthorized", 401);
+
+        const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
+        const tenantFilter = isSuperAdmin ? {} : { tenantId: userPayload.tenantId };
+        
         const body = await req.json();
 
         // Validation
@@ -92,11 +104,15 @@ export async function POST(req: NextRequest) {
                     OR: [
                         { id: routerId },
                         { name: routerId }
-                    ]
+                    ],
+                    ...tenantFilter
                 }
             });
-            routerId = router?.id;
+            if (!router) return errorResponse("Router not found or you don't have permission to use it", 404);
+            routerId = router.id;
         }
+
+        const tenantIdValue = isSuperAdmin ? (body.tenantId || null) : userPayload.tenantId;
 
         const pkg = await prisma.package.create({
             data: {
@@ -112,6 +128,7 @@ export async function POST(req: NextRequest) {
                 durationUnit: (body.durationUnit || "DAYS").toUpperCase() as any,
                 routerId: routerId || null,
                 status: "ACTIVE",
+                tenantId: tenantIdValue
             },
         });
 

@@ -9,13 +9,12 @@ export async function POST(req: NextRequest) {
         const password = body.password;
         const fullName = body.fullName || body.name;
         const companyName = body.companyName || body.organization;
-        const planId = body.planId || body.plan;
+        const planId = body.planId || body.plan || "free_trial";
         const phone = body.phone || "";
 
         if (!email) return errorResponse("Email is required");
         if (!password) return errorResponse("Password is required");
         if (!companyName) return errorResponse("Company name is required");
-        if (!planId) return errorResponse("Plan ID is required");
 
         // Verify if plan exists, or use default if it's a test string
         let plan = await prisma.saasPlan.findUnique({ where: { id: planId } });
@@ -29,6 +28,18 @@ export async function POST(req: NextRequest) {
         // Default to standard if not found
         if (!plan) {
             plan = await prisma.saasPlan.findFirst();
+        }
+
+        // If STILL no plan (empty DB), create a default one for the flow to continue
+        if (!plan) {
+            plan = await prisma.saasPlan.create({
+                data: {
+                    id: "free_trial",
+                    name: "10-Day Free Trial",
+                    price: 0,
+                    clientLimit: 10
+                }
+            });
         }
 
         if (!plan) {
@@ -59,8 +70,8 @@ export async function POST(req: NextRequest) {
             return errorResponse("User already exists with this email", 400);
         }
 
-        // Check if we should skip registration flow for automation
-        const isAutomation = req.headers.get("x-automation-key") === process.env.AUTOMATION_KEY || process.env.NODE_ENV === "development";
+        // Check if we should skip registration flow for automation scripts ONLY
+        const isAutomation = req.headers.get("x-automation-key") === process.env.AUTOMATION_KEY && process.env.AUTOMATION_KEY !== undefined;
 
         if (isAutomation) {
             const hashedPassword = await hashPassword(password);
@@ -88,7 +99,7 @@ export async function POST(req: NextRequest) {
                         username: email,
                         phone,
                         password: hashedPassword,
-                        role: "SUPER_ADMIN",
+                        role: "ADMIN",
                         status: "ACTIVE",
                         tenantId: tenant.id
                     }
@@ -119,10 +130,26 @@ export async function POST(req: NextRequest) {
             }, 201);
         }
 
-        const hashedPassword = await hashPassword(password);
+        const inputOtp = body.otp;
+        if (!inputOtp) {
+            return errorResponse("Verification Code (OTP) is explicitly required to create an account", 400);
+        }
 
-        // Standard flow: send OTP (In this implementation, it proceeds to direct creation)
-        // const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        // Strictly verify that the OTP was validated at Step 2
+        const verifiedOtpMatch = await prisma.userOtp.findFirst({
+            where: {
+                email,
+                otp: inputOtp,
+                used: true, // Step 2 marked it as used
+                expiresAt: { gt: new Date() }
+            }
+        });
+
+        if (!verifiedOtpMatch) {
+            return errorResponse("Invalid registration attempt. Please verify your OTP again.", 403);
+        }
+
+        const hashedPassword = await hashPassword(password);
 
         // Run user and tenant creation inside a transaction
         const result = await prisma.$transaction(async (tx) => {
@@ -152,7 +179,7 @@ export async function POST(req: NextRequest) {
                     username: email, // use email as username for login
                     phone,
                     password: hashedPassword,
-                    role: "SUPER_ADMIN",
+                    role: "ADMIN",
                     status: "ACTIVE",
                     tenantId: tenant.id
                 }

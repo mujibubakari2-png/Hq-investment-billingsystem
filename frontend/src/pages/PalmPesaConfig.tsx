@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { settingsApi } from '../api/client';
 import SaveIcon from '@mui/icons-material/Save';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import VisibilityIcon from '@mui/icons-material/Visibility';
@@ -14,10 +15,38 @@ export default function PalmPesaConfig() {
     const [callbackUrl, setCallbackUrl] = useState('');
     const [cancelUrl, setCancelUrl] = useState('');
     const [saved, setSaved] = useState(false);
+    const [saving, setSaving] = useState(false);
 
-    const handleSave = () => {
-        setSaved(true);
-        setTimeout(() => navigate('/payment-channels'), 1500);
+    useEffect(() => {
+        settingsApi.get().then((res: any) => {
+            const data = res.data || res;
+            if (data?.payment_config_palmpesa) {
+                try {
+                    const parsed = JSON.parse(data.payment_config_palmpesa);
+                    if (parsed.apiKey) setApiKey(parsed.apiKey);
+                    if (parsed.apiToken) setApiToken(parsed.apiToken);
+                    if (parsed.secretKey) setSecretKey(parsed.secretKey);
+                    if (parsed.callbackUrl) setCallbackUrl(parsed.callbackUrl);
+                    if (parsed.cancelUrl) setCancelUrl(parsed.cancelUrl);
+                } catch (e) {}
+            }
+        }).catch(console.error);
+    }, []);
+
+    const handleSave = async () => {
+        setSaving(true);
+        try {
+            await settingsApi.update({
+                payment_config_palmpesa: JSON.stringify({ apiKey, apiToken, secretKey, callbackUrl, cancelUrl })
+            });
+            setSaved(true);
+            setTimeout(() => navigate('/payment-channels'), 1500);
+        } catch (err) {
+            console.error(err);
+            alert('Failed to save config');
+        } finally {
+            setSaving(false);
+        }
     };
 
     return (
@@ -198,11 +227,12 @@ export default function PalmPesaConfig() {
 
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
                     <button className="btn btn-secondary" onClick={() => navigate('/payment-channels')}>+ Cancel</button>
-                    <button className="btn" onClick={handleSave} style={{
+                    <button className="btn" onClick={handleSave} disabled={saving} style={{
                         background: '#e11d48', color: '#fff', fontWeight: 600,
                         padding: '8px 20px', display: 'flex', alignItems: 'center', gap: 6,
+                        opacity: saving ? 0.7 : 1, cursor: saving ? 'not-allowed' : 'pointer',
                     }}>
-                        <SaveIcon fontSize="small" /> Save Configuration
+                        <SaveIcon fontSize="small" /> {saving ? 'Saving...' : 'Save Configuration'}
                     </button>
                 </div>
             </div>

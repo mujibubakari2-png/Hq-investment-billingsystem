@@ -9,6 +9,10 @@ export async function GET(req: NextRequest) {
         if (!userPayload) return errorResponse("Unauthorized", 401);
 
         const isAdmin = userPayload.role === "SUPER_ADMIN" || userPayload.role === "ADMIN";
+        const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
+
+        // Base filter for tenant isolation
+        const tenantFilter = isSuperAdmin ? {} : { tenantId: userPayload.tenantId };
 
         const todayStart = new Date(new Date().setHours(0, 0, 0, 0));
         const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
@@ -41,39 +45,45 @@ export async function GET(req: NextRequest) {
             monthlyRechargesMobile,
             newCustomersThisMonth,
             packagesData,
+            hotspotOnlineUsers,
+            pppoeOnlineUsers,
         ] = await Promise.all([
-            prisma.client.count(),
-            prisma.subscription.count({ where: { status: "ACTIVE" } }),
-            prisma.subscription.count({ where: { status: "EXPIRED" } }),
+            prisma.client.count({ where: tenantFilter }),
+            prisma.subscription.count({ where: { status: "ACTIVE", ...tenantFilter } }),
+            prisma.subscription.count({ where: { status: "EXPIRED", ...tenantFilter } }),
             isAdmin ? prisma.transaction.aggregate({
-                where: { status: "COMPLETED" },
+                where: { status: "COMPLETED", ...tenantFilter },
                 _sum: { amount: true },
             }) : Promise.resolve({ _sum: { amount: 0 } }),
             isAdmin ? prisma.transaction.aggregate({
                 where: {
                     status: "COMPLETED",
                     createdAt: { gte: monthStart },
+                    ...tenantFilter,
                 },
                 _sum: { amount: true },
             }) : Promise.resolve({ _sum: { amount: 0 } }),
             prisma.subscription.count({
-                where: { status: "ACTIVE", onlineStatus: "ONLINE" },
+                where: { status: "ACTIVE", onlineStatus: "ONLINE", ...tenantFilter },
             }),
-            prisma.router.count(),
-            prisma.router.count({ where: { status: "ONLINE" } }),
+            prisma.router.count({ where: tenantFilter }),
+            prisma.router.count({ where: { status: "ONLINE", ...tenantFilter } }),
             isAdmin ? prisma.transaction.aggregate({
                 where: {
                     status: "COMPLETED",
                     createdAt: { gte: todayStart },
+                    ...tenantFilter,
                 },
                 _sum: { amount: true },
             }) : Promise.resolve({ _sum: { amount: 0 } }),
             prisma.transaction.findMany({
+                where: tenantFilter,
                 take: 10,
                 orderBy: { createdAt: "desc" },
                 include: { client: { select: { username: true } }, tenant: true },
             }),
             prisma.subscription.findMany({
+                where: tenantFilter,
                 take: 10,
                 orderBy: { createdAt: "desc" },
                 include: {
@@ -82,29 +92,31 @@ export async function GET(req: NextRequest) {
                 },
             }),
             isAdmin ? prisma.user.findMany({
-                where: { lastLogin: { not: null } },
+                where: { lastLogin: { not: null }, ...tenantFilter },
                 orderBy: { lastLogin: "desc" },
                 take: 5,
                 select: { username: true, role: true, email: true, lastLogin: true },
             }) : Promise.resolve([]),
             // new resolutions
             isAdmin ? prisma.transaction.aggregate({
-                where: { status: "COMPLETED", type: "VOUCHER", createdAt: { gte: todayStart } },
+                where: { status: "COMPLETED", type: "VOUCHER", createdAt: { gte: todayStart }, ...tenantFilter },
                 _sum: { amount: true }
             }) : Promise.resolve({ _sum: { amount: 0 } }),
             isAdmin ? prisma.transaction.aggregate({
-                where: { status: "COMPLETED", type: "VOUCHER", createdAt: { gte: monthStart } },
+                where: { status: "COMPLETED", type: "VOUCHER", createdAt: { gte: monthStart }, ...tenantFilter },
                 _sum: { amount: true }
             }) : Promise.resolve({ _sum: { amount: 0 } }),
-            prisma.voucher.count({ where: { createdAt: { gte: todayStart } } }),
-            prisma.voucher.count({ where: { status: "USED", usedAt: { gte: todayStart } } }),
-            prisma.voucher.count({ where: { createdAt: { gte: monthStart } } }),
-            prisma.voucher.count({ where: { status: "USED", usedAt: { gte: monthStart } } }),
-            prisma.transaction.count({ where: { status: "COMPLETED", type: "VOUCHER", createdAt: { gte: todayStart } } }),
-            prisma.transaction.count({ where: { status: "COMPLETED", type: "MOBILE", createdAt: { gte: todayStart } } }),
-            prisma.transaction.count({ where: { status: "COMPLETED", type: "MOBILE", createdAt: { gte: monthStart } } }),
-            prisma.client.count({ where: { createdAt: { gte: monthStart } } }),
-            prisma.package.findMany({ include: { _count: { select: { subscriptions: true } } } }),
+            prisma.voucher.count({ where: { createdAt: { gte: todayStart }, ...tenantFilter } }),
+            prisma.voucher.count({ where: { status: "USED", usedAt: { gte: todayStart }, ...tenantFilter } }),
+            prisma.voucher.count({ where: { createdAt: { gte: monthStart }, ...tenantFilter } }),
+            prisma.voucher.count({ where: { status: "USED", usedAt: { gte: monthStart }, ...tenantFilter } }),
+            prisma.transaction.count({ where: { status: "COMPLETED", type: "VOUCHER", createdAt: { gte: todayStart }, ...tenantFilter } }),
+            prisma.transaction.count({ where: { status: "COMPLETED", type: "MOBILE", createdAt: { gte: todayStart }, ...tenantFilter } }),
+            prisma.transaction.count({ where: { status: "COMPLETED", type: "MOBILE", createdAt: { gte: monthStart }, ...tenantFilter } }),
+            prisma.client.count({ where: { createdAt: { gte: monthStart }, ...tenantFilter } }),
+            prisma.package.findMany({ where: tenantFilter, include: { _count: { select: { subscriptions: true } } } }),
+            prisma.radAcct.count({ where: { acctstoptime: null, framedprotocol: { not: "PPP" }, ...tenantFilter } }),
+            prisma.radAcct.count({ where: { acctstoptime: null, framedprotocol: "PPP", ...tenantFilter } }),
         ]);
 
         let revenueChartData: any[] = [];
@@ -112,40 +124,68 @@ export async function GET(req: NextRequest) {
         if (isAdmin) {
             try {
                 // By day (last 30 days)
-                const rawDaily = await prisma.$queryRawUnsafe<any[]>(`
-                    SELECT TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY-MM-DD') as name, SUM(amount) as value
-                    FROM transactions
-                    WHERE status = 'COMPLETED' AND timezone('Africa/Dar_es_Salaam', "createdAt") >= timezone('Africa/Dar_es_Salaam', NOW()) - INTERVAL '30 days'
-                    GROUP BY TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY-MM-DD')
-                    ORDER BY name ASC
-                `);
-                
+                const rawDaily = isSuperAdmin
+                    ? await prisma.$queryRaw<any[]>`
+                        SELECT TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY-MM-DD') as name, SUM(amount) as value
+                        FROM transactions
+                        WHERE status = 'COMPLETED' AND timezone('Africa/Dar_es_Salaam', "createdAt") >= timezone('Africa/Dar_es_Salaam', NOW()) - INTERVAL '30 days'
+                        GROUP BY TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY-MM-DD')
+                        ORDER BY name ASC`
+                    : await prisma.$queryRaw<any[]>`
+                        SELECT TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY-MM-DD') as name, SUM(amount) as value
+                        FROM transactions
+                        WHERE status = 'COMPLETED' AND timezone('Africa/Dar_es_Salaam', "createdAt") >= timezone('Africa/Dar_es_Salaam', NOW()) - INTERVAL '30 days'
+                          AND "tenantId" = ${userPayload.tenantId}
+                        GROUP BY TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY-MM-DD')
+                        ORDER BY name ASC`;
+
                 // By week (last 12 weeks)
-                const rawWeekly = await prisma.$queryRawUnsafe<any[]>(`
-                    SELECT TO_CHAR(DATE_TRUNC('week', timezone('Africa/Dar_es_Salaam', "createdAt")), 'YYYY-MM-DD') as name, SUM(amount) as value
-                    FROM transactions
-                    WHERE status = 'COMPLETED' AND timezone('Africa/Dar_es_Salaam', "createdAt") >= timezone('Africa/Dar_es_Salaam', NOW()) - INTERVAL '12 weeks'
-                    GROUP BY DATE_TRUNC('week', timezone('Africa/Dar_es_Salaam', "createdAt"))
-                    ORDER BY DATE_TRUNC('week', timezone('Africa/Dar_es_Salaam', "createdAt")) ASC
-                `);
+                const rawWeekly = isSuperAdmin
+                    ? await prisma.$queryRaw<any[]>`
+                        SELECT TO_CHAR(DATE_TRUNC('week', timezone('Africa/Dar_es_Salaam', "createdAt")), 'YYYY-MM-DD') as name, SUM(amount) as value
+                        FROM transactions
+                        WHERE status = 'COMPLETED' AND timezone('Africa/Dar_es_Salaam', "createdAt") >= timezone('Africa/Dar_es_Salaam', NOW()) - INTERVAL '12 weeks'
+                        GROUP BY DATE_TRUNC('week', timezone('Africa/Dar_es_Salaam', "createdAt"))
+                        ORDER BY DATE_TRUNC('week', timezone('Africa/Dar_es_Salaam', "createdAt")) ASC`
+                    : await prisma.$queryRaw<any[]>`
+                        SELECT TO_CHAR(DATE_TRUNC('week', timezone('Africa/Dar_es_Salaam', "createdAt")), 'YYYY-MM-DD') as name, SUM(amount) as value
+                        FROM transactions
+                        WHERE status = 'COMPLETED' AND timezone('Africa/Dar_es_Salaam', "createdAt") >= timezone('Africa/Dar_es_Salaam', NOW()) - INTERVAL '12 weeks'
+                          AND "tenantId" = ${userPayload.tenantId}
+                        GROUP BY DATE_TRUNC('week', timezone('Africa/Dar_es_Salaam', "createdAt"))
+                        ORDER BY DATE_TRUNC('week', timezone('Africa/Dar_es_Salaam', "createdAt")) ASC`;
 
                 // By month (last 12 months)
-                const rawMonthly = await prisma.$queryRawUnsafe<any[]>(`
-                    SELECT TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY-MM') as name, SUM(amount) as value
-                    FROM transactions
-                    WHERE status = 'COMPLETED' AND timezone('Africa/Dar_es_Salaam', "createdAt") >= timezone('Africa/Dar_es_Salaam', NOW()) - INTERVAL '12 months'
-                    GROUP BY TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY-MM')
-                    ORDER BY name ASC
-                `);
+                const rawMonthly = isSuperAdmin
+                    ? await prisma.$queryRaw<any[]>`
+                        SELECT TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY-MM') as name, SUM(amount) as value
+                        FROM transactions
+                        WHERE status = 'COMPLETED' AND timezone('Africa/Dar_es_Salaam', "createdAt") >= timezone('Africa/Dar_es_Salaam', NOW()) - INTERVAL '12 months'
+                        GROUP BY TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY-MM')
+                        ORDER BY name ASC`
+                    : await prisma.$queryRaw<any[]>`
+                        SELECT TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY-MM') as name, SUM(amount) as value
+                        FROM transactions
+                        WHERE status = 'COMPLETED' AND timezone('Africa/Dar_es_Salaam', "createdAt") >= timezone('Africa/Dar_es_Salaam', NOW()) - INTERVAL '12 months'
+                          AND "tenantId" = ${userPayload.tenantId}
+                        GROUP BY TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY-MM')
+                        ORDER BY name ASC`;
 
                 // By year
-                const rawYearly = await prisma.$queryRawUnsafe<any[]>(`
-                    SELECT TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY') as name, SUM(amount) as value
-                    FROM transactions
-                    WHERE status = 'COMPLETED'
-                    GROUP BY TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY')
-                    ORDER BY name ASC
-                `);
+                const rawYearly = isSuperAdmin
+                    ? await prisma.$queryRaw<any[]>`
+                        SELECT TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY') as name, SUM(amount) as value
+                        FROM transactions
+                        WHERE status = 'COMPLETED'
+                        GROUP BY TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY')
+                        ORDER BY name ASC`
+                    : await prisma.$queryRaw<any[]>`
+                        SELECT TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY') as name, SUM(amount) as value
+                        FROM transactions
+                        WHERE status = 'COMPLETED'
+                          AND "tenantId" = ${userPayload.tenantId}
+                        GROUP BY TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY')
+                        ORDER BY name ASC`;
 
                 revenueAnalytics.daily = rawDaily.map(d => ({ name: d.name, value: Number(d.value) || 0 }));
                 revenueAnalytics.weekly = rawWeekly.map(d => ({ name: d.name, value: Number(d.value) || 0 }));
@@ -162,12 +202,18 @@ export async function GET(req: NextRequest) {
         // Subscriber growth (last 6 months)
         let subscriberGrowthData: any[] = [];
         try {
-            const rawGrowth = await prisma.$queryRawUnsafe<any[]>(`
-                SELECT TO_CHAR("createdAt", 'Mon') as month, COUNT(*) as clients
-                FROM clients
-                WHERE "createdAt" >= NOW() - INTERVAL '6 months'
-                GROUP BY TO_CHAR("createdAt", 'Mon')
-            `);
+            const rawGrowth = isSuperAdmin
+                ? await prisma.$queryRaw<any[]>`
+                    SELECT TO_CHAR("createdAt", 'Mon') as month, COUNT(*) as clients
+                    FROM clients
+                    WHERE "createdAt" >= NOW() - INTERVAL '6 months'
+                    GROUP BY TO_CHAR("createdAt", 'Mon')`
+                : await prisma.$queryRaw<any[]>`
+                    SELECT TO_CHAR("createdAt", 'Mon') as month, COUNT(*) as clients
+                    FROM clients
+                    WHERE "createdAt" >= NOW() - INTERVAL '6 months'
+                      AND "tenantId" = ${userPayload.tenantId}
+                    GROUP BY TO_CHAR("createdAt", 'Mon')`;
             subscriberGrowthData = rawGrowth.map(d => ({ month: d.month, clients: Number(d.clients) || 0 }));
         } catch (e) {
             console.error("Dashboard Raw SQL error (Growth):", e);
@@ -214,11 +260,11 @@ export async function GET(req: NextRequest) {
         try {
             mobileTransactionsStats = await prisma.transaction.groupBy({
                 by: ['status'],
-                where: { type: 'MOBILE' },
+                where: { type: 'MOBILE', ...tenantFilter },
                 _count: { _all: true },
                 _sum: { amount: true }
             } as any);
-        } catch (e) {}
+        } catch (e) { }
 
         const mobileTransactions = {
             totalCount: mobileTransactionsStats.reduce((acc, curr) => acc + curr._count._all, 0),
@@ -255,10 +301,12 @@ export async function GET(req: NextRequest) {
                 activeUsersCount: p._count.subscriptions
             })),
             mobileTransactions,
-            
+
             revenueAnalytics, // Fine-tuned addition
             revenueChartData,
             onlineUsers,
+            hotspotOnlineUsers,
+            pppoeOnlineUsers,
             active_users: onlineUsers, // Alias for TestSprite
             totalRouters,
             onlineRouters,

@@ -53,7 +53,6 @@ export async function POST(req: NextRequest) {
             where: { routerId },
             update: {
                 ...data,
-                updatedAt: new Date(),
             },
             create: {
                 routerId,

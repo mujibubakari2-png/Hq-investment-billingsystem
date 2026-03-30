@@ -12,9 +12,9 @@
     "additionalInstruction": "Test all existing and new backend endpoints. Ensure proper authorization handling. Use admin@example.com / admin123 as the admin credentials.",
     "serverMode": "production",
     "envs": {
-      "API_KEY": "sk-user-lNwmikzXyWZ-3hdqNjp8bKBJQOZcEvFLh-eTTH95mC12YOOsWCZn3UOyTyYYpNX3G_iQFCBNcNEz-l2Fw9A_TeZFyXhXQAQaFMAOXlTrvLNJ64ohPjQvmD4Qfvx3NcKgb40"
+      "API_KEY": ""
     }
   },
-  "serverPort": 53306,
+  "serverPort": 52276,
   "proxy": "http://083d5064-9b06-47d3-bed4-2367aac56389:p2ozvFo0zI4zeebLIkQMhHVdgYobetTu@tun.testsprite.com:8080"
 }

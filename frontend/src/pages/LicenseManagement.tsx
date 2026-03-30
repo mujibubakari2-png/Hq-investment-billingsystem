@@ -1,9 +1,76 @@
+import { useState, useEffect } from 'react';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import PeopleIcon from '@mui/icons-material/People';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import WarningIcon from '@mui/icons-material/Warning';
+import { licenseApi, type LicenseResponse } from '../api/client';
+import CircularProgress from '@mui/material/CircularProgress';
 
 export default function LicenseManagement() {
+    const [license, setLicense] = useState<LicenseResponse | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+
+    useEffect(() => {
+        fetchLicense();
+    }, []);
+
+    const fetchLicense = async () => {
+        try {
+            const data = await licenseApi.getLicense();
+            setLicense(data);
+        } catch (err: any) {
+            setError(err.message || 'Failed to load license details');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    if (loading) {
+        return (
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '100px 0' }}>
+                <CircularProgress style={{ color: '#16a34a' }} />
+            </div>
+        );
+    }
+
+    if (error) {
+        return <div style={{ color: '#ef4444', padding: '20px' }}>{error}</div>;
+    }
+
+    if (license?.isSuperAdmin) {
+        return (
+            <div>
+                <div style={{ marginBottom: 24 }}>
+                    <h1 style={{ fontSize: '1.3rem', fontWeight: 700 }}>License Management</h1>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Global System Administration</p>
+                </div>
+                <div className="card" style={{ padding: '60px 20px', textAlign: 'center' }}>
+                    <CheckCircleIcon style={{ fontSize: 48, color: '#16a34a', marginBottom: 12 }} />
+                    <h3 style={{ fontWeight: 700, fontSize: '1.1rem', marginBottom: 4 }}>Unlimited Access</h3>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Your Super Admin profile bypasses tenant license restrictions.</p>
+                </div>
+            </div>
+        );
+    }
+
+    const { 
+        licenseKey, 
+        daysRemaining, 
+        expiresAt, 
+        customersCount, 
+        clientLimit, 
+        paidThisMonth, 
+        hasOutstanding 
+    } = license || {};
+
+    const copyKey = () => {
+        if (licenseKey) {
+            navigator.clipboard.writeText(licenseKey);
+            alert('License key copied to clipboard!');
+        }
+    };
     return (
         <div>
             <div style={{ marginBottom: 24 }}>
@@ -19,18 +86,26 @@ export default function LicenseManagement() {
             }}>
                 {/* License Active Card */}
                 <div style={{ padding: '20px 24px', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-                    <CheckCircleIcon style={{ color: '#16a34a', fontSize: 28, marginTop: 2 }} />
+                    {daysRemaining! > 7 ? (
+                        <CheckCircleIcon style={{ color: '#16a34a', fontSize: 28, marginTop: 2 }} />
+                    ) : (
+                        <WarningIcon style={{ color: '#ef4444', fontSize: 28, marginTop: 2 }} />
+                    )}
                     <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 700, color: '#16a34a', fontSize: '1rem' }}>License Active</div>
-                        <div style={{ fontSize: '0.8rem', color: '#16a34a', marginBottom: 12 }}>9 days remaining</div>
+                        <div style={{ fontWeight: 700, color: daysRemaining! > 7 ? '#16a34a' : '#ef4444', fontSize: '1rem' }}>
+                            {daysRemaining! > 0 ? 'License Active' : 'License Expired'}
+                        </div>
+                        <div style={{ fontSize: '0.8rem', color: daysRemaining! > 7 ? '#16a34a' : '#ef4444', marginBottom: 12 }}>
+                            {daysRemaining} {daysRemaining === 1 ? 'day' : 'days'} remaining
+                        </div>
                         <div style={{ display: 'flex', gap: 24, fontSize: '0.8rem' }}>
                             <div>
                                 <span style={{ color: 'var(--text-secondary)' }}>Key </span>
-                                <span style={{ fontFamily: 'monospace', fontWeight: 500 }}>LTC-26608396...</span>
+                                <span style={{ fontFamily: 'monospace', fontWeight: 500 }}>{licenseKey?.substring(0, 12)}...</span>
                             </div>
                             <div>
                                 <span style={{ color: 'var(--text-secondary)' }}>Expires </span>
-                                <span style={{ fontWeight: 600 }}>Mar 06, 2026</span>
+                                <span style={{ fontWeight: 600 }}>{expiresAt}</span>
                             </div>
                         </div>
                     </div>
@@ -38,10 +113,7 @@ export default function LicenseManagement() {
                         background: 'transparent', border: '1px solid var(--border)',
                         borderRadius: 'var(--radius-sm)', padding: '6px 8px', cursor: 'pointer',
                         color: 'var(--text-secondary)', display: 'flex', alignItems: 'center',
-                    }} onClick={() => {
-                        navigator.clipboard.writeText('LTC-26608396');
-                        alert('License key copied to clipboard!');
-                    }}>
+                    }} onClick={copyKey}>
                         <ContentCopyIcon style={{ fontSize: 14 }} />
                     </button>
                 </div>
@@ -51,9 +123,9 @@ export default function LicenseManagement() {
                     padding: '20px 30px', borderLeft: '1px solid var(--border-light)',
                     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                 }}>
-                    <PeopleIcon style={{ fontSize: 24, color: '#ef4444', marginBottom: 4 }} />
-                    <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>15</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Customers</div>
+                    <PeopleIcon style={{ fontSize: 24, color: customersCount! >= clientLimit! ? '#ef4444' : '#3b82f6', marginBottom: 4 }} />
+                    <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>{customersCount} <span style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>/ {clientLimit}</span></div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Customers Bound</div>
                 </div>
 
                 {/* Paid This Month stat */}
@@ -62,16 +134,26 @@ export default function LicenseManagement() {
                     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                 }}>
                     <AccountBalanceWalletIcon style={{ fontSize: 24, color: 'var(--info)', marginBottom: 4 }} />
-                    <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>TSH 0</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--info)' }}>Paid This Month</div>
+                    <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>TSH {paidThisMonth?.toLocaleString()}</div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--info)' }}>SaaS Payments (MTD)</div>
                 </div>
             </div>
 
             {/* All Invoices Paid */}
             <div className="card" style={{ padding: '60px 20px', textAlign: 'center' }}>
-                <CheckCircleIcon style={{ fontSize: 48, color: '#16a34a', marginBottom: 12 }} />
-                <h3 style={{ fontWeight: 700, fontSize: '1.1rem', marginBottom: 4 }}>All Invoices Paid!</h3>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>You have no outstanding invoices</p>
+                {hasOutstanding ? (
+                    <>
+                        <WarningIcon style={{ fontSize: 48, color: '#ef4444', marginBottom: 12 }} />
+                        <h3 style={{ fontWeight: 700, fontSize: '1.1rem', marginBottom: 4 }}>Outstanding SaaS Billing</h3>
+                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>You have unpaid invoices pending. Please settle them rapidly to avoid suspension.</p>
+                    </>
+                ) : (
+                    <>
+                        <CheckCircleIcon style={{ fontSize: 48, color: '#16a34a', marginBottom: 12 }} />
+                        <h3 style={{ fontWeight: 700, fontSize: '1.1rem', marginBottom: 4 }}>All Invoices Paid!</h3>
+                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>You have no outstanding ISP invoices mapped.</p>
+                    </>
+                )}
             </div>
         </div>
     );

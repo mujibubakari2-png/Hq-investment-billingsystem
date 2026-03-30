@@ -1,5 +1,5 @@
 generator client {
-  provider = "prisma-client"
+  provider = "prisma-client-js"
   output   = "../src/generated/prisma"
 }
 
@@ -21,7 +21,6 @@ model User {
   updatedAt DateTime   @updatedAt
   tenantId  String?
   expenses  Expense[]
-  otps      UserOtp[]
   tenant    Tenant?    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   vouchers  Voucher[]
 
@@ -30,13 +29,12 @@ model User {
 
 model UserOtp {
   id        String   @id @default(cuid())
-  email     String
+  email     String?
   otp       String
   expiresAt DateTime
   createdAt DateTime @default(now())
   used      Boolean  @default(false)
   tenantId  String?
-  user      User     @relation(fields: [email], references: [email])
   tenant    Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("user_otps")
@@ -156,6 +154,15 @@ model Router {
   apiPort         Int?             @default(8728)
   description     String?
   vpnMode         String?          @default("hybrid")
+  wgPrivateKey    String?
+  wgPublicKey     String?
+  wgPeerPublicKey String?
+  wgPresharedKey  String?
+  wgTunnelIp      String?          @default("10.200.0.1")
+  wgServerEndpoint String?
+  wgListenPort    Int?             @default(13231)
+  wgEnabled       Boolean          @default(false)
+  wgConfiguredAt  DateTime?
   equipments      Equipment[]
   hotspotSettings HotspotSettings?
   packages        Package[]
@@ -199,6 +206,7 @@ model HotspotSettings {
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
   tenantId           String?
+  adMessage          String?  @default("🎉 Special offer! Get extra data on all packages today!")
   router             Router   @relation(fields: [routerId], references: [id], onDelete: Cascade)
   tenant             Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -344,12 +352,13 @@ model PaymentChannel {
 
 model SystemSetting {
   id       String  @id @default(cuid())
-  key      String  @unique
+  key      String
   value    String
   group    String  @default("general")
   tenantId String?
   tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
+  @@unique([key, tenantId])
   @@map("system_settings")
 }
 
@@ -372,6 +381,10 @@ model Tenant {
   messageTemplates MessageTemplate[]
   packages         Package[]
   paymentChannels  PaymentChannel[]
+  radaccts         RadAcct[]
+  radchecks        RadCheck[]
+  radiusNas        RadiusNas[]
+  radiusUsers      RadiusUser[]
   routerLogs       RouterLog[]
   routers          Router[]
   smsMessages      SmsMessage[]
@@ -385,8 +398,6 @@ model Tenant {
   users            User[]
   vouchers         Voucher[]
   vpnUsers         VpnUser[]
-  radiusUsers      RadiusUser[]
-  radiusNas        RadiusNas[]
 
   @@map("tenants")
 }
@@ -438,50 +449,51 @@ model TenantPayment {
 }
 
 model VpnUser {
-  id             String    @id @default(cuid())
-  username       String    @unique
-  password       String
-  fullName       String?
-  protocol       String    @default("L2TP")
-  profile        String    @default("default")
-  service        String    @default("l2tp")
-  localAddress   String?
-  remoteAddress  String?
-  status         String    @default("Active")
-  routerId       String
-  uptime         String?
-  bytesIn        String?
-  bytesOut       String?
-  connectedAt    DateTime?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-  tenantId       String?
-  router         Router    @relation(fields: [routerId], references: [id])
-  tenant         Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id            String    @id @default(cuid())
+  username      String    @unique
+  password      String
+  fullName      String?
+  protocol      String    @default("L2TP")
+  profile       String    @default("default")
+  service       String    @default("l2tp")
+  localAddress  String?
+  remoteAddress String?
+  status        String    @default("Active")
+  routerId      String
+  uptime        String?
+  bytesIn       String?
+  bytesOut      String?
+  connectedAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  tenantId      String?
+  router        Router    @relation(fields: [routerId], references: [id])
+  tenant        Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("vpn_users")
 }
 
 model RadiusUser {
-  id               String    @id @default(cuid())
-  username         String    @unique
-  password         String
-  fullName         String?
-  authType         String    @default("PAP")
-  groupName        String    @default("default")
-  status           String    @default("Active")
-  speed            String?
-  dataLimit        String?
-  sessionTimeout   String?
-  simultaneousUse  Int       @default(1)
-  nasIpAddress     String?
-  framedIpAddress  String?
-  lastSeen         DateTime?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-  tenantId         String?
-  tenant           Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id              String    @id @default(cuid())
+  username        String    @unique
+  password        String
+  fullName        String?
+  authType        String    @default("PAP")
+  groupName       String    @default("default")
+  status          String    @default("Active")
+  speed           String?
+  dataLimit       String?
+  sessionTimeout  String?
+  simultaneousUse Int       @default(1)
+  nasIpAddress    String?
+  framedIpAddress String?
+  lastSeen        DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  tenantId        String?
+  tenant          Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
+  @@index([tenantId])
   @@map("radius_users")
 }
 
@@ -499,7 +511,65 @@ model RadiusNas {
   tenantId    String?
   tenant      Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
+  @@index([tenantId])
+  @@index([nasName, tenantId])
   @@map("radius_nas")
+}
+
+model RadCheck {
+  id        Int     @id @default(autoincrement())
+  username  String  @db.VarChar(64)
+  attribute String  @default("Cleartext-Password") @db.VarChar(64)
+  op        String  @default(":=") @db.VarChar(2)
+  value     String  @db.VarChar(253)
+  tenantId  String?
+  tenant    Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([username])
+  @@index([tenantId])
+  @@index([tenantId, username])
+  @@map("radcheck")
+}
+
+model RadAcct {
+  radacctid          BigInt    @id @default(autoincrement())
+  acctsessionid      String    @db.VarChar(64)
+  acctuniqueid       String    @unique @db.VarChar(32)
+  username           String    @db.VarChar(64)
+  realm              String?   @db.VarChar(64)
+  nasipaddress       String    @db.VarChar(15)
+  nasportid          String?   @db.VarChar(32)
+  nasporttype        String?   @db.VarChar(32)
+  acctstarttime      DateTime?
+  acctupdatetime     DateTime?
+  acctstoptime       DateTime?
+  acctinterval       Int?
+  acctsessiontime    Int?
+  acctauthentic      String?   @db.VarChar(32)
+  connectinfo_start  String?   @db.VarChar(120)
+  connectinfo_stop   String?   @db.VarChar(120)
+  acctinputoctets    BigInt?
+  acctoutputoctets   BigInt?
+  calledstationid    String?   @db.VarChar(50)
+  callingstationid   String?   @db.VarChar(50)
+  acctterminatecause String?   @db.VarChar(32)
+  servicetype        String?   @db.VarChar(32)
+  framedprotocol     String?   @db.VarChar(32)
+  framedipaddress    String?   @db.VarChar(15)
+  tenantId           String?
+  tenant             Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([username])
+  @@index([acctsessionid])
+  @@index([acctstarttime])
+  @@index([acctstoptime])
+  @@index([nasipaddress])
+  @@index([tenantId])
+  @@index([tenantId, acctstoptime])
+  @@index([tenantId, username])
+  @@index([tenantId, acctstarttime])
+  @@index([nasipaddress, acctstoptime])
+  @@map("radacct")
 }
 
 enum Role {
@@ -578,6 +648,7 @@ enum TransactionStatus {
   COMPLETED
   PENDING
   FAILED
+  EXPIRED
 }
 
 enum RouterStatus {

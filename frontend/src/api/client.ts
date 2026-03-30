@@ -51,6 +51,20 @@ function del<T>(path: string) {
     return request<T>(path, { method: 'DELETE' });
 }
 
+export interface LicenseResponse {
+    isSuperAdmin: boolean;
+    licenseKey?: string;
+    status?: string;
+    daysRemaining?: number;
+    expiresAt?: string;
+    customersCount?: number;
+    clientLimit?: number;
+    paidThisMonth?: number;
+    hasOutstanding?: boolean;
+    outstandingInvoices?: { id: string; amount: number; dueDate: string; status: string; }[];
+    message?: string;
+}
+
 // ── Auth ────────────────────────────────────────────────────────────────────
 
 export const authApi = {
@@ -64,14 +78,20 @@ export const authApi = {
     // Registration
     requestRegisterOtp: (data: { email: string; fullName: string }) =>
         post<{ message: string; otp: string }>('/auth/register/request-otp', data),
+    verifyRegisterOtp: (data: { email: string; otp: string }) =>
+        post<{ message: string }>('/auth/register/verify-otp', data),
     register: (data: any) =>
         post<{ message: string; token: string; user: any }>('/auth/register', data),
 
-    // Forgot Password
-    requestPasswordResetOtp: (data: { email: string }) =>
-        post<{ message: string; otp: string }>('/auth/forgot-password/request-otp', data),
+    // Password Recovery
+    requestPasswordResetOtp: (data: { email?: string; phone?: string; identifier?: string }) =>
+        post<{ message: string; otp?: string }>('/auth/forgot-password/request-otp', data),
+    verifyPasswordResetOtp: (data: { email: string; otp: string }) =>
+        post<{ message: string }>('/auth/forgot-password/verify-otp', data),
     resetPassword: (data: any) =>
         post<{ message: string }>('/auth/forgot-password/reset', data),
+    googleLogin: (data: { credential: string; action: 'login' | 'register' }) =>
+        post<{ message: string; token: string; user: any }>('/auth/google', data),
 };
 
 // ── Profile ─────────────────────────────────────────────────────────────────
@@ -107,6 +127,8 @@ export interface DashboardResponse {
     mobileTransactions: { totalCount: number; totalRevenue: number; paid: number; unpaid: number; failed: number; canceled: number };
     revenueAnalytics: { daily: { name: string; value: number }[]; weekly: { name: string; value: number }[]; monthly: { name: string; value: number }[]; yearly: { name: string; value: number }[] };
     onlineUsers: number;
+    hotspotOnlineUsers: number;
+    pppoeOnlineUsers: number;
     totalRouters: number;
     onlineRouters: number;
     revenueChartData: { name: string; value: number }[];
@@ -172,7 +194,32 @@ export const subscriptionsApi = {
     delete: (id: string) => del<{ message: string }>(`/subscriptions/${id}`),
 };
 
+// ── Expired Subscribers ─────────────────────────────────────────────────────
+
+export const expiredSubscribersApi = {
+    list: (params?: Record<string, string | number>) => {
+        const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
+        return get<{ data: Array<any>; total: number; summaries: any }>(`/expired-subscribers${qs}`);
+    },
+    bulkExtend: (subscriptionIds: string[]) => {
+        return post<{ message: string; successes: string[]; failures: any[] }>('/expired-subscribers/bulk-extend', { subscriptionIds });
+    },
+};
+
+// ── Active Subscribers ──────────────────────────────────────────────────────
+
+export const activeSubscribersApi = {
+    list: (params?: Record<string, string | number>) => {
+        const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
+        return get<{ data: Array<any>; total: number; summaries: any }>(`/active-subscribers${qs}`);
+    },
+};
+
 // ── Transactions ────────────────────────────────────────────────────────────
+
+export const licenseApi = {
+    getLicense: () => get<LicenseResponse>('/license'),
+};
 
 export const transactionsApi = {
     list: (params?: Record<string, string>) => {
@@ -183,6 +230,15 @@ export const transactionsApi = {
     delete: (id: string) => del<{ message: string }>(`/transactions/${id}`),
 };
 
+// ── Mobile Transactions ─────────────────────────────────────────────────────
+
+export const mobileTransactionsApi = {
+    list: (params?: Record<string, string | number>) => {
+        const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
+        return get<{ data: Array<any>; total: number; activeGateways: string[]; summaries: any }>(`/mobile-transactions${qs}`);
+    },
+};
+
 // ── Routers ─────────────────────────────────────────────────────────────────
 
 export const routersApi = {
@@ -191,6 +247,10 @@ export const routersApi = {
         type: string; vpnMode: string; description: string; status: string; activeUsers: number;
         cpuLoad: number; memoryUsed: number; uptime: string; lastSeen: string;
     }>>('/routers'),
+    listPaginated: (params?: Record<string, string | number>) => {
+        const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
+        return get<{ data: Array<any>; total: number }>(`/routers${qs}`);
+    },
     get: (id: string) => get<Record<string, unknown>>(`/routers/${id}`),
     create: (data: Record<string, unknown>) => post<Record<string, unknown>>('/routers', data),
     update: (id: string, data: Record<string, unknown>) => put<Record<string, unknown>>(`/routers/${id}`, data),
@@ -234,6 +294,14 @@ export const routersApi = {
             const qs = params ? '?' + new URLSearchParams(params).toString() : '';
             return get<{ data: Array<any>; total: number }>(`/routers/logs${qs}`);
         },
+    },
+
+    // WireGuard
+    wireguard: {
+        getConfig: (routerId: string) => get<any>(`/routers/${routerId}/wireguard`),
+        activate: (routerId: string) => post<any>(`/routers/${routerId}/wireguard`, { action: 'activate' }),
+        deactivate: (routerId: string) => post<any>(`/routers/${routerId}/wireguard`, { action: 'deactivate' }),
+        pushConfig: (routerId: string) => post<any>(`/routers/${routerId}/wireguard`, { action: 'push-config' }),
     },
 };
 

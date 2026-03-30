@@ -1,10 +1,16 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
-import { jsonResponse, errorResponse } from "@/lib/auth";
+import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 
 // GET /api/routers/logs — List all router action logs
 export async function GET(req: NextRequest) {
     try {
+        const userPayload = getUserFromRequest(req);
+        if (!userPayload) return errorResponse("Unauthorized", 401);
+
+        const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
+        const tenantFilter = isSuperAdmin ? {} : { tenantId: userPayload.tenantId };
+
         const url = new URL(req.url);
         const routerId = url.searchParams.get("routerId");
         const action = url.searchParams.get("action");
@@ -12,7 +18,7 @@ export async function GET(req: NextRequest) {
         const limit = parseInt(url.searchParams.get("limit") || "100");
         const page = parseInt(url.searchParams.get("page") || "1");
 
-        const where: any = {};
+        const where: any = { ...tenantFilter };
         if (routerId) where.routerId = routerId;
         if (action) where.action = { contains: action };
         if (status) where.status = status;

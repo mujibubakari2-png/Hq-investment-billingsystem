@@ -7,6 +7,7 @@ import MailOutlineIcon from '@mui/icons-material/MailOutline';
 import SearchIcon from '@mui/icons-material/Search';
 import CheckIcon from '@mui/icons-material/Check';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import Footer from '../components/layout/Footer';
 
 export default function ForgotPassword() {
     const navigate = useNavigate();
@@ -20,13 +21,15 @@ export default function ForgotPassword() {
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
 
-    const handleFindAccount = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const handleFindAccount = async (e?: React.FormEvent) => {
+        if (e) e.preventDefault();
         setError('');
         setLoading(true);
         try {
-            await authApi.requestPasswordResetOtp({ email });
+            const res = await authApi.requestPasswordResetOtp({ email });
+            console.log("TESTING ONLY - Password Reset OTP:", res.otp);
             setActiveStep(2);
+            setSuccess(''); // Clear any previous success message to show toast
         } catch (err: any) {
             setError(err.message || 'Failed to find account');
         } finally {
@@ -34,7 +37,21 @@ export default function ForgotPassword() {
         }
     };
 
-    const handleVerifyOtp = (e?: React.FormEvent) => {
+    const handleResendOtp = async () => {
+        setError('');
+        setLoading(true);
+        try {
+            const res = await authApi.requestPasswordResetOtp({ email });
+            console.log("TESTING ONLY - Resent Password Reset OTP:", res.otp);
+            // Just show a subtle success state if needed
+        } catch (err: any) {
+            setError(err.message || 'Failed to resend OTP');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleVerifyOtp = async (e?: React.FormEvent) => {
         if (e) e.preventDefault();
         const code = otpInputs.join('');
         if (code.length !== 6) {
@@ -43,11 +60,16 @@ export default function ForgotPassword() {
         }
         setError('');
         setLoading(true);
-        // Transition to step 3 to set new password (OTP verification happens at reset)
-        setTimeout(() => {
-            setLoading(false);
+        try {
+            await authApi.verifyPasswordResetOtp({ email, otp: code });
+            // Successfully validated physically
             setActiveStep(3);
-        }, 500);
+            setSuccess('');
+        } catch (err: any) {
+            setError(err.message || 'Invalid or expired verification code');
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleResetPassword = async (e: React.FormEvent) => {
@@ -66,7 +88,7 @@ export default function ForgotPassword() {
             await authApi.resetPassword({ email, password, otp: otpInputs.join('') });
             setSuccess('Password reset successfully!');
         } catch (err: any) {
-            setError(err.message || 'Failed to reset password');
+            setError(err.message || 'Failed to reset password. The code may be invalid or expired.');
         } finally {
             setLoading(false);
         }
@@ -84,7 +106,8 @@ export default function ForgotPassword() {
     };
 
     return (
-        <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f0f4f8', padding: '20px' }}>
+        <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: '#f0f4f8' }}>
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
             <div style={{ width: '100%', maxWidth: '440px' }}>
                 <button
                     onClick={() => {
@@ -242,9 +265,9 @@ export default function ForgotPassword() {
                                 </button>
 
                                 <div style={{ textAlign: 'center', fontSize: '0.95rem', color: '#64748b' }}>
-                                    <div style={{ marginBottom: '8px' }}>Expires: 5:01</div>
-                                    <div style={{ color: '#ffca28', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', marginBottom: '16px' }}>
-                                        <span>↻</span> Resend
+                                    <div style={{ marginBottom: '8px' }}>Expires: 30:00</div>
+                                    <div onClick={handleResendOtp} style={{ color: '#ffca28', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', marginBottom: '16px' }}>
+                                        <span>↻</span> Resend Code
                                     </div>
                                     <div
                                         onClick={() => setActiveStep(1)}
@@ -323,6 +346,8 @@ export default function ForgotPassword() {
                     </div>
                 </div>
             </div>
+            </div>
+            <Footer />
         </div>
     );
 }

@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { settingsApi } from '../api/client';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import SecurityIcon from '@mui/icons-material/Security';
@@ -16,11 +17,36 @@ export default function BankPaymentConfig() {
     const navigate = useNavigate();
     const [paybillNumber, setPaybillNumber] = useState('');
     const [accountNumber, setAccountNumber] = useState('');
+    const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState(false);
 
-    const handleSave = () => {
-        setSaved(true);
-        setTimeout(() => navigate('/payment-channels'), 1500);
+    useEffect(() => {
+        settingsApi.get().then((res: any) => {
+            const data = res.data || res;
+            if (data?.payment_config_bank) {
+                try {
+                    const parsed = JSON.parse(data.payment_config_bank);
+                    if (parsed.paybillNumber) setPaybillNumber(parsed.paybillNumber);
+                    if (parsed.accountNumber) setAccountNumber(parsed.accountNumber);
+                } catch (e) {}
+            }
+        }).catch(console.error);
+    }, []);
+
+    const handleSave = async () => {
+        setSaving(true);
+        try {
+            await settingsApi.update({
+                payment_config_bank: JSON.stringify({ paybillNumber, accountNumber })
+            });
+            setSaved(true);
+            setTimeout(() => navigate('/payment-channels'), 1500);
+        } catch (err) {
+            console.error(err);
+            alert('Failed to save config');
+        } finally {
+            setSaving(false);
+        }
     };
 
     return (
@@ -124,11 +150,12 @@ export default function BankPaymentConfig() {
                     <button className="btn btn-secondary" style={{ fontWeight: 500 }} onClick={() => navigate('/payment-channels')}>
                         + Cancel
                     </button>
-                    <button className="btn" onClick={handleSave} style={{
+                    <button className="btn" onClick={handleSave} disabled={saving} style={{
                         background: '#0ea5e9', color: '#fff', fontWeight: 600,
                         padding: '8px 20px', display: 'flex', alignItems: 'center', gap: 6,
+                        opacity: saving ? 0.7 : 1, cursor: saving ? 'not-allowed' : 'pointer',
                     }}>
-                        <SaveIcon fontSize="small" /> Save Configuration
+                        <SaveIcon fontSize="small" /> {saving ? 'Saving...' : 'Save Configuration'}
                     </button>
                 </div>
             </div>

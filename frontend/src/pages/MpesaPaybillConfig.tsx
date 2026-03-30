@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { settingsApi } from '../api/client';
 import SaveIcon from '@mui/icons-material/Save';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import VisibilityIcon from '@mui/icons-material/Visibility';
@@ -10,16 +11,52 @@ export default function MpesaPaybillConfig() {
     const [environment, setEnvironment] = useState('sandbox-Sandbox/Testing');
     const [shortcode, setShortcode] = useState('174379');
     const [consumerKey, setConsumerKey] = useState('');
+    const [consumerSecret, setConsumerSecret] = useState('');
     const [passkey, setPasskey] = useState('');
     const [authType, setAuthType] = useState('English (Swahili)');
     const [lipaNaMpesaShortcode, setLipaNaMpesaShortcode] = useState('174379');
     const [paymentMethod, setPaymentMethod] = useState('');
     const [ussdVersion, setUssdVersion] = useState('Version 1');
     const [saved, setSaved] = useState(false);
+    const [saving, setSaving] = useState(false);
 
-    const handleSave = () => {
-        setSaved(true);
-        setTimeout(() => navigate('/payment-channels'), 1500);
+    useEffect(() => {
+        settingsApi.get().then((res: any) => {
+            const data = res.data || res;
+            if (data?.payment_config_mpesa_paybill) {
+                try {
+                    const parsed = JSON.parse(data.payment_config_mpesa_paybill);
+                    if (parsed.environment) setEnvironment(parsed.environment);
+                    if (parsed.shortcode) setShortcode(parsed.shortcode);
+                    if (parsed.consumerKey) setConsumerKey(parsed.consumerKey);
+                    if (parsed.consumerSecret) setConsumerSecret(parsed.consumerSecret);
+                    if (parsed.passkey) setPasskey(parsed.passkey);
+                    if (parsed.authType) setAuthType(parsed.authType);
+                    if (parsed.lipaNaMpesaShortcode) setLipaNaMpesaShortcode(parsed.lipaNaMpesaShortcode);
+                    if (parsed.paymentMethod) setPaymentMethod(parsed.paymentMethod);
+                    if (parsed.ussdVersion) setUssdVersion(parsed.ussdVersion);
+                } catch (e) {}
+            }
+        }).catch(console.error);
+    }, []);
+
+    const handleSave = async () => {
+        setSaving(true);
+        try {
+            await settingsApi.update({
+                payment_config_mpesa_paybill: JSON.stringify({ 
+                    environment, shortcode, consumerKey, consumerSecret, passkey, 
+                    authType, lipaNaMpesaShortcode, paymentMethod, ussdVersion 
+                })
+            });
+            setSaved(true);
+            setTimeout(() => navigate('/payment-channels'), 1500);
+        } catch (err) {
+            console.error(err);
+            alert('Failed to save config');
+        } finally {
+            setSaving(false);
+        }
     };
 
     return (
@@ -56,7 +93,7 @@ export default function MpesaPaybillConfig() {
                     </div>
                     <div className="form-group">
                         <label className="form-label" style={{ fontWeight: 600 }}>🔗 Consumer Secret</label>
-                        <input type="text" className="form-input" />
+                        <input type="text" className="form-input" value={consumerSecret} onChange={e => setConsumerSecret(e.target.value)} />
                     </div>
                 </div>
 
@@ -209,11 +246,12 @@ export default function MpesaPaybillConfig() {
 
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
                     <button className="btn btn-secondary" onClick={() => navigate('/payment-channels')}>+ Cancel</button>
-                    <button className="btn" onClick={handleSave} style={{
+                    <button className="btn" onClick={handleSave} disabled={saving} style={{
                         background: '#e11d48', color: '#fff', fontWeight: 600,
                         padding: '8px 20px', display: 'flex', alignItems: 'center', gap: 6,
+                        opacity: saving ? 0.7 : 1, cursor: saving ? 'not-allowed' : 'pointer',
                     }}>
-                        <SaveIcon fontSize="small" /> Save Configuration
+                        <SaveIcon fontSize="small" /> {saving ? 'Saving...' : 'Save Configuration'}
                     </button>
                 </div>
             </div>

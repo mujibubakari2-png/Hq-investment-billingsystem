@@ -81,8 +81,11 @@ export class MikroTikService {
     constructor(conn: MikroTikConnection, routerId: string) {
         this.conn = conn;
         this.routerId = routerId;
-        // RouterOS REST API runs on port 80/443, but we'll use the configured port
-        this.baseUrl = `http://${conn.host}:${conn.port}`;
+        // RouterOS REST API runs on the HTTP port (default 80), NOT the API port (8728)
+        // The apiPort (8728) is for the RouterOS terminal API protocol
+        // For REST: use port 80 (http) or 443 (https)
+        const restPort = conn.port === 8728 || conn.port === 8729 ? 80 : conn.port;
+        this.baseUrl = `http://${conn.host}:${restPort}`;
     }
 
     // ── Internal HTTP helper for RouterOS REST API ───────────────────────────
@@ -96,7 +99,7 @@ export class MikroTikService {
 
         try {
             const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 10000); // 10s timeout
+            const timeout = setTimeout(() => controller.abort(), 8000); // 8s timeout
 
             const res = await fetch(url, {
                 method,
@@ -116,9 +119,15 @@ export class MikroTikService {
             return text ? JSON.parse(text) : {};
         } catch (err: any) {
             if (err.name === "AbortError") {
-                throw new Error(`Connection to router ${this.conn.host} timed out`);
+                throw new Error(`Connection to ${this.conn.host} timed out after 8 seconds. Ensure the router is reachable and REST API is enabled on the web port (80/443).`);
             }
-            throw err;
+            if (err.cause?.code === "ECONNREFUSED") {
+                throw new Error(`Connection refused by ${this.conn.host}. Ensure the router is reachable and the REST API (www-ssl or www) service is enabled.`);
+            }
+            if (err.cause?.code === "EHOSTUNREACH" || err.cause?.code === "ENETUNREACH") {
+                throw new Error(`Router ${this.conn.host} is unreachable. Check the IP address and network connectivity.`);
+            }
+            throw new Error(`Failed to connect to ${this.conn.host}: ${err.message}`);
         }
     }
 
@@ -138,6 +147,12 @@ export class MikroTikService {
         } catch (e) {
             console.error("Failed to create router log:", e);
         }
+    }
+
+    // ── Public API Request (for advanced operations like WireGuard push) ───
+
+    async apiRequestPublic(path: string, method: string = "GET", body?: unknown): Promise<any> {
+        return this.apiRequest(path, method, body);
     }
 
     // ── Connection Test ─────────────────────────────────────────────────────

@@ -5,6 +5,7 @@ import AddIcon from '@mui/icons-material/Add';
 import SearchIcon from '@mui/icons-material/Search';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
+import RouterIcon from '@mui/icons-material/Router';
 import { packagesApi } from '../api/client';
 import type { Package } from '../types';
 import ConfirmDeleteModal from '../modals/ConfirmDeleteModal';
@@ -140,7 +141,11 @@ export default function Packages() {
                                     <td><span className={`badge ${pkg.type.toLowerCase()}`}>{pkg.type}</span></td>
                                     <td>📊 {pkg.bandwidth}</td>
                                     <td>💰 {pkg.price.toLocaleString()} TZS</td>
-                                    <td>🖥️ {pkg.router}</td>
+                                    <td>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                            <RouterIcon style={{ fontSize: 16, color: 'var(--text-secondary)' }} /> {pkg.router}
+                                        </div>
+                                    </td>
                                     <td>⏱️ {pkg.validity}</td>
                                     <td>{pkg.devices ?? '—'}</td>
                                     <td><span className={`badge ${pkg.status.toLowerCase()}`}>{pkg.status}</span></td>

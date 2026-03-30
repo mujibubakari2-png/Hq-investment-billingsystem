@@ -6,7 +6,6 @@ import PaletteIcon from '@mui/icons-material/Palette';
 import TextFieldsIcon from '@mui/icons-material/TextFields';
 import ViewModuleIcon from '@mui/icons-material/ViewModule';
 import CampaignIcon from '@mui/icons-material/Campaign';
-import AnnouncementIcon from '@mui/icons-material/Announcement';
 import PersonIcon from '@mui/icons-material/Person';
 import BusinessIcon from '@mui/icons-material/Business';
 import DownloadIcon from '@mui/icons-material/Download';
@@ -49,7 +48,7 @@ export default function HotspotLoginCustomizer() {
     const [selectedFont, setSelectedFont] = useState('Inter');
     const [layout, setLayout] = useState<'grid' | 'horizontal' | 'vertical'>('grid');
     const [enableAds, setEnableAds] = useState(false);
-    const [enableAnnouncement, setEnableAnnouncement] = useState(true);
+    const [adMessage, setAdMessage] = useState('🎉 Special offer! Get extra data on all packages today!');
     const [enableRememberMe, setEnableRememberMe] = useState(true);
     const [companyName, setCompanyName] = useState('');
     const [customerCareNumber, setCustomerCareNumber] = useState('');
@@ -138,7 +137,7 @@ export default function HotspotLoginCustomizer() {
                     if (settings.selectedFont) setSelectedFont(settings.selectedFont);
                     if (settings.layout) setLayout(settings.layout);
                     if (settings.enableAds !== undefined) setEnableAds(settings.enableAds);
-                    if (settings.enableAnnouncement !== undefined) setEnableAnnouncement(settings.enableAnnouncement);
+                    if (settings.adMessage) setAdMessage(settings.adMessage);
                     if (settings.enableRememberMe !== undefined) setEnableRememberMe(settings.enableRememberMe);
                     if (settings.companyName) setCompanyName(settings.companyName);
                     if (settings.customerCareNumber) setCustomerCareNumber(settings.customerCareNumber);
@@ -174,41 +173,41 @@ export default function HotspotLoginCustomizer() {
         /* ── Header ── */
         .header {
             background: linear-gradient(135deg, ${primaryColor}, ${accentColor});
-            padding: 20px 16px 16px; text-align: center; color: #fff;
-            border-radius: 0 0 20px 20px;
+            padding: 14px 12px 12px; text-align: center; color: #fff;
+            border-radius: 0 0 16px 16px;
         }
-        .header-brand { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 12px; }
-        .header-brand svg { width: 24px; height: 24px; fill: #fff; }
-        .header-brand h1 { font-size: 1.2rem; font-weight: 700; letter-spacing: 0.5px; }
-        .networks-title { font-size: 0.82rem; font-weight: 600; margin-bottom: 8px; opacity: 0.9; }
-        .networks-row { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+        .header-brand { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 8px; }
+        .header-brand svg { width: 20px; height: 20px; fill: #fff; }
+        .header-brand h1 { font-size: 1.1rem; font-weight: 700; letter-spacing: 0.5px; }
+        .networks-title { font-size: 0.75rem; font-weight: 600; margin-bottom: 6px; opacity: 0.9; }
+        .networks-row { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
         .networks-row img { height: 28px; object-fit: contain; filter: brightness(1.1); }
         .network-badge {
             background: rgba(255,255,255,0.2); border-radius: 8px; padding: 4px 10px;
             font-size: 0.72rem; font-weight: 600; color: #fff;
         }
-        .steps { display: flex; justify-content: center; gap: 12px; font-size: 0.78rem; margin-bottom: 10px; }
+        .steps { display: flex; justify-content: center; gap: 10px; font-size: 0.75rem; margin-bottom: 8px; }
         .steps span { opacity: 0.85; }
         .steps .dot { opacity: 0.5; }
         .support-bar {
-            background: ${accentColor}40; border-radius: 20px; padding: 8px 16px;
-            font-size: 0.82rem; display: inline-flex; align-items: center; gap: 6px;
+            background: ${accentColor}40; border-radius: 16px; padding: 6px 14px;
+            font-size: 0.75rem; display: inline-flex; align-items: center; gap: 6px;
         }
 
         /* ── Section Shared ── */
-        .section { padding: 16px; }
+        .section { padding: 10px 12px; }
         .section-title {
-            font-size: 0.92rem; font-weight: 700; color: ${primaryColor};
-            margin-bottom: 12px; display: flex; align-items: center; gap: 6px;
+            font-size: 0.85rem; font-weight: 700; color: ${primaryColor};
+            margin-bottom: 8px; display: flex; align-items: center; gap: 6px;
         }
         .section-card {
-            background: #f8fafb; border: 1px solid #e8ecf0; border-radius: 12px;
-            padding: 14px; margin-bottom: 14px;
+            background: #f8fafb; border: 1px solid #e8ecf0; border-radius: 10px;
+            padding: 10px; margin-bottom: 8px;
         }
 
         /* ── Packages Grid ── */
-        .packages-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-        .packages-horizontal { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 8px; }
+        .packages-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+        .packages-horizontal { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; }
         .packages-horizontal .pkg-card { min-width: 140px; flex-shrink: 0; }
         .packages-vertical { display: flex; flex-direction: column; gap: 8px; }
 
@@ -228,37 +227,37 @@ export default function HotspotLoginCustomizer() {
         }
 
         /* ── Input fields ── */
-        .field-group { margin-bottom: 12px; }
-        .field-group label { display: block; font-size: 0.78rem; color: #666; margin-bottom: 4px; font-weight: 500; }
+        .field-group { margin-bottom: 8px; }
+        .field-group label { display: block; font-size: 0.75rem; color: #666; margin-bottom: 4px; font-weight: 500; }
         .field-input {
-            width: 100%; padding: 10px 14px; border: 1.5px solid #d1d5db; border-radius: 8px;
-            font-size: 0.9rem; font-family: '${selectedFont}', sans-serif;
+            width: 100%; padding: 8px 12px; border: 1.5px solid #d1d5db; border-radius: 8px;
+            font-size: 0.85rem; font-family: '${selectedFont}', sans-serif;
             transition: border-color 0.2s;
         }
         .field-input:focus { outline: none; border-color: ${accentColor}; box-shadow: 0 0 0 3px ${accentColor}15; }
 
         /* ── Buttons ── */
         .btn-primary {
-            width: 100%; padding: 12px; background: ${accentColor}; color: #fff;
-            border: none; border-radius: 8px; font-size: 0.92rem; font-weight: 700;
+            width: 100%; padding: 10px; background: ${accentColor}; color: #fff;
+            border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 700;
             cursor: pointer; font-family: '${selectedFont}', sans-serif;
-            display: flex; align-items: center; justify-content: center; gap: 6px;
+            display: flex; align-items: center; justify-content: center; gap: 4px;
             transition: all 0.2s;
         }
         .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
         .btn-accent {
-            width: 100%; padding: 12px; background: linear-gradient(135deg, #e53935, #c62828);
-            color: #fff; border: none; border-radius: 8px; font-size: 0.92rem; font-weight: 700;
+            width: 100%; padding: 10px; background: linear-gradient(135deg, #e53935, #c62828);
+            color: #fff; border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 700;
             cursor: pointer; font-family: '${selectedFont}', sans-serif;
-            display: flex; align-items: center; justify-content: center; gap: 6px;
+            display: flex; align-items: center; justify-content: center; gap: 4px;
         }
         .btn-connect {
-            padding: 10px 24px; background: ${accentColor}; color: #fff;
-            border: none; border-radius: 8px; font-size: 0.88rem; font-weight: 700;
+            padding: 8px 16px; background: ${accentColor}; color: #fff;
+            border: none; border-radius: 8px; font-size: 0.8rem; font-weight: 700;
             cursor: pointer; white-space: nowrap;
         }
         .login-row { display: flex; gap: 8px; align-items: center; }
-        .login-row .field-input { flex: 1; }
+        .login-row .field-input { flex: 1; margin-bottom: 0; }
 
         /* ── Remember me / MAC ── */
         .remember-row {
@@ -285,22 +284,6 @@ export default function HotspotLoginCustomizer() {
             font-weight: 500; animation: slideAd 6s infinite;
         }
         @keyframes slideAd { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }` : ''}
-
-        /* ── Announcement ── */
-        ${enableAnnouncement ? `.announcement-overlay {
-            position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex;
-            align-items: center; justify-content: center; z-index: 1000;
-        }
-        .announcement-box {
-            background: #fff; border-radius: 16px; padding: 28px; max-width: 360px;
-            width: 90%; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-        }
-        .announcement-box h3 { color: ${primaryColor}; font-size: 1.1rem; margin-bottom: 10px; }
-        .announcement-box p { color: #666; font-size: 0.85rem; line-height: 1.5; margin-bottom: 18px; }
-        .announcement-box button {
-            background: ${accentColor}; color: #fff; border: none; padding: 10px 32px;
-            border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 0.92rem;
-        }` : ''}
 
         .pkg-loading { text-align: center; padding: 20px; color: #888; font-size: 0.85rem; }
         @media (max-width: 380px) {
@@ -333,13 +316,6 @@ export default function HotspotLoginCustomizer() {
     </style>
 </head>
 <body>
-    ${enableAnnouncement ? `<div class="announcement-overlay" id="announcementOverlay">
-        <div class="announcement-box">
-            <h3>📢 Welcome!</h3>
-            <p>Welcome to ${companyName} WiFi. Browse our packages below and pay via mobile money to get connected instantly!</p>
-            <button onclick="document.getElementById('announcementOverlay').style.display='none'">OK, Got It!</button>
-        </div>
-    </div>` : ''}
 
     <!-- Payment Modal -->
     <div class="payment-overlay" id="paymentOverlay">
@@ -397,7 +373,7 @@ export default function HotspotLoginCustomizer() {
             <div class="support-bar">📞 Support: ${customerCareNumber}</div>
         </div>
 
-        ${enableAds ? `<div class="ad-banner">🎉 Special offer! Get extra data on all packages today!</div>` : ''}
+        ${enableAds ? `<div class="ad-banner">${adMessage || '🎉 Special offer! Get extra data on all packages today!'}</div>` : ''}
 
         <!-- Packages -->
         <div class="section">
@@ -425,9 +401,9 @@ export default function HotspotLoginCustomizer() {
         <div class="section">
             <div class="section-title">🔄 Reconnect</div>
             <div class="section-card">
-                <label style="font-size: 0.78rem; color: #666; margin-bottom: 6px; display: block;">Enter ZenoPay reference</label>
+                <label style="font-size: 0.78rem; color: #666; margin-bottom: 6px; display: block;">Enter Transaction reference</label>
                 <div class="login-row">
-                    <input type="text" class="field-input" id="zenopay-ref" placeholder="ZenoPay reference (ZP...)" />
+                    <input type="text" class="field-input" id="zenopay-ref" placeholder="Transaction reference (HP...)" />
                 </div>
                 <button class="btn-accent" style="margin-top: 10px;" onclick="doReconnect()">
                     💳 Reconnect
@@ -466,7 +442,7 @@ export default function HotspotLoginCustomizer() {
 
     <script>
         // ── Configuration ──
-        var API_BASE = window.location.protocol + '//' + window.location.hostname + ':3001';
+        var API_BASE = '${window.location.origin.includes("localhost") ? "http://localhost:3000" : window.location.origin}';
         var ROUTER_ID = '${selectedRouterId}';
         var ACCENT = '${accentColor}';
         var PRIMARY = '${primaryColor}';
@@ -492,10 +468,11 @@ export default function HotspotLoginCustomizer() {
             var c = document.getElementById('packagesContainer');
             if (!packages || packages.length === 0) { c.innerHTML = '<div class="pkg-loading">No packages available</div>'; return; }
             c.innerHTML = packages.map(function(p) {
-                return '<div class="pkg-card" onclick=\\'showPayment(' + JSON.stringify(p).replace(/"/g, "&quot;") + ')\\'>' +
+                return '<div class="pkg-card" onclick=\\'showPayment(' + JSON.stringify(p).replace(/"/g, "&quot;").replace(/'/g, "&#39;") + ')\\'>' +
                     '<div class="pkg-name">' + p.name + '</div>' +
                     '<div class="pkg-price"><small>TSH</small> ' + Number(p.price).toLocaleString() + '</div>' +
-                    '<div class="pkg-duration">⏱ ' + (p.validity||'') + '</div>' +
+                    '<div class="pkg-duration" style="margin-bottom:6px">⏱ ' + (p.validity||'') + '</div>' +
+                    '<button style="width:100%; border:none; padding:6px; background:' + ACCENT + '; color:#fff; border-radius:6px; font-weight:700; font-size:0.75rem; cursor:pointer;">Buy</button>' +
                 '</div>';
             }).join('');
         }
@@ -672,7 +649,7 @@ export default function HotspotLoginCustomizer() {
                 selectedFont,
                 layout,
                 enableAds,
-                enableAnnouncement,
+                adMessage,
                 enableRememberMe,
                 companyName,
                 customerCareNumber
@@ -695,7 +672,255 @@ export default function HotspotLoginCustomizer() {
         zip.file("login.html", generateHtml());
         zip.file("alogin.html", `<html><body><script>window.location='login.html';</script></body></html>`);
         zip.file("redirect.html", `<html><body><script>window.location='login.html';</script></body></html>`);
-        zip.file("README.txt", `Hotspot Login Page for ${companyName}\nRouter: ${selectedRouter?.name || 'N/A'} (${selectedRouter?.host || ''})\n\nUpload these files to your MikroTik router's hotspot directory.\n1. Connect to your router via FTP or Winbox\n2. Navigate to /hotspot folder\n3. Replace the existing files with these\n4. Test by connecting to the hotspot`);
+        zip.file("api.json", `{
+   "captive": $(if logged-in == 'yes')false$(else)true$(endif),
+   "user-portal-url": "$(link-login-only)",
+$(if session-timeout-secs != 0)
+   "seconds-remaining": $(session-timeout-secs),
+$(endif)
+$(if remain-bytes-total)
+   "bytes-remaining": $(remain-bytes-total),
+$(endif)
+   "can-extend-session": true
+}`);
+        zip.file("errors.txt", `# ERRORS
+# This file contains error messages which are shown to user, when http/https
+# login is used.
+# These messages can be changed to make user interface more friendly, including
+# translations to different languages.
+#
+# Various variables can be used here as well. Most frequently used ones are:
+#	$(error-orig)	- original error message from hotspot
+#	$(ip)		- ip address of a client
+#	$(username)	- username of client trying to log in
+
+# internal-error
+# It should never happen. If it will, error page will be shown
+# displaying this error message (error-orig will describe what has happened)
+
+internal-error = internal error ($(error-orig))
+
+# config-error
+# Should never happen if hotspot is configured properly.
+
+config-error = configuration error ($(error-orig))
+
+# not-logged-in
+# Will happen, if status or logout page is requested by user,
+# which actually is not logged in
+
+not-logged-in = you are not logged in (ip $(ip))
+
+# ippool-empty
+# IP address for user is to be assigned from ip pool, but there are no more
+# addresses in that pool
+
+ippool-empty = cannot assign ip address - no more free addresses from pool
+
+# shutting-down
+# When shutdown is executed, new clients are not accepted
+
+shutting-down = hotspot service is shutting down
+
+# user-session-limit
+# If user profile has limit of shared-users, then this error will be shown
+# after reaching this limit
+
+user-session-limit = no more sessions are allowed for user $(username)
+
+# license-session-limit
+# Depending on licence number of active hotspot clients is limited to
+# one or another amount. If this limit is reached, following error is displayed.
+
+license-session-limit = session limit reached ($(error-orig))
+
+# wrong-mac-username
+# If username looks like MAC address (12:34:56:78:9a:bc), but is not
+# a MAC address of this client, login is rejected
+
+wrong-mac-username = invalid username ($(username)): this MAC address is not yours
+
+# chap-missing
+# If http-chap login method is used, but hotspot program does not receive
+# back encrypted password, this error message is shown.
+# Possible reasons of failure:
+#	- JavaScript is not enabled in web browser;
+#	- login.html page is not valid;
+#	- challenge value has expired on server (more than 1h of inactivity);
+#	- http-chap login method is recently removed;
+# If JavaScript is enabled and login.html page is valid,
+# then retrying to login usually fixes this problem.
+
+chap-missing = web browser did not send challenge response (try again, enable JavaScript)
+
+# invalid-username
+# Most general case of invalid username or password. If RADIUS server
+# has sent an error string with Access-Reject message, then it will
+# override this setting.
+
+invalid-username = invalid username or password
+
+# invalid-mac
+# Local users (on hotspot server) can be bound to some MAC address. If login
+# from different MAC is tried, this error message will be shown.
+
+invalid-mac = user $(username) is not allowed to log in from this MAC address
+
+# uptime-limit, traffic-limit
+# For local hotspot users in case if limits are reached
+
+uptime-limit = user $(username) has reached uptime limit
+traffic-limit = user $(username) has reached traffic limit
+
+# radius-timeout
+# User is authenticated by RADIUS server, but no response is received from it,
+# following error will be shown.
+
+radius-timeout = RADIUS server is not responding
+
+# auth-in-progress
+# Authorization in progress. Client already has issued an authorization request
+# which is not yet complete.
+
+auth-in-progress = already authorizing, retry later
+
+# radius-reply
+# Radius server returned some custom error message
+
+radius-reply = $(error-orig)`);
+        zip.file("WISPAaccessGatewaParam.xsd", `<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified" attributeFormDefault="unqualified">
+	<xs:element name="WISPAccessGatewayParam">
+		<xs:complexType>
+			<xs:choice>
+				<xs:element name="Redirect" type="RedirectType"/>
+				<xs:element name="Proxy" type="ProxyType"/>
+				<xs:element name="AuthenticationReply" type="AuthenticationReplyType"/>
+				<xs:element name="AuthenticationPollReply" type="AuthenticationPollReplyType"/>
+				<xs:element name="LogoffReply" type="LogoffReplyType"/>
+				<xs:element name="AbortLoginReply" type="AbortLoginReplyType"/>
+			</xs:choice>
+		</xs:complexType>
+	</xs:element>
+	<xs:simpleType name="AbortLoginURLType">
+		<xs:restriction base="xs:anyURI"/>
+	</xs:simpleType>
+	<xs:simpleType name="NextURLType">
+		<xs:restriction base="xs:anyURI"/>
+	</xs:simpleType>
+	<xs:simpleType name="AccessProcedureType">
+		<xs:restriction base="xs:string"/>
+	</xs:simpleType>
+	<xs:simpleType name="AccessLocationType">
+		<xs:restriction base="xs:string"/>
+	</xs:simpleType>
+	<xs:simpleType name="LocationNameType">
+		<xs:restriction base="xs:string"/>
+	</xs:simpleType>
+	<xs:simpleType name="LoginURLType">
+		<xs:restriction base="xs:anyURI"/>
+	</xs:simpleType>
+	<xs:simpleType name="MessageTypeType">
+		<xs:restriction base="xs:integer"/>
+	</xs:simpleType>
+	<xs:simpleType name="ResponseCodeType">
+		<xs:restriction base="xs:integer"/>
+	</xs:simpleType>
+	<xs:simpleType name="ReplyMessageType">
+		<xs:restriction base="xs:string"/>
+	</xs:simpleType>
+	<xs:simpleType name="LoginResultsURLType">
+		<xs:restriction base="xs:anyURI"/>
+	</xs:simpleType>
+	<xs:simpleType name="LogoffURLType">
+		<xs:restriction base="xs:anyURI"/>
+	</xs:simpleType>
+	<xs:simpleType name="DelayType">
+		<xs:restriction base="xs:integer"/>
+	</xs:simpleType>
+	<xs:complexType name="RedirectType">
+		<xs:all>
+			<xs:element name="AccessProcedure" type="AccessProcedureType"/>
+			<xs:element name="AccessLocation" type="AccessLocationType"/>
+			<xs:element name="LocationName" type="LocationNameType"/>
+			<xs:element name="LoginURL" type="LoginURLType"/>
+			<xs:element name="AbortLoginURL" type="AbortLoginURLType"/>
+			<xs:element name="MessageType" type="MessageTypeType"/>
+			<xs:element name="ResponseCode" type="ResponseCodeType"/>
+		</xs:all>
+	</xs:complexType>
+	<xs:complexType name="ProxyType">
+		<xs:all>
+			<xs:element name="MessageType" type="MessageTypeType"/>
+			<xs:element name="ResponseCode" type="ResponseCodeType"/>
+			<xs:element name="NextURL" type="NextURLType" minOccurs="0" maxOccurs="1"/>
+			<xs:element name="Delay" type="DelayType" minOccurs="0" maxOccurs="1"/>
+		</xs:all>
+	</xs:complexType>
+	<xs:complexType name="AuthenticationReplyType">
+		<xs:all>
+			<xs:element name="MessageType" type="MessageTypeType"/>
+			<xs:element name="ResponseCode" type="ResponseCodeType"/>
+			<xs:element name="ReplyMessage" type="ReplyMessageType" minOccurs="0" maxOccurs="1"/>
+			<xs:element name="LoginResultsURL" type="LoginResultsURLType" minOccurs="0" maxOccurs="1"/>
+			<xs:element name="LogoffURL" type="LogoffURLType" minOccurs="0" maxOccurs="1"/>
+		</xs:all>
+	</xs:complexType>
+	<xs:complexType name="AuthenticationPollReplyType">
+		<xs:all>
+			<xs:element name="MessageType" type="MessageTypeType"/>
+			<xs:element name="ResponseCode" type="ResponseCodeType"/>
+			<xs:element name="ReplyMessage" type="ReplyMessageType" minOccurs="0" maxOccurs="1"/>
+			<xs:element name="Delay" type="DelayType" minOccurs="0" maxOccurs="1"/>
+			<xs:element name="LogoffURL" type="LogoffURLType" minOccurs="0" maxOccurs="1"/>
+		</xs:all>
+	</xs:complexType>
+	<xs:complexType name="LogoffReplyType">
+		<xs:sequence>
+			<xs:element name="MessageType" type="MessageTypeType"/>
+			<xs:element name="ResponseCode" type="ResponseCodeType"/>
+		</xs:sequence>
+	</xs:complexType>
+	<xs:complexType name="AbortLoginReplyType">
+		<xs:sequence>
+			<xs:element name="MessageType" type="MessageTypeType"/>
+			<xs:element name="ResponseCode" type="ResponseCodeType"/>
+			<xs:element name="LogoffURL" type="LogoffURLType" minOccurs="0" maxOccurs="1"/>
+		</xs:sequence>
+	</xs:complexType>
+</xs:schema>`);
+        zip.file("README.txt", `HQINVESTMENT HOTSPOT LOGIN PAGE
+========================
+
+Generated on: ${new Date().toLocaleString()}
+Company: ${companyName}
+Router: ${selectedRouter?.name || 'N/A'} (${selectedRouter?.host || ''})
+
+FILES INCLUDED:
+- login.html (Main hotspot login page)
+- alogin.html (Status page after login)
+- redirect.html (Automatic redirect)
+- api.json (Connection status for external apps)
+- errors.txt (Custom error messages)
+- WISPAaccessGatewaParam.xsd (WISPr support for mobile devices)
+
+DEPLOYMENT INSTRUCTIONS:
+1. Upload the contents of this hotspot folder to your router's hotspot directory
+2. Ensure the login.html file is accessible via your router's web interface
+3. Test the page functionality before going live
+4. Make sure all file permissions are set correctly on your router
+
+MIKROTIK ROUTER SETUP:
+1. Access your router via Winbox or WebFig
+2. Go to Files and upload the contents to the hotspot folder
+3. In IP > Hotspot > Server Profiles, set the login page to 'login.html'
+4. Test the hotspot functionality
+
+TROUBLESHOOTING:
+- Ensure your router has internet connectivity for external resources
+- IMPORTANT: You MUST allow Walled Garden access to your billing host/IP otherwise payments will fail!
+- Check that the M-Pesa integration endpoints are accessible
+- Verify that JavaScript is enabled on client devices`);
         const content = await zip.generateAsync({ type: "blob" });
         saveAs(content, `hotspot-${(selectedRouter?.name || 'template').replace(/\s+/g, '-').toLowerCase()}.zip`);
     };
@@ -863,27 +1088,26 @@ export default function HotspotLoginCustomizer() {
                             <h4 style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, color: 'var(--info)' }}>
                                 <CampaignIcon style={{ fontSize: 16 }} /> Advertisement Settings
                             </h4>
-                            <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer' }}>
+                            <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer', marginBottom: enableAds ? 12 : 0 }}>
                                 <input type="checkbox" checked={enableAds} onChange={e => setEnableAds(e.target.checked)} style={{ width: 16, height: 16, marginTop: 2 }} />
                                 <div>
-                                    <div style={{ fontWeight: 500, fontSize: '0.85rem' }}>Enable Advertisement Slider</div>
-                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Display rotating advertisements at the top of the login page. Ads will slide automatically every 5 seconds.</div>
+                                    <div style={{ fontWeight: 500, fontSize: '0.85rem' }}>Enable Advertisement Banner</div>
+                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Display an advertisement banner at the top of the login page.</div>
                                 </div>
                             </label>
-                        </div>
-
-                        {/* Announcement Popup */}
-                        <div style={{ marginBottom: 20 }}>
-                            <h4 style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, color: 'var(--primary)' }}>
-                                <AnnouncementIcon style={{ fontSize: 16 }} /> Announcement Popup
-                            </h4>
-                            <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer', border: '1px solid #fecaca', borderRadius: 'var(--radius-sm)', padding: 10 }}>
-                                <input type="checkbox" checked={enableAnnouncement} onChange={e => setEnableAnnouncement(e.target.checked)} style={{ width: 16, height: 16, marginTop: 2 }} />
-                                <div>
-                                    <div style={{ fontWeight: 500, fontSize: '0.85rem' }}>Enable Announcement Popup</div>
-                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Show a popup announcement when users first visit the login page. Features close/ok, OKE key support, and modern design.</div>
+                            {enableAds && (
+                                <div style={{ marginLeft: 24, padding: '10px 14px', background: '#f8fafc', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
+                                    <label style={{ display: 'block', fontSize: '0.78rem', color: '#475569', marginBottom: 6, fontWeight: 600 }}>Advertisement Text</label>
+                                    <input 
+                                        type="text" 
+                                        value={adMessage} 
+                                        onChange={e => setAdMessage(e.target.value)}
+                                        placeholder="Type your advertisement completely..."
+                                        style={{ width: '100%', padding: '8px 12px', border: '1px solid #cbd5e1', borderRadius: 4, fontSize: '0.85rem' }} 
+                                    />
+                                    <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: 6 }}>You can use emojis like 🎉, ⚡ locally!</div>
                                 </div>
-                            </label>
+                            )}
                         </div>
 
                         {/* User Experience Features */}
@@ -980,6 +1204,16 @@ export default function HotspotLoginCustomizer() {
                                     </div>
                                 </div>
 
+                                {enableAds && (
+                                    <div style={{
+                                        background: `linear-gradient(90deg, ${accentColor}10, ${primaryColor}10)`,
+                                        padding: '6px 10px', textAlign: 'center', fontSize: '0.55rem', 
+                                        color: primaryColor, fontWeight: 600
+                                    }}>
+                                        {adMessage || '🎉 Special offer! Get extra data on all packages today!'}
+                                    </div>
+                                )}
+
                                 <div style={{ padding: '10px 12px', fontFamily: selectedFont }}>
                                     {/* Packages */}
                                     <div style={{ fontWeight: 700, color: primaryColor, fontSize: '0.68rem', marginBottom: 6 }}>📦 Packages</div>
@@ -1010,7 +1244,12 @@ export default function HotspotLoginCustomizer() {
                                                 <div style={{ fontSize: '0.82rem', fontWeight: 700, color: primaryColor, lineHeight: 1 }}>
                                                     <span style={{ fontSize: '0.48rem', color: '#888' }}>TSH </span>{(pkg.price || 0).toLocaleString()}
                                                 </div>
-                                                <div style={{ fontSize: '0.48rem', color: '#e74c3c', marginTop: 2 }}>⏱ {pkg.validity}</div>
+                                                <div style={{ fontSize: '0.48rem', color: '#e74c3c', marginTop: 2, marginBottom: 5 }}>⏱ {pkg.validity}</div>
+                                                <button style={{
+                                                    background: accentColor, color: '#fff', border: 'none', padding: '3px 0',
+                                                    width: '100%', borderRadius: 4, fontSize: '0.48rem', fontWeight: 700,
+                                                    cursor: 'pointer'
+                                                }}>Buy</button>
                                             </div>
                                         ))}
                                     </div>
@@ -1032,7 +1271,7 @@ export default function HotspotLoginCustomizer() {
                                     {/* Reconnect */}
                                     <div style={{ fontWeight: 700, color: primaryColor, fontSize: '0.62rem', marginBottom: 4 }}>🔄 Reconnect</div>
                                     <div style={{ background: '#f8fafb', border: '1px solid #e8ecf0', borderRadius: 8, padding: 8, marginBottom: 8 }}>
-                                        <input placeholder="ZenoPay reference (ZP...)" readOnly style={{
+                                        <input placeholder="Transaction reference (HP...)" readOnly style={{
                                             width: '100%', padding: '4px 6px', border: '1px solid #d1d5db', borderRadius: 5,
                                             fontSize: '0.56rem', marginBottom: 4,
                                         }} />

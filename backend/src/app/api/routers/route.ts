@@ -1,22 +1,34 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
-import { jsonResponse, errorResponse } from "@/lib/auth";
+import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 
 // GET /api/routers
-export async function GET() {
+export async function GET(req: NextRequest) {
     try {
+        const userPayload = getUserFromRequest(req);
+        if (!userPayload) return errorResponse("Unauthorized", 401);
+
+        const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
+        const tenantFilter = isSuperAdmin ? {} : { tenantId: userPayload.tenantId };
+        
+        const { searchParams } = new URL(req.url);
+        const search = searchParams.get("search")?.toLowerCase() || "";
+        const isPaginated = searchParams.has("page");
+
         const routers = await prisma.router.findMany({
+            where: { ...tenantFilter },
             include: {
                 _count: { select: { packages: true, subscriptions: true, logs: true } },
             },
             orderBy: { createdAt: "desc" },
         });
 
-        const mapped = routers.map((r) => ({
+        let mapped = routers.map((r) => ({
             id: r.id,
             name: r.name,
             host: r.host,
             username: r.username,
+            password: r.password,
             port: r.port,
             apiPort: r.apiPort,
             type: r.type,
@@ -32,6 +44,20 @@ export async function GET() {
             subscriberCount: r._count.subscriptions,
         }));
 
+        if (isPaginated) {
+            if (search) {
+                mapped = mapped.filter(r => 
+                    r.name.toLowerCase().includes(search) || 
+                    r.host.toLowerCase().includes(search)
+                );
+            }
+            const page = parseInt(searchParams.get("page") || "1");
+            const limit = searchParams.get("limit") === "All" ? 999999 : parseInt(searchParams.get("limit") || "25");
+            const total = mapped.length;
+            const paginated = mapped.slice((page - 1) * limit, page * limit);
+            return jsonResponse({ data: paginated, total });
+        }
+
         return jsonResponse(mapped);
     } catch (e) {
         console.error(e);
@@ -42,6 +68,12 @@ export async function GET() {
 // POST /api/routers
 export async function POST(req: NextRequest) {
     try {
+        const userPayload = getUserFromRequest(req);
+        if (!userPayload) return errorResponse("Unauthorized", 401);
+
+        const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
+        const tenantFilter = isSuperAdmin ? {} : { tenantId: userPayload.tenantId };
+        
         const body = await req.json();
         const name = body.name || body.routerName;
         const host = body.host || body.hostIP || body.ipAddress;
@@ -69,8 +101,10 @@ export async function POST(req: NextRequest) {
             return errorResponse("Invalid port number (must be 1-65535)");
         }
 
-        const existing = await prisma.router.findUnique({ where: { name } });
-        if (existing) return errorResponse("Router name already exists");
+        const existing = await prisma.router.findFirst({ where: { name, ...tenantFilter } });
+        if (existing) return errorResponse("Router name already exists in your tenant");
+
+        const tenantIdValue = isSuperAdmin ? (body.tenantId || null) : userPayload.tenantId;
 
         const router = await prisma.router.create({
             data: {
@@ -83,7 +117,8 @@ export async function POST(req: NextRequest) {
                 type: body.type || "MikroTik",
                 vpnMode: body.vpnMode || "hybrid",
                 description: body.description || "",
-                status: "ONLINE", // Assume online initially for tests
+                status: "OFFLINE", // Default to offline until test connection succeeds
+                tenantId: tenantIdValue
             },
         });
 

@@ -31,7 +31,6 @@ export default function AddRouterModal({ onClose, onSave, initialData }: AddRout
             return;
         }
         if (onSave) onSave({ routerName, host, apiPort, username, accessCode, vpnMode, description });
-        onClose();
     };
 
     return (

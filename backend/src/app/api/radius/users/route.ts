@@ -1,14 +1,18 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
+import { getTenantFilter, getAssignTenantId } from "@/lib/tenant";
 
-// GET /api/radius/users – list RADIUS users
+// GET /api/radius/users – list RADIUS users (tenant-isolated)
 export async function GET(req: NextRequest) {
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
 
+        const { filter } = getTenantFilter(userPayload);
+
         const users = await prisma.radiusUser.findMany({
+            where: { ...filter },
             orderBy: { createdAt: "desc" },
         });
 
@@ -36,7 +40,7 @@ export async function GET(req: NextRequest) {
     }
 }
 
-// POST /api/radius/users – create RADIUS user
+// POST /api/radius/users – create RADIUS user (tenant-isolated)
 export async function POST(req: NextRequest) {
     try {
         const userPayload = getUserFromRequest(req);
@@ -52,6 +56,8 @@ export async function POST(req: NextRequest) {
         const existing = await prisma.radiusUser.findUnique({ where: { username } });
         if (existing) return errorResponse("RADIUS username already exists", 409);
 
+        const tenantId = getAssignTenantId(userPayload, body.tenantId);
+
         const user = await prisma.radiusUser.create({
             data: {
                 username,
@@ -65,6 +71,7 @@ export async function POST(req: NextRequest) {
                 simultaneousUse: simultaneousUse || 1,
                 framedIpAddress: framedIpAddress || null,
                 status: "Active",
+                tenantId,
             },
         });
 

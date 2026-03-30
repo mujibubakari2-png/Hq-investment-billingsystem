@@ -5,6 +5,12 @@ import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 // GET /api/vouchers
 export async function GET(req: NextRequest) {
     try {
+        const userPayload = getUserFromRequest(req);
+        if (!userPayload) return errorResponse("Unauthorized", 401);
+
+        const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
+        const tenantFilter = isSuperAdmin ? {} : { tenantId: userPayload.tenantId };
+        
         const { searchParams } = new URL(req.url);
         const status = searchParams.get("status") || "";
         const search = searchParams.get("search") || "";
@@ -13,7 +19,7 @@ export async function GET(req: NextRequest) {
         const skip = (page - 1) * limit;
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const where: any = {};
+        const where: any = { ...tenantFilter };
         if (status) where.status = status;
         if (search) {
             where.OR = [
@@ -37,28 +43,29 @@ export async function GET(req: NextRequest) {
             prisma.voucher.count({ where }),
         ]);
 
-        const mapped = vouchers.map((v: {
-            id: string;
-            code: string;
-            package: { name: string; type: string };
-            router: { name: string } | null;
-            status: string;
-            createdBy: { username: string; fullName: string | null };
-            createdAt: Date;
-            usedBy: string | null;
-            usedAt: Date | null;
-            customer: number | null;
-        }) => ({
+        const formatDate = (d: any) => {
+            if (!d) return null;
+            const dateObj = new Date(d);
+            if (isNaN(dateObj.getTime())) return "Invalid Date";
+            try {
+                return dateObj.toLocaleDateString("en-US", { timeZone: "Africa/Dar_es_Salaam", month: "short", day: "numeric", year: "numeric" });
+            } catch (e) {
+                return dateObj.toDateString(); // Safe fallback
+            }
+        };
+
+        const mapped = vouchers.map((v: any) => ({
             id: v.id,
             code: v.code,
-            plan: v.package.name,
+            plan: v.package?.name,
             router: v.router?.name || "",
-            packageType: v.package.type,
+            packageType: v.package?.type,
             status: v.status.charAt(0) + v.status.slice(1).toLowerCase(),
-            createdBy: v.createdBy.fullName || v.createdBy.username,
-            createdAt: v.createdAt.toLocaleDateString("en-US", { timeZone: "Africa/Dar_es_Salaam", month: "short", day: "numeric", year: "numeric" }),
+            createdBy: v.createdBy?.fullName || v.createdBy?.username || "System",
+            createdAt: formatDate(v.createdAt) || "N/A",
+            timestamp: new Date(v.createdAt).getTime() || 0, // Fallback raw number for sorting
             usedBy: v.usedBy,
-            usedAt: v.usedAt?.toLocaleDateString("en-US", { timeZone: "Africa/Dar_es_Salaam", month: "short", day: "numeric", year: "numeric" }),
+            usedAt: formatDate(v.usedAt),
             customer: v.customer,
         }));
 
@@ -83,6 +90,10 @@ export async function POST(req: NextRequest) {
 
         // Prefer logged-in user from JWT token, then body, then admin fallback
         const currentUser = getUserFromRequest(req);
+        if (!currentUser) return errorResponse("Unauthorized", 401);
+
+        const isSuperAdmin = currentUser.role === "SUPER_ADMIN";
+        const tenantFilter = isSuperAdmin ? {} : { tenantId: currentUser.tenantId };
         let finalCreatedById = currentUser?.userId || createdById;
         if (!finalCreatedById) {
             const admin = await prisma.user.findFirst({ where: { role: { in: ["ADMIN", "SUPER_ADMIN"] } } });
@@ -92,6 +103,7 @@ export async function POST(req: NextRequest) {
         if (!finalCreatedById) return errorResponse("Creator user ID is required");
 
         const finalCode = code || Math.floor(100000 + Math.random() * 900000).toString();
+        const tenantIdValue = isSuperAdmin ? (body.tenantId || null) : currentUser.tenantId;
 
         const voucher = await prisma.voucher.create({
             data: {
@@ -99,6 +111,7 @@ export async function POST(req: NextRequest) {
                 packageId: pkg.id,
                 routerId,
                 createdById: finalCreatedById,
+                tenantId: tenantIdValue
             },
         });
 

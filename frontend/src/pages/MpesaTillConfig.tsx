@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { settingsApi } from '../api/client';
 import SaveIcon from '@mui/icons-material/Save';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
@@ -13,17 +14,43 @@ export default function MpesaTillConfig() {
     const [consumerKey, setConsumerKey] = useState('');
     const [consumerSecret, setConsumerSecret] = useState('');
     const [saved, setSaved] = useState(false);
-
+    const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
 
-    const handleSave = () => {
+    useEffect(() => {
+        settingsApi.get().then((res: any) => {
+            const data = res.data || res;
+            if (data?.payment_config_mpesa_till) {
+                try {
+                    const parsed = JSON.parse(data.payment_config_mpesa_till);
+                    if (parsed.tillType) setTillType(parsed.tillType);
+                    if (parsed.tillNumber) setTillNumber(parsed.tillNumber);
+                    if (parsed.consumerKey) setConsumerKey(parsed.consumerKey);
+                    if (parsed.consumerSecret) setConsumerSecret(parsed.consumerSecret);
+                } catch (e) {}
+            }
+        }).catch(console.error);
+    }, []);
+
+    const handleSave = async () => {
         if (tillType === 'Business Till' && !consumerKey) {
             setError('Consumer Key is required');
             return;
         }
         setError('');
-        setSaved(true);
-        setTimeout(() => navigate('/payment-channels'), 1500);
+        setSaving(true);
+        try {
+            await settingsApi.update({
+                payment_config_mpesa_till: JSON.stringify({ tillType, tillNumber, consumerKey, consumerSecret })
+            });
+            setSaved(true);
+            setTimeout(() => navigate('/payment-channels'), 1500);
+        } catch (err) {
+            console.error(err);
+            setError('Failed to save config');
+        } finally {
+            setSaving(false);
+        }
     };
 
     return (
@@ -209,11 +236,12 @@ export default function MpesaTillConfig() {
 
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
                     <button className="btn btn-secondary" onClick={() => navigate('/payment-channels')}>+ Cancel</button>
-                    <button className="btn" onClick={handleSave} style={{
+                    <button className="btn" onClick={handleSave} disabled={saving} style={{
                         background: '#e11d48', color: '#fff', fontWeight: 600,
                         padding: '8px 20px', display: 'flex', alignItems: 'center', gap: 6,
+                        opacity: saving ? 0.7 : 1, cursor: saving ? 'not-allowed' : 'pointer',
                     }}>
-                        <SaveIcon fontSize="small" /> Save Configuration
+                        <SaveIcon fontSize="small" /> {saving ? 'Saving...' : 'Save Configuration'}
                     </button>
                 </div>
             </div>

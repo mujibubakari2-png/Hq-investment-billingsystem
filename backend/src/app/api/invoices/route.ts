@@ -11,13 +11,16 @@ export async function GET(req: NextRequest) {
             return errorResponse("Forbidden", 403);
         }
 
+        const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
+        const tenantFilter = isSuperAdmin ? {} : { tenantId: userPayload.tenantId };
+
         const { searchParams } = new URL(req.url);
         const status = searchParams.get("status") || "";
         const search = searchParams.get("search") || "";
 
         // Build where filter dynamically
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const where: any = {};
+        const where: any = { ...tenantFilter };
         if (status) where.status = status;
         if (search) {
             where.OR = [
@@ -77,7 +80,9 @@ export async function POST(req: NextRequest) {
             return errorResponse("Forbidden", 403);
         }
 
+        const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
         const body = await req.json();
+        const tenantIdValue = isSuperAdmin ? (body.tenantId || null) : userPayload.tenantId;
 
         const invoice = await prisma.invoice.create({
             data: {
@@ -87,6 +92,7 @@ export async function POST(req: NextRequest) {
                 status: (body.status || "DRAFT").toUpperCase(),
                 dueDate: new Date(body.dueDate),
                 issuedDate: new Date(body.issuedDate || new Date()),
+                tenantId: tenantIdValue,
                 items: {
                     create: (body.items || []).map((item: { description: string; quantity: number; unitPrice: number; total: number }) => ({
                         description: item.description,

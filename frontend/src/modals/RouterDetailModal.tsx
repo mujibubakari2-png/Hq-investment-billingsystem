@@ -16,11 +16,10 @@ import type { Router } from '../types';
 interface RouterDetailModalProps {
     router: Router;
     onClose: () => void;
-    onEdit?: (router: Router) => void;
     onDelete?: (router: Router) => void;
 }
 
-export default function RouterDetailModal({ router, onClose, onEdit, onDelete }: RouterDetailModalProps) {
+export default function RouterDetailModal({ router, onClose, onDelete }: RouterDetailModalProps) {
     const navigate = useNavigate();
     const [showScript, setShowScript] = useState(false);
     const [showWireGuard, setShowWireGuard] = useState(false);
@@ -123,18 +122,12 @@ export default function RouterDetailModal({ router, onClose, onEdit, onDelete }:
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, color: '#d97706', fontWeight: 600, fontSize: '0.85rem' }}>
                             <EditIcon style={{ fontSize: 16 }} /> MANAGEMENT
                         </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                            <button className="btn" style={{
-                                background: '#ecfdf5', color: '#16a34a', fontWeight: 600, border: '1px solid #86efac',
-                                padding: '10px 16px', borderRadius: 'var(--radius-sm)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                            }} onClick={() => { if (onEdit) { onClose(); onEdit(router); } }}>
-                                <EditIcon fontSize="small" /> Edit Router
-                            </button>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 8 }}>
                             <button className="btn" style={{
                                 background: '#ecfdf5', color: '#16a34a', fontWeight: 600, border: '1px solid #86efac',
                                 padding: '10px 16px', borderRadius: 'var(--radius-sm)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                             }} onClick={() => { onClose(); navigate('/hotspot-customizer'); }}>
-                                <LoginIcon fontSize="small" /> Login Page
+                                <LoginIcon fontSize="small" /> Login Page Customizer
                             </button>
                         </div>
                     </div>

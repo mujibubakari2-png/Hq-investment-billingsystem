@@ -5,12 +5,29 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import { authApi } from '../api/client';
 import authStore from '../stores/authStore';
+import Footer from '../components/layout/Footer';
+import { GoogleLogin } from '@react-oauth/google';
 
 export default function Login() {
     const navigate = useNavigate();
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [showPass, setShowPass] = useState(false);
+
+    const handleGoogleSuccess = async (credentialResponse: any) => {
+        try {
+            setLoading(true);
+            const { token, user } = await authApi.googleLogin({
+                credential: credentialResponse.credential,
+                action: 'login'
+            });
+            authStore.login(token, user);
+            navigate('/dashboard', { replace: true });
+        } catch (err: any) {
+            setError(err.message || "Google authentication failed");
+            setLoading(false);
+        }
+    };
     const [remember, setRemember] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -38,8 +55,9 @@ export default function Login() {
     };
 
     return (
-        <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f0f4f8', padding: '20px' }}>
-            <div style={{ backgroundColor: '#ffffff', padding: '40px', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)', width: '100%', maxWidth: '440px' }}>
+        <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: '#f0f4f8' }}>
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+                <div style={{ backgroundColor: '#ffffff', padding: '40px', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)', width: '100%', maxWidth: '440px' }}>
                 {/* Text Logo */}
                 <div style={{ textAlign: 'center', marginBottom: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
@@ -62,6 +80,21 @@ export default function Login() {
                     <a href="/register" style={{ color: '#008ee6', textDecoration: 'none', fontWeight: 500, fontSize: '1rem' }}>
                         Create a new account
                     </a>
+                </div>
+                
+                <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'center' }}>
+                    <GoogleLogin
+                        onSuccess={handleGoogleSuccess}
+                        onError={() => setError('Google Login Failed')}
+                        useOneTap
+                        width="100%"
+                    />
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '24px 0', color: '#94a3b8', fontSize: '0.85rem' }}>
+                    <div style={{ flex: 1, height: '1px', backgroundColor: '#e2e8f0' }} />
+                    or sign in manually
+                    <div style={{ flex: 1, height: '1px', backgroundColor: '#e2e8f0' }} />
                 </div>
 
                 {error && (
@@ -134,6 +167,8 @@ export default function Login() {
                     </button>
                 </form>
             </div>
+            </div>
+            <Footer />
         </div>
     );
 }

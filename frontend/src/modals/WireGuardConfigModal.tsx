@@ -1,70 +1,123 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import CloseIcon from '@mui/icons-material/Close';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import DownloadIcon from '@mui/icons-material/Download';
 import VpnLockIcon from '@mui/icons-material/VpnLock';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import SendIcon from '@mui/icons-material/Send';
+import PowerSettingsNewIcon from '@mui/icons-material/PowerSettingsNew';
+import SyncIcon from '@mui/icons-material/Sync';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import { routersApi } from '../api/client';
 import type { Router } from '../types';
+import RouterIcon from '@mui/icons-material/Router';
 
 interface WireGuardConfigModalProps {
     router: Router;
     onClose: () => void;
 }
 
-function generateKey(length: number = 44): string {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-    let result = '';
-    for (let i = 0; i < length; i++) {
-        result += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return result + '=';
+interface WgConfig {
+    routerId: string;
+    routerName: string;
+    routerHost: string;
+    enabled: boolean;
+    configuredAt: string | null;
+    routerPrivateKey: string;
+    routerPublicKey: string;
+    serverPublicKey: string;
+    presharedKey: string;
+    routerTunnelIp: string;
+    serverTunnelIp: string;
+    listenPort: number;
+    serverEndpoint: string;
+    serverPort: number;
 }
 
 export default function WireGuardConfigModal({ router, onClose }: WireGuardConfigModalProps) {
     const [copied, setCopied] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<'server' | 'client'>('server');
+    const [loading, setLoading] = useState(true);
+    const [config, setConfig] = useState<WgConfig | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    const [actionLoading, setActionLoading] = useState<string | null>(null);
+    const [actionResult, setActionResult] = useState<{ success: boolean; message: string } | null>(null);
 
-    const routerIdCode = `MYR-${router.id.padStart(3, '0')}VBHBC`;
+    // Fetch persisted WireGuard config from the backend
+    useEffect(() => {
+        const fetchConfig = async () => {
+            try {
+                setLoading(true);
+                const data = await routersApi.wireguard.getConfig(router.id);
+                setConfig(data);
+            } catch (err: any) {
+                setError(err.message || 'Failed to load WireGuard configuration');
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchConfig();
+    }, [router.id]);
 
-    // Generate deterministic-looking keys based on router name
-    const serverPrivKey = generateKey();
-    const serverPubKey = generateKey();
-    const clientPrivKey = generateKey();
-    const clientPubKey = generateKey();
-    const presharedKey = generateKey();
+    if (loading) {
+        return (
+            <div className="modal-overlay" onClick={onClose}>
+                <div className="modal" style={{ maxWidth: 500, padding: 40, textAlign: 'center' }} onClick={e => e.stopPropagation()}>
+                    <SyncIcon style={{ fontSize: 48, color: '#15803d', animation: 'spin 1s linear infinite' }} />
+                    <p style={{ marginTop: 16, fontWeight: 600 }}>Loading WireGuard Configuration...</p>
+                    <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>Generating persistent keys for {router.name}</p>
+                </div>
+            </div>
+        );
+    }
 
+    if (error || !config) {
+        return (
+            <div className="modal-overlay" onClick={onClose}>
+                <div className="modal" style={{ maxWidth: 500, padding: 30 }} onClick={e => e.stopPropagation()}>
+                    <div style={{ textAlign: 'center' }}>
+                        <WarningAmberIcon style={{ fontSize: 48, color: '#dc2626' }} />
+                        <p style={{ fontWeight: 600, marginTop: 12, color: '#dc2626' }}>Failed to Load Config</p>
+                        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{error}</p>
+                        <button className="btn btn-secondary" onClick={onClose} style={{ marginTop: 16 }}>Close</button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // Build MikroTik server script with CORRECT syntax (single backslash for line continuation)
     const serverConfig = `# ═══════════════════════════════════════════════════════════════
 # WireGuard Server Config — MikroTik RouterOS
-# Router: ${router.name} (${routerIdCode})
-# IP: ${router.host}
-# Generated: ${new Date().toISOString().split('T')[0]}
+# Router: ${config.routerName} (${config.routerId})
+# Generated keys are PERSISTENT — same on every view
 # ═══════════════════════════════════════════════════════════════
 
 # ── 1. Create WireGuard Interface ─────────────────────────────
 /interface wireguard
-add name=wg-kenge listen-port=13231 private-key="${serverPrivKey}"
-# Public Key: ${serverPubKey}
+add name=wg-kenge listen-port=${config.listenPort} private-key="${config.routerPrivateKey}"
+# Public Key: ${config.routerPublicKey}
 
 # ── 2. Assign IP to WireGuard Interface ───────────────────────
 /ip address
-add address=10.200.0.1/24 interface=wg-kenge network=10.200.0.0
+add address=${config.routerTunnelIp}/24 interface=wg-kenge network=10.200.0.0
 
 # ── 3. Add Peer (Kenge Server) ────────────────────────────────
 /interface wireguard peers
 add interface=wg-kenge \\
-    public-key="${clientPubKey}" \\
-    preshared-key="${presharedKey}" \\
+    public-key="${config.serverPublicKey}" \\
+    preshared-key="${config.presharedKey}" \\
     allowed-address=10.200.0.0/24 \\
-    endpoint-address=vpn.hqinvestment.co.tz \\
-    endpoint-port=51820 \\
+    endpoint-address=${config.serverEndpoint} \\
+    endpoint-port=${config.serverPort} \\
     persistent-keepalive=25s \\
     comment="Kenge ISP Server"
 
 # ── 4. Firewall Rules (Allow WireGuard) ───────────────────────
 /ip firewall filter
-add chain=input protocol=udp dst-port=13231 action=accept \\
-    comment="Allow WireGuard"
+add chain=input protocol=udp dst-port=${config.listenPort} action=accept \\
+    comment="Allow WireGuard - Kenge"
 add chain=forward in-interface=wg-kenge action=accept \\
     comment="Allow WG traffic"
 add chain=forward out-interface=wg-kenge action=accept \\
@@ -81,29 +134,30 @@ add dst-address=10.200.0.0/24 gateway=wg-kenge \\
     comment="WireGuard subnet route"
 
 # ═══════════════════════════════════════════════════════════════
-# ✅ WireGuard configured for "${router.name}"
-# Server Endpoint: ${router.host}:13231
-# Tunnel Address: 10.200.0.1/24
+# ✅ WireGuard configured for "${config.routerName}"
+# Tunnel Address: ${config.routerTunnelIp}/24
+# Server Endpoint: ${config.serverEndpoint}:${config.serverPort}
 # ═══════════════════════════════════════════════════════════════`;
 
+    // Client config for the Kenge ISP server
     const clientConfig = `# ═══════════════════════════════════════════════════════════════
 # WireGuard Client Config — Kenge ISP Server
-# For Router: ${router.name} (${routerIdCode})
-# Generated: ${new Date().toISOString().split('T')[0]}
+# For Router: ${config.routerName} (${config.routerId})
+# Keys are PERSISTENT — install this on the Kenge VPN server
 # ═══════════════════════════════════════════════════════════════
 
 [Interface]
 # Kenge ISP Server side
-PrivateKey = ${clientPrivKey}
-Address = 10.200.0.2/24
+PrivateKey = <SERVER_PRIVATE_KEY>
+Address = ${config.serverTunnelIp}/24
 DNS = 8.8.8.8, 1.1.1.1
 
 [Peer]
-# Router: ${router.name}
-PublicKey = ${serverPubKey}
-PresharedKey = ${presharedKey}
-AllowedIPs = 10.200.0.0/24, 10.10.0.0/24
-Endpoint = ${router.host}:13231
+# Router: ${config.routerName}
+PublicKey = ${config.routerPublicKey}
+PresharedKey = ${config.presharedKey}
+AllowedIPs = 10.200.0.0/24, ${config.routerHost}/32
+Endpoint = ${config.routerHost}:${config.listenPort}
 PersistentKeepalive = 25`;
 
     const handleCopy = (text: string, label: string) => {
@@ -122,12 +176,32 @@ PersistentKeepalive = 25`;
         URL.revokeObjectURL(url);
     };
 
+    const handleAction = async (action: 'activate' | 'deactivate' | 'push-config') => {
+        setActionLoading(action);
+        setActionResult(null);
+        try {
+            let result;
+            if (action === 'activate') result = await routersApi.wireguard.activate(router.id);
+            else if (action === 'deactivate') result = await routersApi.wireguard.deactivate(router.id);
+            else result = await routersApi.wireguard.pushConfig(router.id);
+
+            setActionResult({ success: result.success, message: result.message });
+            if (result.success) {
+                setConfig({ ...config, enabled: action !== 'deactivate', configuredAt: new Date().toISOString() });
+            }
+        } catch (err: any) {
+            setActionResult({ success: false, message: err.message || 'Action failed' });
+        } finally {
+            setActionLoading(null);
+        }
+    };
+
     const activeConfig = activeTab === 'server' ? serverConfig : clientConfig;
     const activeLabel = activeTab === 'server' ? 'Server (MikroTik)' : 'Client (Kenge)';
 
     return (
         <div className="modal-overlay" onClick={onClose}>
-            <div className="modal" style={{ maxWidth: 750, maxHeight: '92vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
+            <div className="modal" style={{ maxWidth: 780, maxHeight: '94vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
                 {/* Header */}
                 <div style={{
                     background: 'linear-gradient(135deg, #15803d 0%, #22c55e 100%)', color: '#fff',
@@ -137,13 +211,83 @@ PersistentKeepalive = 25`;
                         <VpnLockIcon />
                         <div>
                             <div style={{ fontWeight: 700, fontSize: '1.05rem' }}>WireGuard VPN Configuration</div>
-                            <div style={{ fontSize: '0.8rem', opacity: 0.85 }}>{router.name} — {router.host}</div>
+                            <div style={{ fontSize: '0.8rem', opacity: 0.85 }}>
+                                {router.name} — {router.host}
+                                {config.enabled && <span style={{ marginLeft: 8, background: 'rgba(255,255,255,0.25)', padding: '2px 8px', borderRadius: 10, fontSize: '0.72rem' }}>✅ ACTIVE</span>}
+                            </div>
                         </div>
                     </div>
                     <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', cursor: 'pointer', borderRadius: 6, padding: '6px 8px' }}>
                         <CloseIcon fontSize="small" />
                     </button>
                 </div>
+
+                {/* Status + Action Buttons */}
+                <div style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '10px 24px', background: config.enabled ? '#f0fdf4' : '#fef3c7',
+                    borderBottom: '1px solid var(--border-light)', gap: 8, flexWrap: 'wrap',
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{
+                            width: 10, height: 10, borderRadius: '50%',
+                            background: config.enabled ? '#16a34a' : '#d97706',
+                            boxShadow: config.enabled ? '0 0 6px #16a34a' : 'none',
+                        }} />
+                        <span style={{ fontSize: '0.82rem', fontWeight: 600, color: config.enabled ? '#15803d' : '#92400e' }}>
+                            {config.enabled
+                                ? `WireGuard Active — Connected via tunnel ${config.routerTunnelIp}`
+                                : 'WireGuard Not Configured — Paste script or auto-push'}
+                        </span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                        {!config.enabled ? (
+                            <>
+                                <button
+                                    className="btn"
+                                    style={{ background: '#15803d', color: '#fff', fontWeight: 600, fontSize: '0.78rem', padding: '6px 14px', display: 'flex', alignItems: 'center', gap: 4 }}
+                                    onClick={() => handleAction('push-config')}
+                                    disabled={actionLoading !== null}
+                                >
+                                    {actionLoading === 'push-config' ? <SyncIcon style={{ fontSize: 14, animation: 'spin 1s linear infinite' }} /> : <SendIcon style={{ fontSize: 14 }} />}
+                                    Auto-Push to Router
+                                </button>
+                                <button
+                                    className="btn"
+                                    style={{ background: '#2563eb', color: '#fff', fontWeight: 600, fontSize: '0.78rem', padding: '6px 14px', display: 'flex', alignItems: 'center', gap: 4 }}
+                                    onClick={() => handleAction('activate')}
+                                    disabled={actionLoading !== null}
+                                >
+                                    {actionLoading === 'activate' ? <SyncIcon style={{ fontSize: 14, animation: 'spin 1s linear infinite' }} /> : <CheckCircleIcon style={{ fontSize: 14 }} />}
+                                    I Pasted It — Activate
+                                </button>
+                            </>
+                        ) : (
+                            <button
+                                className="btn"
+                                style={{ background: '#dc2626', color: '#fff', fontWeight: 600, fontSize: '0.78rem', padding: '6px 14px', display: 'flex', alignItems: 'center', gap: 4 }}
+                                onClick={() => handleAction('deactivate')}
+                                disabled={actionLoading !== null}
+                            >
+                                {actionLoading === 'deactivate' ? <SyncIcon style={{ fontSize: 14, animation: 'spin 1s linear infinite' }} /> : <PowerSettingsNewIcon style={{ fontSize: 14 }} />}
+                                Deactivate
+                            </button>
+                        )}
+                    </div>
+                </div>
+
+                {/* Action Result */}
+                {actionResult && (
+                    <div style={{
+                        padding: '8px 24px', fontSize: '0.82rem', fontWeight: 500,
+                        background: actionResult.success ? '#dcfce7' : '#fee2e2',
+                        color: actionResult.success ? '#166534' : '#dc2626',
+                        display: 'flex', alignItems: 'center', gap: 6,
+                    }}>
+                        {actionResult.success ? <CheckCircleIcon style={{ fontSize: 14 }} /> : <WarningAmberIcon style={{ fontSize: 14 }} />}
+                        {actionResult.message}
+                    </div>
+                )}
 
                 {/* Tabs */}
                 <div style={{ display: 'flex', borderBottom: '1px solid var(--border-light)' }}>
@@ -157,7 +301,9 @@ PersistentKeepalive = 25`;
                             borderBottom: activeTab === 'server' ? '2px solid #15803d' : '2px solid transparent',
                         }}
                     >
-                        🖥️ Server Config (MikroTik)
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}>
+                            <RouterIcon style={{ fontSize: 18 }} /> Server Config (MikroTik)
+                        </div>
                     </button>
                     <button
                         onClick={() => setActiveTab('client')}
@@ -175,16 +321,20 @@ PersistentKeepalive = 25`;
 
                 {/* Key Info Bar */}
                 <div style={{
-                    display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12,
+                    display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12,
                     padding: '12px 24px', background: '#f8fafc', borderBottom: '1px solid var(--border-light)',
                 }}>
                     <div>
                         <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 2 }}>Tunnel Address</div>
-                        <div style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '0.85rem' }}>10.200.0.{activeTab === 'server' ? '1' : '2'}/24</div>
+                        <div style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '0.85rem' }}>{activeTab === 'server' ? config.routerTunnelIp : config.serverTunnelIp}/24</div>
                     </div>
                     <div>
-                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 2 }}>Endpoint</div>
-                        <div style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '0.85rem' }}>{router.host}:13231</div>
+                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 2 }}>Listen Port</div>
+                        <div style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '0.85rem' }}>{config.listenPort}</div>
+                    </div>
+                    <div>
+                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 2 }}>Server Endpoint</div>
+                        <div style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '0.85rem' }}>{config.serverEndpoint}:{config.serverPort}</div>
                     </div>
                 </div>
 
@@ -204,13 +354,19 @@ PersistentKeepalive = 25`;
                 {/* Info Note */}
                 <div style={{
                     background: '#f0fdf4', padding: '10px 24px', fontSize: '0.8rem', color: '#15803d',
-                    display: 'flex', alignItems: 'center', gap: 8,
+                    display: 'flex', alignItems: 'flex-start', gap: 8,
                 }}>
-                    <InfoOutlinedIcon style={{ fontSize: 16 }} />
-                    {activeTab === 'server'
-                        ? 'Paste this script into MikroTik Terminal to configure WireGuard VPN.'
-                        : 'Use this config on your Kenge server to connect to this router via WireGuard.'
-                    }
+                    <InfoOutlinedIcon style={{ fontSize: 16, marginTop: 2, flexShrink: 0 }} />
+                    <div>
+                        {activeTab === 'server'
+                            ? <>
+                                <strong>Option 1:</strong> Click "Auto-Push to Router" to configure automatically via API.<br />
+                                <strong>Option 2:</strong> Copy and paste this script into MikroTik Terminal, then click "I Pasted It — Activate".<br />
+                                The system will switch to the WireGuard tunnel IP ({config.routerTunnelIp}) for all future API connections.
+                              </>
+                            : 'Install this config on your Kenge VPN server to complete the tunnel. Replace <SERVER_PRIVATE_KEY> with your actual server private key.'
+                        }
+                    </div>
                 </div>
 
                 {/* Footer */}

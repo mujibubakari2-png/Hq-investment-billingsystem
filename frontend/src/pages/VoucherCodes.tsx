@@ -9,6 +9,8 @@ import PrintIcon from '@mui/icons-material/Print';
 import CheckBoxIcon from '@mui/icons-material/CheckBox';
 import CheckBoxOutlineBlankIcon from '@mui/icons-material/CheckBoxOutlineBlank';
 import RouterIcon from '@mui/icons-material/Router';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import { vouchersApi } from '../api/client';
 import type { Voucher } from '../types';
 import GenerateVouchersModal from '../modals/GenerateVouchersModal';
@@ -31,6 +33,17 @@ export default function VoucherCodes() {
     const [loading, setLoading] = useState(true);
     const [currentPage, setCurrentPage] = useState(1);
     const [entriesPerPage, setEntriesPerPage] = useState<number | 'All'>(10);
+    const [revealedCodes, setRevealedCodes] = useState<Set<string>>(new Set());
+
+    const toggleCodeVisibility = (id: string, e?: React.MouseEvent) => {
+        if (e) e.stopPropagation();
+        setRevealedCodes(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(id)) newSet.delete(id);
+            else newSet.add(id);
+            return newSet;
+        });
+    };
 
     // Reset pagination when filters change
     useEffect(() => {
@@ -312,10 +325,22 @@ export default function VoucherCodes() {
                                         <td>
                                             <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>🎫 {v.plan}</span>
                                         </td>
-                                        <td>
-                                            <span style={{ display: 'inline-block', background: '#222', color: '#fff', padding: '2px 14px', borderRadius: 3, fontFamily: 'monospace', fontWeight: 700, letterSpacing: 2 }}>
-                                                {v.code}
-                                            </span>
+                                        <td style={{ cursor: 'pointer' }} onClick={() => toggleCodeVisibility(v.id)} title="Click to show/hide code">
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                <span style={{ 
+                                                    display: 'inline-block', background: '#222', color: '#fff', 
+                                                    padding: '2px 14px', borderRadius: 3, fontFamily: 'monospace', 
+                                                    fontWeight: 700, letterSpacing: 2,
+                                                    filter: revealedCodes.has(v.id) ? 'none' : 'blur(4.5px)',
+                                                    userSelect: revealedCodes.has(v.id) ? 'auto' : 'none',
+                                                    transition: 'filter 0.2s ease',
+                                                }}>
+                                                    {v.code}
+                                                </span>
+                                                <div style={{ color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }}>
+                                                    {revealedCodes.has(v.id) ? <VisibilityIcon style={{ fontSize: 16 }} /> : <VisibilityOffIcon style={{ fontSize: 16 }} />}
+                                                </div>
+                                            </div>
                                         </td>
                                         <td><span className={`badge ${v.status === 'Used' ? 'expired' : v.status === 'Unused' ? 'active' : 'inactive'}`}>{v.status}</span></td>
                                         <td>{v.customer ?? '—'}</td>

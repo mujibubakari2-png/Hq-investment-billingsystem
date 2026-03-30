@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Header from './Header';
+import Footer from './Footer';
 
 export default function MainLayout() {
     const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -38,15 +39,17 @@ export default function MainLayout() {
 
             <div
                 className={`main-content ${!sidebarVisible && !isMobile ? 'sidebar-collapsed' : ''}`}
+                style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}
             >
                 <Header
                     onToggleSidebar={handleToggleSidebar}
                     darkMode={darkMode}
                     onToggleDarkMode={() => setDarkMode(!darkMode)}
                 />
-                <div className="page-content">
+                <div className="page-content" style={{ flex: 1 }}>
                     <Outlet />
                 </div>
+                <Footer />
             </div>
         </div>
     );

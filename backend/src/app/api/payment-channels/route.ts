@@ -8,7 +8,11 @@ export async function GET(req: NextRequest) {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
 
+        const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
+        const tenantFilter = isSuperAdmin ? {} : { tenantId: userPayload.tenantId };
+
         const channels = await prisma.paymentChannel.findMany({
+            where: { ...tenantFilter },
             orderBy: { createdAt: "desc" },
         });
 
@@ -40,7 +44,13 @@ export async function GET(req: NextRequest) {
 // POST /api/payment-channels
 export async function POST(req: NextRequest) {
     try {
+        const userPayload = getUserFromRequest(req);
+        if (!userPayload) return errorResponse("Unauthorized", 401);
+
         const body = await req.json();
+
+        const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
+        const tenantIdValue = isSuperAdmin ? (body.tenantId || null) : userPayload.tenantId;
 
         const channel = await prisma.paymentChannel.create({
             data: {
@@ -50,6 +60,7 @@ export async function POST(req: NextRequest) {
                 apiKey: body.apiKey,
                 apiSecret: body.apiSecret,
                 config: body.config,
+                tenantId: tenantIdValue
             },
         });
 

@@ -45,12 +45,29 @@ export async function GET(req: NextRequest) {
             return jsonResponse({ active: false, message: "No active subscription found" });
         }
 
+        // Determine correct password
+        let password = subscription.client.phone; // default for Mobile purchases
+        
+        if (subscription.method === "VOUCHER") {
+            // Find the most recently used voucher by this client
+            const lastVoucher = await prisma.voucher.findFirst({
+                where: { usedBy: subscription.client.username, status: "USED" },
+                orderBy: { usedAt: "desc" }
+            });
+            
+            if (lastVoucher) {
+                password = lastVoucher.code;
+            } else if (subscription.client.username.startsWith("V-")) {
+                password = subscription.client.username.substring(2); // Fallback to extraction
+            }
+        }
+
         return jsonResponse({
             active: true,
             username: subscription.client.username,
-            password: subscription.client.phone, // Assuming phone as default password
+            password: password,
             expiresAt: subscription.expiresAt.toISOString(),
-            packageName: subscription.packageId, // Could include package name if joined
+            packageName: subscription.packageId,
         });
 
     } catch (e) {

@@ -1,16 +1,22 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
-import { jsonResponse, errorResponse } from "@/lib/auth";
+import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 
 // GET /api/equipment
 export async function GET(req: NextRequest) {
     try {
+        const userPayload = getUserFromRequest(req);
+        if (!userPayload) return errorResponse("Unauthorized", 401);
+
+        const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
+        const tenantFilter = isSuperAdmin ? {} : { tenantId: userPayload.tenantId };
+
         const { searchParams } = new URL(req.url);
         const search = searchParams.get("search") || "";
         const status = searchParams.get("status") || "";
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const where: any = {};
+        const where: any = { ...tenantFilter };
         if (status) where.status = status;
         if (search) {
             where.OR = [
@@ -22,7 +28,7 @@ export async function GET(req: NextRequest) {
 
         const equipment = await prisma.equipment.findMany({
             where,
-            include: { router: { select: { name: true } } },
+            include: { router: { select: { name: true } }, tenant: { select: { name: true } } },
             orderBy: { createdAt: "desc" },
         });
 
@@ -36,7 +42,12 @@ export async function GET(req: NextRequest) {
 // POST /api/equipment
 export async function POST(req: NextRequest) {
     try {
+        const userPayload = getUserFromRequest(req);
+        if (!userPayload) return errorResponse("Unauthorized", 401);
+
+        const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
         const body = await req.json();
+        const tenantIdValue = isSuperAdmin ? (body.tenantId || null) : userPayload.tenantId;
 
         const equipment = await prisma.equipment.create({
             data: {
@@ -49,6 +60,7 @@ export async function POST(req: NextRequest) {
                 purchaseDate: body.purchaseDate ? new Date(body.purchaseDate) : undefined,
                 notes: body.notes,
                 routerId: body.routerId,
+                tenantId: tenantIdValue
             },
         });
 

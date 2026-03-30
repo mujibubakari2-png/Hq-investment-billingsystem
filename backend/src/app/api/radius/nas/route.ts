@@ -1,14 +1,18 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
+import { getTenantFilter, getAssignTenantId } from "@/lib/tenant";
 
-// GET /api/radius/nas – list NAS clients
+// GET /api/radius/nas – list NAS clients (tenant-isolated)
 export async function GET(req: NextRequest) {
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
 
+        const { filter } = getTenantFilter(userPayload);
+
         const nasList = await prisma.radiusNas.findMany({
+            where: { ...filter },
             orderBy: { createdAt: "desc" },
         });
 
@@ -31,7 +35,7 @@ export async function GET(req: NextRequest) {
     }
 }
 
-// POST /api/radius/nas – create NAS client
+// POST /api/radius/nas – create NAS client (tenant-isolated)
 export async function POST(req: NextRequest) {
     try {
         const userPayload = getUserFromRequest(req);
@@ -44,6 +48,8 @@ export async function POST(req: NextRequest) {
             return errorResponse("NAS name and secret are required", 400);
         }
 
+        const tenantId = getAssignTenantId(userPayload, body.tenantId);
+
         const nas = await prisma.radiusNas.create({
             data: {
                 nasName,
@@ -53,6 +59,7 @@ export async function POST(req: NextRequest) {
                 secret,
                 server: server || null,
                 description: description || null,
+                tenantId,
             },
         });
 

@@ -1,8 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import RouterIcon from '@mui/icons-material/Router';
 import AddIcon from '@mui/icons-material/Add';
 import SearchIcon from '@mui/icons-material/Search';
-import DownloadIcon from '@mui/icons-material/Download';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import VisibilityIcon from '@mui/icons-material/Visibility';
@@ -11,6 +10,7 @@ import CancelIcon from '@mui/icons-material/Cancel';
 import SettingsIcon from '@mui/icons-material/Settings';
 import PowerSettingsNewIcon from '@mui/icons-material/PowerSettingsNew';
 import SyncIcon from '@mui/icons-material/Sync';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
 import { routersApi } from '../api/client';
 import AddRouterModal from '../modals/AddRouterModal';
 import RouterDetailModal from '../modals/RouterDetailModal';
@@ -32,16 +32,35 @@ export default function Mikrotiks() {
     const [remoteRouter, setRemoteRouter] = useState<Router | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [loading, setLoading] = useState(false);
-    const [pageSize, setPageSize] = useState(25);
+    const [pageSize, setPageSize] = useState<number | 'All'>(25);
     const [wizardRouter, setWizardRouter] = useState<Router | null>(null);
     const [testingId, setTestingId] = useState<string>('');
     const [currentPage, setCurrentPage] = useState(1);
+    const [totalRouters, setTotalRouters] = useState(0);
+    const [actionMenuId, setActionMenuId] = useState<string | null>(null);
+    const menuRef = useRef<HTMLDivElement>(null);
+
+    // Close action menu on outside click
+    useEffect(() => {
+        const handleClick = (e: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+                setActionMenuId(null);
+            }
+        };
+        if (actionMenuId) document.addEventListener('mousedown', handleClick);
+        return () => document.removeEventListener('mousedown', handleClick);
+    }, [actionMenuId]);
 
     const fetchRouters = async () => {
         setLoading(true);
         try {
-            const data = await routersApi.list();
-            setRouters(data as unknown as Router[]);
+            const res = await routersApi.listPaginated({
+                search: searchTerm,
+                page: currentPage,
+                limit: pageSize
+            });
+            setRouters((res.data || []) as unknown as Router[]);
+            setTotalRouters(res.total || 0);
         } catch (err) {
             console.error('Failed to load routers:', err);
         } finally {
@@ -49,7 +68,8 @@ export default function Mikrotiks() {
         }
     };
 
-    useEffect(() => { fetchRouters(); }, []);
+    useEffect(() => { fetchRouters(); }, [searchTerm, currentPage, pageSize]);
+    useEffect(() => { setCurrentPage(1); }, [searchTerm, pageSize]);
 
     const handleAddRouter = async (data: any) => {
         try {
@@ -81,14 +101,17 @@ export default function Mikrotiks() {
                 host: data.host,
                 username: data.username,
                 password: data.accessCode,
-                status: data.initialStatus === 'enable' ? 'ACTIVE' : 'INACTIVE',
+                port: data.apiPort ? parseInt(data.apiPort) : undefined,
+                apiPort: data.apiPort ? parseInt(data.apiPort) : undefined,
+                vpnMode: data.vpnMode,
+                description: data.description,
             });
             setSelectedRouterToEdit(null);
             fetchRouters();
             alert('Router updated successfully!');
-        } catch (err) {
+        } catch (err: any) {
             console.error('Failed to update router:', err);
-            alert('Failed to update router.');
+            alert(`Failed to update router: ${err?.message || 'Unknown error'}`);
         }
     };
 
@@ -121,13 +144,7 @@ export default function Mikrotiks() {
         }
     };
 
-    const filtered = routers.filter(r =>
-        r.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        r.host.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-
-    const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-    const paginated = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+    const totalPages = pageSize === 'All' ? 1 : Math.max(1, Math.ceil(totalRouters / (pageSize as number)));
 
     const getVpnType = (router: Router) => {
         const mode = (router as any).vpnMode || 'hybrid';
@@ -157,7 +174,7 @@ export default function Mikrotiks() {
         <div>
             {showAddModal && <AddRouterModal onClose={() => setShowAddModal(false)} onSave={handleAddRouter} />}
             {selectedRouterToEdit && <AddRouterModal onClose={() => setSelectedRouterToEdit(null)} onSave={handleEditRouter} initialData={selectedRouterToEdit} />}
-            {selectedRouter && <RouterDetailModal router={selectedRouter} onClose={() => setSelectedRouter(null)} onEdit={(r) => { setSelectedRouter(null); setSelectedRouterToEdit(r); }} onDelete={(r) => { setSelectedRouter(null); setDeleteRouter(r); }} />}
+            {selectedRouter && <RouterDetailModal router={selectedRouter} onClose={() => setSelectedRouter(null)} onDelete={(r) => { setSelectedRouter(null); setDeleteRouter(r); }} />}
             {scriptRouter && <MikrotikScriptModal router={scriptRouter} onClose={() => setScriptRouter(null)} />}
             {deleteRouter && (
                 <ConfirmDeleteModal
@@ -181,23 +198,6 @@ export default function Mikrotiks() {
                     </div>
                 </div>
                 <div className="page-header-right" style={{ display: 'flex', gap: 8 }}>
-                    <button
-                        className="btn"
-                        style={{
-                            background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: '#fff', fontWeight: 600,
-                            display: 'flex', alignItems: 'center', gap: 6,
-                        }}
-                        onClick={() => {
-                            if (routers.length === 0) { alert('No routers. Add one first.'); return; }
-                            setScriptRouter(routers[0]);
-                        }}
-                    >
-                        <DownloadIcon style={{ fontSize: 16 }} />
-                        <span>
-                            <span style={{ fontSize: '0.65rem', display: 'block', lineHeight: 1, opacity: 0.9 }}>API SPECIFIC</span>
-                            <span style={{ fontSize: '0.82rem', lineHeight: 1 }}>Download</span>
-                        </span>
-                    </button>
                     <button className="btn" style={{ background: '#16a34a', color: '#fff', fontWeight: 600 }} onClick={() => setShowAddModal(true)}>
                         <AddIcon fontSize="small" /> New Router
                     </button>
@@ -214,12 +214,13 @@ export default function Mikrotiks() {
                             className="select-field"
                             style={{ width: 65, padding: '6px 8px', fontSize: '0.82rem' }}
                             value={pageSize}
-                            onChange={e => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
+                            onChange={e => { setPageSize(e.target.value === 'All' ? 'All' : Number(e.target.value)); setCurrentPage(1); }}
                         >
                             <option value={10}>10</option>
                             <option value={25}>25</option>
                             <option value={50}>50</option>
                             <option value={100}>100</option>
+                            <option value="All">All</option>
                         </select>
                     </div>
                     <div className="table-toolbar-right">
@@ -248,9 +249,9 @@ export default function Mikrotiks() {
                         <tbody>
                             {loading ? (
                                 <tr><td colSpan={8} style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>Loading routers...</td></tr>
-                            ) : paginated.length === 0 ? (
+                            ) : routers.length === 0 ? (
                                 <tr><td colSpan={8} style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>No routers found. Click "New Router" to add one.</td></tr>
-                            ) : paginated.map((router) => (
+                            ) : routers.map((router) => (
                                 <tr key={router.id}>
                                     <td>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -314,7 +315,7 @@ export default function Mikrotiks() {
                                     </td>
                                     <td>
                                         {router.status === 'Online' ? (
-                                            <button 
+                                            <button
                                                 className="btn"
                                                 onClick={() => setRemoteRouter(router)}
                                                 style={{
@@ -329,7 +330,7 @@ export default function Mikrotiks() {
                                                 <LanguageIcon style={{ fontSize: 13 }} /> Connect
                                             </button>
                                         ) : (
-                                            <button 
+                                            <button
                                                 className="btn"
                                                 onClick={() => setRemoteRouter(router)}
                                                 style={{
@@ -346,27 +347,113 @@ export default function Mikrotiks() {
                                         )}
                                     </td>
                                     <td>
-                                        <div className="table-actions" style={{ display: 'flex', gap: 4 }}>
-                                            <button className="btn-icon" style={{ background: testingId === router.id ? '#fef3c7' : '#e0f2fe', color: testingId === router.id ? '#d97706' : '#0284c7' }}
-                                                title="Test Connection" onClick={() => handleTestConnection(router)} disabled={testingId === router.id}>
+                                        <div className="table-actions" style={{ display: 'flex', gap: 6, alignItems: 'center', position: 'relative' }}>
+                                            <button
+                                                className="btn"
+                                                onClick={() => setSelectedRouter(router)}
+                                                style={{
+                                                    display: 'inline-flex', alignItems: 'center', gap: 5,
+                                                    padding: '5px 14px', borderRadius: 20, fontWeight: 600, fontSize: '0.75rem',
+                                                    background: 'linear-gradient(135deg, #16a34a 0%, #22c55e 100%)',
+                                                    color: '#fff', border: 'none', cursor: 'pointer',
+                                                    boxShadow: '0 1px 3px rgba(22,163,74,0.3)',
+                                                    transition: 'all 0.2s',
+                                                }}
+                                                onMouseOver={(e) => { (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-1px)'; (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 3px 8px rgba(22,163,74,0.35)'; }}
+                                                onMouseOut={(e) => { (e.currentTarget as HTMLButtonElement).style.transform = 'none'; (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 1px 3px rgba(22,163,74,0.3)'; }}
+                                            >
+                                                <VisibilityIcon style={{ fontSize: 13 }} /> Details
+                                            </button>
+                                            <button
+                                                className="btn-icon"
+                                                style={{
+                                                    background: testingId === router.id ? '#fef3c7' : '#e0f2fe',
+                                                    color: testingId === router.id ? '#d97706' : '#0284c7',
+                                                    width: 30, height: 30, borderRadius: 6,
+                                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                    border: 'none', cursor: 'pointer', transition: 'all 0.15s',
+                                                }}
+                                                title="Test Connection"
+                                                onClick={() => handleTestConnection(router)}
+                                                disabled={testingId === router.id}
+                                            >
                                                 {testingId === router.id
                                                     ? <SyncIcon style={{ fontSize: 14, animation: 'spin 1s linear infinite' }} />
                                                     : <PowerSettingsNewIcon style={{ fontSize: 14 }} />}
                                             </button>
-                                            <button className="btn-icon" style={{ background: '#e0f2fe', color: '#0284c7' }} title="View Details"
-                                                onClick={() => setSelectedRouter(router)}>
-                                                <VisibilityIcon style={{ fontSize: 14 }} />
-                                            </button>
-                                            <button className="btn-icon" style={{ background: '#fef3c7', color: '#d97706' }} title="Setup Wizard"
-                                                onClick={() => setWizardRouter(router)}>
-                                                <SettingsIcon style={{ fontSize: 14 }} />
-                                            </button>
-                                            <button className="btn-icon edit" title="Edit" onClick={() => setSelectedRouterToEdit(router)}>
-                                                <EditIcon style={{ fontSize: 14 }} />
-                                            </button>
-                                            <button className="btn-icon delete" title="Delete" onClick={() => setDeleteRouter(router)}>
-                                                <DeleteIcon style={{ fontSize: 14 }} />
-                                            </button>
+                                            <div style={{ position: 'relative' }} ref={actionMenuId === router.id ? menuRef : undefined}>
+                                                <button
+                                                    className="btn-icon"
+                                                    style={{
+                                                        background: actionMenuId === router.id ? '#e5e7eb' : '#f3f4f6',
+                                                        color: '#6b7280', width: 30, height: 30,
+                                                        borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                        border: '1px solid transparent', cursor: 'pointer',
+                                                        transition: 'all 0.15s',
+                                                    }}
+                                                    title="More actions"
+                                                    onClick={(e) => { e.stopPropagation(); setActionMenuId(actionMenuId === router.id ? null : router.id); }}
+                                                    onMouseOver={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#e5e7eb'; (e.currentTarget as HTMLButtonElement).style.borderColor = '#d1d5db'; }}
+                                                    onMouseOut={(e) => { if (actionMenuId !== router.id) { (e.currentTarget as HTMLButtonElement).style.background = '#f3f4f6'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'transparent'; } }}
+                                                >
+                                                    <MoreVertIcon style={{ fontSize: 16 }} />
+                                                </button>
+
+                                                {actionMenuId === router.id && (
+                                                    <div style={{
+                                                        position: 'absolute', top: '100%', right: 0, marginTop: 4,
+                                                        background: '#fff', borderRadius: 10, boxShadow: '0 8px 30px rgba(0,0,0,0.15)',
+                                                        border: '1px solid #e5e7eb', overflow: 'hidden', zIndex: 999,
+                                                        minWidth: 175, animation: 'fadeIn 0.15s ease-out',
+                                                    }}>
+                                                        <div style={{ padding: '6px 0' }}>
+                                                            <button
+                                                                onClick={() => { setWizardRouter(router); setActionMenuId(null); }}
+                                                                style={{
+                                                                    display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+                                                                    padding: '9px 16px', border: 'none', background: 'transparent',
+                                                                    cursor: 'pointer', fontSize: '0.82rem', color: '#374151',
+                                                                    transition: 'background 0.15s',
+                                                                }}
+                                                                onMouseOver={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#fefce8'; }}
+                                                                onMouseOut={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
+                                                            >
+                                                                <SettingsIcon style={{ fontSize: 15, color: '#d97706' }} />
+                                                                <span>Setup Wizard</span>
+                                                            </button>
+                                                            <button
+                                                                onClick={() => { setSelectedRouterToEdit(router); setActionMenuId(null); }}
+                                                                style={{
+                                                                    display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+                                                                    padding: '9px 16px', border: 'none', background: 'transparent',
+                                                                    cursor: 'pointer', fontSize: '0.82rem', color: '#374151',
+                                                                    transition: 'background 0.15s',
+                                                                }}
+                                                                onMouseOver={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#eff6ff'; }}
+                                                                onMouseOut={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
+                                                            >
+                                                                <EditIcon style={{ fontSize: 15, color: '#2563eb' }} />
+                                                                <span>Edit Router</span>
+                                                            </button>
+                                                            <div style={{ height: 1, background: '#f3f4f6', margin: '4px 12px' }} />
+                                                            <button
+                                                                onClick={() => { setDeleteRouter(router); setActionMenuId(null); }}
+                                                                style={{
+                                                                    display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+                                                                    padding: '9px 16px', border: 'none', background: 'transparent',
+                                                                    cursor: 'pointer', fontSize: '0.82rem', color: '#dc2626',
+                                                                    transition: 'background 0.15s',
+                                                                }}
+                                                                onMouseOver={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#fef2f2'; }}
+                                                                onMouseOut={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
+                                                            >
+                                                                <DeleteIcon style={{ fontSize: 15, color: '#dc2626' }} />
+                                                                <span>Delete Router</span>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                     </td>
                                 </tr>
@@ -378,7 +465,7 @@ export default function Mikrotiks() {
                 {/* Pagination */}
                 <div className="pagination" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderTop: '1px solid var(--border-light)' }}>
                     <div className="pagination-info" style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
-                        Showing {filtered.length === 0 ? 0 : (currentPage - 1) * pageSize + 1} to {Math.min(currentPage * pageSize, filtered.length)} of {filtered.length} routers
+                        Showing {totalRouters === 0 ? 0 : (currentPage - 1) * (pageSize === 'All' ? totalRouters : (pageSize as number)) + 1} to {pageSize === 'All' ? totalRouters : Math.min(currentPage * (pageSize as number), totalRouters)} of {totalRouters} routers
                     </div>
                     <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                         <button

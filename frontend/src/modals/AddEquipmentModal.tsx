@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import DevicesIcon from '@mui/icons-material/Devices';
+import RouterIcon from '@mui/icons-material/Router';
 import CloseIcon from '@mui/icons-material/Close';
 import CheckIcon from '@mui/icons-material/Check';
 
@@ -31,7 +31,7 @@ export default function AddEquipmentModal({ onClose, onSave }: AddEquipmentModal
                 <div className="modal-header">
                     <div className="modal-header-left">
                         <div className="modal-header-icon" style={{ background: 'var(--teal-light)', color: 'var(--teal)' }}>
-                            <DevicesIcon fontSize="small" />
+                            <RouterIcon fontSize="small" />
                         </div>
                         <div>
                             <div className="modal-title">Add Equipment</div>

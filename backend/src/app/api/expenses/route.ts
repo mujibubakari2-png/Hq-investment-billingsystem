@@ -1,16 +1,22 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
-import { jsonResponse, errorResponse } from "@/lib/auth";
+import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 
 // GET /api/expenses
 export async function GET(req: NextRequest) {
     try {
+        const userPayload = getUserFromRequest(req);
+        if (!userPayload) return errorResponse("Unauthorized", 401);
+
+        const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
+        const tenantFilter = isSuperAdmin ? {} : { tenantId: userPayload.tenantId };
+
         const { searchParams } = new URL(req.url);
         const category = searchParams.get("category") || "";
         const search = searchParams.get("search") || "";
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const where: any = {};
+        const where: any = { ...tenantFilter };
         if (category) where.category = category;
         if (search) {
             where.OR = [
@@ -21,7 +27,7 @@ export async function GET(req: NextRequest) {
 
         const expenses = await prisma.expense.findMany({
             where,
-            include: { createdBy: { select: { username: true } } },
+            include: { createdBy: { select: { username: true } }, tenant: { select: { name: true } } },
             orderBy: { date: "desc" },
         });
 
@@ -53,11 +59,20 @@ export async function GET(req: NextRequest) {
 // POST /api/expenses
 export async function POST(req: NextRequest) {
     try {
+        const userPayload = getUserFromRequest(req);
+        if (!userPayload) return errorResponse("Unauthorized", 401);
+
+        const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
         const body = await req.json();
 
-        let createdById = body.createdById || body.created_by;
+        let createdById = body.createdById || body.created_by || userPayload.userId;
         if (!createdById) {
-            const admin = await prisma.user.findFirst({ where: { role: "ADMIN" } });
+            const admin = await prisma.user.findFirst({ 
+                where: { 
+                    role: { in: ["ADMIN", "SUPER_ADMIN"] },
+                    ...(isSuperAdmin ? {} : { tenantId: userPayload.tenantId })
+                } 
+            });
             createdById = admin?.id;
         }
 
@@ -66,6 +81,7 @@ export async function POST(req: NextRequest) {
         }
 
         const amount = parseFloat(body.amount) || parseFloat(body.amount_value) || 0;
+        const tenantIdValue = isSuperAdmin ? (body.tenantId || null) : userPayload.tenantId;
 
         const expense = await prisma.expense.create({
             data: {
@@ -76,6 +92,7 @@ export async function POST(req: NextRequest) {
                 reference: body.reference || `EXP-${Date.now()}`,
                 receipt: body.receipt,
                 createdById,
+                tenantId: tenantIdValue
             },
         });
 

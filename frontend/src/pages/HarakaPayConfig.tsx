@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { settingsApi } from '../api/client';
 import SaveIcon from '@mui/icons-material/Save';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import VisibilityIcon from '@mui/icons-material/Visibility';
@@ -9,13 +10,37 @@ export default function HarakaPayConfig() {
     const navigate = useNavigate();
     const [apiKey, setApiKey] = useState('');
     const [saved, setSaved] = useState(false);
+    const [saving, setSaving] = useState(false);
 
     const [testing, setTesting] = useState(false);
     const [testResult, setTestResult] = useState('');
 
-    const handleSave = () => {
-        setSaved(true);
-        setTimeout(() => navigate('/payment-channels'), 1500);
+    useEffect(() => {
+        settingsApi.get().then((res: any) => {
+            const data = res.data || res;
+            if (data?.payment_config_harakapay) {
+                try {
+                    const parsed = JSON.parse(data.payment_config_harakapay);
+                    if (parsed.apiKey) setApiKey(parsed.apiKey);
+                } catch (e) {}
+            }
+        }).catch(console.error);
+    }, []);
+
+    const handleSave = async () => {
+        setSaving(true);
+        try {
+            await settingsApi.update({
+                payment_config_harakapay: JSON.stringify({ apiKey })
+            });
+            setSaved(true);
+            setTimeout(() => navigate('/payment-channels'), 1500);
+        } catch (err) {
+            console.error(err);
+            alert('Failed to save config');
+        } finally {
+            setSaving(false);
+        }
     };
 
     const handleTestPayment = () => {
@@ -184,11 +209,12 @@ export default function HarakaPayConfig() {
                     <button className="btn btn-secondary" onClick={handleTestPayment} disabled={testing}>
                         {testing ? 'Testing...' : 'Test Payment'}
                     </button>
-                    <button className="btn" onClick={handleSave} style={{
+                    <button className="btn" onClick={handleSave} disabled={saving} style={{
                         background: '#e11d48', color: '#fff', fontWeight: 600,
                         padding: '8px 20px', display: 'flex', alignItems: 'center', gap: 6,
+                        opacity: saving ? 0.7 : 1, cursor: saving ? 'not-allowed' : 'pointer',
                     }}>
-                        <SaveIcon fontSize="small" /> Save Configuration
+                        <SaveIcon fontSize="small" /> {saving ? 'Saving...' : 'Save Configuration'}
                     </button>
                 </div>
 

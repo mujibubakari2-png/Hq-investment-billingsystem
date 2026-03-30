@@ -62,7 +62,21 @@ export default function PaymentChannels() {
     const defaultGateway = gateways.find(g => g.isDefault);
 
     const toggleEnabled = (id: string) => {
-        setGateways(prev => prev.map(g => g.id === id ? { ...g, enabled: !g.enabled } : g));
+        setGateways(prev => {
+            const target = prev.find(p => p.id === id);
+            if (!target) return prev;
+            const willBeEnabled = !target.enabled;
+            
+            return prev.map(g => {
+                if (g.id === id) {
+                    return { ...g, enabled: willBeEnabled, isDefault: willBeEnabled };
+                }
+                if (willBeEnabled) {
+                    return { ...g, enabled: false, isDefault: false };
+                }
+                return g;
+            });
+        });
     };
 
     const setDefault = (id: string) => {

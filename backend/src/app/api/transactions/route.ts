@@ -1,10 +1,16 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
-import { jsonResponse, errorResponse } from "@/lib/auth";
+import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 
 // GET /api/transactions
 export async function GET(req: NextRequest) {
     try {
+        const userPayload = getUserFromRequest(req);
+        if (!userPayload) return errorResponse("Unauthorized", 401);
+
+        const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
+        const tenantFilter = isSuperAdmin ? {} : { tenantId: userPayload.tenantId };
+        
         const { searchParams } = new URL(req.url);
         const search = searchParams.get("search") || "";
         const status = searchParams.get("status") || "";
@@ -14,7 +20,7 @@ export async function GET(req: NextRequest) {
         const skip = (page - 1) * limit;
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const where: any = {};
+        const where: any = { ...tenantFilter };
         if (status) where.status = status.toUpperCase();
         if (type) where.type = type.toUpperCase();
         if (search) {
@@ -35,31 +41,29 @@ export async function GET(req: NextRequest) {
             prisma.transaction.count({ where }),
         ]);
 
-        const isValidDate = (d: any) => d instanceof Date && !isNaN(d.getTime());
+        const formatDateTime = (d: any) => {
+            if (!d) return "N/A";
+            const dateObj = new Date(d);
+            if (isNaN(dateObj.getTime())) return "Invalid Date";
+            try {
+                return dateObj.toLocaleString("en-US", { timeZone: "Africa/Dar_es_Salaam", month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" });
+            } catch (e) {
+                return dateObj.toISOString();
+            }
+        };
 
-        const mapped = transactions.map((t: {
-            id: string;
-            client: { username: string; fullName: string };
-            planName: string | null;
-            amount: number;
-            type: string;
-            method: string;
-            status: string;
-            createdAt: Date;
-            expiryDate: string | null;
-            reference: string;
-        }) => ({
+        const mapped = transactions.map((t: any) => ({
             id: t.id,
-            user: t.client.username,
+            user: t.client?.username || "Unknown",
             planName: t.planName,
             plan: t.planName, // Add alias for TestSprite
             amount: t.amount,
             type: t.type.charAt(0) + t.type.slice(1).toLowerCase(),
             method: t.method,
             status: t.status.charAt(0) + t.status.slice(1).toLowerCase(),
-            date: isValidDate(t.createdAt) ? t.createdAt.toLocaleString("en-US", { timeZone: "Africa/Dar_es_Salaam", month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "N/A",
-            createdAt: t.createdAt, // Alias for TestSprite
-            expiryDate: t.expiryDate,
+            date: formatDateTime(t.createdAt),
+            timestamp: new Date(t.createdAt).getTime() || 0, // Safe numerical value for deterministic sorting
+            expiryDate: t.expiryDate || null,
             reference: t.reference,
         }));
 
@@ -67,7 +71,7 @@ export async function GET(req: NextRequest) {
         if (type.toUpperCase() === "MOBILE") {
             const stats = (await prisma.transaction.groupBy({
                 by: ['status'],
-                where: { type: 'MOBILE' },
+                where: { type: 'MOBILE', ...tenantFilter },
                 _count: { _all: true },
                 _sum: { amount: true }
             } as any)) as unknown as any[];
@@ -92,18 +96,57 @@ export async function GET(req: NextRequest) {
 // POST /api/transactions
 export async function POST(req: NextRequest) {
     try {
+        const userPayload = getUserFromRequest(req);
+        if (!userPayload) return errorResponse("Unauthorized", 401);
+
+        const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
+        const tenantFilter = isSuperAdmin ? {} : { tenantId: userPayload.tenantId };
+        
         const body = await req.json();
+
+        // Resolve client ID natively if a username was provided instead
+        let clientId = body.clientId;
+        if (!clientId && body.username) {
+            const client = await prisma.client.findFirst({
+                where: {
+                    OR: [
+                        { username: body.username },
+                        { phone: body.username }
+                    ],
+                    ...tenantFilter
+                }
+            });
+            if (client) {
+                clientId = client.id;
+            } else {
+                return errorResponse("Client not found based on the provided username/phone.", 404);
+            }
+        }
+
+        // Resolve plan name natively if a planId was provided instead
+        let planName = body.planName;
+        if (!planName && body.planId) {
+            const plan = await prisma.package.findUnique({ where: { id: body.planId } });
+            if (plan && (isSuperAdmin || plan.tenantId === userPayload.tenantId)) {
+                planName = plan.name;
+            }
+        }
+
+        if (!clientId) return errorResponse("Client ID or Username is required", 400);
+
+        const tenantIdValue = isSuperAdmin ? (body.tenantId || null) : userPayload.tenantId;
 
         const transaction = await prisma.transaction.create({
             data: {
-                clientId: body.clientId,
-                planName: body.planName,
+                clientId: clientId,
+                planName: planName || "Manual Transaction",
                 amount: parseFloat(body.amount),
                 type: (body.type || "MANUAL").toUpperCase(),
-                method: body.method,
+                method: body.method || "Cash",
                 status: (body.status || "COMPLETED").toUpperCase(),
                 reference: body.reference || `TXN-${Date.now()}`,
                 expiryDate: body.expiryDate,
+                tenantId: tenantIdValue
             },
         });
 

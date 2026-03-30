@@ -44,7 +44,7 @@ export default function Dashboard() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [selectedRouter, setSelectedRouter] = useState<string>('All');
-    const [analyticsPeriod, setAnalyticsPeriod] = useState<'daily'|'weekly'|'monthly'|'yearly'>('daily');
+    const [analyticsPeriod, setAnalyticsPeriod] = useState<'daily' | 'weekly' | 'monthly' | 'yearly'>('daily');
 
     const fetchData = async () => {
         setLoading(true);
@@ -187,9 +187,9 @@ export default function Dashboard() {
                     </span>
                 </div>
                 <div className="dash-datetime-right">
-                    <button className="dash-refresh-btn" onClick={() => fetchData()}>
-                        <RefreshIcon style={{ fontSize: 16 }} />
-                        Refresh Data
+                    <button className="dash-refresh-btn" disabled={loading} onClick={() => fetchData()} style={{ opacity: loading ? 0.7 : 1 }}>
+                        <RefreshIcon style={{ fontSize: 16 }} className={loading ? 'spin' : ''} />
+                        {loading ? 'Refreshing...' : 'Refresh Data'}
                     </button>
                     <div style={{ position: 'relative' }}>
                         <button className="dash-notif-btn" onClick={() => {
@@ -383,12 +383,12 @@ export default function Dashboard() {
                                     <div className="conn-count-item">
                                         <CheckCircleIcon style={{ fontSize: 22, color: '#4caf50' }} />
                                         <div className="conn-count-num">{stats?.activeSubscribers ?? 0}</div>
-                                        <div className="conn-count-label">Active</div>
+                                        <div className="conn-count-label">Total Active</div>
                                     </div>
                                     <div className="conn-count-item">
                                         <WifiIcon style={{ fontSize: 22, color: '#4caf50' }} />
-                                        <div className="conn-count-num">{stats?.onlineUsers ?? 0}</div>
-                                        <div className="conn-count-label">Online</div>
+                                        <div className="conn-count-num">{stats?.hotspotOnlineUsers ?? 0}</div>
+                                        <div className="conn-count-label">Online (Hotspot)</div>
                                     </div>
                                 </div>
                             </div>
@@ -402,14 +402,9 @@ export default function Dashboard() {
                                 </div>
                                 <div className="conn-counts">
                                     <div className="conn-count-item">
-                                        <CheckCircleIcon style={{ fontSize: 22, color: '#4caf50' }} />
-                                        <div className="conn-count-num">0</div>
-                                        <div className="conn-count-label">Active</div>
-                                    </div>
-                                    <div className="conn-count-item">
                                         <PersonIcon style={{ fontSize: 22, color: '#4caf50' }} />
-                                        <div className="conn-count-num">0</div>
-                                        <div className="conn-count-label">Online</div>
+                                        <div className="conn-count-num">{stats?.pppoeOnlineUsers ?? 0}</div>
+                                        <div className="conn-count-label">Online (PPPoE)</div>
                                     </div>
                                 </div>
                             </div>
@@ -536,7 +531,7 @@ export default function Dashboard() {
                                     <FiberManualRecordIcon style={{ fontSize: 10, color: ['#e53935', '#e91e63', '#9c27b0', '#2196f3', '#4caf50'][i % 5] }} />
                                     <div>
                                         <div className="service-plan-name">{pkg.name}</div>
-                                        <div className="service-plan-type" style={{fontSize: '0.8rem', opacity: 0.8}}>{pkg.type} Plan</div>
+                                        <div className="service-plan-type" style={{ fontSize: '0.8rem', opacity: 0.8 }}>{pkg.type} Plan</div>
                                     </div>
                                 </div>
                                 <div className="service-plan-count">

@@ -1,10 +1,16 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
-import { jsonResponse, errorResponse } from "@/lib/auth";
+import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 
 // GET /api/clients - List all clients
 export async function GET(req: NextRequest) {
     try {
+        const userPayload = getUserFromRequest(req);
+        if (!userPayload) return errorResponse("Unauthorized", 401);
+
+        const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
+        const tenantFilter = isSuperAdmin ? {} : { tenantId: userPayload.tenantId };
+        
         const { searchParams } = new URL(req.url);
         const search = searchParams.get("search") || "";
         const status = searchParams.get("status") || "";
@@ -14,7 +20,7 @@ export async function GET(req: NextRequest) {
         const skip = (page - 1) * limit;
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const where: any = {};
+        const where: any = { ...tenantFilter };
         if (search) {
             where.OR = [
                 { username: { contains: search, mode: "insensitive" } },
@@ -122,8 +128,18 @@ export async function POST(req: NextRequest) {
             return errorResponse("Invalid email format");
         }
 
+        const userPayload = getUserFromRequest(req);
+        if (!userPayload) return errorResponse("Unauthorized", 401);
+
+        const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
+        const tenantFilter = isSuperAdmin ? {} : { tenantId: userPayload.tenantId };
+        
         const existing = await prisma.client.findUnique({ where: { username } });
+        // Optionally should check existing per tenant, but username is globally unique per Prisma schema right now
         if (existing) return errorResponse("Username already exists");
+
+        // Insert client tied to current admin's tenant (or super_admin's choice, optionally)
+        const tenantIdValue = isSuperAdmin ? (body.tenantId || null) : userPayload.tenantId;
 
         const client = await prisma.client.create({
             data: {
@@ -136,6 +152,7 @@ export async function POST(req: NextRequest) {
                 accountType: body.accountType || body.account_type || "PERSONAL",
                 macAddress: body.macAddress || body.mac_address || body.mac,
                 device: body.device,
+                tenantId: tenantIdValue
             },
         });
 

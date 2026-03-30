@@ -16,6 +16,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
             select: {
                 id: true,
                 username: true,
+                fullName: true,
                 email: true,
                 role: true,
                 status: true,
@@ -45,6 +46,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const data: any = {};
         if (body.username) data.username = body.username;
+        if (body.fullName !== undefined) data.fullName = body.fullName;
         if (body.email) data.email = body.email;
         if (body.phone !== undefined) data.phone = body.phone;
         if (body.role) {
@@ -66,7 +68,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         const user = await prisma.user.update({
             where: { id },
             data,
-            select: { id: true, username: true, email: true, role: true, status: true, phone: true },
+            select: { id: true, username: true, fullName: true, email: true, role: true, status: true, phone: true },
         });
 
         return jsonResponse(user);

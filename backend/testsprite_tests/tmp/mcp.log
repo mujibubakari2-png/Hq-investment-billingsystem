@@ -20826,3 +20826,65 @@
 {"timestamp":"2026-03-17T23:57:24.731Z","level":"info","message":"TIME END: connection-105"}
 {"timestamp":"2026-03-17T23:57:24.731Z","level":"info","message":"✅ [105] Connection bc988c7d-0cfb-4594-b1fa-8bea16170c23 fully established and proxying"}
 {"timestamp":"2026-03-17T23:57:24.731Z","level":"info","message":"🔄 [105] Starting data proxy"}
+{"timestamp":"2026-03-30T21:49:12.524Z","level":"debug","message":"Generate code and execute params","context":{"projectName":"kenge-backend","projectPath":"c:\\Users\\hqbak\\kenge\\backend","testIds":[],"serverMode":"production"}}
+{"timestamp":"2026-03-30T21:49:12.557Z","level":"info","message":"Attempting to start server (attempt 1/3)"}
+{"timestamp":"2026-03-30T21:49:13.593Z","level":"info","message":"HTTP proxy started successfully on port 64094"}
+{"timestamp":"2026-03-30T21:49:12.561Z","level":"info","message":"HTTP server started successfully on port 64092"}
+{"timestamp":"2026-03-30T21:49:13.591Z","level":"info","message":"Attempting to start HTTP proxy (attempt 1/3)"}
+{"timestamp":"2026-03-30T21:49:37.008Z","level":"debug","message":"Generate code and execute params","context":{"projectName":"kenge-backend","projectPath":"c:\\Users\\hqbak\\kenge\\backend","testIds":[],"serverMode":"production"}}
+{"timestamp":"2026-03-30T21:49:37.037Z","level":"info","message":"Attempting to start server (attempt 1/3)"}
+{"timestamp":"2026-03-30T21:49:37.059Z","level":"info","message":"Attempting to start HTTP proxy (attempt 1/3)"}
+{"timestamp":"2026-03-30T21:49:37.040Z","level":"info","message":"HTTP server started successfully on port 58885"}
+{"timestamp":"2026-03-30T21:49:37.061Z","level":"info","message":"HTTP proxy started successfully on port 58887"}
+{"timestamp":"2026-03-30T21:52:31.676Z","level":"debug","message":"Generate code and execute params","context":{"projectName":"kenge-backend","projectPath":"c:\\Users\\hqbak\\kenge\\backend","testIds":[],"serverMode":"production"}}
+{"timestamp":"2026-03-30T21:52:31.713Z","level":"error","message":"checkPortListening tcp error: 3001 localhost\nAggregateError"}
+{"timestamp":"2026-03-30T21:52:32.232Z","level":"error","message":"checkPortListening tcp error: 3001 localhost\nAggregateError"}
+{"timestamp":"2026-03-30T21:52:32.742Z","level":"error","message":"checkPortListening tcp error: 3001 localhost\nAggregateError"}
+{"timestamp":"2026-03-30T21:52:33.262Z","level":"error","message":"checkPortListening tcp error: 3001 localhost\nAggregateError"}
+{"timestamp":"2026-03-30T21:52:33.767Z","level":"info","message":"checkPortListening tcp failed, trying http fallback: 3001 localhost"}
+{"timestamp":"2026-03-30T21:52:33.803Z","level":"info","message":"Attempting to start server (attempt 1/3)"}
+{"timestamp":"2026-03-30T21:52:33.811Z","level":"info","message":"HTTP server started successfully on port 49845"}
+{"timestamp":"2026-03-30T21:52:33.802Z","level":"error","message":"checkPortListening failed (tcp + http): 3001 localhost"}
+{"timestamp":"2026-03-30T21:52:34.852Z","level":"error","message":"checkPortListening tcp error: 3001 localhost\nAggregateError"}
+{"timestamp":"2026-03-30T21:52:35.364Z","level":"error","message":"checkPortListening tcp error: 3001 localhost\nAggregateError"}
+{"timestamp":"2026-03-30T21:52:33.801Z","level":"error","message":"checkPortListening http check failed: http://localhost:3001/ TypeError: fetch failed"}
+{"timestamp":"2026-03-30T21:52:35.877Z","level":"error","message":"checkPortListening tcp error: 3001 localhost\nAggregateError"}
+{"timestamp":"2026-03-30T21:52:36.391Z","level":"error","message":"checkPortListening tcp error: 3001 localhost\nAggregateError"}
+{"timestamp":"2026-03-30T21:52:36.901Z","level":"error","message":"checkPortListening tcp error: 3001 localhost\nAggregateError"}
+{"timestamp":"2026-03-30T21:52:37.415Z","level":"error","message":"checkPortListening tcp error: 3001 localhost\nAggregateError"}
+{"timestamp":"2026-03-30T21:52:37.921Z","level":"error","message":"checkPortListening tcp error: 3001 localhost\nAggregateError"}
+{"timestamp":"2026-03-30T21:52:38.425Z","level":"error","message":"checkPortListening tcp error: 3001 localhost\nAggregateError"}
+{"timestamp":"2026-03-30T21:52:38.944Z","level":"error","message":"checkPortListening tcp error: 3001 localhost\nAggregateError"}
+{"timestamp":"2026-03-30T21:52:39.461Z","level":"error","message":"checkPortListening tcp error: 3001 localhost\nAggregateError"}
+{"timestamp":"2026-03-30T21:52:39.977Z","level":"error","message":"checkPortListening tcp error: 3001 localhost\nAggregateError"}
+{"timestamp":"2026-03-30T21:52:40.494Z","level":"error","message":"checkPortListening tcp error: 3001 localhost\nAggregateError"}
+{"timestamp":"2026-03-30T21:52:41.005Z","level":"error","message":"checkPortListening tcp error: 3001 localhost\nAggregateError"}
+{"timestamp":"2026-03-30T21:52:41.526Z","level":"error","message":"checkPortListening tcp error: 3001 localhost\nAggregateError"}
+{"timestamp":"2026-03-30T21:52:42.037Z","level":"error","message":"checkPortListening tcp error: 3001 localhost\nAggregateError"}
+{"timestamp":"2026-03-30T21:52:42.544Z","level":"error","message":"checkPortListening tcp error: 3001 localhost\nAggregateError"}
+{"timestamp":"2026-03-30T21:53:09.906Z","level":"debug","message":"Generate code and execute params","context":{"projectName":"kenge-backend","projectPath":"c:\\Users\\hqbak\\kenge\\backend","testIds":[],"serverMode":"production"}}
+{"timestamp":"2026-03-30T21:53:09.938Z","level":"error","message":"checkPortListening tcp error: 3001 localhost\nAggregateError"}
+{"timestamp":"2026-03-30T21:53:10.455Z","level":"error","message":"checkPortListening tcp error: 3001 localhost\nAggregateError"}
+{"timestamp":"2026-03-30T21:53:10.960Z","level":"error","message":"checkPortListening tcp error: 3001 localhost\nAggregateError"}
+{"timestamp":"2026-03-30T21:53:11.474Z","level":"error","message":"checkPortListening tcp error: 3001 localhost\nAggregateError"}
+{"timestamp":"2026-03-30T21:53:11.975Z","level":"info","message":"checkPortListening tcp failed, trying http fallback: 3001 localhost"}
+{"timestamp":"2026-03-30T21:53:12.011Z","level":"error","message":"checkPortListening tcp error: 3001 localhost\nAggregateError"}
+{"timestamp":"2026-03-30T21:53:11.987Z","level":"info","message":"Attempting to start server (attempt 1/3)"}
+{"timestamp":"2026-03-30T21:53:11.986Z","level":"error","message":"checkPortListening http check failed: http://localhost:3001/ TypeError: fetch failed"}
+{"timestamp":"2026-03-30T21:53:12.526Z","level":"error","message":"checkPortListening tcp error: 3001 localhost\nAggregateError"}
+{"timestamp":"2026-03-30T21:53:11.991Z","level":"info","message":"HTTP server started successfully on port 52276"}
+{"timestamp":"2026-03-30T21:53:11.987Z","level":"error","message":"checkPortListening failed (tcp + http): 3001 localhost"}
+{"timestamp":"2026-03-30T21:53:13.045Z","level":"error","message":"checkPortListening tcp error: 3001 localhost\nAggregateError"}
+{"timestamp":"2026-03-30T21:53:13.561Z","level":"error","message":"checkPortListening tcp error: 3001 localhost\nAggregateError"}
+{"timestamp":"2026-03-30T21:53:14.082Z","level":"error","message":"checkPortListening tcp error: 3001 localhost\nAggregateError"}
+{"timestamp":"2026-03-30T21:53:14.593Z","level":"error","message":"checkPortListening tcp error: 3001 localhost\nAggregateError"}
+{"timestamp":"2026-03-30T21:53:15.107Z","level":"error","message":"checkPortListening tcp error: 3001 localhost\nAggregateError"}
+{"timestamp":"2026-03-30T21:53:15.623Z","level":"error","message":"checkPortListening tcp error: 3001 localhost\nAggregateError"}
+{"timestamp":"2026-03-30T21:53:16.131Z","level":"error","message":"checkPortListening tcp error: 3001 localhost\nAggregateError"}
+{"timestamp":"2026-03-30T21:53:16.642Z","level":"error","message":"checkPortListening tcp error: 3001 localhost\nAggregateError"}
+{"timestamp":"2026-03-30T21:53:17.156Z","level":"error","message":"checkPortListening tcp error: 3001 localhost\nAggregateError"}
+{"timestamp":"2026-03-30T21:53:17.670Z","level":"error","message":"checkPortListening tcp error: 3001 localhost\nAggregateError"}
+{"timestamp":"2026-03-30T21:53:18.178Z","level":"error","message":"checkPortListening tcp error: 3001 localhost\nAggregateError"}
+{"timestamp":"2026-03-30T21:53:18.692Z","level":"error","message":"checkPortListening tcp error: 3001 localhost\nAggregateError"}
+{"timestamp":"2026-03-30T21:53:19.203Z","level":"error","message":"checkPortListening tcp error: 3001 localhost\nAggregateError"}
+{"timestamp":"2026-03-30T21:53:19.709Z","level":"error","message":"checkPortListening tcp error: 3001 localhost\nAggregateError"}
