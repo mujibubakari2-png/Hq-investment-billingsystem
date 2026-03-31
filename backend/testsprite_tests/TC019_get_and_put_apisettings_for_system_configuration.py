@@ -1,69 +1,86 @@
 import requests
+import random
+import string
 
 BASE_URL = "http://localhost:3001"
-ADMIN_EMAIL = "admin@example.com"
-ADMIN_PASSWORD = "admin123"
 TIMEOUT = 30
 
-def test_get_and_put_api_settings_for_system_configuration():
-    # Authenticate as admin to get JWT token
+# Use valid admin credentials for login (should be replaced with valid test credentials)
+ADMIN_EMAIL = "admin@example.com"
+ADMIN_PASSWORD = "admin123"
+
+def get_auth_token():
     login_url = f"{BASE_URL}/api/auth/login"
-    login_payload = {
+    payload = {
         "email": ADMIN_EMAIL,
         "password": ADMIN_PASSWORD
     }
     try:
-        login_response = requests.post(login_url, json=login_payload, timeout=TIMEOUT)
-        assert login_response.status_code == 200, f"Login failed with status {login_response.status_code}"
-        login_json = login_response.json()
-        assert "token" in login_json, "JWT token missing in login response"
-        token = login_json["token"]
+        resp = requests.post(login_url, json=payload, timeout=TIMEOUT)
+        resp.raise_for_status()
+        data = resp.json()
+        token = data.get("token") or data.get("accessToken")
+        assert token, "Token not found in login response"
+        return token
     except Exception as e:
-        raise AssertionError(f"Login request failed: {e}")
+        raise RuntimeError(f"Failed to authenticate: {e}")
 
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json"
-    }
+def test_get_and_put_apisettings():
+    token = get_auth_token()
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
 
     settings_url = f"{BASE_URL}/api/settings"
 
+    # Step 1: GET current system configurations
     try:
-        # Step 1: GET current settings
-        get_response = requests.get(settings_url, headers=headers, timeout=TIMEOUT)
-        assert get_response.status_code == 200, f"GET /api/settings failed with status {get_response.status_code}"
-        settings = get_response.json()
-        assert isinstance(settings, dict), "Settings response is not a JSON object"
+        get_resp = requests.get(settings_url, headers=headers, timeout=TIMEOUT)
+        get_resp.raise_for_status()
+        settings_data = get_resp.json()
+    except Exception as e:
+        raise AssertionError(f"GET /api/settings failed: {e}")
 
-        # Extract original companyName if exists, else set fallback value
-        original_company_name = settings.get("companyName", None)
-        new_company_name = "Test Company Inc."
+    assert isinstance(settings_data, dict), "Settings response should be a JSON object"
 
-        # Step 2: PUT updated setting (update company name)
-        put_payload = dict(settings)  # copy current settings
-        put_payload["companyName"] = new_company_name
+    # Pick a key to update "companyName" or similar. If not present, just add one.
+    # We'll assume "companyName" is a typical setting key.
+    original_company_name = settings_data.get("companyName", "")
+    new_company_name = (
+        original_company_name + "_" + "".join(random.choices(string.ascii_letters + string.digits, k=6))
+        if original_company_name else "TestCompany_" + "".join(random.choices(string.ascii_letters + string.digits, k=6))
+    )
 
-        put_response = requests.put(settings_url, headers=headers, json=put_payload, timeout=TIMEOUT)
-        assert put_response.status_code == 200, f"PUT /api/settings failed with status {put_response.status_code}"
-        updated_settings = put_response.json()
-        assert isinstance(updated_settings, dict), "PUT response is not a JSON object"
-        assert updated_settings.get("companyName") == new_company_name, "Company name was not updated correctly"
+    # Step 2: PUT updated settings to update the company name
+    updated_settings = dict(settings_data)  # copy current settings
+    updated_settings["companyName"] = new_company_name
 
-        # Step 3: GET again to verify update persisted
-        verify_get_response = requests.get(settings_url, headers=headers, timeout=TIMEOUT)
-        assert verify_get_response.status_code == 200, f"Second GET /api/settings failed with status {verify_get_response.status_code}"
-        verify_settings = verify_get_response.json()
-        assert verify_settings.get("companyName") == new_company_name, "Company name update not persisted"
+    try:
+        put_resp = requests.put(settings_url, headers=headers, json=updated_settings, timeout=TIMEOUT)
+        put_resp.raise_for_status()
+        updated_resp_data = put_resp.json()
+    except Exception as e:
+        raise AssertionError(f"PUT /api/settings failed: {e}")
 
-    finally:
-        # Cleanup: revert companyName to original if it existed and was changed
-        if original_company_name is not None and original_company_name != new_company_name:
-            revert_payload = dict(settings)
-            revert_payload["companyName"] = original_company_name
-            try:
-                revert_response = requests.put(settings_url, headers=headers, json=revert_payload, timeout=TIMEOUT)
-                assert revert_response.status_code == 200, f"Cleanup PUT /api/settings failed with status {revert_response.status_code}"
-            except Exception as e:
-                print(f"Warning: Cleanup revert companyName failed: {e}")
+    assert isinstance(updated_resp_data, dict), "PUT response should be a JSON object"
+    assert updated_resp_data.get("companyName") == new_company_name, "companyName was not updated correctly"
 
-test_get_and_put_api_settings_for_system_configuration()
+    # Step 3: Verify by GET again that the change persisted
+    try:
+        verify_resp = requests.get(settings_url, headers=headers, timeout=TIMEOUT)
+        verify_resp.raise_for_status()
+        verify_data = verify_resp.json()
+    except Exception as e:
+        raise AssertionError(f"Verification GET /api/settings failed: {e}")
+
+    assert verify_data.get("companyName") == new_company_name, "Updated companyName not persisted after PUT"
+
+    # Cleanup: revert the change back to original value to avoid side effects
+    if original_company_name != new_company_name:
+        reverted_settings = dict(verify_data)
+        reverted_settings["companyName"] = original_company_name
+        try:
+            revert_resp = requests.put(settings_url, headers=headers, json=reverted_settings, timeout=TIMEOUT)
+            revert_resp.raise_for_status()
+        except Exception as e:
+            print(f"Warning: Failed to revert companyName after test: {e}")
+
+test_get_and_put_apisettings()

@@ -1,77 +1,85 @@
 import requests
+import random
+import string
 
 BASE_URL = "http://localhost:3001"
-LOGIN_ENDPOINT = "/api/auth/login"
-PACKAGES_ENDPOINT = "/api/packages"
-ADMIN_EMAIL = "admin@example.com"
-ADMIN_PASSWORD = "admin123"
+API_PACKAGES_ENDPOINT = f"{BASE_URL}/api/packages"
 TIMEOUT = 30
 
-def test_post_apipackages_create_new_package():
-    # Step 1: Authenticate as admin to get JWT token
-    login_payload = {
-        "email": ADMIN_EMAIL,
-        "password": ADMIN_PASSWORD
-    }
+# This test assumes that authentication is required, so we first register and login a user to get a valid JWT token.
+def test_post_api_packages_create_new_package():
+    email = "testuser_tc009@example.com"
+    password = "Password123!"
+    token = None
+    headers = {}
+
     try:
-        login_resp = requests.post(
-            BASE_URL + LOGIN_ENDPOINT,
-            json=login_payload,
-            timeout=TIMEOUT
-        )
-        assert login_resp.status_code == 200, f"Login failed with status {login_resp.status_code}: {login_resp.text}"
-        login_data = login_resp.json()
-        assert "token" in login_data, "Login response missing 'token'"
-        token = login_data["token"]
-    except Exception as e:
-        raise AssertionError(f"Admin login request failed: {e}")
+        # First try to register
+        register_payload = {
+            "name": "Test User TC009",
+            "email": email,
+            "password": password
+        }
+        register_resp = requests.post(f"{BASE_URL}/api/auth/register", json=register_payload, timeout=TIMEOUT)
+        if register_resp.status_code == 201:
+            register_data = register_resp.json()
+            assert "token" in register_data, "JWT token missing in registration response"
+            token = register_data["token"]
+        elif register_resp.status_code == 400:
+            # Registration failed, probably user exists, then try to login
+            login_payload = {
+                "email": email,
+                "password": password
+            }
+            login_resp = requests.post(f"{BASE_URL}/api/auth/login", json=login_payload, timeout=TIMEOUT)
+            assert login_resp.status_code == 200, f"Login failed with status {login_resp.status_code}"
+            login_data = login_resp.json()
+            assert "token" in login_data, "JWT token missing in login response"
+            token = login_data["token"]
+        else:
+            assert False, f"Registration failed with status {register_resp.status_code}"
 
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json"
-    }
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json"
+        }
 
-    # Step 2: Prepare new package payload with valid parameters
-    # Using required fields from PRD: name, price, duration
-    package_payload = {
-        "name": "Test Package TC009",
-        "price": 19.99,
-        "duration": 30
-    }
+        # Create a new package with required valid parameters: name, price, duration
+        package_payload = {
+            "type": "Hotspot",
+            "name": "Test Package TC009",
+            "price": 49.99,
+            "duration": 30,
+            "routerId": None,     # Assuming routerId is optional or can be None
+            "uploadSpeed": 1024,  # example numeric bandwidth
+            "downloadSpeed": 2048,
+            "hotspotSettings": {}
+        }
 
-    # Step 3: Create new package
-    try:
-        create_resp = requests.post(
-            BASE_URL + PACKAGES_ENDPOINT,
-            headers=headers,
-            json=package_payload,
-            timeout=TIMEOUT,
-        )
-    except Exception as e:
-        raise AssertionError(f"Package creation request failed: {e}")
+        # Clean routerId if backend rejects None
+        if package_payload["routerId"] is None:
+            package_payload.pop("routerId")
 
-    # Step 4: Validate response
-    assert create_resp.status_code == 201, f"Expected 201 Created, got {create_resp.status_code}: {create_resp.text}"
-    create_data = create_resp.json()
-    # Validate returned package fields
-    assert isinstance(create_data, dict), "Response JSON is not an object"
-    assert create_data.get("name") == package_payload["name"], "Package name mismatch"
-    # Price may be int or float depending on backend parsing
-    assert abs(float(create_data.get("price", 0)) - package_payload["price"]) < 0.001, "Package price mismatch"
-    assert create_data.get("duration") == package_payload["duration"], "Package duration mismatch"
-    assert "id" in create_data, "Created package missing 'id'"
+        post_resp = requests.post(API_PACKAGES_ENDPOINT, headers=headers, json=package_payload, timeout=TIMEOUT)
+        assert post_resp.status_code == 201, f"Expected 201 Created, got {post_resp.status_code}"
+        
+        post_resp_json = post_resp.json()
+        # Validate response contains keys indicating the package was created
+        assert "id" in post_resp_json, "Created package response missing 'id'"
+        assert post_resp_json.get("name") == package_payload["name"], "Response 'name' doesn't match request"
+        assert float(post_resp_json.get("price", 0)) == package_payload["price"], "Response 'price' doesn't match request"
+        assert int(post_resp_json.get("duration", 0)) == package_payload["duration"], "Response 'duration' doesn't match request"
 
-    # Step 5: Cleanup - delete created package to keep environment clean
-    package_id = create_data["id"]
-    delete_endpoint = f"{PACKAGES_ENDPOINT}/{package_id}"
-    try:
-        del_resp = requests.delete(
-            BASE_URL + delete_endpoint,
-            headers=headers,
-            timeout=TIMEOUT
-        )
-        assert del_resp.status_code in (200, 204), f"Failed to delete test package with status {del_resp.status_code}: {del_resp.text}"
-    except Exception as e:
-        raise AssertionError(f"Package deletion request failed: {e}")
+    finally:
+        # Cleanup: delete the created package if present
+        try:
+            if 'post_resp_json' in locals() and "id" in post_resp_json:
+                package_id = post_resp_json["id"]
+                del_resp = requests.delete(f"{API_PACKAGES_ENDPOINT}/{package_id}", headers=headers, timeout=TIMEOUT)
+                # Accept 200 OK or 204 No Content for delete
+                assert del_resp.status_code in (200, 204), f"Failed to delete package ID {package_id}, status {del_resp.status_code}"
+        except Exception:
+            pass
 
-test_post_apipackages_create_new_package()
+
+test_post_api_packages_create_new_package()

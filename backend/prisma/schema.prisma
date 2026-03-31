@@ -135,42 +135,42 @@ model Transaction {
 }
 
 model Router {
-  id              String           @id @default(cuid())
-  name            String           @unique
-  host            String
-  username        String?          @default("admin")
-  password        String?
-  port            Int?             @default(8728)
-  type            String           @default("MikroTik")
-  status          RouterStatus     @default(OFFLINE)
-  activeUsers     Int              @default(0)
-  cpuLoad         Float            @default(0)
-  memoryUsed      Float            @default(0)
-  uptime          String?
-  lastSeen        String?
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-  tenantId        String?
-  apiPort         Int?             @default(8728)
-  description     String?
-  vpnMode         String?          @default("hybrid")
-  wgPrivateKey    String?
-  wgPublicKey     String?
-  wgPeerPublicKey String?
-  wgPresharedKey  String?
-  wgTunnelIp      String?          @default("10.200.0.1")
+  id               String           @id @default(cuid())
+  name             String           @unique
+  host             String
+  username         String?          @default("admin")
+  password         String?
+  port             Int?             @default(8728)
+  type             String           @default("MikroTik")
+  status           RouterStatus     @default(OFFLINE)
+  activeUsers      Int              @default(0)
+  cpuLoad          Float            @default(0)
+  memoryUsed       Float            @default(0)
+  uptime           String?
+  lastSeen         String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  tenantId         String?
+  apiPort          Int?             @default(8728)
+  description      String?
+  vpnMode          String?          @default("hybrid")
+  wgConfiguredAt   DateTime?
+  wgEnabled        Boolean          @default(false)
+  wgListenPort     Int?             @default(13231)
+  wgPeerPublicKey  String?
+  wgPresharedKey   String?
+  wgPrivateKey     String?
+  wgPublicKey      String?
   wgServerEndpoint String?
-  wgListenPort    Int?             @default(13231)
-  wgEnabled       Boolean          @default(false)
-  wgConfiguredAt  DateTime?
-  equipments      Equipment[]
-  hotspotSettings HotspotSettings?
-  packages        Package[]
-  logs            RouterLog[]
-  tenant          Tenant?          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  subscriptions   Subscription[]
-  vouchers        Voucher[]
-  vpnUsers        VpnUser[]
+  wgTunnelIp       String?          @default("10.200.0.1")
+  equipments       Equipment[]
+  hotspotSettings  HotspotSettings?
+  packages         Package[]
+  logs             RouterLog[]
+  tenant           Tenant?          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  subscriptions    Subscription[]
+  vouchers         Voucher[]
+  vpnUsers         VpnUser[]
 
   @@map("routers")
 }

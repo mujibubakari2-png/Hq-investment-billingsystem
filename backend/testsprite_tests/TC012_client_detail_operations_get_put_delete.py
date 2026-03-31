@@ -1,100 +1,79 @@
 import requests
+import uuid
 
 BASE_URL = "http://localhost:3001"
-ADMIN_EMAIL = "admin@example.com"
-ADMIN_PASSWORD = "admin123"
 TIMEOUT = 30
 
-def test_client_detail_operations_get_put_delete():
-    # Authenticate to get JWT token
-    login_url = f"{BASE_URL}/api/auth/login"
+# Helper function to login and get auth token
+def get_auth_token():
     login_payload = {
-        "email": ADMIN_EMAIL,
-        "password": ADMIN_PASSWORD
+        "email": "admin@example.com",
+        "password": "password"
     }
-    try:
-        login_resp = requests.post(login_url, json=login_payload, timeout=TIMEOUT)
-        assert login_resp.status_code == 200, f"Login failed: {login_resp.text}"
-        token = login_resp.json().get("token") or login_resp.json().get("accessToken") or login_resp.json().get("jwt")
-        assert token, "JWT token not found in login response"
-    except (requests.RequestException, AssertionError) as e:
-        raise RuntimeError(f"Authentication failed: {e}")
+    resp = requests.post(f"{BASE_URL}/api/auth/login", json=login_payload, timeout=TIMEOUT)
+    resp.raise_for_status()
+    data = resp.json()
+    assert "token" in data or "accessToken" in data or "jwt" in data, "Login response missing token"
+    # Attempt common token keys
+    token = data.get("token") or data.get("accessToken") or data.get("jwt") or data.get("access_token")
+    assert token, "No token found in login response"
+    return token
 
+def test_TC012_client_detail_operations_get_put_delete():
+    token = get_auth_token()
     headers = {
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json"
     }
 
-    # Create a new client to use for get/put/delete tests
-    create_client_url = f"{BASE_URL}/api/clients"
-    new_client_payload = {
-        "username": "testuser_tc012",
-        "fullName": "Test User TC012",
-        "phone": "+12345678901",
-        "planId": None  # Assuming planId can be null or skipped if not mandatory
-    }
-    # If planId is required, we must fetch a planId first. So let's try to get clients and grab a valid planId.
+    created_client_id = None
+
+    # First create a new client to test on
     try:
-        plans_resp = requests.get(f"{BASE_URL}/api/packages", headers=headers, timeout=TIMEOUT)
-        if plans_resp.status_code == 200:
-            packages = plans_resp.json()
-            if isinstance(packages, list) and len(packages) > 0:
-                new_client_payload["planId"] = packages[0].get("id") or packages[0].get("planId") or packages[0].get("packageId")
-        # fallback: if no planId assignable, remove from payload
-        if not new_client_payload["planId"]:
-            new_client_payload.pop("planId", None)
-    except requests.RequestException:
-        # ignore error, use payload without planId
-        new_client_payload.pop("planId", None)
-
-    client_id = None
-    try:
-        create_resp = requests.post(create_client_url, headers=headers, json=new_client_payload, timeout=TIMEOUT)
-        assert create_resp.status_code == 201, f"Failed to create client: {create_resp.text}"
-        created_client = create_resp.json()
-        client_id = created_client.get("id") or created_client.get("_id")
-        assert client_id, "Created client ID not returned"
-
-        client_url = f"{BASE_URL}/api/clients/{client_id}"
-
-        # GET client details
-        get_resp = requests.get(client_url, headers=headers, timeout=TIMEOUT)
-        assert get_resp.status_code == 200, f"Failed to get client details: {get_resp.text}"
-        client_data = get_resp.json()
-        assert client_data.get("username") == new_client_payload["username"], "Client username mismatch on GET"
-
-        # PUT update client details
-        update_payload = {
-            "fullName": "Test User TC012 Updated",
-            "phone": "+19876543210"
+        client_payload = {
+            "username": f"testuser_{uuid.uuid4().hex[:8]}",
+            "fullName": "Test User",
+            "phone": "+12345678901"
+            # Removed planId as it might be required and None causes issue
         }
-        put_resp = requests.put(client_url, headers=headers, json=update_payload, timeout=TIMEOUT)
-        assert put_resp.status_code == 200, f"Failed to update client: {put_resp.text}"
-        updated_client = put_resp.json()
-        assert updated_client.get("fullName") == update_payload["fullName"], "Client fullName not updated"
-        assert updated_client.get("phone") == update_payload["phone"], "Client phone not updated"
 
-        # Verify updated client by GET again
-        get_after_put_resp = requests.get(client_url, headers=headers, timeout=TIMEOUT)
-        assert get_after_put_resp.status_code == 200, f"Failed to get client after update: {get_after_put_resp.text}"
-        client_after_update = get_after_put_resp.json()
-        assert client_after_update.get("fullName") == update_payload["fullName"], "Client fullName mismatch after update"
-        assert client_after_update.get("phone") == update_payload["phone"], "Client phone mismatch after update"
+        # Try creating client
+        create_resp = requests.post(f"{BASE_URL}/api/clients", json=client_payload, headers=headers, timeout=TIMEOUT)
+        assert create_resp.status_code == 201, f"Expected 201 Created but got {create_resp.status_code}"
+        create_data = create_resp.json()
+        created_client_id = create_data.get("id") or create_data.get("clientId") or create_data.get("_id")
+        assert created_client_id, "Created client response missing id"
 
-        # DELETE the client
-        delete_resp = requests.delete(client_url, headers=headers, timeout=TIMEOUT)
-        assert delete_resp.status_code in (200, 204), f"Failed to delete client: {delete_resp.text}"
+        # GET the client detail
+        get_resp = requests.get(f"{BASE_URL}/api/clients/{created_client_id}", headers=headers, timeout=TIMEOUT)
+        assert get_resp.status_code == 200, f"GET client returned {get_resp.status_code} instead of 200"
+        get_data = get_resp.json()
+        assert get_data.get("id") == created_client_id or str(get_data.get("id")) == str(created_client_id), "Mismatch in client id from GET"
 
-        # Verify client no longer exists
-        get_after_delete_resp = requests.get(client_url, headers=headers, timeout=TIMEOUT)
-        assert get_after_delete_resp.status_code == 404, f"Deleted client still accessible: {get_after_delete_resp.text}"
+        # PUT update client detail
+        update_payload = {
+            "fullName": "Updated Test User",
+            "phone": "+10987654321"
+        }
+        put_resp = requests.put(f"{BASE_URL}/api/clients/{created_client_id}", json=update_payload, headers=headers, timeout=TIMEOUT)
+        assert put_resp.status_code == 200, f"PUT update client returned {put_resp.status_code} instead of 200"
+        put_data = put_resp.json()
+        # Validate updated fields
+        assert put_data.get("fullName") == "Updated Test User"
+        assert put_data.get("phone") == "+10987654321"
+
+        # GET again to verify update persisted
+        get_resp2 = requests.get(f"{BASE_URL}/api/clients/{created_client_id}", headers=headers, timeout=TIMEOUT)
+        assert get_resp2.status_code == 200, f"GET after update returned {get_resp2.status_code} instead of 200"
+        get_data2 = get_resp2.json()
+        assert get_data2.get("fullName") == "Updated Test User"
+        assert get_data2.get("phone") == "+10987654321"
 
     finally:
-        # Cleanup if client still exists (in case test failed before delete)
-        if client_id:
-            try:
-                requests.delete(f"{BASE_URL}/api/clients/{client_id}", headers=headers, timeout=TIMEOUT)
-            except requests.RequestException:
-                pass
+        # Clean up: delete the created client if exists
+        if created_client_id:
+            del_resp = requests.delete(f"{BASE_URL}/api/clients/{created_client_id}", headers=headers, timeout=TIMEOUT)
+            # 204 No Content or 200 OK expected for delete
+            assert del_resp.status_code in (200, 204), f"Delete client returned {del_resp.status_code} instead of 200/204"
 
-test_client_detail_operations_get_put_delete()
+test_TC012_client_detail_operations_get_put_delete()

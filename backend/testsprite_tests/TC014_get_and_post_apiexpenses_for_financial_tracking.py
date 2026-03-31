@@ -1,70 +1,52 @@
 import requests
 
 BASE_URL = "http://localhost:3001"
-ADMIN_EMAIL = "admin@example.com"
-ADMIN_PASSWORD = "admin123"
 TIMEOUT = 30
 
-
 def test_get_and_post_api_expenses():
-    # Authenticate and get JWT token
-    login_url = f"{BASE_URL}/api/auth/login"
-    login_payload = {"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD}
+    # Step 1: GET /api/expenses to list all expenses
     try:
-        login_resp = requests.post(login_url, json=login_payload, timeout=TIMEOUT)
-        login_resp.raise_for_status()
-    except requests.RequestException as e:
-        assert False, f"Login request failed: {e}"
-    login_json = login_resp.json()
-    assert "token" in login_json, "Login response missing token"
-    token = login_json["token"]
-
-    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-
-    expenses_url = f"{BASE_URL}/api/expenses"
-
-    # GET /api/expenses - List all expenses
-    try:
-        get_resp = requests.get(expenses_url, headers=headers, timeout=TIMEOUT)
-        get_resp.raise_for_status()
+        get_response = requests.get(f"{BASE_URL}/api/expenses", timeout=TIMEOUT)
+        assert get_response.status_code == 200, f"Expected 200 OK, got {get_response.status_code}"
+        expenses_list = get_response.json()
+        assert isinstance(expenses_list, list), "Expected response to be a list"
     except requests.RequestException as e:
         assert False, f"GET /api/expenses request failed: {e}"
-    assert get_resp.status_code == 200, f"Expected 200 OK, got {get_resp.status_code}"
-    expenses_list = get_resp.json()
-    assert isinstance(expenses_list, list), "GET /api/expenses response is not a list"
+    except ValueError:
+        assert False, "GET /api/expenses response is not valid JSON"
 
-    new_expense = {
-        "category": "office supplies",
+    # Step 2: POST /api/expenses to create a new expense entry
+    new_expense_payload = {
+        "category": "Office Supplies",
         "amount": 123.45,
-        "description": "Purchased printer ink cartridges"
+        "description": "Printer ink cartridges"
     }
 
-    created_expense_id = None
-
-    # POST /api/expenses - Create a new expense
     try:
-        post_resp = requests.post(expenses_url, headers=headers, json=new_expense, timeout=TIMEOUT)
-        post_resp.raise_for_status()
+        post_response = requests.post(
+            f"{BASE_URL}/api/expenses",
+            json=new_expense_payload,
+            timeout=TIMEOUT
+        )
+        assert post_response.status_code == 201, f"Expected 201 Created, got {post_response.status_code}"
+        created_expense = post_response.json()
+        assert "id" in created_expense, "Response JSON should contain 'id'"
+        assert created_expense.get("category") == new_expense_payload["category"], "Category mismatch"
+        assert abs(created_expense.get("amount", 0) - new_expense_payload["amount"]) < 0.0001, "Amount mismatch"
+        assert created_expense.get("description") == new_expense_payload["description"], "Description mismatch"
     except requests.RequestException as e:
         assert False, f"POST /api/expenses request failed: {e}"
-
-    assert post_resp.status_code == 201, f"Expected 201 Created on expense creation, got {post_resp.status_code}"
-    expense_created = post_resp.json()
-    assert "id" in expense_created, "Created expense response missing 'id'"
-    assert expense_created.get("category") == new_expense["category"], "Category mismatch"
-    assert abs(expense_created.get("amount", 0) - new_expense["amount"]) < 0.0001, "Amount mismatch"
-    assert expense_created.get("description") == new_expense["description"], "Description mismatch"
-
-    created_expense_id = expense_created["id"]
-
-    # Cleanup: delete the created expense if DELETE /api/expenses/[id] supported
-    if created_expense_id:
-        del_url = f"{expenses_url}/{created_expense_id}"
+    except ValueError:
+        assert False, "POST /api/expenses response is not valid JSON"
+    finally:
+        # Cleanup: Delete the created expense to not pollute test data, if created
         try:
-            del_resp = requests.delete(del_url, headers=headers, timeout=TIMEOUT)
-            # Not asserting on delete status, as endpoint support unknown
+            if 'created_expense' in locals() and "id" in created_expense:
+                expense_id = created_expense["id"]
+                delete_response = requests.delete(f"{BASE_URL}/api/expenses/{expense_id}", timeout=TIMEOUT)
+                # Expect 200 OK or 204 No Content on successful delete
+                assert delete_response.status_code in (200, 204), f"Failed to delete expense with id {expense_id}"
         except requests.RequestException:
-            pass
-
+            pass  # If deletion fails, ignore to not hide main test results
 
 test_get_and_post_api_expenses()

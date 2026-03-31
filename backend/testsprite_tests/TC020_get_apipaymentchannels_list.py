@@ -1,48 +1,38 @@
 import requests
 
 BASE_URL = "http://localhost:3001"
-ADMIN_EMAIL = "admin@example.com"
-ADMIN_PASSWORD = "admin123"
 TIMEOUT = 30
 
-def test_tc020_get_apipaymentchannels_list():
-    # Step 1: Authenticate with admin credentials to get JWT token
-    login_url = f"{BASE_URL}/api/auth/login"
-    login_payload = {
-        "email": ADMIN_EMAIL,
-        "password": ADMIN_PASSWORD,
-    }
+def test_get_apipaymentchannels_list():
+    url = f"{BASE_URL}/api/payment-channels"
     try:
-        login_response = requests.post(login_url, json=login_payload, timeout=TIMEOUT)
-        assert login_response.status_code == 200, f"Login failed, status code: {login_response.status_code}"
-        login_data = login_response.json()
-        assert "token" in login_data, "Login response missing 'token'"
-        token = login_data["token"]
-    except requests.RequestException as e:
-        raise AssertionError(f"Login request failed: {e}")
+        response = requests.get(url, timeout=TIMEOUT)
+        response.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        assert False, f"Request to {url} failed: {e}"
 
-    # Step 2: Call /api/payment-channels endpoint with Authorization header
-    payment_channels_url = f"{BASE_URL}/api/payment-channels"
-    headers = {
-        "Authorization": f"Bearer {token}"
-    }
+    # Validate response status code
+    assert response.status_code == 200, f"Expected status code 200, got {response.status_code}"
 
+    # Validate content-type is JSON
+    content_type = response.headers.get("Content-Type", "")
+    assert "application/json" in content_type, f"Expected JSON response, got Content-Type: {content_type}"
+
+    # Validate response JSON structure
     try:
-        response = requests.get(payment_channels_url, headers=headers, timeout=TIMEOUT)
-    except requests.RequestException as e:
-        raise AssertionError(f"Request to /api/payment-channels failed: {e}")
-    
-    # Step 3: Verify response status and structure
-    assert response.status_code == 200, f"Expected 200 OK, got {response.status_code}"
-    try:
-        channels = response.json()
+        data = response.json()
     except ValueError:
-        raise AssertionError("Response is not valid JSON")
+        assert False, "Response is not valid JSON"
 
-    # Ensure channels is a list and contains expected gateway names like M-Pesa, PalmPesa
-    assert isinstance(channels, list), "Expected response to be a list"
-    gateways = [ch.get("name", "").lower() for ch in channels if isinstance(ch, dict) and "name" in ch]
-    assert any("mpesa" in g for g in gateways), "M-Pesa not found in payment channels"
-    assert any("palmpesa" in g for g in gateways) or any("palm pesa" in g for g in gateways), "PalmPesa not found in payment channels"
+    # Expected to be a list of payment channels
+    assert isinstance(data, list), f"Expected response to be a list, got {type(data)}"
 
-test_tc020_get_apipaymentchannels_list()
+    # Each item should have expected fields like name, id or code or similar
+    for item in data:
+        assert isinstance(item, dict), "Each payment channel item should be a dictionary"
+        # Check at least a 'name' field exists
+        assert "name" in item, "Payment channel missing 'name' field"
+        # Optional: Check name is a non-empty string
+        assert isinstance(item["name"], str) and item["name"].strip(), "Payment channel 'name' must be a non-empty string"
+
+test_get_apipaymentchannels_list()

@@ -139,8 +139,30 @@ export default function Dashboard() {
         );
     }
 
+    const isSuperAdmin = user?.role === 'SUPER_ADMIN';
+
     return (
         <div className="dashboard-new">
+            {/* Super Admin Quick Actions */}
+            {isSuperAdmin && (
+                <div className="card" style={{ marginBottom: 24, background: 'var(--teal-light)', border: '1px solid var(--teal)' }}>
+                    <div style={{ padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                            <div className="page-header-icon" style={{ background: 'var(--teal)', color: '#fff', width: 40, height: 40 }}>
+                                <PersonIcon />
+                            </div>
+                            <div>
+                                <h3 style={{ margin: 0, fontSize: '1.05rem', color: 'var(--teal)', fontWeight: 700 }}>New Tenants Pending Confirmation</h3>
+                                <p style={{ margin: '4px 0 0', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>You have new company registrations that need to be reviewed and confirmed.</p>
+                            </div>
+                        </div>
+                        <button className="btn btn-primary" onClick={() => navigate('/admin-tenants')}>
+                            Confirm New Tenants
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* ===== DARK WELCOME HEADER ===== */}
             <div className="dash-welcome-bar">
                 <div className="dash-welcome-left">

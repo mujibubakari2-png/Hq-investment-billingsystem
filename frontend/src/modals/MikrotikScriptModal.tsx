@@ -28,7 +28,7 @@ export default function MikrotikScriptModal({ router, onClose }: MikrotikScriptM
 
 # ── 2. Hotspot Server Setup ───────────────────────────────────
 /ip hotspot profile
-add name="hsprof-${router.name}" hotspot-address=10.10.0.1 dns-name="${router.name.toLowerCase()}.hotspot" \\
+add name="hsprof-${router.name}" hotspot-address=10.10.0.1 dns-name="${router.name.toLowerCase().replace(/\\s+/g, '-')}.hotspot" \\
     html-directory=hotspot login-by=http-chap,http-pap,cookie,mac-cookie \\
     http-cookie-lifetime=3d
 
@@ -58,6 +58,8 @@ add name="dhcp-${router.name}" interface=ether2 address-pool="hs-pool-${router.n
 /ip firewall filter
 add chain=input protocol=tcp dst-port=8291 action=accept comment="Allow Winbox"
 add chain=input protocol=tcp dst-port=80,443 action=accept comment="Allow Web"
+add chain=input protocol=udp dst-port=53,67 action=accept comment="Allow DNS & DHCP"
+add chain=input protocol=icmp action=accept comment="Allow Ping"
 add chain=input connection-state=established,related action=accept
 add chain=input action=drop comment="Drop all other input"
 
@@ -66,12 +68,9 @@ add chain=input action=drop comment="Drop all other input"
 add service=hotspot address=127.0.0.1 secret=kenge-radius-secret \\
     authentication-port=1812 accounting-port=1813
 
-/ip hotspot profile set hsprof-${router.name} use-radius=yes radius-accounting=yes
+/ip hotspot profile set "hsprof-${router.name}" use-radius=yes radius-accounting=yes
 
 # ── 8. Walled Garden (Allow billing portal) ──────────────────
-/ip hotspot walled-garden ip
-add dst-address=0.0.0.0/0 action=accept comment="Allow Kenge Portal"
-
 /ip hotspot walled-garden
 add dst-host="*.hqinvestment.co.tz" action=allow comment="Kenge Billing Portal"
 

@@ -6,15 +6,20 @@
   "loginUser": "admin",
   "loginPassword": "admin123",
   "executionArgs": {
-    "projectName": "kenge-backend",
+    "projectName": "backend",
     "projectPath": "c:\\Users\\hqbak\\kenge\\backend",
-    "testIds": [],
-    "additionalInstruction": "Test all existing and new backend endpoints. Ensure proper authorization handling. Use admin@example.com / admin123 as the admin credentials.",
-    "serverMode": "production",
+    "testIds": [
+      "TC001",
+      "TC002",
+      "TC006",
+      "TC007"
+    ],
+    "additionalInstruction": "Verify fixes for TC001, TC002, TC006, and TC007. Use the correct admin credentials and automation key.",
+    "serverMode": "development",
     "envs": {
-      "API_KEY": ""
+      "API_KEY": "sk-user-a53UTC5CweLj3DEaL8Y6cx-lhuv7DDqxwJM23Ju5oCDaSPStVTy5t8bNnbE3FONVT-EEYLE66IO5Q496TlHs3JhRNyWD26SKOGKKQm-VGi8tCzPzp23wjdy3Cn6ESOOC__U"
     }
   },
-  "serverPort": 52276,
-  "proxy": "http://083d5064-9b06-47d3-bed4-2367aac56389:p2ozvFo0zI4zeebLIkQMhHVdgYobetTu@tun.testsprite.com:8080"
+  "serverPort": 63492,
+  "proxy": "http://d8a46bee-3cbc-4e73-8e9b-f9cc489bb75c:dTqyLAhO80X2CtQV9cKuQkvwmHcFapzy@tun.testsprite.com:8080"
 }

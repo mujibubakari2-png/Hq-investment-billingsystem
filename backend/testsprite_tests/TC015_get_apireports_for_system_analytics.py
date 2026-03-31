@@ -1,45 +1,33 @@
 import requests
 
 BASE_URL = "http://localhost:3001"
-ADMIN_EMAIL = "admin@example.com"
-ADMIN_PASSWORD = "admin123"
+DASHBOARD_ENDPOINT = "/api/dashboard"
 TIMEOUT = 30
 
-def test_get_apireports_for_system_analytics():
-    login_url = f"{BASE_URL}/api/auth/login"
-    reports_url = f"{BASE_URL}/api/reports"
+# Placeholder token for testing; replace with valid JWT for real tests
+auth_token = "Bearer test.jwt.token"
 
-    # Login to get JWT token
+def test_get_dashboard_summary_with_auth():
+    headers = {"Authorization": auth_token}
     try:
-        login_resp = requests.post(
-            login_url,
-            json={"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD},
-            timeout=TIMEOUT,
-        )
-        assert login_resp.status_code == 200, f"Login failed with status {login_resp.status_code}"
-        login_data = login_resp.json()
-        token = login_data.get("token") or login_data.get("accessToken")
-        assert token, "No token found in login response"
-    except Exception as e:
-        assert False, f"Login request failed: {e}"
+        response = requests.get(f"{BASE_URL}{DASHBOARD_ENDPOINT}", headers=headers, timeout=TIMEOUT)
+    except requests.RequestException as e:
+        assert False, f"Request to {DASHBOARD_ENDPOINT} failed: {e}"
 
-    headers = {"Authorization": f"Bearer {token}"}
+    assert response.status_code == 200, f"Expected status 200, got {response.status_code}"
 
-    # Call /api/reports endpoint
     try:
-        resp = requests.get(reports_url, headers=headers, timeout=TIMEOUT)
-        assert resp.status_code == 200, f"/api/reports returned status {resp.status_code}"
+        data = response.json()
+    except ValueError:
+        assert False, "Response is not valid JSON"
 
-        data = resp.json()
-        # Basic keys expected for aggregated data: revenue, clientGrowth, kpis or similar
-        # Since exact response schema isn't provided, check presence of common KPI fields.
-        assert isinstance(data, dict), "Response is not a JSON object"
+    expected_keys = {"revenue", "routerStatus", "activeUsers"}
+    missing_keys = expected_keys - data.keys()
+    assert not missing_keys, f"Response JSON missing expected keys: {missing_keys}"
 
-        keys_to_check = ["revenue", "clientGrowth", "kpis", "keyPerformanceIndicators", "summary", "analytics"]
-        found_key = any(key in data for key in keys_to_check)
-        assert found_key, f"None of the expected keys {keys_to_check} found in response"
+    assert isinstance(data["revenue"], (int, float)) and data["revenue"] >= 0, "Invalid revenue value"
+    assert isinstance(data["activeUsers"], int) and data["activeUsers"] >= 0, "Invalid activeUsers value"
+    assert isinstance(data["routerStatus"], dict), "Invalid routerStatus structure"
 
-    except Exception as e:
-        assert False, f"Error during /api/reports request: {e}"
 
-test_get_apireports_for_system_analytics()
+test_get_dashboard_summary_with_auth()

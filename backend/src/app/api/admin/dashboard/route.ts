@@ -1,16 +1,20 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
-import { errorResponse, jsonResponse } from "@/lib/auth";
+import { errorResponse, jsonResponse, getUserFromRequest } from "@/lib/auth";
+
+export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
     try {
-        // Authenticate admin (superuser)
-        // ... omitted for brevity in this example ...
+        const user = getUserFromRequest(req);
+        if (!user || user.role !== "SUPER_ADMIN") {
+            return errorResponse("Forbidden: Super Admin access required", 403);
+        }
 
         const [
             totalTenants,
-            activeUsers,
-            trialUsers,
+            activeTenants,
+            trialTenants,
             revenueResult,
             unpaidInvoices
         ] = await Promise.all([
@@ -26,8 +30,8 @@ export async function GET(req: NextRequest) {
 
         return jsonResponse({
             totalTenants,
-            activeUsers,
-            trialUsers,
+            activeTenants,
+            trialTenants,
             revenue: revenueResult._sum.amount || 0,
             unpaidInvoices
         });
