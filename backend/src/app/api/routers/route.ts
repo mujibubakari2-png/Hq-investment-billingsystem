@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
 
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
         const tenantFilter = isSuperAdmin ? {} : { tenantId: userPayload.tenantId };
-        
+
         const { searchParams } = new URL(req.url);
         const search = searchParams.get("search")?.toLowerCase() || "";
         const isPaginated = searchParams.has("page");
@@ -46,8 +46,8 @@ export async function GET(req: NextRequest) {
 
         if (isPaginated) {
             if (search) {
-                mapped = mapped.filter(r => 
-                    r.name.toLowerCase().includes(search) || 
+                mapped = mapped.filter(r =>
+                    r.name.toLowerCase().includes(search) ||
                     r.host.toLowerCase().includes(search)
                 );
             }
@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
 
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
         const tenantFilter = isSuperAdmin ? {} : { tenantId: userPayload.tenantId };
-        
+
         const body = await req.json();
         const name = body.name || body.routerName;
         const host = body.host || body.hostIP || body.ipAddress;
@@ -86,9 +86,10 @@ export async function POST(req: NextRequest) {
             return errorResponse("Router name contains invalid characters", 400);
         }
 
-        // Normalize numeric fields
-        const port = body.port || body.apiPort ? parseInt((body.port || body.apiPort).toString()) : 8728;
-        const apiPort = body.apiPort ? parseInt(body.apiPort.toString()) : port;
+        // Normalize numeric fields — both port and apiPort come from the same "API Port" form field
+        const rawPort = body.apiPort || body.port;
+        const port = rawPort ? parseInt(rawPort.toString()) : 8728;
+        const apiPort = port;
 
         // Validate IP or domain for host
         const hostRegex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$|^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\-]*[A-Za-z0-9])$/;

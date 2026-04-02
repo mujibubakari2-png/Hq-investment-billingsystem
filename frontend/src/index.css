@@ -334,6 +334,8 @@ table {
 .btn-icon.view:hover { background: var(--secondary); color: white; }
 .btn-icon.sync { color: var(--info); background: var(--info-light); }
 .btn-icon.sync:hover { background: var(--info); color: white; }
+.btn-icon.copy { color: var(--purple); background: var(--purple-light); }
+.btn-icon.copy:hover { background: var(--purple); color: white; }
 
 /* Badge */
 .badge {
@@ -354,6 +356,9 @@ table {
 .badge.suspended { background: #fce4ec; color: #c62828; }
 .badge.online { background: #e8f5e9; color: #2e7d32; border: 1px solid #a5d6a7; }
 .badge.offline { background: #ffebee; color: #c62828; border: 1px solid #ef9a9a; }
+.badge.sent { background: #e8f5e9; color: #2e7d32; }
+.badge.failed { background: #ffebee; color: #c62828; }
+.badge.pending { background: #fff3e0; color: #e65100; }
 
 /* Table */
 .table-container {

@@ -28,11 +28,22 @@ out/
 *.swo
 *.DS_Store
 
-# Logs
+# Logs & debug output
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .eslintcache
+*.log
+backend/error.txt
+backend/error2.txt
+backend/dbcheck.log
+backend/test_output.log
+backend/test_connect.log
+backend/response.json
+
+# Generated files
+backend/src/generated/
+backend/tsconfig.tsbuildinfo
 
 # Project specific
 frontend/node_modules/

@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
 
         // Verify if plan exists, or use default if it's a test string
         let plan = await prisma.saasPlan.findUnique({ where: { id: planId } });
-        
+
         if (!plan && (planId === "basic" || planId === "standard" || planId === "premium")) {
             // Map simple strings to seeded IDs
             const mappedId = `plan_${planId}`;
@@ -58,13 +58,13 @@ export async function POST(req: NextRequest) {
         }
 
         // Verify if email already exists
-        const existingUser = await prisma.user.findFirst({ 
-            where: { 
+        const existingUser = await prisma.user.findFirst({
+            where: {
                 OR: [
                     { email },
                     { username: email }
                 ]
-            } 
+            }
         });
         if (existingUser) {
             return errorResponse("User already exists with this email", 400);
@@ -164,7 +164,7 @@ export async function POST(req: NextRequest) {
                     name: companyName,
                     email,
                     phone,
-                    status: "TRIALLING",
+                    status: "ACTIVE",
                     planId: actualPlanId,
                     trialStart,
                     trialEnd,

@@ -2,7 +2,17 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { NextRequest } from "next/server";
 
-const JWT_SECRET = process.env.JWT_SECRET || "kenge-isp-default-secret";
+const JWT_SECRET = (() => {
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+        if (process.env.NODE_ENV === "production") {
+            throw new Error("FATAL: JWT_SECRET environment variable is required in production!");
+        }
+        console.warn("⚠️  WARNING: JWT_SECRET not set — using insecure default. Set JWT_SECRET in .env for production.");
+        return "kenge-isp-default-secret-DO-NOT-USE-IN-PRODUCTION";
+    }
+    return secret;
+})();
 
 export interface JwtPayload {
     userId: string;

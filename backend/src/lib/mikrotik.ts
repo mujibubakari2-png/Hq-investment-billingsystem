@@ -76,11 +76,13 @@ export interface RouterSystemInfo {
 export class MikroTikService {
     private conn: MikroTikConnection;
     private routerId: string;
+    private tenantId: string | null;
     private baseUrl: string;
 
-    constructor(conn: MikroTikConnection, routerId: string) {
+    constructor(conn: MikroTikConnection, routerId: string, tenantId?: string | null) {
         this.conn = conn;
         this.routerId = routerId;
+        this.tenantId = tenantId || null;
         // RouterOS REST API runs on the HTTP port (default 80), NOT the API port (8728)
         // The apiPort (8728) is for the RouterOS terminal API protocol
         // For REST: use port 80 (http) or 443 (https)
@@ -142,6 +144,7 @@ export class MikroTikService {
                     details,
                     status,
                     username,
+                    tenantId: this.tenantId,
                 },
             });
         } catch (e) {
@@ -624,5 +627,6 @@ export async function getMikroTikService(routerId: string): Promise<MikroTikServ
             password: router.password || "",
         },
         routerId,
+        router.tenantId,
     );
 }

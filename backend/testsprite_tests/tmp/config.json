@@ -17,7 +17,7 @@
     "additionalInstruction": "Verify fixes for TC001, TC002, TC006, and TC007. Use the correct admin credentials and automation key.",
     "serverMode": "development",
     "envs": {
-      "API_KEY": "sk-user-a53UTC5CweLj3DEaL8Y6cx-lhuv7DDqxwJM23Ju5oCDaSPStVTy5t8bNnbE3FONVT-EEYLE66IO5Q496TlHs3JhRNyWD26SKOGKKQm-VGi8tCzPzp23wjdy3Cn6ESOOC__U"
+      "API_KEY": "sk-user-MrK0z6G-P25uVr3pLuLwm5f7ZJM_qb20XN5jDbihfRf3--OF19Y-9mCNitZhQ7CFYi9dCBfnm9RP7Ksa54AYZMg4XMTVGyf0i19ewS0sWv3_PDeIcxnaA7Z3LTyozEgbyaQ"
     }
   },
   "serverPort": 63492,

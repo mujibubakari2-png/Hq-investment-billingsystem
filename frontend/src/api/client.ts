@@ -414,27 +414,3 @@ export const vpnApi = {
     create: (data: Record<string, unknown>) => post<unknown>('/vpn', data),
     delete: (id: string) => del<{ message: string }>(`/vpn/${id}`),
 };
-
-// ── Admin Tenants ───────────────────────────────────────────────────────────
-
-export interface Tenant {
-    id: string;
-    name: string;
-    email: string;
-    phone: string;
-    status: string;
-    plan: string;
-    clientCount: number;
-    userCount: number;
-    routerCount: number;
-    trialEnd?: string;
-    createdAt: string;
-}
-
-export const adminTenantsApi = {
-    list: () => get<Tenant[]>('/admin/tenants'),
-    confirm: (tenantId: string) => post<{ message: string; tenant: any }>('/admin/tenants', { action: 'confirm', tenantId }),
-    suspend: (tenantId: string) => post<{ message: string; tenant: any }>('/admin/tenants', { action: 'suspend', tenantId }),
-};
-
-

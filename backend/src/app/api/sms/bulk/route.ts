@@ -1,10 +1,17 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
-import { jsonResponse, errorResponse } from "@/lib/auth";
+import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
+import { getTenantFilter, getAssignTenantId } from "@/lib/tenant";
 
 // POST /api/sms/bulk - send bulk SMS
 export async function POST(req: NextRequest) {
     try {
+        const userPayload = getUserFromRequest(req);
+        if (!userPayload) return errorResponse("Unauthorized", 401);
+
+        const { filter } = getTenantFilter(userPayload);
+        const tenantId = getAssignTenantId(userPayload);
+
         const body = await req.json();
         const { recipients, message, clientIds } = body;
 
@@ -13,9 +20,9 @@ export async function POST(req: NextRequest) {
         const messages = [];
 
         if (clientIds && clientIds.length > 0) {
-            // Send to specific clients
+            // Send to specific clients — scoped to tenant
             const clients = await prisma.client.findMany({
-                where: { id: { in: clientIds } },
+                where: { id: { in: clientIds }, ...filter },
                 select: { id: true, phone: true },
             });
 
@@ -28,6 +35,7 @@ export async function POST(req: NextRequest) {
                             message,
                             type: "BROADCAST",
                             status: "SENT",
+                            tenantId,
                         },
                     });
                     messages.push(sms);
@@ -42,6 +50,7 @@ export async function POST(req: NextRequest) {
                         message,
                         type: "BROADCAST",
                         status: "SENT",
+                        tenantId,
                     },
                 });
                 messages.push(sms);

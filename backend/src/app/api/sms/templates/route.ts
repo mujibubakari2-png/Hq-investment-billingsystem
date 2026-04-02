@@ -1,21 +1,22 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
-import { jsonResponse, errorResponse } from "@/lib/auth";
+import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
+import { getTenantFilter, getAssignTenantId } from "@/lib/tenant";
 
 // GET /api/sms/templates
-export async function GET() {
+export async function GET(req: NextRequest) {
     try {
+        const userPayload = getUserFromRequest(req);
+        if (!userPayload) return errorResponse("Unauthorized", 401);
+
+        const { filter } = getTenantFilter(userPayload);
+
         const templates = await prisma.messageTemplate.findMany({
+            where: filter,
             orderBy: { createdAt: "desc" },
         });
 
-        const mapped = templates.map((t: {
-            id: string;
-            name: string;
-            content: string;
-            type: string;
-            variables: string[];
-        }) => ({
+        const mapped = templates.map((t) => ({
             id: t.id,
             name: t.name,
             content: t.content,
@@ -33,7 +34,15 @@ export async function GET() {
 // POST /api/sms/templates
 export async function POST(req: NextRequest) {
     try {
+        const userPayload = getUserFromRequest(req);
+        if (!userPayload) return errorResponse("Unauthorized", 401);
+
+        const tenantId = getAssignTenantId(userPayload);
         const body = await req.json();
+
+        if (!body.name || !body.content) {
+            return errorResponse("Name and content are required");
+        }
 
         const template = await prisma.messageTemplate.create({
             data: {
@@ -41,6 +50,7 @@ export async function POST(req: NextRequest) {
                 content: body.content,
                 type: (body.type || "CUSTOM").toUpperCase(),
                 variables: body.variables || [],
+                tenantId,
             },
         });
 

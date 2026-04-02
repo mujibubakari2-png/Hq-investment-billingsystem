@@ -4,12 +4,11 @@ import CloseIcon from '@mui/icons-material/Close';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import RouterIcon from '@mui/icons-material/Router';
 import VpnLockIcon from '@mui/icons-material/VpnLock';
-import DescriptionIcon from '@mui/icons-material/Description';
+import DownloadIcon from '@mui/icons-material/Download';
 import EditIcon from '@mui/icons-material/Edit';
 import LoginIcon from '@mui/icons-material/Login';
 import DeleteIcon from '@mui/icons-material/Delete';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
-import MikrotikScriptModal from './MikrotikScriptModal';
 import WireGuardConfigModal from './WireGuardConfigModal';
 import type { Router } from '../types';
 
@@ -21,12 +20,91 @@ interface RouterDetailModalProps {
 
 export default function RouterDetailModal({ router, onClose, onDelete }: RouterDetailModalProps) {
     const navigate = useNavigate();
-    const [showScript, setShowScript] = useState(false);
     const [showWireGuard, setShowWireGuard] = useState(false);
 
-    if (showScript) {
-        return <MikrotikScriptModal router={router} onClose={() => setShowScript(false)} />;
-    }
+    const downloadScript = () => {
+        const routerIdCode = `MYR-${router.id.padStart(3, '0')}VBHBC`;
+        const script = `# ═══════════════════════════════════════════════════════════════
+# KENGE ISP Billing - MikroTik Auto-Configuration Script
+# Router: ${router.name}
+# ID: ${routerIdCode}
+# Generated: ${new Date().toISOString().split('T')[0]}
+# ═══════════════════════════════════════════════════════════════
+
+# ── 1. System Identity ────────────────────────────────────────
+/system identity set name="${router.name}"
+
+# ── 2. Hotspot Server Setup ───────────────────────────────────
+/ip hotspot profile
+add name="hsprof-${router.name}" hotspot-address=10.10.0.1 dns-name="${router.name.toLowerCase().replace(/\s+/g, '-')}.hotspot" \\
+    html-directory=hotspot login-by=http-chap,http-pap,cookie,mac-cookie \\
+    http-cookie-lifetime=3d
+
+/ip pool
+add name="hs-pool-${router.name}" ranges=10.10.0.2-10.10.0.254
+
+/ip hotspot
+add name="hotspot-${router.name}" interface=ether2 address-pool="hs-pool-${router.name}" \\
+    profile="hsprof-${router.name}" disabled=no
+
+# ── 3. DHCP Server ───────────────────────────────────────────
+/ip address add address=10.10.0.1/24 interface=ether2
+
+/ip dhcp-server network
+add address=10.10.0.0/24 gateway=10.10.0.1 dns-server=8.8.8.8,1.1.1.1
+
+/ip dhcp-server
+add name="dhcp-${router.name}" interface=ether2 address-pool="hs-pool-${router.name}" disabled=no
+
+# ── 4. NAT (Masquerade) ──────────────────────────────────────
+/ip firewall nat add chain=srcnat out-interface=ether1 action=masquerade
+
+# ── 5. DNS Settings ──────────────────────────────────────────
+/ip dns set servers=8.8.8.8,1.1.1.1 allow-remote-requests=yes
+
+# ── 6. Firewall Rules ────────────────────────────────────────
+/ip firewall filter
+add chain=input protocol=tcp dst-port=8291 action=accept comment="Allow Winbox"
+add chain=input protocol=tcp dst-port=80,443 action=accept comment="Allow Web"
+add chain=input protocol=udp dst-port=53,67 action=accept comment="Allow DNS & DHCP"
+add chain=input protocol=icmp action=accept comment="Allow Ping"
+add chain=input connection-state=established,related action=accept
+add chain=input action=drop comment="Drop all other input"
+
+# ── 7. RADIUS Client (Kenge ISP Billing) ─────────────────────
+/radius
+add service=hotspot address=127.0.0.1 secret=kenge-radius-secret \\
+    authentication-port=1812 accounting-port=1813
+
+/ip hotspot profile set "hsprof-${router.name}" use-radius=yes radius-accounting=yes
+
+# ── 8. Walled Garden (Allow billing portal) ──────────────────
+/ip hotspot walled-garden
+add dst-host="*.hqinvestment.co.tz" action=allow comment="Kenge Billing Portal"
+
+# ── 9. System Scheduler (Auto-sync with Kenge) ───────────────
+/system scheduler
+add name="kenge-sync" interval=5m on-event="/tool fetch url=\\"https://api.hqinvestment.co.tz/sync/${routerIdCode}\\" mode=https" \\
+    start-time=startup
+
+# ── 10. Logging ──────────────────────────────────────────────
+/system logging
+add topics=hotspot action=memory
+add topics=radius action=memory
+
+# ═══════════════════════════════════════════════════════════════
+# ✅ Script Complete! Router "${router.name}" is configured.
+# ═══════════════════════════════════════════════════════════════`;
+        const blob = new Blob([script], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `mikrotik-script-${router.name.toLowerCase().replace(/\s+/g, '-')}.rsc`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
     if (showWireGuard) {
         return <WireGuardConfigModal router={router} onClose={() => setShowWireGuard(false)} />;
     }
@@ -109,10 +187,10 @@ export default function RouterDetailModal({ router, onClose, onDelete }: RouterD
                                 <VpnLockIcon fontSize="small" /> WireGuard
                             </button>
                             <button className="btn" style={{
-                                background: '#fef3c7', color: '#d97706', fontWeight: 600, border: '1px solid #fbbf24',
+                                background: '#eef2ff', color: '#4338ca', fontWeight: 600, border: '1px solid #c7d2fe',
                                 padding: '10px 16px', borderRadius: 'var(--radius-sm)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                            }} onClick={() => setShowScript(true)}>
-                                <DescriptionIcon fontSize="small" /> MikroTik Script
+                            }} onClick={downloadScript}>
+                                <DownloadIcon fontSize="small" /> Download Script
                             </button>
                         </div>
                     </div>

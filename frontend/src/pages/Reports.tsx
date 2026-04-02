@@ -4,7 +4,7 @@ import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import GroupIcon from '@mui/icons-material/Group';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { reportsApi } from '../api/client';
+import { dashboardApi, expensesApi } from '../api/client';
 
 const COLORS = ['#e53935', '#4caf50', '#2196f3', '#ff9800', '#9c27b0'];
 
@@ -15,8 +15,26 @@ export default function Reports() {
     const fetchReports = async () => {
         setLoading(true);
         try {
-            const data = await reportsApi.get({ period: 'monthly' });
-            setReportData(data);
+            const [dashData, expensesData] = await Promise.all([
+                dashboardApi.getStats(),
+                expensesApi.list()
+            ]);
+
+            let totalExpenses = 0;
+            const expensesByCategory: Record<string, number> = {};
+
+            expensesData.forEach((exp: any) => {
+                const amount = Number(exp.amount) || 0;
+                totalExpenses += amount;
+                const cat = exp.category || 'OTHER';
+                expensesByCategory[cat] = (expensesByCategory[cat] || 0) + amount;
+            });
+
+            setReportData({
+                ...dashData,
+                totalExpenses,
+                expensesByCategory
+            });
         } catch (err) {
             console.error('Failed to load reports:', err);
         } finally {
@@ -148,12 +166,34 @@ export default function Reports() {
                 <div className="card card-body">
                     <h3 style={{ marginBottom: 16, fontWeight: 600 }}>Performance Summary</h3>
                     {[
-                        { label: 'Net Profit', value: '25,000 TZS', positive: true },
-                        { label: 'Avg Revenue/Client', value: '472 TZS' },
-                        { label: 'Active Rate', value: '79%', positive: true },
-                        { label: 'Expiry Rate', value: '21%', negative: true },
-                        { label: 'Vouchers Generated', value: '10' },
-                        { label: 'SMS Sent', value: '45' },
+                        { 
+                            label: 'Net Profit', 
+                            value: `${((reportData.totalRevenue || 0) - (reportData.totalExpenses || 0)).toLocaleString()} TZS`, 
+                            positive: ((reportData.totalRevenue || 0) - (reportData.totalExpenses || 0)) >= 0,
+                            negative: ((reportData.totalRevenue || 0) - (reportData.totalExpenses || 0)) < 0 
+                        },
+                        { 
+                            label: 'Avg Revenue/Client', 
+                            value: `${reportData.totalClients ? Math.round((reportData.totalRevenue || 0) / reportData.totalClients).toLocaleString() : 0} TZS` 
+                        },
+                        { 
+                            label: 'Active Rate', 
+                            value: `${reportData.totalClients ? Math.round(((reportData.activeSubscribers || 0) / reportData.totalClients) * 100) : 0}%`, 
+                            positive: true 
+                        },
+                        { 
+                            label: 'Expiry Rate', 
+                            value: `${reportData.totalClients ? Math.round(((reportData.expiredSubscribers || 0) / reportData.totalClients) * 100) : 0}%`, 
+                            negative: true 
+                        },
+                        { 
+                            label: 'Monthly Vouchers', 
+                            value: `${(reportData.vouchersGeneratedMonth || 0).toLocaleString()} Generated` 
+                        },
+                        { 
+                            label: 'Mobile TXNs Paid', 
+                            value: `${(reportData.mobileTransactions?.paid || 0).toLocaleString()} Transactions` 
+                        },
                     ].map(item => (
                         <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--border-light)', fontSize: '0.85rem' }}>
                             <span style={{ color: 'var(--text-secondary)' }}>{item.label}</span>

@@ -14,7 +14,6 @@ import MoreVertIcon from '@mui/icons-material/MoreVert';
 import { routersApi } from '../api/client';
 import AddRouterModal from '../modals/AddRouterModal';
 import RouterDetailModal from '../modals/RouterDetailModal';
-import MikrotikScriptModal from '../modals/MikrotikScriptModal';
 import ConfirmDeleteModal from '../modals/ConfirmDeleteModal';
 import RouterSetupWizard from './RouterSetupWizard';
 import RemoteAccessModal from '../modals/RemoteAccessModal';
@@ -27,7 +26,6 @@ export default function Mikrotiks() {
     const [showAddModal, setShowAddModal] = useState(false);
     const [selectedRouter, setSelectedRouter] = useState<Router | null>(null);
     const [selectedRouterToEdit, setSelectedRouterToEdit] = useState<Router | null>(null);
-    const [scriptRouter, setScriptRouter] = useState<Router | null>(null);
     const [deleteRouter, setDeleteRouter] = useState<Router | null>(null);
     const [remoteRouter, setRemoteRouter] = useState<Router | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
@@ -38,6 +36,7 @@ export default function Mikrotiks() {
     const [currentPage, setCurrentPage] = useState(1);
     const [totalRouters, setTotalRouters] = useState(0);
     const [actionMenuId, setActionMenuId] = useState<string | null>(null);
+    const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
     const menuRef = useRef<HTMLDivElement>(null);
 
     // Close action menu on outside click
@@ -71,6 +70,8 @@ export default function Mikrotiks() {
     useEffect(() => { fetchRouters(); }, [searchTerm, currentPage, pageSize]);
     useEffect(() => { setCurrentPage(1); }, [searchTerm, pageSize]);
 
+
+
     const handleAddRouter = async (data: any) => {
         try {
             const res = await routersApi.create({
@@ -78,15 +79,14 @@ export default function Mikrotiks() {
                 host: data.host || '0.0.0.0',
                 username: data.username || 'admin',
                 password: data.accessCode,
-                port: data.port || 8728,
-                apiPort: data.apiPort || 8728,
+                port: parseInt(data.apiPort) || 8728,
+                apiPort: parseInt(data.apiPort) || 8728,
                 vpnMode: data.vpnMode,
                 description: data.description,
             });
             setShowAddModal(false);
             fetchRouters();
-            setScriptRouter(res as unknown as Router);
-            alert('Router created successfully! Please copy the configuration script provided.');
+            alert(`Router "${(res as any).name}" created successfully! Open the router Details to download the MikroTik script.`);
         } catch (err) {
             console.error('Failed to create router:', err);
             alert('Failed to create router.');
@@ -101,8 +101,8 @@ export default function Mikrotiks() {
                 host: data.host,
                 username: data.username,
                 password: data.accessCode,
-                port: data.apiPort ? parseInt(data.apiPort) : undefined,
-                apiPort: data.apiPort ? parseInt(data.apiPort) : undefined,
+                port: parseInt(data.apiPort) || undefined,
+                apiPort: parseInt(data.apiPort) || undefined,
                 vpnMode: data.vpnMode,
                 description: data.description,
             });
@@ -175,7 +175,6 @@ export default function Mikrotiks() {
             {showAddModal && <AddRouterModal onClose={() => setShowAddModal(false)} onSave={handleAddRouter} />}
             {selectedRouterToEdit && <AddRouterModal onClose={() => setSelectedRouterToEdit(null)} onSave={handleEditRouter} initialData={selectedRouterToEdit} />}
             {selectedRouter && <RouterDetailModal router={selectedRouter} onClose={() => setSelectedRouter(null)} onDelete={(r) => { setSelectedRouter(null); setDeleteRouter(r); }} />}
-            {scriptRouter && <MikrotikScriptModal router={scriptRouter} onClose={() => setScriptRouter(null)} />}
             {deleteRouter && (
                 <ConfirmDeleteModal
                     title="Delete Router"
@@ -392,68 +391,25 @@ export default function Mikrotiks() {
                                                         transition: 'all 0.15s',
                                                     }}
                                                     title="More actions"
-                                                    onClick={(e) => { e.stopPropagation(); setActionMenuId(actionMenuId === router.id ? null : router.id); }}
+                                                     onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        if (actionMenuId === router.id) {
+                                                            setActionMenuId(null);
+                                                            setMenuPosition(null);
+                                                        } else {
+                                                            const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect();
+                                                            setMenuPosition({ top: rect.bottom + 4, left: rect.right - 175 });
+                                                            setActionMenuId(router.id);
+                                                        }
+                                                    }}
                                                     onMouseOver={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#e5e7eb'; (e.currentTarget as HTMLButtonElement).style.borderColor = '#d1d5db'; }}
                                                     onMouseOut={(e) => { if (actionMenuId !== router.id) { (e.currentTarget as HTMLButtonElement).style.background = '#f3f4f6'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'transparent'; } }}
                                                 >
                                                     <MoreVertIcon style={{ fontSize: 16 }} />
                                                 </button>
 
-                                                {actionMenuId === router.id && (
-                                                    <div style={{
-                                                        position: 'absolute', top: '100%', right: 0, marginTop: 4,
-                                                        background: '#fff', borderRadius: 10, boxShadow: '0 8px 30px rgba(0,0,0,0.15)',
-                                                        border: '1px solid #e5e7eb', overflow: 'hidden', zIndex: 999,
-                                                        minWidth: 175, animation: 'fadeIn 0.15s ease-out',
-                                                    }}>
-                                                        <div style={{ padding: '6px 0' }}>
-                                                            <button
-                                                                onClick={() => { setWizardRouter(router); setActionMenuId(null); }}
-                                                                style={{
-                                                                    display: 'flex', alignItems: 'center', gap: 10, width: '100%',
-                                                                    padding: '9px 16px', border: 'none', background: 'transparent',
-                                                                    cursor: 'pointer', fontSize: '0.82rem', color: '#374151',
-                                                                    transition: 'background 0.15s',
-                                                                }}
-                                                                onMouseOver={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#fefce8'; }}
-                                                                onMouseOut={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
-                                                            >
-                                                                <SettingsIcon style={{ fontSize: 15, color: '#d97706' }} />
-                                                                <span>Setup Wizard</span>
-                                                            </button>
-                                                            <button
-                                                                onClick={() => { setSelectedRouterToEdit(router); setActionMenuId(null); }}
-                                                                style={{
-                                                                    display: 'flex', alignItems: 'center', gap: 10, width: '100%',
-                                                                    padding: '9px 16px', border: 'none', background: 'transparent',
-                                                                    cursor: 'pointer', fontSize: '0.82rem', color: '#374151',
-                                                                    transition: 'background 0.15s',
-                                                                }}
-                                                                onMouseOver={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#eff6ff'; }}
-                                                                onMouseOut={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
-                                                            >
-                                                                <EditIcon style={{ fontSize: 15, color: '#2563eb' }} />
-                                                                <span>Edit Router</span>
-                                                            </button>
-                                                            <div style={{ height: 1, background: '#f3f4f6', margin: '4px 12px' }} />
-                                                            <button
-                                                                onClick={() => { setDeleteRouter(router); setActionMenuId(null); }}
-                                                                style={{
-                                                                    display: 'flex', alignItems: 'center', gap: 10, width: '100%',
-                                                                    padding: '9px 16px', border: 'none', background: 'transparent',
-                                                                    cursor: 'pointer', fontSize: '0.82rem', color: '#dc2626',
-                                                                    transition: 'background 0.15s',
-                                                                }}
-                                                                onMouseOver={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#fef2f2'; }}
-                                                                onMouseOut={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
-                                                            >
-                                                                <DeleteIcon style={{ fontSize: 15, color: '#dc2626' }} />
-                                                                <span>Delete Router</span>
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </div>
+                                                {/* dropdown rendered via fixed portal below */}
+                                             </div>
                                         </div>
                                     </td>
                                 </tr>
@@ -497,6 +453,76 @@ export default function Mikrotiks() {
                     </div>
                 </div>
             </div>
+            {/* Fixed Action Menu Portal */}
+            {actionMenuId && menuPosition && (
+                <div style={{
+                    position: 'fixed', top: menuPosition.top, left: menuPosition.left,
+                    background: '#fff', borderRadius: 10, boxShadow: '0 8px 30px rgba(0,0,0,0.15)',
+                    border: '1px solid #e5e7eb', overflow: 'hidden', zIndex: 9999,
+                    minWidth: 175, animation: 'fadeIn 0.15s ease-out',
+                }}>
+                    <div style={{ padding: '6px 0' }}>
+                        <button
+                            onClick={() => { 
+                                const r = routers.find(r => r.id === actionMenuId);
+                                if (r) setWizardRouter(r); 
+                                setActionMenuId(null); 
+                                setMenuPosition(null);
+                            }}
+                            style={{
+                                display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+                                padding: '9px 16px', border: 'none', background: 'transparent',
+                                cursor: 'pointer', fontSize: '0.82rem', color: '#374151',
+                                transition: 'background 0.15s',
+                            }}
+                            onMouseOver={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#fefce8'; }}
+                            onMouseOut={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
+                        >
+                            <SettingsIcon style={{ fontSize: 15, color: '#d97706' }} />
+                            <span>Setup Wizard</span>
+                        </button>
+                        <button
+                            onClick={() => { 
+                                const r = routers.find(r => r.id === actionMenuId);
+                                if (r) setSelectedRouterToEdit(r); 
+                                setActionMenuId(null); 
+                                setMenuPosition(null);
+                            }}
+                            style={{
+                                display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+                                padding: '9px 16px', border: 'none', background: 'transparent',
+                                cursor: 'pointer', fontSize: '0.82rem', color: '#374151',
+                                transition: 'background 0.15s',
+                            }}
+                            onMouseOver={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#eff6ff'; }}
+                            onMouseOut={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
+                        >
+                            <EditIcon style={{ fontSize: 15, color: '#2563eb' }} />
+                            <span>Edit Router</span>
+                        </button>
+                        <div style={{ height: 1, background: '#f3f4f6', margin: '4px 12px' }} />
+                        <button
+                            onClick={() => { 
+                                const r = routers.find(r => r.id === actionMenuId);
+                                if (r) setDeleteRouter(r); 
+                                setActionMenuId(null); 
+                                setMenuPosition(null);
+                            }}
+                            style={{
+                                display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+                                padding: '9px 16px', border: 'none', background: 'transparent',
+                                cursor: 'pointer', fontSize: '0.82rem', color: '#dc2626',
+                                transition: 'background 0.15s',
+                            }}
+                            onMouseOver={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#fef2f2'; }}
+                            onMouseOut={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
+                        >
+                            <DeleteIcon style={{ fontSize: 15, color: '#dc2626' }} />
+                            <span>Delete Router</span>
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

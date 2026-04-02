@@ -3,16 +3,16 @@
   "type": "frontend",
   "scope": "codebase",
   "localEndpoint": "http://localhost:4173",
-  "loginUser": "admin@example.com",
-  "loginPassword": "admin123",
+  "loginUser": "mujibubakari2@gmail.com",
+  "loginPassword": "Muu@1212",
   "executionArgs": {
     "projectName": "kenge-frontend",
     "projectPath": "c:\\Users\\hqbak\\kenge\\frontend",
     "testIds": [],
-    "additionalInstruction": "Test the login, client registration, and dashboard features. Use admin@example.com / admin123 as the login credentials. Use the local server at http://localhost:4173/.",
+    "additionalInstruction": "Test the login, client registration, and dashboard features. Use mujibubakari2@gmail.com / Muu@1212 as the login credentials. Use the local server at http://localhost:4173/.",
     "serverMode": "production",
     "envs": {
-      "API_KEY": ""
+      "API_KEY": "sk-user-MrK0z6G-P25uVr3pLuLwm5f7ZJM_qb20XN5jDbihfRf3--OF19Y-9mCNitZhQ7CFYi9dCBfnm9RP7Ksa54AYZMg4XMTVGyf0i19ewS0sWv3_PDeIcxnaA7Z3LTyozEgbyaQ"
     }
   },
   "serverPort": 58939,

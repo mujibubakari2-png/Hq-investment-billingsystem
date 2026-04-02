@@ -1,10 +1,13 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
-import { jsonResponse, errorResponse } from "@/lib/auth";
+import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 
 // GET /api/subscriptions/[id]
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
+        const userPayload = getUserFromRequest(req);
+        if (!userPayload) return errorResponse("Unauthorized", 401);
+
         const { id } = await params;
         const sub = await prisma.subscription.findUnique({
             where: { id },
@@ -20,13 +23,18 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 // PUT /api/subscriptions/[id] - edit plan / extend
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
+        const userPayload = getUserFromRequest(req);
+        if (!userPayload) return errorResponse("Unauthorized", 401);
+
         const { id } = await params;
         const body = await req.json();
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const data: any = {};
         if (body.packageId) data.packageId = body.packageId;
+        if (body.routerId !== undefined) data.routerId = body.routerId || null;
         if (body.expiresAt) data.expiresAt = new Date(body.expiresAt);
+        if (body.activatedAt) data.activatedAt = new Date(body.activatedAt);
         if (body.status) data.status = body.status;
         if (body.method) data.method = body.method;
 
@@ -37,14 +45,18 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         });
 
         return jsonResponse(sub);
-    } catch {
+    } catch (e) {
+        console.error("SUBSCRIPTION UPDATE ERROR:", e);
         return errorResponse("Internal server error", 500);
     }
 }
 
 // DELETE /api/subscriptions/[id]
-export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
+        const userPayload = getUserFromRequest(req);
+        if (!userPayload) return errorResponse("Unauthorized", 401);
+
         const { id } = await params;
         await prisma.subscription.delete({ where: { id } });
         return jsonResponse({ message: "Subscription deleted" });

@@ -40,7 +40,7 @@ import TutorialVideos from './pages/TutorialVideos';
 import Invoices from './pages/Invoices';
 import Profile from './pages/Profile';
 import VpnManagement from './pages/VpnManagement';
-import AdminTenants from './pages/AdminTenants';
+
 
 
 export default function App() {
@@ -60,7 +60,7 @@ export default function App() {
             <Route path="/dashboard" element={<Dashboard />} />
 
             {/* SYSTEM ADMINISTRATION (SUPER_ADMIN ONLY) */}
-            <Route path="/admin-tenants" element={<AdminTenants />} />
+
 
             {/* CLIENT MANAGEMENT */}
             <Route path="/clients" element={<Clients />} />
