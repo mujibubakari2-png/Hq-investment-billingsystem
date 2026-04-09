@@ -3,10 +3,13 @@ import { jsonResponse, errorResponse } from "@/lib/auth";
 import { getMikroTikService } from "@/lib/mikrotik";
 
 // GET /api/routers/[id]/sessions — List active sessions (PPPoE + Hotspot)
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
+        const userPayload = getUserFromRequest(req);
+        if (!userPayload) return errorResponse("Unauthorized", 401);
+
         const { id } = await params;
-        const service = await getMikroTikService(id);
+        const service = await getMikroTikService(id, userPayload.tenantId);
         const sessions = await service.listAllActiveSessions();
         return jsonResponse(sessions);
     } catch (err: any) {

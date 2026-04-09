@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
+import { toISOSafe, toTimestampSafe } from "@/lib/dateUtils";
 
 export async function GET(req: NextRequest) {
     try {
@@ -8,7 +9,7 @@ export async function GET(req: NextRequest) {
         if (!userPayload) return errorResponse("Unauthorized", 401);
 
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
-        const tenantFilter = isSuperAdmin ? {} : { tenantId: userPayload.tenantId };
+        const tenantFilter = { tenantId: userPayload.tenantId };
 
         const { searchParams } = new URL(req.url);
         const search = searchParams.get("search")?.toLowerCase() || "";
@@ -38,13 +39,10 @@ export async function GET(req: NextRequest) {
         const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
         const startOfWeek = startOfToday - 7 * 24 * 60 * 60 * 1000;
 
-        // Date Format helper
-        const isValidDate = (d: any) => d instanceof Date && !isNaN(d.getTime());
-
-        // Format all expired subscriptions natively
+        // Format all expired subscriptions
         const allMapped = allExpired.map(s => {
-            const expires = new Date(s.expiresAt);
-            const expiredDays = isValidDate(expires) ? Math.max(0, Math.floor((now.getTime() - expires.getTime()) / (1000 * 3600 * 24))) : 0;
+            const expiresTs = toTimestampSafe(s.expiresAt);
+            const expiredDays = expiresTs > 0 ? Math.max(0, Math.floor((now.getTime() - expiresTs) / (1000 * 3600 * 24))) : 0;
             
             return {
                 id: s.id,
@@ -52,8 +50,8 @@ export async function GET(req: NextRequest) {
                 plan: s.package?.name || "N/A",
                 type: s.client?.serviceType === "HOTSPOT" ? "Hotspot" : "PPPoE",
                 router: s.router?.name || "N/A",
-                expiredDate: isValidDate(expires) ? expires.toLocaleDateString("en-US", { timeZone: "Africa/Dar_es_Salaam", month: "short", day: "numeric", year: "numeric" }) : "N/A",
-                expiredTimestamp: isValidDate(expires) ? expires.getTime() : 0,
+                expiredDate: toISOSafe(s.expiresAt),
+                expiredTimestamp: expiresTs,
                 days: expiredDays,
                 method: s.method || "Manual",
             };

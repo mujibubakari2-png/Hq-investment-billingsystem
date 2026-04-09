@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { errorResponse, jsonResponse } from "@/lib/auth";
+import nodemailer from "nodemailer";
 
 export async function POST(req: NextRequest) {
     try {
@@ -22,7 +23,8 @@ export async function POST(req: NextRequest) {
 
         // Find the invoice
         const invoice = await prisma.tenantInvoice.findUnique({
-            where: { invoiceNumber: AccountReference }
+            where: { invoiceNumber: AccountReference },
+            include: { tenant: true }
         });
 
         if (!invoice) {
@@ -54,12 +56,55 @@ export async function POST(req: NextRequest) {
                 }
             });
 
-            // 3. Activate the Tenant
+            // 3. Activate the Tenant and Push Expiration Date Forward
+            const now = new Date();
+            let currentExpiry = invoice.tenant.licenseExpiresAt || invoice.tenant.trialEnd || now;
+            if (currentExpiry < now) currentExpiry = now; // Prevent backdating
+
+            const monthsToExtend = invoice.packageMonths || 0;
+            const newExpiry = new Date(currentExpiry);
+            newExpiry.setMonth(newExpiry.getMonth() + monthsToExtend);
+
             await tx.tenant.update({
                 where: { id: invoice.tenantId },
-                data: { status: "ACTIVE" }
+                data: { 
+                    status: "ACTIVE",
+                    licenseExpiresAt: newExpiry
+                }
             });
         });
+
+        // Send activation email
+        try {
+            const transporter = nodemailer.createTransport({
+                host: process.env.SMTP_HOST || "smtp.ethereal.email",
+                port: Number(process.env.SMTP_PORT) || 587,
+                secure: process.env.SMTP_SECURE === "true",
+                auth: {
+                    user: process.env.SMTP_USER,
+                    pass: process.env.SMTP_PASS,
+                },
+            });
+
+            const mailOptions = {
+                from: process.env.SMTP_FROM || '"HQ INVESTMENT" <no-reply@hqinvestment.local>',
+                to: invoice.tenant.email,
+                subject: "Payment Received & Account Activated",
+                text: `Hello ${invoice.tenant.name},\n\nYour payment of ${Amount} has been received. Your account has been successfully renewed and activated!\n\nLog in here: ${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:5173/'}`,
+                html: `<div style="font-family: sans-serif; padding: 20px;">
+                        <h2>Account Activated!</h2>
+                        <p>Hello <strong>${invoice.tenant.name}</strong>,</p>
+                        <p>We have successfully received your payment of <strong>${Amount}/=</strong>.</p>
+                        <p>Your subscription has been renewed and your account is now <strong>ACTIVE</strong>.</p>
+                        <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:5173/'}" style="background-color: #1d4ed8; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin-top: 10px;">Log In to Dashboard</a>
+                       </div>`
+            };
+
+            await transporter.sendMail(mailOptions);
+            console.log("Activation email sent successfully to", invoice.tenant.email);
+        } catch (mailError) {
+            console.error("Failed to send activation email:", mailError);
+        }
 
         return jsonResponse({ message: "Webhook processed successfully" });
 

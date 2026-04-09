@@ -34,9 +34,27 @@ export async function POST(req: Request) {
                 return NextResponse.json({ message: 'Transaction already processed' });
             }
 
-            // Find Client based on BillRefNumber (could be phone or username)
+            // Check if it's an invoice payment
+            let targetClientId = undefined;
+            let invoicePaidId = undefined;
+            
+            if (BillRefNumber && typeof BillRefNumber === 'string' && BillRefNumber.toUpperCase().startsWith('INV-')) {
+                const invoice = await prisma.invoice.findUnique({
+                    where: { invoiceNumber: BillRefNumber.toUpperCase() },
+                });
+                if (invoice) {
+                    targetClientId = invoice.clientId;
+                    invoicePaidId = invoice.id;
+                    await prisma.invoice.update({
+                        where: { id: invoice.id },
+                        data: { status: "PAID" }
+                    });
+                }
+            }
+
+            // Find Client based on BillRefNumber (could be phone or username) or the found targetClientId
             const client = await prisma.client.findFirst({
-                where: { OR: [{ phone: BillRefNumber }, { username: BillRefNumber }] },
+                where: targetClientId ? { id: targetClientId } : { OR: [{ phone: BillRefNumber }, { username: BillRefNumber }] },
                 include: {
                     subscriptions: {
                         orderBy: { createdAt: 'desc' },

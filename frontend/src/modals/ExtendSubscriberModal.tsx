@@ -4,6 +4,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import CheckIcon from '@mui/icons-material/Check';
 import { packagesApi } from '../api/client';
 import type { ExpiredSubscriber, Package } from '../types';
+import { formatDate } from '../utils/formatters';
 
 interface ExtendSubscriberModalProps {
     subscriber: ExpiredSubscriber;
@@ -65,7 +66,7 @@ export default function ExtendSubscriberModal({ subscriber, onClose, onSave }: E
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                             <span style={{ color: 'var(--text-secondary)' }}>Expired</span>
-                            <strong style={{ color: 'var(--danger)' }}>{subscriber.expiredDate}</strong>
+                            <strong style={{ color: 'var(--danger)' }}>{formatDate(subscriber.expiredDate)}</strong>
                         </div>
                     </div>
 

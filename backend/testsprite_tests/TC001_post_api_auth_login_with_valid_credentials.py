@@ -1,7 +1,7 @@
 import requests
 
 def test_post_api_auth_login_with_valid_credentials():
-    base_url = "http://localhost:3000"
+    base_url = "http://localhost:3001"
     login_url = f"{base_url}/api/auth/login"
     payload = {
         "username": "admin",

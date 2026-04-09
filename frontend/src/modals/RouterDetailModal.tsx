@@ -11,6 +11,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import WireGuardConfigModal from './WireGuardConfigModal';
 import type { Router } from '../types';
+import { formatDateTime } from '../utils/formatters';
 
 interface RouterDetailModalProps {
     router: Router;
@@ -161,7 +162,7 @@ add topics=radius action=memory
                             { label: 'Active Users', value: String(router.activeUsers || 0), mono: false },
                             { label: 'CPU Load', value: `${router.cpuLoad || 0}%`, mono: false },
                             { label: 'Uptime', value: router.uptime || 'N/A', mono: false },
-                            { label: 'Last Seen', value: router.lastSeen && !isNaN(new Date(router.lastSeen).getTime()) ? new Date(router.lastSeen).toLocaleString() : 'Never', mono: false },
+                            { label: 'Last Seen', value: formatDateTime(router.lastSeen), mono: false },
                             { label: 'Description', value: router.description || '—', mono: false },
                         ]).map(row => (
                             <div key={row.label} style={{

@@ -71,7 +71,7 @@ export default function Login() {
                     </div>
                 </div>
                 <h2 style={{ color: '#008ee6', fontSize: '1.5rem', fontWeight: 600, textAlign: 'center', margin: '0 0 8px 0' }}>
-                    Welcome back! ??
+                    Welcome back!
                 </h2>
                 <p style={{ color: '#64748b', textAlign: 'center', margin: '0 0 16px 0', fontSize: '1rem' }}>
                     Sign in to your account to continue

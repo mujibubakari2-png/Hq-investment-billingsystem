@@ -12,6 +12,7 @@ import SyncIcon from '@mui/icons-material/Sync';
 
 import { useNavigate } from 'react-router-dom';
 import { activeSubscribersApi, subscriptionsApi, routersApi } from '../api/client';
+import { formatDate } from '../utils/formatters';
 import type { ActiveSubscriber, Router } from '../types';
 import ConfirmDeleteModal from '../modals/ConfirmDeleteModal';
 
@@ -285,8 +286,8 @@ export default function ActiveSubscribers() {
                                                 <div style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>{sub.device}</div>
                                             </div>
                                         </td>
-                                        <td style={{ fontSize: '0.82rem' }}>{sub.created}</td>
-                                        <td style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--secondary)' }}>{sub.expires}</td>
+                                        <td style={{ fontSize: '0.82rem' }}>{formatDate(sub.created)}</td>
+                                        <td style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--secondary)' }}>{formatDate(sub.expires)}</td>
                                         <td style={{ fontSize: '0.82rem' }}>{sub.method}</td>
                                         <td>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.82rem' }}>

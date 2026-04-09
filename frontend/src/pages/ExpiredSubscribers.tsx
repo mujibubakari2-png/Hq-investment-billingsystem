@@ -11,6 +11,7 @@ import WifiIcon from '@mui/icons-material/Wifi';
 import PersonIcon from '@mui/icons-material/Person';
 import { useNavigate } from 'react-router-dom';
 import { expiredSubscribersApi, subscriptionsApi, routersApi } from '../api/client';
+import { formatDate } from '../utils/formatters';
 import type { ExpiredSubscriber, Router } from '../types';
 import ExtendSubscriberModal from '../modals/ExtendSubscriberModal';
 
@@ -303,7 +304,7 @@ export default function ExpiredSubscribers() {
                                             <span className={`badge ${sub.type.toLowerCase()}`}>{sub.type}</span>
                                         </td>
                                         <td>{sub.router}</td>
-                                        <td>{sub.expiredDate}</td>
+                                        <td>{formatDate(sub.expiredDate)}</td>
                                         <td>
                                             <span
                                                 style={{

@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
+import { toISOSafe } from "@/lib/dateUtils";
 
 export async function GET(req: NextRequest) {
     try {
@@ -8,7 +9,7 @@ export async function GET(req: NextRequest) {
         if (!userPayload) return errorResponse("Unauthorized", 401);
 
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
-        const tenantFilter = isSuperAdmin ? {} : { tenantId: userPayload.tenantId };
+        const tenantFilter = { tenantId: userPayload.tenantId };
 
         const { searchParams } = new URL(req.url);
         const search = searchParams.get("search")?.toLowerCase() || "";
@@ -33,9 +34,6 @@ export async function GET(req: NextRequest) {
             orderBy: { createdAt: "desc" }
         });
 
-        // Date helper
-        const isValidDate = (d: any) => d instanceof Date && !isNaN(d.getTime());
-
         // Map to common UI format
         const allMapped = allActive.map(s => {
             return {
@@ -46,8 +44,8 @@ export async function GET(req: NextRequest) {
                 type: s.client?.serviceType === "HOTSPOT" ? "Hotspot" : "PPPoE",
                 device: s.client?.device || "N/A",
                 macAddress: s.client?.macAddress || "N/A",
-                created: isValidDate(s.createdAt) ? s.createdAt.toLocaleDateString("en-US", { timeZone: "Africa/Dar_es_Salaam", month: "short", day: "numeric", year: "numeric" }) : "N/A",
-                expires: isValidDate(s.expiresAt) ? s.expiresAt.toLocaleDateString("en-US", { timeZone: "Africa/Dar_es_Salaam", month: "short", day: "numeric", year: "numeric" }) : "N/A",
+                created: toISOSafe(s.createdAt),
+                expires: toISOSafe(s.expiresAt),
                 method: s.method || "Manual",
                 router: s.router?.name || "N/A",
                 routerId: s.routerId || "",

@@ -1,6 +1,11 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import MainLayout from './components/layout/MainLayout';
 import ProtectedRoute from './components/ProtectedRoute';
+import LicenseGuard from './components/LicenseGuard';
+import SuperAdminGuard from './components/SuperAdminGuard';
+import Restricted from './pages/Restricted';
+import PendingApproval from './pages/PendingApproval';
+import RenewLicense from './pages/RenewLicense';
 import Dashboard from './pages/Dashboard';
 import Clients from './pages/Clients';
 import ActiveSubscribers from './pages/ActiveSubscribers';
@@ -38,6 +43,7 @@ import ForgotPassword from './pages/ForgotPassword';
 import Reports from './pages/Reports';
 import TutorialVideos from './pages/TutorialVideos';
 import Invoices from './pages/Invoices';
+import SystemTenants from './pages/SystemTenants';
 import Profile from './pages/Profile';
 import VpnManagement from './pages/VpnManagement';
 
@@ -54,14 +60,21 @@ export default function App() {
 
         {/* Protected pages with sidebar layout */}
         <Route element={<ProtectedRoute />}>
-          <Route element={<MainLayout />}>
-            {/* MAIN */}
+          <Route path="/pending-approval" element={<PendingApproval />} />
+          <Route path="/restricted" element={<Restricted />} />
+          <Route path="/renew" element={<RenewLicense />} />
+          
+          <Route element={<LicenseGuard />}>
+            <Route element={<MainLayout />}>
+              {/* MAIN */}
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<Dashboard />} />
 
             {/* SYSTEM ADMINISTRATION (SUPER_ADMIN ONLY) */}
-
-
+            <Route element={<SuperAdminGuard />}>
+              <Route path="/invoices" element={<Invoices />} />
+              <Route path="/system-tenants" element={<SystemTenants />} />
+            </Route>
             {/* CLIENT MANAGEMENT */}
             <Route path="/clients" element={<Clients />} />
             <Route path="/active-subscribers" element={<ActiveSubscribers />} />
@@ -75,7 +88,6 @@ export default function App() {
             <Route path="/all-transactions" element={<AllTransactions />} />
             <Route path="/mobile-transactions" element={<MobileTransactions />} />
             <Route path="/expense-tracking" element={<ExpenseTracking />} />
-            <Route path="/invoices" element={<Invoices />} />
 
             {/* NETWORK MANAGEMENT */}
             <Route path="/mikrotiks" element={<Mikrotiks />} />
@@ -113,6 +125,7 @@ export default function App() {
             <Route path="/mpesa-paybill-config" element={<MpesaPaybillConfig />} />
             <Route path="/palmpesa-config" element={<PalmPesaConfig />} />
             <Route path="/zenopay-config" element={<ZenoPayConfig />} />
+          </Route>
           </Route>
         </Route>
       </Routes>

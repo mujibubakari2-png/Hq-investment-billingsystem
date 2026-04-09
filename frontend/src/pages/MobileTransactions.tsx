@@ -9,6 +9,7 @@ import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import BlockIcon from '@mui/icons-material/Block';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 import { mobileTransactionsApi } from '../api/client';
+import { formatDateTime } from '../utils/formatters';
 
 export default function MobileTransactions() {
     const [searchTerm, setSearchTerm] = useState('');
@@ -30,7 +31,7 @@ export default function MobileTransactions() {
         const csvContent = "data:text/csv;charset=utf-8,"
             + headers.join(',') + '\n'
             + transactions.map((t: any) =>
-                `${t.user},${t.planName || ''},${t.amount},${t.method || ''},${t.reference || t.transactionId || ''},${t.status},${t.date}`
+                `${t.user},${t.planName || ''},${t.amount},${t.method || ''},${t.reference || t.transactionId || ''},${t.status},${formatDateTime(t.date)}`
             ).join('\n');
 
         const encodedUri = encodeURI(csvContent);
@@ -297,8 +298,8 @@ export default function MobileTransactions() {
                                             {tx.transactionId || tx.reference || '—'}
                                         </td>
                                         <td style={{ textTransform: 'capitalize' }}>{tx.method || '—'}</td>
-                                        <td>{tx.date || tx.created || '—'}</td>
-                                        <td>{tx.status === 'Paid' || tx.status === 'Completed' ? (tx.date || tx.paid) : '—'}</td>
+                                        <td>{formatDateTime(tx.date)}</td>
+                                        <td>{tx.status === 'Paid' || tx.status === 'Completed' ? formatDateTime(tx.date) : '—'}</td>
                                         <td>
                                             <span className={`badge ${tx.status === 'Paid' || tx.status === 'Completed' ? 'active' : tx.status === 'Pending' ? 'expired' : 'suspended'}`}>
                                                 {tx.status}

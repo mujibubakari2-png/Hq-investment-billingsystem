@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
+import { toISOSafe, parseSafeDate } from "@/lib/dateUtils";
 
 // GET /api/invoices
 export async function GET(req: NextRequest) {
@@ -12,7 +13,7 @@ export async function GET(req: NextRequest) {
         }
 
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
-        const tenantFilter = isSuperAdmin ? {} : { tenantId: userPayload.tenantId };
+        const tenantFilter = { tenantId: userPayload.tenantId };
 
         const { searchParams } = new URL(req.url);
         const status = searchParams.get("status") || "";
@@ -54,8 +55,8 @@ export async function GET(req: NextRequest) {
             clientName: inv.client.fullName,
             amount: inv.amount,
             status: inv.status.charAt(0) + inv.status.slice(1).toLowerCase(),
-            dueDate: inv.dueDate.toLocaleDateString("en-US", { timeZone: "Africa/Dar_es_Salaam", month: "short", day: "numeric", year: "numeric" }),
-            issuedDate: inv.issuedDate.toLocaleDateString("en-US", { timeZone: "Africa/Dar_es_Salaam", month: "short", day: "numeric", year: "numeric" }),
+            dueDate: toISOSafe(inv.dueDate),
+            issuedDate: toISOSafe(inv.issuedDate),
             items: inv.items.map((item) => ({
                 description: item.description,
                 quantity: item.quantity,
@@ -82,7 +83,7 @@ export async function POST(req: NextRequest) {
 
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
         const body = await req.json();
-        const tenantIdValue = isSuperAdmin ? (body.tenantId || null) : userPayload.tenantId;
+        const tenantIdValue = userPayload.tenantId;
 
         const invoice = await prisma.invoice.create({
             data: {
@@ -90,8 +91,8 @@ export async function POST(req: NextRequest) {
                 clientId: body.clientId,
                 amount: parseFloat(body.amount),
                 status: (body.status || "DRAFT").toUpperCase(),
-                dueDate: new Date(body.dueDate),
-                issuedDate: new Date(body.issuedDate || new Date()),
+                dueDate: parseSafeDate(body.dueDate) || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // Default 7 days from now
+                issuedDate: parseSafeDate(body.issuedDate) || new Date(),
                 tenantId: tenantIdValue,
                 items: {
                     create: (body.items || []).map((item: { description: string; quantity: number; unitPrice: number; total: number }) => ({

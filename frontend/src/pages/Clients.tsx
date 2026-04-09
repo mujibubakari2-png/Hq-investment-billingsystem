@@ -9,6 +9,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import PhoneIcon from '@mui/icons-material/Phone';
 import SortIcon from '@mui/icons-material/UnfoldMore';
 import { clientsApi } from '../api/client';
+import { formatDate } from '../utils/formatters';
 import AddClientModal from '../modals/AddClientModal';
 import EditClientModal from '../modals/EditClientModal';
 import ViewClientModal from '../modals/ViewClientModal';
@@ -145,7 +146,7 @@ export default function Clients() {
                     <div className="table-toolbar-right">
                         <button className="btn btn-secondary btn-sm" onClick={() => {
                             const csvContent = 'Full Name,Phone,Service Type,Status,Created On\n' +
-                                clients.map(c => `"${c.fullName}","${c.phone}","${c.serviceType || ''}","${c.status || ''}","${c.createdOn}"`).join('\n');
+                                clients.map(c => `"${c.fullName}","${c.phone}","${c.serviceType || ''}","${c.status || ''}","${formatDate(c.createdOn)}"`).join('\n');
                             const blob = new Blob([csvContent], { type: 'text/csv' });
                             const url = URL.createObjectURL(blob);
                             const a = document.createElement('a');
@@ -216,7 +217,7 @@ export default function Clients() {
                                         </td>
                                         <td>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                                📅 {client.createdOn}
+                                                📅 {formatDate(client.createdOn)}
                                             </div>
                                         </td>
                                         <td>

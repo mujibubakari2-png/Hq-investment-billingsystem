@@ -19,6 +19,7 @@ export async function GET(req: NextRequest) {
                 phone: true,
                 status: true,
                 lastLogin: true,
+                tenantId: true,
             },
         });
 
@@ -26,7 +27,10 @@ export async function GET(req: NextRequest) {
             return errorResponse("User not found", 404);
         }
 
-        return jsonResponse(user);
+        return jsonResponse({
+            ...user,
+            tenant_id: user.tenantId, // Alias for tests
+        });
     } catch {
         return errorResponse("Internal server error", 500);
     }

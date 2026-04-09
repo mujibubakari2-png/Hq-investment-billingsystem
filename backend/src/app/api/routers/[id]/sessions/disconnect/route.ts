@@ -5,6 +5,9 @@ import { getMikroTikService } from "@/lib/mikrotik";
 // POST /api/routers/[id]/sessions/disconnect — Disconnect a session
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
+        const userPayload = getUserFromRequest(req);
+        if (!userPayload) return errorResponse("Unauthorized", 401);
+
         const { id } = await params;
         const body = await req.json();
 
@@ -12,7 +15,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             return errorResponse("sessionId and service (pppoe/hotspot) are required");
         }
 
-        const service = await getMikroTikService(id);
+        const service = await getMikroTikService(id, userPayload.tenantId);
 
         if (body.service === "pppoe") {
             await service.disconnectPPPoESession(body.sessionId, body.username);

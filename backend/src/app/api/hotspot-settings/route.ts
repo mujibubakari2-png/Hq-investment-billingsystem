@@ -12,6 +12,16 @@ export async function GET(req: NextRequest) {
             return errorResponse("routerId is required", 400);
         }
 
+        const userPayload = getUserFromRequest(req);
+        if (!userPayload) return errorResponse("Unauthorized", 401);
+
+        const router = await prisma.router.findUnique({ where: { id: routerId } });
+        if (!router) return errorResponse("Router not found", 404);
+        
+        if (userPayload.role !== "SUPER_ADMIN" && router.tenantId !== userPayload.tenantId) {
+            return errorResponse("Unauthorized to access this router's settings", 403);
+        }
+
         let settings = await prisma.hotspotSettings.findUnique({
             where: { routerId },
         });
@@ -23,8 +33,7 @@ export async function GET(req: NextRequest) {
             settings = await prisma.hotspotSettings.create({
                 data: {
                     routerId,
-                    // Tenant ID from router if available
-                    tenantId: (await prisma.router.findUnique({ where: { id: routerId } }))?.tenantId
+                    tenantId: router.tenantId
                 }
             });
         }
@@ -46,8 +55,17 @@ export async function POST(req: NextRequest) {
             return errorResponse("routerId is required", 400);
         }
 
-        const user = getUserFromRequest(req);
-        const tenantId = user?.tenantId;
+        const userPayload = getUserFromRequest(req);
+        if (!userPayload) return errorResponse("Unauthorized", 401);
+
+        const router = await prisma.router.findUnique({ where: { id: routerId } });
+        if (!router) return errorResponse("Router not found", 404);
+        
+        if (userPayload.role !== "SUPER_ADMIN" && router.tenantId !== userPayload.tenantId) {
+            return errorResponse("Unauthorized to update this router's settings", 403);
+        }
+
+        const tenantId = router.tenantId;
 
         const settings = await prisma.hotspotSettings.upsert({
             where: { routerId },

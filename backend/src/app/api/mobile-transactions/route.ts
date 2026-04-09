@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
+import { toISOSafe, toTimestampSafe, getStartOfTodayTZ, getStartOfMonthTZ, getEndOfMonthTZ } from "@/lib/dateUtils";
 
 export async function GET(req: NextRequest) {
     try {
@@ -8,10 +9,18 @@ export async function GET(req: NextRequest) {
         if (!userPayload) return errorResponse("Unauthorized", 401);
 
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
-        const tenantFilter = isSuperAdmin ? {} : { tenantId: userPayload.tenantId };
+        const tenantFilter = { tenantId: userPayload.tenantId };
+
+        // Super Admin can override tenant filter via query param
+        const url = new URL(req.url);
+        const searchParams = url.searchParams;
+        const targetTenantId = searchParams.get("tenantId");
+        if (isSuperAdmin && targetTenantId) {
+            tenantFilter.tenantId = targetTenantId;
+        }
         
         // Fetch settings to determine active gateways scoped by tenantId
-        let gwSetting = await prisma.systemSetting.findFirst({ where: { key: 'paymentGateways', tenantId: userPayload.tenantId } });
+        let gwSetting = await prisma.systemSetting.findFirst({ where: { key: 'paymentGateways', ...tenantFilter } });
         
         // Fallback to global setting if no tenant-specific override exists
         if (!gwSetting && !isSuperAdmin) {
@@ -30,7 +39,6 @@ export async function GET(req: NextRequest) {
         }
 
         // Parse URL Query Parameters for server-side pagination and filtering
-        const { searchParams } = new URL(req.url);
         const search = searchParams.get("search")?.toLowerCase() || "";
         const status = searchParams.get("status") || "All";
         const methodFilter = searchParams.get("method") || "All";
@@ -45,13 +53,6 @@ export async function GET(req: NextRequest) {
             orderBy: { createdAt: "desc" },
         });
 
-        const formatDateTime = (d: any) => {
-            if (!d) return "N/A";
-            const dateObj = new Date(d);
-            if (isNaN(dateObj.getTime())) return "Invalid Date";
-            try { return dateObj.toLocaleString("en-US", { timeZone: "Africa/Dar_es_Salaam", month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" }); } catch (e) { return dateObj.toISOString(); }
-        };
-
         const allMapped = transactions.map((t: any) => ({
             id: t.id,
             user: t.client?.username || "Unknown",
@@ -61,9 +62,9 @@ export async function GET(req: NextRequest) {
             type: t.type.charAt(0) + t.type.slice(1).toLowerCase(),
             method: t.method || "Cash",
             status: t.status.charAt(0) + t.status.slice(1).toLowerCase(),
-            date: formatDateTime(t.createdAt),
-            timestamp: new Date(t.createdAt).getTime(),
-            expiryDate: t.expiryDate || null,
+            date: toISOSafe(t.createdAt),
+            timestamp: toTimestampSafe(t.createdAt),
+            expiryDate: toISOSafe(t.expiryDate),
             reference: t.reference || t.transactionId,
         }));
 
@@ -74,11 +75,11 @@ export async function GET(req: NextRequest) {
         });
 
         // Compute Summaries (Always computed unconditionally against all channel transactions, unfiltered by search)
-        const now = new Date();
-        const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+        // Fixed: Use timezone-aware boundaries (Africa/Dar_es_Salaam) to match frontend display
+        const startOfToday = getStartOfTodayTZ();
         const endOfToday = startOfToday + 24 * 60 * 60 * 1000 - 1;
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-        const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999).getTime();
+        const startOfMonth = getStartOfMonthTZ();
+        const endOfMonth = getEndOfMonthTZ();
 
         const todayTxs = channelTxs.filter(t => t.timestamp >= startOfToday && t.timestamp <= endOfToday);
         const monthTxs = channelTxs.filter(t => t.timestamp >= startOfMonth && t.timestamp <= endOfMonth);

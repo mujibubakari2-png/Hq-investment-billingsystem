@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
+import { toISOSafe, toTimestampSafe, getStartOfTodayTZ, getStartOfMonthTZ } from "@/lib/dateUtils";
 
 // GET /api/dashboard - aggregate stats
 export async function GET(req: NextRequest) {
@@ -12,10 +13,26 @@ export async function GET(req: NextRequest) {
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
 
         // Base filter for tenant isolation
-        const tenantFilter = isSuperAdmin ? {} : { tenantId: userPayload.tenantId };
+        const tenantFilter = { tenantId: userPayload.tenantId };
+        
+        // Super Admin can override tenant filter to see specific tenant dashboard via query param
+        const { searchParams: queryParams } = new URL(req.url);
+        const targetTenantId = queryParams.get("tenantId");
+        const routerId = queryParams.get("routerId");
+        
+        if (isSuperAdmin && targetTenantId) {
+            tenantFilter.tenantId = targetTenantId;
+        }
 
-        const todayStart = new Date(new Date().setHours(0, 0, 0, 0));
-        const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+        // Router filter for stats (clients, subscriptions, transactions)
+        const routerFilter: any = {};
+        if (routerId) {
+            routerFilter.routerId = routerId;
+        }
+
+        // Fixed: Use timezone-aware boundaries (Africa/Dar_es_Salaam) to match frontend display
+        const todayStart = new Date(getStartOfTodayTZ());
+        const monthStart = new Date(getStartOfMonthTZ());
 
         const lastYear = new Date();
         lastYear.setFullYear(lastYear.getFullYear() - 1);
@@ -49,8 +66,8 @@ export async function GET(req: NextRequest) {
             pppoeOnlineUsers,
         ] = await Promise.all([
             prisma.client.count({ where: tenantFilter }),
-            prisma.subscription.count({ where: { status: "ACTIVE", ...tenantFilter } }),
-            prisma.subscription.count({ where: { status: "EXPIRED", ...tenantFilter } }),
+            prisma.subscription.count({ where: { status: "ACTIVE", ...tenantFilter, ...routerFilter } }),
+            prisma.subscription.count({ where: { status: "EXPIRED", ...tenantFilter, ...routerFilter } }),
             isAdmin ? prisma.transaction.aggregate({
                 where: { status: "COMPLETED", ...tenantFilter },
                 _sum: { amount: true },
@@ -64,10 +81,10 @@ export async function GET(req: NextRequest) {
                 _sum: { amount: true },
             }) : Promise.resolve({ _sum: { amount: 0 } }),
             prisma.subscription.count({
-                where: { status: "ACTIVE", onlineStatus: "ONLINE", ...tenantFilter },
+                where: { status: "ACTIVE", onlineStatus: "ONLINE", ...tenantFilter, ...routerFilter },
             }),
-            prisma.router.count({ where: tenantFilter }),
-            prisma.router.count({ where: { status: "ONLINE", ...tenantFilter } }),
+            prisma.router.count({ where: { ...tenantFilter, ...(routerId ? { id: routerId } : {}) } }),
+            prisma.router.count({ where: { status: "ONLINE", ...tenantFilter, ...(routerId ? { id: routerId } : {}) } }),
             isAdmin ? prisma.transaction.aggregate({
                 where: {
                     status: "COMPLETED",
@@ -83,7 +100,7 @@ export async function GET(req: NextRequest) {
                 include: { client: { select: { username: true } }, tenant: true },
             }),
             prisma.subscription.findMany({
-                where: tenantFilter,
+                where: { ...tenantFilter, ...routerFilter },
                 take: 10,
                 orderBy: { createdAt: "desc" },
                 include: {
@@ -106,15 +123,15 @@ export async function GET(req: NextRequest) {
                 where: { status: "COMPLETED", type: "VOUCHER", createdAt: { gte: monthStart }, ...tenantFilter },
                 _sum: { amount: true }
             }) : Promise.resolve({ _sum: { amount: 0 } }),
-            prisma.voucher.count({ where: { createdAt: { gte: todayStart }, ...tenantFilter } }),
-            prisma.voucher.count({ where: { status: "USED", usedAt: { gte: todayStart }, ...tenantFilter } }),
-            prisma.voucher.count({ where: { createdAt: { gte: monthStart }, ...tenantFilter } }),
-            prisma.voucher.count({ where: { status: "USED", usedAt: { gte: monthStart }, ...tenantFilter } }),
+            prisma.voucher.count({ where: { createdAt: { gte: todayStart }, ...tenantFilter, ...routerFilter } }),
+            prisma.voucher.count({ where: { status: "USED", usedAt: { gte: todayStart }, ...tenantFilter, ...routerFilter } }),
+            prisma.voucher.count({ where: { createdAt: { gte: monthStart }, ...tenantFilter, ...routerFilter } }),
+            prisma.voucher.count({ where: { status: "USED", usedAt: { gte: monthStart }, ...tenantFilter, ...routerFilter } }),
             prisma.transaction.count({ where: { status: "COMPLETED", type: "VOUCHER", createdAt: { gte: todayStart }, ...tenantFilter } }),
             prisma.transaction.count({ where: { status: "COMPLETED", type: "MOBILE", createdAt: { gte: todayStart }, ...tenantFilter } }),
             prisma.transaction.count({ where: { status: "COMPLETED", type: "MOBILE", createdAt: { gte: monthStart }, ...tenantFilter } }),
             prisma.client.count({ where: { createdAt: { gte: monthStart }, ...tenantFilter } }),
-            prisma.package.findMany({ where: tenantFilter, include: { _count: { select: { subscriptions: true } } } }),
+            prisma.package.findMany({ where: { ...tenantFilter, ...routerFilter }, include: { _count: { select: { subscriptions: true } } } }),
             prisma.radAcct.count({ where: { acctstoptime: null, framedprotocol: { not: "PPP" }, ...tenantFilter } }),
             prisma.radAcct.count({ where: { acctstoptime: null, framedprotocol: "PPP", ...tenantFilter } }),
         ]);
@@ -124,7 +141,7 @@ export async function GET(req: NextRequest) {
         if (isAdmin) {
             try {
                 // By day (last 30 days)
-                const rawDaily = isSuperAdmin
+                const rawDaily = isSuperAdmin && !targetTenantId
                     ? await prisma.$queryRaw<any[]>`
                         SELECT TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY-MM-DD') as name, SUM(amount) as value
                         FROM transactions
@@ -135,12 +152,12 @@ export async function GET(req: NextRequest) {
                         SELECT TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY-MM-DD') as name, SUM(amount) as value
                         FROM transactions
                         WHERE status = 'COMPLETED' AND timezone('Africa/Dar_es_Salaam', "createdAt") >= timezone('Africa/Dar_es_Salaam', NOW()) - INTERVAL '30 days'
-                          AND "tenantId" = ${userPayload.tenantId}
+                          AND "tenantId" = ${tenantFilter.tenantId}
                         GROUP BY TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY-MM-DD')
                         ORDER BY name ASC`;
 
                 // By week (last 12 weeks)
-                const rawWeekly = isSuperAdmin
+                const rawWeekly = isSuperAdmin && !targetTenantId
                     ? await prisma.$queryRaw<any[]>`
                         SELECT TO_CHAR(DATE_TRUNC('week', timezone('Africa/Dar_es_Salaam', "createdAt")), 'YYYY-MM-DD') as name, SUM(amount) as value
                         FROM transactions
@@ -151,12 +168,12 @@ export async function GET(req: NextRequest) {
                         SELECT TO_CHAR(DATE_TRUNC('week', timezone('Africa/Dar_es_Salaam', "createdAt")), 'YYYY-MM-DD') as name, SUM(amount) as value
                         FROM transactions
                         WHERE status = 'COMPLETED' AND timezone('Africa/Dar_es_Salaam', "createdAt") >= timezone('Africa/Dar_es_Salaam', NOW()) - INTERVAL '12 weeks'
-                          AND "tenantId" = ${userPayload.tenantId}
+                          AND "tenantId" = ${tenantFilter.tenantId}
                         GROUP BY DATE_TRUNC('week', timezone('Africa/Dar_es_Salaam', "createdAt"))
                         ORDER BY DATE_TRUNC('week', timezone('Africa/Dar_es_Salaam', "createdAt")) ASC`;
 
                 // By month (last 12 months)
-                const rawMonthly = isSuperAdmin
+                const rawMonthly = isSuperAdmin && !targetTenantId
                     ? await prisma.$queryRaw<any[]>`
                         SELECT TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY-MM') as name, SUM(amount) as value
                         FROM transactions
@@ -167,12 +184,12 @@ export async function GET(req: NextRequest) {
                         SELECT TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY-MM') as name, SUM(amount) as value
                         FROM transactions
                         WHERE status = 'COMPLETED' AND timezone('Africa/Dar_es_Salaam', "createdAt") >= timezone('Africa/Dar_es_Salaam', NOW()) - INTERVAL '12 months'
-                          AND "tenantId" = ${userPayload.tenantId}
+                          AND "tenantId" = ${tenantFilter.tenantId}
                         GROUP BY TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY-MM')
                         ORDER BY name ASC`;
 
                 // By year
-                const rawYearly = isSuperAdmin
+                const rawYearly = isSuperAdmin && !targetTenantId
                     ? await prisma.$queryRaw<any[]>`
                         SELECT TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY') as name, SUM(amount) as value
                         FROM transactions
@@ -183,7 +200,7 @@ export async function GET(req: NextRequest) {
                         SELECT TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY') as name, SUM(amount) as value
                         FROM transactions
                         WHERE status = 'COMPLETED'
-                          AND "tenantId" = ${userPayload.tenantId}
+                          AND "tenantId" = ${tenantFilter.tenantId}
                         GROUP BY TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY')
                         ORDER BY name ASC`;
 
@@ -202,7 +219,7 @@ export async function GET(req: NextRequest) {
         // Subscriber growth (last 6 months)
         let subscriberGrowthData: any[] = [];
         try {
-            const rawGrowth = isSuperAdmin
+            const rawGrowth = isSuperAdmin && !targetTenantId
                 ? await prisma.$queryRaw<any[]>`
                     SELECT TO_CHAR("createdAt", 'Mon') as month, COUNT(*) as clients
                     FROM clients
@@ -212,7 +229,7 @@ export async function GET(req: NextRequest) {
                     SELECT TO_CHAR("createdAt", 'Mon') as month, COUNT(*) as clients
                     FROM clients
                     WHERE "createdAt" >= NOW() - INTERVAL '6 months'
-                      AND "tenantId" = ${userPayload.tenantId}
+                      AND "tenantId" = ${tenantFilter.tenantId}
                     GROUP BY TO_CHAR("createdAt", 'Mon')`;
             subscriberGrowthData = rawGrowth.map(d => ({ month: d.month, clients: Number(d.clients) || 0 }));
         } catch (e) {
@@ -220,10 +237,11 @@ export async function GET(req: NextRequest) {
         }
 
         const loginActivities = recentLogins.map(u => ({
-            id: `login-${u.username}-${u.lastLogin?.getTime()}`,
+            id: `login-${u.username}-${toTimestampSafe(u.lastLogin)}`,
             title: u.role === 'SUPER_ADMIN' ? 'SuperAdmin' : u.role === 'ADMIN' ? 'Admin' : 'User',
             description: `${u.email || u.username} logged in via System`,
-            date: u.lastLogin,
+            date: toISOSafe(u.lastLogin),
+            timestamp: toTimestampSafe(u.lastLogin),
             status: 'Info',
             type: 'login'
         }));
@@ -232,17 +250,14 @@ export async function GET(req: NextRequest) {
             id: t.id,
             title: t.client.username,
             description: `${t.amount} TZS via ${t.method}`,
-            date: t.createdAt,
+            date: toISOSafe(t.createdAt),
+            timestamp: toTimestampSafe(t.createdAt),
             status: t.status.charAt(0) + t.status.slice(1).toLowerCase(),
             type: 'transaction'
         }));
 
         const systemActivities = [...loginActivities, ...transactionActivities]
-            .sort((a, b) => {
-                const timeA = a.date instanceof Date && !isNaN(a.date.getTime()) ? a.date.getTime() : 0;
-                const timeB = b.date instanceof Date && !isNaN(b.date.getTime()) ? b.date.getTime() : 0;
-                return timeB - timeA;
-            })
+            .sort((a, b) => (b.timestamp) - (a.timestamp))
             .slice(0, 5)
             .map(act => ({
                 id: act.id,
@@ -250,9 +265,7 @@ export async function GET(req: NextRequest) {
                 description: act.description,
                 type: act.type,
                 status: act.status,
-                date: (act.date instanceof Date && !isNaN(act.date.getTime()))
-                    ? act.date.toLocaleString("en-US", { timeZone: "Africa/Dar_es_Salaam", month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })
-                    : "Recent"
+                date: act.date || null
             }));
 
         // Mobile transactions metrics
@@ -318,17 +331,17 @@ export async function GET(req: NextRequest) {
                 user: t.client.username,
                 amount: t.amount,
                 method: t.method,
-                planType: t.planName || 'N/A', // approximate plan type/name
+                planType: t.planName || 'N/A',
                 status: t.status.charAt(0) + t.status.slice(1).toLowerCase(),
-                date: (t.createdAt instanceof Date && !isNaN(t.createdAt.getTime())) ? t.createdAt.toLocaleString("en-US", { timeZone: "Africa/Dar_es_Salaam", month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "Recent",
-                timeActiveSys: t.client ? "N/A" : "N/A", // This depends on mikrotik sync, setting N/A for display
+                date: toISOSafe(t.createdAt),
+                timeActiveSys: "N/A",
             })) : [],
             recentSubscriptions: recentSubscriptions.map((s) => ({
                 id: s.id,
                 username: s.client.username,
                 plan: s.package.name,
                 status: s.status.charAt(0) + s.status.slice(1).toLowerCase(),
-                expiresAt: (s.expiresAt instanceof Date && !isNaN(s.expiresAt.getTime())) ? s.expiresAt.toLocaleString("en-US", { timeZone: "Africa/Dar_es_Salaam", month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "N/A",
+                expiresAt: toISOSafe(s.expiresAt),
             })),
         };
 

@@ -1,7 +1,12 @@
-import { PrismaClient } from "./src/generated/prisma/index.js";
-import bcrypt from "bcryptjs";
+import { PrismaClient } from "./src/generated/prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
+import { Pool } from "pg";
 
-const prisma = new PrismaClient({});
+const connectionString = "postgresql://enterprisedb:Muu%4066487125@localhost:5444/kenge_isp";
+const pool = new Pool({ connectionString });
+const adapter = new PrismaPg(pool);
+const prisma = new PrismaClient({ adapter });
+import bcrypt from "bcryptjs";
 
 async function main() {
     try {
@@ -58,7 +63,7 @@ async function main() {
         console.log("\nSuper Admin setup complete.");
         console.log(`Login Email: ${superAdminEmail}`);
         console.log(`Password: ${superAdminPassword}`);
-        
+
     } catch (error) {
         console.error("Error setting up super admin:", error);
     } finally {

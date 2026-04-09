@@ -5,6 +5,7 @@ import PhoneIcon from '@mui/icons-material/Phone';
 import EmailIcon from '@mui/icons-material/Email';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import type { Client } from '../types';
+import { formatDate } from '../utils/formatters';
 
 interface ViewClientModalProps {
     client: Client;
@@ -67,7 +68,7 @@ export default function ViewClientModal({ client, onClose, onEdit }: ViewClientM
                         </div>
                         <div className="info-item">
                             <div className="info-label"><CalendarTodayIcon style={{ fontSize: 14 }} /> Created On</div>
-                            <div className="info-value">{client.createdOn}</div>
+                            <div className="info-value">{formatDate(client.createdOn)}</div>
                         </div>
                         {client.router && (
                             <div className="info-item">
@@ -84,7 +85,7 @@ export default function ViewClientModal({ client, onClose, onEdit }: ViewClientM
                         {client.expiresOn && (
                             <div className="info-item">
                                 <div className="info-label">Expires On</div>
-                                <div className="info-value" style={{ color: 'var(--danger)' }}>{client.expiresOn}</div>
+                                <div className="info-value" style={{ color: 'var(--danger)' }}>{formatDate(client.expiresOn)}</div>
                             </div>
                         )}
                         {client.dataUsed && (

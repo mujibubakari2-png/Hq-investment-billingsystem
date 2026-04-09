@@ -8,6 +8,7 @@ import type { Expense } from '../types';
 import AddExpenseModal from '../modals/AddExpenseModal';
 import EditExpenseModal from '../modals/EditExpenseModal';
 import ConfirmDeleteModal from '../modals/ConfirmDeleteModal';
+import { formatDate } from '../utils/formatters';
 
 export default function ExpenseTracking() {
     const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -151,11 +152,7 @@ export default function ExpenseTracking() {
                                         <td style={{ fontWeight: 500 }}>{exp.description}</td>
                                         <td><span className="badge active">{exp.category}</span></td>
                                         <td>{exp.amount.toLocaleString()}</td>
-                                        <td>{(() => {
-                                            if (!exp.date) return '—';
-                                            const d = new Date(exp.date);
-                                            return isNaN(d.getTime()) ? String(exp.date) : d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-                                        })()}</td>
+                                        <td>{formatDate(exp.date)}</td>
                                         <td><span className={`badge ${(exp.status || 'approved').toLowerCase() === 'approved' ? 'active' : 'pending'}`}>{exp.status || 'Approved'}</span></td>
                                         <td>
                                             <div className="table-actions">

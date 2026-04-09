@@ -125,13 +125,17 @@ export default function EditPlan() {
                 // Parse dates
                 if (subData.activatedAt) {
                     const d = new Date(subData.activatedAt);
-                    setActivatedDate(d.toISOString().split('T')[0]);
-                    setActivatedTime(d.toTimeString().slice(0, 8));
+                    if (!isNaN(d.getTime())) {
+                        setActivatedDate(d.toISOString().split('T')[0]);
+                        setActivatedTime(d.toTimeString().slice(0, 8));
+                    }
                 }
                 if (subData.expiresAt) {
                     const d = new Date(subData.expiresAt);
-                    setExpiresDate(d.toISOString().split('T')[0]);
-                    setExpiresTime(d.toTimeString().slice(0, 8));
+                    if (!isNaN(d.getTime())) {
+                        setExpiresDate(d.toISOString().split('T')[0]);
+                        setExpiresTime(d.toTimeString().slice(0, 8));
+                    }
                 }
             })
             .catch((err) => {

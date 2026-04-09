@@ -2,6 +2,8 @@ import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 
+import { toISOSafe, toTimestampSafe } from "@/lib/dateUtils";
+
 // GET /api/vouchers
 export async function GET(req: NextRequest) {
     try {
@@ -9,7 +11,7 @@ export async function GET(req: NextRequest) {
         if (!userPayload) return errorResponse("Unauthorized", 401);
 
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
-        const tenantFilter = isSuperAdmin ? {} : { tenantId: userPayload.tenantId };
+        const tenantFilter = { tenantId: userPayload.tenantId };
         
         const { searchParams } = new URL(req.url);
         const status = searchParams.get("status") || "";
@@ -43,17 +45,6 @@ export async function GET(req: NextRequest) {
             prisma.voucher.count({ where }),
         ]);
 
-        const formatDate = (d: any) => {
-            if (!d) return null;
-            const dateObj = new Date(d);
-            if (isNaN(dateObj.getTime())) return "Invalid Date";
-            try {
-                return dateObj.toLocaleDateString("en-US", { timeZone: "Africa/Dar_es_Salaam", month: "short", day: "numeric", year: "numeric" });
-            } catch (e) {
-                return dateObj.toDateString(); // Safe fallback
-            }
-        };
-
         const mapped = vouchers.map((v: any) => ({
             id: v.id,
             code: v.code,
@@ -62,10 +53,10 @@ export async function GET(req: NextRequest) {
             packageType: v.package?.type,
             status: v.status.charAt(0) + v.status.slice(1).toLowerCase(),
             createdBy: v.createdBy?.fullName || v.createdBy?.username || "System",
-            createdAt: formatDate(v.createdAt) || "N/A",
-            timestamp: new Date(v.createdAt).getTime() || 0, // Fallback raw number for sorting
+            createdAt: toISOSafe(v.createdAt),
+            timestamp: toTimestampSafe(v.createdAt),
             usedBy: v.usedBy,
-            usedAt: formatDate(v.usedAt),
+            usedAt: toISOSafe(v.usedAt),
             customer: v.customer,
         }));
 
@@ -93,7 +84,20 @@ export async function POST(req: NextRequest) {
         if (!currentUser) return errorResponse("Unauthorized", 401);
 
         const isSuperAdmin = currentUser.role === "SUPER_ADMIN";
-        const tenantFilter = isSuperAdmin ? {} : { tenantId: currentUser.tenantId };
+        
+        if (!isSuperAdmin && pkg.tenantId !== currentUser.tenantId) {
+            return errorResponse("Forbidden: Package belongs to another tenant", 403);
+        }
+
+        if (routerId) {
+            const router = await prisma.router.findUnique({ where: { id: routerId } });
+            if (!router) return errorResponse("Router not found", 404);
+            if (!isSuperAdmin && router.tenantId !== currentUser.tenantId) {
+                return errorResponse("Forbidden: Router belongs to another tenant", 403);
+            }
+        }
+
+        const tenantFilter = { tenantId: isSuperAdmin ? undefined : currentUser.tenantId };
         let finalCreatedById = currentUser?.userId || createdById;
         if (!finalCreatedById) {
             const admin = await prisma.user.findFirst({ where: { role: { in: ["ADMIN", "SUPER_ADMIN"] } } });
@@ -103,7 +107,7 @@ export async function POST(req: NextRequest) {
         if (!finalCreatedById) return errorResponse("Creator user ID is required");
 
         const finalCode = code || Math.floor(100000 + Math.random() * 900000).toString();
-        const tenantIdValue = isSuperAdmin ? (body.tenantId || null) : currentUser.tenantId;
+        const tenantIdValue = isSuperAdmin ? pkg.tenantId : currentUser.tenantId;
 
         const voucher = await prisma.voucher.create({
             data: {

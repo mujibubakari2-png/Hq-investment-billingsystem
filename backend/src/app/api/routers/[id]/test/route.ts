@@ -9,7 +9,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         if (!userPayload) return errorResponse("Unauthorized", 401);
 
         const { id } = await params;
-        const service = await getMikroTikService(id);
+        const service = await getMikroTikService(id, userPayload.tenantId);
         const result = await service.testConnection();
 
         // Always return 200 — the `success` field in the body indicates

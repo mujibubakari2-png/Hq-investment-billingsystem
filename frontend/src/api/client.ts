@@ -53,6 +53,7 @@ function del<T>(path: string) {
 
 export interface LicenseResponse {
     isSuperAdmin: boolean;
+    companyName?: string;
     licenseKey?: string;
     status?: string;
     daysRemaining?: number;
@@ -61,6 +62,7 @@ export interface LicenseResponse {
     clientLimit?: number;
     paidThisMonth?: number;
     hasOutstanding?: boolean;
+    plan?: { id: string; name: string; price: number; };
     outstandingInvoices?: { id: string; amount: number; dueDate: string; status: string; }[];
     message?: string;
 }
@@ -139,7 +141,13 @@ export interface DashboardResponse {
 }
 
 export const dashboardApi = {
-    getStats: () => get<DashboardResponse>('/dashboard'),
+    getStats: (tenantId?: string, routerId?: string) => {
+        const params = new URLSearchParams();
+        if (tenantId) params.append('tenantId', tenantId);
+        if (routerId && routerId !== 'All') params.append('routerId', routerId);
+        const qs = params.toString() ? `?${params.toString()}` : '';
+        return get<DashboardResponse>(`/dashboard${qs}`);
+    },
 };
 
 // ── Clients ─────────────────────────────────────────────────────────────────
@@ -219,6 +227,7 @@ export const activeSubscribersApi = {
 
 export const licenseApi = {
     getLicense: () => get<LicenseResponse>('/license'),
+    renewLicense: (data: { packageMonths: number; phoneNumber: string; amount: number; invoiceId?: string }) => post<{ success: boolean; message: string; expiresAt: string }>('/license/renew', data),
 };
 
 export const transactionsApi = {
@@ -413,4 +422,26 @@ export const vpnApi = {
     list: () => get<unknown[]>('/vpn'),
     create: (data: Record<string, unknown>) => post<unknown>('/vpn', data),
     delete: (id: string) => del<{ message: string }>(`/vpn/${id}`),
+};
+
+// ── Super Admin ─────────────────────────────────────────────────────────────
+
+export const superAdminTenantsApi = {
+    list: () => get<Array<any>>('/super-admin/tenants'),
+    // Uses the dedicated /approve route which sends email notification
+    approve: (tenantId: string) => post<any>('/super-admin/tenants/approve', { tenantId }),
+    // Uses the main route for suspend/reactivate (no email needed)
+    action: (tenantId: string, action: 'suspend' | 'reactivate') =>
+        post<any>('/super-admin/tenants', { tenantId, action }),
+};
+
+export const adminInvoicesApi = {
+    list: () => get<Array<any>>('/admin/saas-invoices'),
+    confirmPayment: (invoiceId: string) =>
+        post<any>('/admin/saas-invoices', { action: 'confirm_payment', invoiceId }),
+    create: (data: { tenantId: string; planId: string; amount: number; dueDate?: string; packageMonths?: number }) =>
+        post<any>('/admin/saas-invoices', { action: 'create', ...data }),
+    // Extend a tenant's license by N months — auto-calculates new expiry from current date
+    extend: (tenantId: string, months: number) =>
+        post<any>('/admin/saas-invoices', { action: 'extend', tenantId, months }),
 };

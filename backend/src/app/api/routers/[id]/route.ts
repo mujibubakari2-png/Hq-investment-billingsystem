@@ -1,9 +1,12 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
-import { jsonResponse, errorResponse } from "@/lib/auth";
+import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
+        const userPayload = getUserFromRequest(req);
+        if (!userPayload) return errorResponse("Unauthorized", 401);
+
         const { id } = await params;
         const router = await prisma.router.findUnique({
             where: { id },
@@ -15,6 +18,11 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
             },
         });
         if (!router) return errorResponse("Router not found", 404);
+
+        if (userPayload.role !== "SUPER_ADMIN" && router.tenantId !== userPayload.tenantId) {
+            return errorResponse("Unauthorized to access this router", 403);
+        }
+
         return jsonResponse(router);
     } catch {
         return errorResponse("Internal server error", 500);
@@ -23,7 +31,18 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
+        const userPayload = getUserFromRequest(req);
+        if (!userPayload) return errorResponse("Unauthorized", 401);
+
         const { id } = await params;
+
+        const existingRouter = await prisma.router.findUnique({ where: { id } });
+        if (!existingRouter) return errorResponse("Router not found", 404);
+        
+        if (userPayload.role !== "SUPER_ADMIN" && existingRouter.tenantId !== userPayload.tenantId) {
+            return errorResponse("Unauthorized to modify this router", 403);
+        }
+
         const body = await req.json();
 
         const data: any = {};
@@ -55,9 +74,20 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     }
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
+        const userPayload = getUserFromRequest(req);
+        if (!userPayload) return errorResponse("Unauthorized", 401);
+
         const { id } = await params;
+        
+        const existingRouter = await prisma.router.findUnique({ where: { id } });
+        if (!existingRouter) return errorResponse("Router not found", 404);
+        
+        if (userPayload.role !== "SUPER_ADMIN" && existingRouter.tenantId !== userPayload.tenantId) {
+            return errorResponse("Unauthorized to delete this router", 403);
+        }
+
         await prisma.router.delete({ where: { id } });
         return jsonResponse({ message: "Router deleted" });
     } catch {

@@ -10,6 +10,7 @@ import type { Invoice } from '../types';
 import CreateInvoiceModal from '../modals/CreateInvoiceModal';
 import ViewInvoiceModal from '../modals/ViewInvoiceModal';
 import ConfirmDeleteModal from '../modals/ConfirmDeleteModal';
+import { formatDate } from '../utils/formatters';
 
 export default function Invoices() {
     const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -73,7 +74,7 @@ export default function Invoices() {
             </style></head><body>
             <h1>Invoice ${inv.invoiceNumber}</h1>
             <p>Client: <strong>${inv.client}</strong> | Status: ${inv.status}</p>
-            <p>Issued: ${inv.issuedDate} | Due: ${inv.dueDate}</p>
+            <p>Issued: ${formatDate(inv.issuedDate)} | Due: ${formatDate(inv.dueDate)}</p>
             <table>
                 <thead><tr><th>Description</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr></thead>
                 <tbody>${itemsHtml}</tbody>
@@ -210,8 +211,8 @@ export default function Invoices() {
                                                 {inv.status}
                                             </span>
                                         </td>
-                                        <td>{inv.issuedDate}</td>
-                                        <td style={{ color: inv.status === 'Overdue' ? 'var(--danger)' : 'inherit' }}>{inv.dueDate}</td>
+                                        <td>{formatDate(inv.issuedDate)}</td>
+                                        <td style={{ color: inv.status === 'Overdue' ? 'var(--danger)' : 'inherit' }}>{formatDate(inv.dueDate)}</td>
                                         <td>
                                             <div className="table-actions">
                                                 <button className="btn-icon view" title="View" onClick={() => setViewInvoice(inv)}><VisibilityIcon style={{ fontSize: 16 }} /></button>

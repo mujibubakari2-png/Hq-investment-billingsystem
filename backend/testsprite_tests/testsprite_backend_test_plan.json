@@ -1,102 +1,42 @@
 [
   {
     "id": "TC001",
-    "title": "post apiauthlogin with valid and invalid credentials",
-    "description": "Test the /api/auth/login endpoint by submitting valid user credentials to receive a successful authentication response with a JWT token, and invalid credentials to verify the response returns a 401 Unauthorized status with an 'Invalid credentials' error message."
+    "title": "postapiauthregistershouldregisternewtenantanduser",
+    "description": "Test POST /api/auth/register with valid email, password, and tenantName to ensure it creates a new user and tenant, returning 201 with the created objects including tenant_id."
   },
   {
     "id": "TC002",
-    "title": "post apiauthregister with valid and invalid payloads",
-    "description": "Test the /api/auth/register endpoint by submitting a valid registration payload including name, email, and password to receive a 201 Created response with a JWT token, and invalid or incomplete payloads to verify proper validation errors are returned."
+    "title": "postapiauthloginshouldauthenticateuserandreturnjwttoken",
+    "description": "Test POST /api/auth/login with valid credentials to verify it returns 200 with a JWT token containing tenant_id and the user object."
   },
   {
     "id": "TC003",
-    "title": "get apiauthme with valid and missing authorization",
-    "description": "Test the /api/auth/me endpoint by calling it with a valid Authorization header containing a JWT token to retrieve the current user profile, and without the Authorization header to verify it returns a 401 Unauthorized error."
+    "title": "getapiauthmeshouldreturncurrentuserprofile",
+    "description": "Test GET /api/auth/me with a valid Authorization Bearer token to ensure it returns 200 with the user profile including tenant_id."
   },
   {
     "id": "TC004",
-    "title": "get apidashboard with and without authorization",
-    "description": "Test the /api/dashboard endpoint by calling it with a valid Authorization header to receive aggregated metrics including revenue, router status, and active users, and without authorization to verify it returns a 401 Unauthorized error."
+    "title": "postapiclientsshouldcreateclientwithtenantidfromtoken",
+    "description": "Test POST /api/clients with Authorization Bearer token and valid client data to verify it creates a client associated with tenant_id from the token, ignoring any tenant_id in the request body, returning 201 with the created client object."
   },
   {
     "id": "TC005",
-    "title": "get and post apiclients with valid and invalid data",
-    "description": "Test the /api/clients endpoint by retrieving a list of clients with a valid Authorization header, creating a new client with a complete payload to receive a 201 Created response, and submitting incomplete or invalid client data to verify validation errors are returned."
+    "title": "getapiclientsshouldlistclientsforcurrenttenant",
+    "description": "Test GET /api/clients with Authorization Bearer token to ensure it returns 200 with an array of clients filtered by the tenant_id from the token."
   },
   {
     "id": "TC006",
-    "title": "get post apirouters with valid and invalid router data",
-    "description": "Test the /api/routers endpoint by listing routers with a valid Authorization header, creating a new router with valid data to receive a 201 Created response including setup instructions, and submitting invalid router names to verify validation errors are returned."
+    "title": "postapiroutersshouldaddrouterwithtenantidfromtoken",
+    "description": "Test POST /api/routers with Authorization Bearer token and valid router data to verify it creates a router associated with tenant_id from the token, returning 201 with the created router object."
   },
   {
     "id": "TC007",
-    "title": "post apihotspotpurchase with valid and invalid payment details",
-    "description": "Test the /api/hotspot/purchase endpoint by submitting a valid purchase payload to receive voucher or activation details, and submitting insufficient or invalid payment information to verify the response returns a 402 Payment Required or 400 error with appropriate messages."
+    "title": "getapiroutersshouldlistroutersforcurrenttenant",
+    "description": "Test GET /api/routers with Authorization Bearer token to ensure it returns 200 with an array of routers filtered by tenant_id from the token."
   },
   {
     "id": "TC008",
-    "title": "get apipackages list and filtering",
-    "description": "Test the /api/packages endpoint to ensure it returns a list of billing packages and supports filtering by type or status."
-  },
-  {
-    "id": "TC009",
-    "title": "post apipackages create new package",
-    "description": "Test creating a new billing package with valid parameters (name, price, duration) and verify it returns 201 Created."
-  },
-  {
-    "id": "TC010",
-    "title": "get apitransactions history",
-    "description": "Test the /api/transactions endpoint to retrieve the list of financial transactions and verify the data structure."
-  },
-  {
-    "id": "TC011",
-    "title": "get apisubscriptions active and expired",
-    "description": "Test the /api/subscriptions endpoint to ensure it returns client subscriptions with correct status and dates."
-  },
-  {
-    "id": "TC012",
-    "title": "client detail operations get put delete",
-    "description": "Test the /api/clients/[id] endpoint for retrieving, updating, and deleting a specific client record."
-  },
-  {
-    "id": "TC013",
-    "title": "post apivouchersgenerate with valid parameters",
-    "description": "Test the /api/vouchers/generate endpoint by providing a package ID and count to generate new voucher codes, and verify the response contains the generated vouchers."
-  },
-  {
-    "id": "TC014",
-    "title": "get and post apiexpenses for financial tracking",
-    "description": "Test the /api/expenses endpoint by listing all expenses and creating a new expense entry with valid category, amount, and description."
-  },
-  {
-    "id": "TC015",
-    "title": "get apireports for system analytics",
-    "description": "Test the /api/reports endpoint to ensure it returns aggregated data for revenue, client growth, and other key performance indicators."
-  },
-  {
-    "id": "TC016",
-    "title": "post apismsbulk to send messages to clients",
-    "description": "Test the /api/sms/bulk endpoint by sending a test message to a list of client IDs and verifying the success response."
-  },
-  {
-    "id": "TC017",
-    "title": "get and post apiequipment for inventory management",
-    "description": "Test the /api/equipment endpoint by listing equipment and adding a new item with serial number and model details."
-  },
-  {
-    "id": "TC018",
-    "title": "post apiauthforgotpasswordrequestotp with valid identifier",
-    "description": "Test the /api/auth/forgot-password/request-otp endpoint by providing a valid email or phone number to receive a success message for OTP dispatch."
-  },
-  {
-    "id": "TC019",
-    "title": "get and put apisettings for system configuration",
-    "description": "Test the /api/settings endpoint to retrieve current system configurations and update a setting (e.g., company name) to verify changes are saved."
-  },
-  {
-    "id": "TC020",
-    "title": "get apipaymentchannels list",
-    "description": "Test the /api/payment-channels endpoint to list available payment gateways like M-Pesa, PalmPesa, etc."
+    "title": "tenantisolationmiddlewareshouldenforcetenantidfromtoken",
+    "description": "Test that all protected endpoints enforce tenant isolation by deriving tenant_id from the JWT token and applying it to database queries, rejecting or ignoring any tenant_id supplied in request bodies or queries."
   }
 ]

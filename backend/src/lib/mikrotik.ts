@@ -189,7 +189,7 @@ export class MikroTikService {
                         ? Math.round((1 - info.freeMemory / info.totalMemory) * 100)
                         : 0,
                     uptime: info.uptime,
-                    lastSeen: new Date().toISOString(),
+                    lastSeen: new Date(),
                 },
             });
 
@@ -615,9 +615,14 @@ export class MikroTikService {
 
 // ── Factory Function ────────────────────────────────────────────────────────
 
-export async function getMikroTikService(routerId: string): Promise<MikroTikService> {
+export async function getMikroTikService(routerId: string, tenantId?: string | null): Promise<MikroTikService> {
     const router = await prisma.router.findUnique({ where: { id: routerId } });
     if (!router) throw new Error("Router not found");
+
+    // Strict tenant isolation check
+    if (tenantId !== undefined && router.tenantId !== tenantId) {
+        throw new Error("Unauthorized: This router belongs to another tenant");
+    }
 
     return new MikroTikService(
         {

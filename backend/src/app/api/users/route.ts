@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { hashPassword, jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
+import { toISOSafe } from "@/lib/dateUtils";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +16,7 @@ export async function GET(req: NextRequest) {
         }
 
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
-        const tenantFilter = isSuperAdmin ? {} : { tenantId: userPayload.tenantId };
+        const tenantFilter = { tenantId: userPayload.tenantId };
 
         const users = await prisma.user.findMany({
             where: { ...tenantFilter },
@@ -41,8 +42,8 @@ export async function GET(req: NextRequest) {
             role: u.role === "SUPER_ADMIN" ? "Super Admin" : u.role.charAt(0) + u.role.slice(1).toLowerCase(),
             status: u.status === "ACTIVE" ? "Active" : "Inactive",
             phone: u.phone,
-            lastLogin: u.lastLogin,
-            createdAt: u.createdAt,
+            lastLogin: toISOSafe(u.lastLogin),
+            createdAt: toISOSafe(u.createdAt),
         }));
 
         return jsonResponse(mapped);
@@ -63,7 +64,7 @@ export async function POST(req: NextRequest) {
         }
 
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
-        const tenantFilter = isSuperAdmin ? {} : { tenantId: userPayload.tenantId };
+        const tenantFilter = { tenantId: userPayload.tenantId };
         
         const body = await req.json();
 
@@ -91,7 +92,7 @@ export async function POST(req: NextRequest) {
             return errorResponse("Forbidden: Cannot bestow Super Admin status.", 403);
         }
 
-        const tenantIdValue = isSuperAdmin ? (body.tenantId || null) : userPayload.tenantId;
+        const tenantIdValue = userPayload.tenantId;
 
         const user = await prisma.user.create({
             data: {

@@ -58,7 +58,7 @@ export async function GET(req: NextRequest) {
 
             response.username = transaction.client.username;
             response.password = transaction.client.phone; // Phone as default password
-            response.expiresAt = subscription?.expiresAt?.toISOString() || transaction.expiryDate;
+            response.expiresAt = subscription?.expiresAt?.toISOString() || transaction.expiryDate?.toISOString();
             response.message = "Payment confirmed! You can now connect.";
             response.autoConnect = true;
         } else if (transaction.status === "FAILED") {

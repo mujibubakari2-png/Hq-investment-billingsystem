@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import bcrypt from "bcryptjs";
@@ -97,6 +98,25 @@ async function main() {
         },
     });
 
+    // ─── Test User for TestSprite ──────────────────────────────────────────
+    await prisma.user.create({
+        data: {
+            username: "testuser",
+            email: "testuser@example.com",
+            password: await bcrypt.hash("correct_password", 12),
+            role: "ADMIN",
+            status: "ACTIVE",
+            phone: "255700000009",
+            tenantId: (await prisma.tenant.create({
+                data: {
+                    name: "Test Tenant",
+                    email: "testtenant@example.com",
+                    planId: "plan_basic",
+                }
+            })).id,
+        },
+    });
+
     console.log("  ✓ Created system users (login: admin / admin123)");
 
     // ─── Routers ────────────────────────────────────────────────────────
@@ -187,7 +207,7 @@ async function main() {
             cpuLoad: 15,
             memoryUsed: 42,
             uptime: "15 days 4:23:11",
-            lastSeen: "Now",
+            lastSeen: new Date(),
         },
     });
 

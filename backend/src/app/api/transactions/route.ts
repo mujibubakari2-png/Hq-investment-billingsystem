@@ -2,6 +2,8 @@ import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 
+import { toISOSafe, toTimestampSafe, parseSafeDate } from "@/lib/dateUtils";
+
 // GET /api/transactions
 export async function GET(req: NextRequest) {
     try {
@@ -9,7 +11,7 @@ export async function GET(req: NextRequest) {
         if (!userPayload) return errorResponse("Unauthorized", 401);
 
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
-        const tenantFilter = isSuperAdmin ? {} : { tenantId: userPayload.tenantId };
+        const tenantFilter = { tenantId: userPayload.tenantId };
         
         const { searchParams } = new URL(req.url);
         const search = searchParams.get("search") || "";
@@ -41,29 +43,18 @@ export async function GET(req: NextRequest) {
             prisma.transaction.count({ where }),
         ]);
 
-        const formatDateTime = (d: any) => {
-            if (!d) return "N/A";
-            const dateObj = new Date(d);
-            if (isNaN(dateObj.getTime())) return "Invalid Date";
-            try {
-                return dateObj.toLocaleString("en-US", { timeZone: "Africa/Dar_es_Salaam", month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" });
-            } catch (e) {
-                return dateObj.toISOString();
-            }
-        };
-
         const mapped = transactions.map((t: any) => ({
             id: t.id,
             user: t.client?.username || "Unknown",
             planName: t.planName,
-            plan: t.planName, // Add alias for TestSprite
+            plan: t.planName,
             amount: t.amount,
             type: t.type.charAt(0) + t.type.slice(1).toLowerCase(),
             method: t.method,
             status: t.status.charAt(0) + t.status.slice(1).toLowerCase(),
-            date: formatDateTime(t.createdAt),
-            timestamp: new Date(t.createdAt).getTime() || 0, // Safe numerical value for deterministic sorting
-            expiryDate: t.expiryDate || null,
+            date: toISOSafe(t.createdAt),
+            timestamp: toTimestampSafe(t.createdAt),
+            expiryDate: toISOSafe(t.expiryDate),
             reference: t.reference,
         }));
 
@@ -100,7 +91,7 @@ export async function POST(req: NextRequest) {
         if (!userPayload) return errorResponse("Unauthorized", 401);
 
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
-        const tenantFilter = isSuperAdmin ? {} : { tenantId: userPayload.tenantId };
+        const tenantFilter = { tenantId: userPayload.tenantId };
         
         const body = await req.json();
 
@@ -134,7 +125,7 @@ export async function POST(req: NextRequest) {
 
         if (!clientId) return errorResponse("Client ID or Username is required", 400);
 
-        const tenantIdValue = isSuperAdmin ? (body.tenantId || null) : userPayload.tenantId;
+        const tenantIdValue = userPayload.tenantId;
 
         const transaction = await prisma.transaction.create({
             data: {
@@ -145,7 +136,7 @@ export async function POST(req: NextRequest) {
                 method: body.method || "Cash",
                 status: (body.status || "COMPLETED").toUpperCase(),
                 reference: body.reference || `TXN-${Date.now()}`,
-                expiryDate: body.expiryDate,
+                expiryDate: parseSafeDate(body.expiryDate),
                 tenantId: tenantIdValue
             },
         });

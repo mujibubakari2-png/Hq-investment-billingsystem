@@ -20,6 +20,7 @@ import RemoteAccessModal from '../modals/RemoteAccessModal';
 import LanguageIcon from '@mui/icons-material/Language';
 import CellTowerIcon from '@mui/icons-material/CellTower';
 import type { Router } from '../types';
+import { formatDate } from '../utils/formatters';
 
 export default function Mikrotiks() {
     const [routers, setRouters] = useState<Router[]>([]);
@@ -162,7 +163,7 @@ export default function Mikrotiks() {
         if (diff < 60000) return 'Just now';
         if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
         if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
-        return d.toLocaleDateString();
+        return formatDate(d);
     };
 
     // If router setup wizard is active, show it full-screen
@@ -463,7 +464,8 @@ export default function Mikrotiks() {
                 }}>
                     <div style={{ padding: '6px 0' }}>
                         <button
-                            onClick={() => { 
+                            onMouseDown={(e) => { 
+                                e.preventDefault();
                                 const r = routers.find(r => r.id === actionMenuId);
                                 if (r) setWizardRouter(r); 
                                 setActionMenuId(null); 
@@ -482,7 +484,8 @@ export default function Mikrotiks() {
                             <span>Setup Wizard</span>
                         </button>
                         <button
-                            onClick={() => { 
+                            onMouseDown={(e) => { 
+                                e.preventDefault();
                                 const r = routers.find(r => r.id === actionMenuId);
                                 if (r) setSelectedRouterToEdit(r); 
                                 setActionMenuId(null); 
@@ -502,7 +505,8 @@ export default function Mikrotiks() {
                         </button>
                         <div style={{ height: 1, background: '#f3f4f6', margin: '4px 12px' }} />
                         <button
-                            onClick={() => { 
+                            onMouseDown={(e) => { 
+                                e.preventDefault();
                                 const r = routers.find(r => r.id === actionMenuId);
                                 if (r) setDeleteRouter(r); 
                                 setActionMenuId(null); 

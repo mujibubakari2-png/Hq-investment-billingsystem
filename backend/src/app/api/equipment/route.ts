@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
+import { parseOptionalDate } from "@/lib/dateUtils";
 
 // GET /api/equipment
 export async function GET(req: NextRequest) {
@@ -9,7 +10,7 @@ export async function GET(req: NextRequest) {
         if (!userPayload) return errorResponse("Unauthorized", 401);
 
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
-        const tenantFilter = isSuperAdmin ? {} : { tenantId: userPayload.tenantId };
+        const tenantFilter = { tenantId: userPayload.tenantId };
 
         const { searchParams } = new URL(req.url);
         const search = searchParams.get("search") || "";
@@ -47,7 +48,7 @@ export async function POST(req: NextRequest) {
 
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
         const body = await req.json();
-        const tenantIdValue = isSuperAdmin ? (body.tenantId || null) : userPayload.tenantId;
+        const tenantIdValue = userPayload.tenantId;
 
         const equipment = await prisma.equipment.create({
             data: {
@@ -57,7 +58,7 @@ export async function POST(req: NextRequest) {
                 status: (body.status || "ACTIVE").toUpperCase() as any,
                 location: body.location,
                 assignedTo: body.assignedTo,
-                purchaseDate: body.purchaseDate ? new Date(body.purchaseDate) : undefined,
+                purchaseDate: parseOptionalDate(body.purchaseDate),
                 notes: body.notes,
                 routerId: body.routerId,
                 tenantId: tenantIdValue

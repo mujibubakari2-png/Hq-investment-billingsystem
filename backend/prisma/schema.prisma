@@ -124,7 +124,7 @@ model Transaction {
   method     String
   status     TransactionStatus @default(PENDING)
   reference  String            @unique
-  expiryDate String?
+  expiryDate DateTime?
   createdAt  DateTime          @default(now())
   updatedAt  DateTime          @updatedAt
   tenantId   String?
@@ -136,7 +136,7 @@ model Transaction {
 
 model Router {
   id               String           @id @default(cuid())
-  name             String           @unique
+  name             String
   host             String
   username         String?          @default("admin")
   password         String?
@@ -147,8 +147,9 @@ model Router {
   cpuLoad          Float            @default(0)
   memoryUsed       Float            @default(0)
   uptime           String?
-  lastSeen         String?
-  createdAt        DateTime         @default(now())
+  lastSeen         DateTime?
+  accountingEnabled Boolean          @default(true)
+  createdAt        DateTime          @default(now())
   updatedAt        DateTime         @updatedAt
   tenantId         String?
   apiPort          Int?             @default(8728)
@@ -172,6 +173,7 @@ model Router {
   vouchers         Voucher[]
   vpnUsers         VpnUser[]
 
+  @@unique([name, tenantId])
   @@map("routers")
 }
 
@@ -371,6 +373,7 @@ model Tenant {
   planId           String
   trialStart       DateTime?
   trialEnd         DateTime?
+  licenseExpiresAt DateTime?
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   clients          Client[]
@@ -420,6 +423,7 @@ model TenantInvoice {
   invoiceNumber String              @unique
   tenantId      String
   planId        String
+  packageMonths Int?
   amount        Float
   status        TenantInvoiceStatus @default(PENDING)
   dueDate       DateTime
@@ -702,6 +706,7 @@ enum ChannelStatus {
 }
 
 enum TenantStatus {
+  PENDING_APPROVAL
   TRIALLING
   ACTIVE
   SUSPENDED

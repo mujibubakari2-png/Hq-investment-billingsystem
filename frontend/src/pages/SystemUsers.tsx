@@ -10,6 +10,7 @@ import AccessTimeIcon from '@mui/icons-material/AccessTime';
 
 import { usersApi } from '../api/client';
 import type { SystemUser } from '../types';
+import { formatDateTime } from '../utils/formatters';
 
 export default function SystemUsers() {
     const [showAddUser, setShowAddUser] = useState(false);
@@ -110,7 +111,7 @@ export default function SystemUsers() {
             `Phone: ${user.phone || 'N/A'}\n` +
             `Role: ${user.role || 'N/A'}\n` +
             `Status: ${user.status || 'N/A'}\n` +
-            `Last Login: ${formatDate(user.lastLogin)}`
+            `Last Login: ${formatDateTime(user.lastLogin) === 'N/A' ? 'Never' : formatDateTime(user.lastLogin)}`
         );
     };
 
@@ -139,12 +140,6 @@ export default function SystemUsers() {
         } finally {
             setIsSaving(false);
         }
-    };
-
-    const formatDate = (dateString: string | null) => {
-        if (!dateString) return 'Never';
-        const date = new Date(dateString);
-        return isNaN(date.getTime()) ? 'Never' : date.toLocaleString();
     };
 
     if (showAddUser) {
@@ -445,7 +440,7 @@ export default function SystemUsers() {
                                     </td>
                                     <td>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                                            <AccessTimeIcon style={{ fontSize: 14 }} /> {user.lastLogin ? formatDate(user.lastLogin) : 'Never Logged In'}
+                                            <AccessTimeIcon style={{ fontSize: 14 }} /> {user.lastLogin ? (formatDateTime(user.lastLogin) === 'N/A' ? 'Never' : formatDateTime(user.lastLogin)) : 'Never Logged In'}
                                         </div>
                                     </td>
                                     <td>

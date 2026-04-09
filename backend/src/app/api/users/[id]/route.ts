@@ -56,10 +56,21 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
                 Agent: "AGENT",
                 Viewer: "VIEWER",
             };
-            data.role = roleMap[body.role] || body.role;
+            const mappedRole = roleMap[body.role] || body.role;
+            // Only SUPER_ADMIN can assign SUPER_ADMIN role
+            if (mappedRole === "SUPER_ADMIN" && userPayload.role !== "SUPER_ADMIN") {
+                return errorResponse("Forbidden: Only Super Admin can assign Super Admin role", 403);
+            }
+            data.role = mappedRole;
         }
         if (body.status) {
-            data.status = body.status === "Active" ? "ACTIVE" : "INACTIVE";
+            const statusMap: Record<string, string> = {
+                Active: "ACTIVE",
+                Inactive: "INACTIVE",
+                Banned: "BANNED",
+                Pending: "PENDING",
+            };
+            data.status = statusMap[body.status] || body.status;
         }
         if (body.password) {
             data.password = await hashPassword(body.password);
@@ -86,6 +97,12 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
         }
 
         const { id } = await params;
+
+        // Prevent self-deletion
+        if (userPayload.userId === id) {
+            return errorResponse("Cannot delete your own account", 400);
+        }
+
         await prisma.user.delete({ where: { id } });
         return jsonResponse({ message: "User deleted" });
     } catch {

@@ -6,6 +6,7 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import WarningIcon from '@mui/icons-material/Warning';
 import { licenseApi, type LicenseResponse } from '../api/client';
 import CircularProgress from '@mui/material/CircularProgress';
+import { formatDate } from '../utils/formatters';
 
 export default function LicenseManagement() {
     const [license, setLicense] = useState<LicenseResponse | null>(null);
@@ -84,19 +85,29 @@ export default function LicenseManagement() {
                 border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)',
                 overflow: 'hidden', marginBottom: 24, background: '#fff',
             }}>
-                {/* License Active Card */}
+                    {/* License Active Card */}
                 <div style={{ padding: '20px 24px', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-                    {daysRemaining! > 7 ? (
+                    {(daysRemaining! > 0 || !expiresAt) && license?.status !== 'SUSPENDED' ? (
                         <CheckCircleIcon style={{ color: '#16a34a', fontSize: 28, marginTop: 2 }} />
                     ) : (
                         <WarningIcon style={{ color: '#ef4444', fontSize: 28, marginTop: 2 }} />
                     )}
                     <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 700, color: daysRemaining! > 7 ? '#16a34a' : '#ef4444', fontSize: '1rem' }}>
-                            {daysRemaining! > 0 ? 'License Active' : 'License Expired'}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                            <div style={{ fontWeight: 700, color: license?.status === 'SUSPENDED' ? '#ef4444' : '#16a34a', fontSize: '1rem' }}>
+                                {license?.status === 'SUSPENDED' ? 'Account Suspended' : 'License Active'}
+                            </div>
+                            {license?.status === 'TRIALLING' && (
+                                <span style={{ fontSize: '0.7rem', background: '#dbeafe', color: '#1e40af', padding: '1px 7px', borderRadius: 10, fontWeight: 600 }}>TRIAL</span>
+                            )}
                         </div>
-                        <div style={{ fontSize: '0.8rem', color: daysRemaining! > 7 ? '#16a34a' : '#ef4444', marginBottom: 12 }}>
-                            {daysRemaining} {daysRemaining === 1 ? 'day' : 'days'} remaining
+                        <div style={{ fontSize: '0.8rem', color: daysRemaining! > 0 ? (daysRemaining! > 7 ? '#16a34a' : '#ef4444') : 'var(--text-secondary)', marginBottom: 12 }}>
+                            {!expiresAt
+                                ? 'No expiry date — contact your provider'
+                                : daysRemaining! > 0
+                                    ? `${daysRemaining} ${daysRemaining === 1 ? 'day' : 'days'} remaining`
+                                    : 'License expired'
+                            }
                         </div>
                         <div style={{ display: 'flex', gap: 24, fontSize: '0.8rem' }}>
                             <div>
@@ -105,7 +116,7 @@ export default function LicenseManagement() {
                             </div>
                             <div>
                                 <span style={{ color: 'var(--text-secondary)' }}>Expires </span>
-                                <span style={{ fontWeight: 600 }}>{expiresAt}</span>
+                                <span style={{ fontWeight: 600 }}>{expiresAt ? formatDate(expiresAt) : '—'}</span>
                             </div>
                         </div>
                     </div>

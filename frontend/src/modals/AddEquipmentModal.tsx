@@ -17,7 +17,7 @@ export default function AddEquipmentModal({ onClose, onSave }: AddEquipmentModal
     const [status, setStatus] = useState('Active');
     const [location, setLocation] = useState('');
     const [assignedTo, setAssignedTo] = useState('');
-    const [purchaseDate, setPurchaseDate] = useState('');
+    const [purchaseDate, setPurchaseDate] = useState(new Date().toISOString().split('T')[0]);
     const [notes, setNotes] = useState('');
 
     const handleSave = () => {

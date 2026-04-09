@@ -1,11 +1,18 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
-import { jsonResponse, errorResponse } from "@/lib/auth";
+import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { getMikroTikService } from "@/lib/mikrotik";
+import { parseSafeDate, toISOSafe, toTimestampSafe, isValidDate } from "@/lib/dateUtils";
 
 // GET /api/subscriptions
 export async function GET(req: NextRequest) {
     try {
+        const userPayload = getUserFromRequest(req);
+        if (!userPayload) return errorResponse("Unauthorized", 401);
+
+        const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
+        const tenantFilter = { tenantId: userPayload.tenantId };
+
         const { searchParams } = new URL(req.url);
         const status = searchParams.get("status") || "";
         const search = searchParams.get("search") || "";
@@ -14,7 +21,7 @@ export async function GET(req: NextRequest) {
         const skip = (page - 1) * limit;
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const where: any = {};
+        const where: any = { ...tenantFilter };
         if (status) where.status = status;
         if (search) {
             where.client = {
@@ -40,12 +47,10 @@ export async function GET(req: NextRequest) {
             prisma.subscription.count({ where }),
         ]);
 
-        const isValidDate = (d: any) => d instanceof Date && !isNaN(d.getTime());
-
         const mapped = subs.map((s) => {
-            const expires = new Date(s.expiresAt);
-            const now = new Date();
-            const days = (isValidDate(expires)) ? Math.max(0, Math.floor((now.getTime() - expires.getTime()) / (1000 * 3600 * 24))) : 0;
+            const expiresTs = toTimestampSafe(s.expiresAt);
+            const nowTs = Date.now();
+            const days = expiresTs > 0 ? Math.max(0, Math.floor((nowTs - expiresTs) / (1000 * 3600 * 24))) : 0;
             
             return {
                 id: s.id,
@@ -56,13 +61,13 @@ export async function GET(req: NextRequest) {
                 type: s.client?.serviceType === "HOTSPOT" ? "Hotspot" : "PPPoE",
                 device: s.client?.device || "",
                 macAddress: s.client?.macAddress || "",
-                created: isValidDate(s.createdAt) ? s.createdAt.toLocaleDateString("en-US", { timeZone: "Africa/Dar_es_Salaam", month: "short", day: "numeric", year: "numeric" }) : "N/A",
-                expires: isValidDate(s.expiresAt) ? s.expiresAt.toLocaleDateString("en-US", { timeZone: "Africa/Dar_es_Salaam", month: "short", day: "numeric", year: "numeric" }) : "N/A",
-                expiresAt: s.expiresAt,
-                expiryDate: s.expiresAt || "N/A", // Ensure not null
-                startDate: s.activatedAt || s.createdAt || new Date(),
-                activatedAt: s.activatedAt,
-                expiredDate: isValidDate(s.expiresAt) ? s.expiresAt.toLocaleDateString("en-US", { timeZone: "Africa/Dar_es_Salaam", month: "short", day: "numeric", year: "numeric" }) : "N/A",
+                created: toISOSafe(s.createdAt),
+                expires: toISOSafe(s.expiresAt),
+                expiresAt: toISOSafe(s.expiresAt),
+                expiryDate: toISOSafe(s.expiresAt),
+                startDate: toISOSafe(s.activatedAt) || toISOSafe(s.createdAt),
+                activatedAt: toISOSafe(s.activatedAt),
+                expiredDate: toISOSafe(s.expiresAt),
                 method: s.method || "Manual",
                 router: s.router?.name || "N/A",
                 status: s.status === "ACTIVE" ? "Active" : s.status === "EXPIRED" ? "Expired" : "Suspended",
@@ -82,6 +87,11 @@ export async function GET(req: NextRequest) {
 // POST /api/subscriptions
 export async function POST(req: NextRequest) {
     try {
+        const userPayload = getUserFromRequest(req);
+        if (!userPayload) return errorResponse("Unauthorized", 401);
+
+        const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
+
         const body = await req.json();
         
         const clientId = body.clientId || body.client;
@@ -92,16 +102,26 @@ export async function POST(req: NextRequest) {
             return errorResponse(`clientId and packageId are required. Got clientId: ${clientId}, packageId: ${packageId}`);
         }
 
+        // Verify client belongs to tenant
+        const client = await prisma.client.findUnique({ where: { id: clientId } });
+        if (!client) return errorResponse("Client not found", 404);
+        if (!isSuperAdmin && client.tenantId !== userPayload.tenantId) {
+            return errorResponse("Forbidden", 403);
+        }
+
+        const tenantIdValue = userPayload.tenantId;
+
         const sub = await prisma.subscription.create({
             data: {
                 clientId,
                 packageId,
                 routerId,
                 method: body.method || "MANUAL",
-                expiresAt: body.expiresAt ? new Date(body.expiresAt) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-                activatedAt: body.activatedAt ? new Date(body.activatedAt) : new Date(),
+                expiresAt: parseSafeDate(body.expiresAt) || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+                activatedAt: parseSafeDate(body.activatedAt) || new Date(),
                 status: "ACTIVE",
                 syncStatus: "PENDING",
+                tenantId: tenantIdValue,
             },
             include: { client: true, package: true, router: true },
         });

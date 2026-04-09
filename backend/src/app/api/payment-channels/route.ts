@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
         if (!userPayload) return errorResponse("Unauthorized", 401);
 
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
-        const tenantFilter = isSuperAdmin ? {} : { tenantId: userPayload.tenantId };
+        const tenantFilter = { tenantId: userPayload.tenantId };
 
         const channels = await prisma.paymentChannel.findMany({
             where: { ...tenantFilter },
@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
         const body = await req.json();
 
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
-        const tenantIdValue = isSuperAdmin ? (body.tenantId || null) : userPayload.tenantId;
+        const tenantIdValue = userPayload.tenantId;
 
         const channel = await prisma.paymentChannel.create({
             data: {

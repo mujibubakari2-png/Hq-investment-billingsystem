@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
         if (!userPayload) return errorResponse("Unauthorized", 401);
 
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
-        const tenantFilter = isSuperAdmin ? { tenantId: null } : { tenantId: userPayload.tenantId };
+        const tenantFilter = { tenantId: userPayload.tenantId };
         
         let settings = await prisma.systemSetting.findMany({ where: tenantFilter });
         
@@ -36,7 +36,7 @@ export async function PUT(req: NextRequest) {
         if (!userPayload) return errorResponse("Unauthorized", 401);
 
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
-        const tenantIdValue = isSuperAdmin ? null : userPayload.tenantId;
+        const tenantIdValue = userPayload.tenantId;
         
         const body = await req.json();
 

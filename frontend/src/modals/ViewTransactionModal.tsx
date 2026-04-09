@@ -2,6 +2,7 @@ import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import CloseIcon from '@mui/icons-material/Close';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import type { Transaction } from '../types';
+import { formatDateTime } from '../utils/formatters';
 
 interface ViewTransactionModalProps {
     transaction: Transaction;
@@ -62,11 +63,11 @@ export default function ViewTransactionModal({ transaction, onClose }: ViewTrans
                         </div>
                         <div style={{ padding: '12px 0', borderBottom: '1px solid var(--border-light)' }}>
                             <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: 4 }}>Created Date</div>
-                            <div style={{ fontWeight: 500 }}>{transaction.date}</div>
+                            <div style={{ fontWeight: 500 }}>{formatDateTime(transaction.date)}</div>
                         </div>
                         <div style={{ padding: '12px 0', borderBottom: '1px solid var(--border-light)' }}>
                             <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: 4 }}>Expiry Date</div>
-                            <div style={{ fontWeight: 500 }}>{transaction.expiryDate || '—'}</div>
+                            <div style={{ fontWeight: 500 }}>{transaction.expiryDate ? formatDateTime(transaction.expiryDate) : '—'}</div>
                         </div>
                     </div>
 

@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import MenuIcon from '@mui/icons-material/Menu';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 import LightModeIcon from '@mui/icons-material/LightMode';
 import LogoutIcon from '@mui/icons-material/Logout';
 import PersonIcon from '@mui/icons-material/Person';
+import { licenseApi, type LicenseResponse } from '../../api/client';
 import authStore from '../../stores/authStore';
 import './Header.css';
 
@@ -18,6 +19,13 @@ export default function Header({ onToggleSidebar, darkMode, onToggleDarkMode }: 
     const { user } = authStore.useAuth();
     const navigate = useNavigate();
     const [showMenu, setShowMenu] = useState(false);
+    const [license, setLicense] = useState<LicenseResponse | null>(null);
+
+    useEffect(() => {
+        if (user && user.role !== 'SUPER_ADMIN') {
+            licenseApi.getLicense().then(setLicense).catch(console.error);
+        }
+    }, [user?.role]);
 
     const displayName = user?.fullName || user?.username || 'User';
 
@@ -34,12 +42,18 @@ export default function Header({ onToggleSidebar, darkMode, onToggleDarkMode }: 
     };
 
     return (
-        <header className="header">
-            <div className="header-left">
-                <button className="hamburger-btn" onClick={onToggleSidebar}>
-                    <MenuIcon />
-                </button>
-            </div>
+        <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
+            {license && typeof license.daysRemaining === 'number' && license.daysRemaining > 0 && license.daysRemaining <= 7 && (
+                <div style={{ background: license.daysRemaining <= 2 ? '#fee2e2' : '#fef3c7', color: license.daysRemaining <= 2 ? '#991b1b' : '#92400e', padding: '10px 20px', textAlign: 'center', fontWeight: 'bold', borderBottom: `1px solid ${license.daysRemaining <= 2 ? '#fca5a5' : '#fde68a'}`, fontSize: '0.85rem' }}>
+                    {license.daysRemaining <= 2 ? '🚨' : '⚠️'} Your account will be restricted in {license.daysRemaining} {license.daysRemaining === 1 ? 'day' : 'days'}. <span style={{ textDecoration: 'underline', cursor: 'pointer', marginLeft: 8 }} onClick={() => navigate('/renew')}>Renew now</span> to avoid service interruption!
+                </div>
+            )}
+            <header className="header">
+                <div className="header-left">
+                    <button className="hamburger-btn" onClick={onToggleSidebar}>
+                        <MenuIcon />
+                    </button>
+                </div>
 
             <div className="header-right">
                 <button className="header-icon-btn" onClick={onToggleDarkMode}>
@@ -109,5 +123,6 @@ export default function Header({ onToggleSidebar, darkMode, onToggleDarkMode }: 
                 </div>
             </div>
         </header>
+        </div>
     );
 }

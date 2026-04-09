@@ -96,7 +96,7 @@ export async function POST(req: NextRequest) {
                 where: { id: transaction.id },
                 data: {
                     status: "COMPLETED",
-                    expiryDate: expiresAt.toISOString(),
+                    expiryDate: expiresAt,
                 },
             });
 

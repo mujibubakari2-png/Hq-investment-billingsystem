@@ -21,7 +21,7 @@ async function getRouterWgFields(routerId: string) {
     const rows = await prisma.$queryRawUnsafe(
         `SELECT "wgPrivateKey", "wgPublicKey", "wgPeerPublicKey", "wgPresharedKey",
                 "wgTunnelIp", "wgServerEndpoint", "wgListenPort", "wgEnabled", "wgConfiguredAt",
-                "host", "name", "id"
+                "host", "name", "id", "tenantId"
          FROM "routers" WHERE "id" = $1 LIMIT 1`,
         routerId,
     ) as any[];
@@ -56,6 +56,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         const { id } = await params;
         const router = await getRouterWgFields(id);
         if (!router) return errorResponse("Router not found", 404);
+
+        if (userPayload.role !== "SUPER_ADMIN" && router.tenantId !== userPayload.tenantId) {
+            return errorResponse("Unauthorized to access this router", 403);
+        }
 
         let wgPrivateKey = router.wgPrivateKey;
         let wgPublicKey = router.wgPublicKey;
@@ -124,6 +128,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         const router = await getRouterWgFields(id);
         if (!router) return errorResponse("Router not found", 404);
 
+        if (userPayload.role !== "SUPER_ADMIN" && router.tenantId !== userPayload.tenantId) {
+            return errorResponse("Unauthorized to modify this router", 403);
+        }
+
         if (action === "deactivate") {
             await updateRouterWgFields(id, { wgEnabled: false });
 
@@ -151,7 +159,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
         if (action === "push-config") {
             try {
-                const service = await getMikroTikService(id);
+                const service = await getMikroTikService(id, userPayload.tenantId);
 
                 // Step 1: Create WireGuard interface
                 try {

@@ -3,6 +3,7 @@ import DevicesIcon from '@mui/icons-material/Devices';
 import CloseIcon from '@mui/icons-material/Close';
 import CheckIcon from '@mui/icons-material/Check';
 import type { Equipment } from '../types';
+import { formatDateForInput } from '../utils/formatters';
 
 interface EditEquipmentModalProps {
     equipment: Equipment;
@@ -19,7 +20,7 @@ export default function EditEquipmentModal({ equipment, onClose, onSave }: EditE
     const [status, setStatus] = useState(equipment.status);
     const [location, setLocation] = useState(equipment.location);
     const [assignedTo, setAssignedTo] = useState(equipment.assignedTo || '');
-    const [purchaseDate, setPurchaseDate] = useState(equipment.purchaseDate || '');
+    const [purchaseDate, setPurchaseDate] = useState(formatDateForInput(equipment.purchaseDate));
     const [notes, setNotes] = useState(equipment.notes || '');
 
     const handleSave = () => {

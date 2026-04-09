@@ -3,6 +3,7 @@ import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import CloseIcon from '@mui/icons-material/Close';
 import CheckIcon from '@mui/icons-material/Check';
 import type { Expense } from '../types';
+import { formatDateForInput } from '../utils/formatters';
 
 interface EditExpenseModalProps {
     expense: Expense;
@@ -16,7 +17,7 @@ export default function EditExpenseModal({ expense, onClose, onSave }: EditExpen
     const [description, setDescription] = useState(expense.description);
     const [category, setCategory] = useState(expense.category);
     const [amount, setAmount] = useState(String(expense.amount));
-    const [date, setDate] = useState(expense.date ? new Date(expense.date).toISOString().split('T')[0] : '');
+    const [date, setDate] = useState(formatDateForInput(expense.date));
     const [status, setStatus] = useState(expense.status || 'Approved');
     const [reference, setReference] = useState(expense.reference || '');
 

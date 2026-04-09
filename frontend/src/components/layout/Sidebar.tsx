@@ -22,6 +22,7 @@ import BarChartIcon from '@mui/icons-material/BarChart';
 import PlayCircleIcon from '@mui/icons-material/PlayCircle';
 import ReceiptIcon from '@mui/icons-material/Receipt';
 import VpnKeyIcon from '@mui/icons-material/VpnKey';
+import BusinessIcon from '@mui/icons-material/Business';
 
 import CloseIcon from '@mui/icons-material/Close';
 import authStore from '../../stores/authStore';
@@ -33,6 +34,12 @@ const navSections = [
         title: 'MAIN',
         items: [
             { label: 'Dashboard', icon: 'dashboard', path: '/' },
+        ],
+    },
+    {
+        title: 'SUPER ADMIN',
+        items: [
+            { label: 'System Tenants', icon: 'business', path: '/system-tenants' },
         ],
     },
     {
@@ -116,6 +123,7 @@ const iconMap: Record<string, React.ReactNode> = {
     tutorial: <PlayCircleIcon fontSize="small" />,
     invoice: <ReceiptIcon fontSize="small" />,
     vpn: <VpnKeyIcon fontSize="small" />,
+    business: <BusinessIcon fontSize="small" />,
 
 };
 
@@ -166,11 +174,18 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 
                 <nav className="sidebar-nav">
                     {navSections.map((section) => {
+                        if (section.title === 'SUPER ADMIN' && user?.role !== 'SUPER_ADMIN') {
+                            return null;
+                        }
+
                         const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
 
                         const filteredItems = section.items.filter(item => {
-                            if (item.label === 'Invoices' || item.label === 'System Users') {
+                            if (item.label === 'System Users') {
                                 return isAdmin;
+                            }
+                            if (item.label === 'Invoices') {
+                                return user?.role === 'SUPER_ADMIN';
                             }
                             return true;
                         });

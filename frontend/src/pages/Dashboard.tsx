@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { dashboardApi, routersApi } from '../api/client';
 import type { DashboardResponse } from '../api/client';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import authStore from '../stores/authStore';
+import { formatDateTime } from '../utils/formatters';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
@@ -38,6 +39,8 @@ function fmt(n: number) { return `TSH ${n.toLocaleString('en-US', { minimumFract
 export default function Dashboard() {
     const { user } = authStore.useAuth();
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const tenantIdParam = searchParams.get('tenantId');
     const [hiddenCards, setHiddenCards] = useState<Set<number>>(new Set());
     const [stats, setStats] = useState<DashboardResponse | null>(null);
     const [routers, setRouters] = useState<Array<{ id: string; name: string; host: string; status: string; lastSeen: string }>>([]);
@@ -51,7 +54,7 @@ export default function Dashboard() {
         setError(null);
         try {
             const [dashData, routerData] = await Promise.all([
-                dashboardApi.getStats(),
+                dashboardApi.getStats(tenantIdParam || undefined, selectedRouter),
                 routersApi.list(),
             ]);
             setStats(dashData);
@@ -65,7 +68,7 @@ export default function Dashboard() {
     };
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    useEffect(() => { fetchData(); }, []);
+    useEffect(() => { fetchData(); }, [tenantIdParam, selectedRouter]);
 
     const toggleCardVisibility = (index: number) => {
         setHiddenCards(prev => {
@@ -88,7 +91,9 @@ export default function Dashboard() {
 
     const greetName = user?.username || 'User';
     const hour = now.getHours();
-    const greeting = hour < 12 ? '☀️ Good morning!' : hour < 18 ? '🌤️ Good afternoon!' : '🌙 Good night!';
+    const greeting = tenantIdParam 
+        ? `Viewing dashboard for tenant: ${tenantIdParam}`
+        : (hour < 12 ? '☀️ Good morning!' : hour < 18 ? '🌤️ Good afternoon!' : '🌙 Good night!');
 
     const revenueCards = [
         { label: "Today's Revenue", value: fmt(stats?.todayRevenue ?? 0), subtitle: `${stats?.todayRechargesMobile || 0} users paid via payment channel`, change: null, color: '#e53935', icon: '💰' },
@@ -104,7 +109,7 @@ export default function Dashboard() {
 
     const recentTransactions = (stats?.recentTransactions ?? []).map(t => ({
         user: t.user,
-        time: t.date,
+        time: formatDateTime(t.date),
         planType: t.planType,
         timeActive: t.timeActiveSys,
         amount: fmt(t.amount),
@@ -638,7 +643,7 @@ export default function Dashboard() {
                                         <div className="sys-activity-desc">
                                             {act.description}
                                         </div>
-                                        <div className="sys-activity-time">{act.date}</div>
+                                        <div className="sys-activity-time">{formatDateTime(act.date)}</div>
                                     </div>
                                 </div>
                             ))}

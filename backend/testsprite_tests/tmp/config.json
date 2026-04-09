@@ -3,23 +3,19 @@
   "type": "backend",
   "scope": "codebase",
   "localEndpoint": "http://localhost:3001",
-  "loginUser": "admin",
-  "loginPassword": "admin123",
+  "backendAuthType": "API key",
+  "backendApiKey": "karimu",
+  "backendApiValue": "sk-user-wr0eKZ_Ytg73zZIWxpNDQdWf65bUNwxqET31xUX7c6uNnMi5P4tH6hllD1TqnPiyPBBal8AzniRqDRddlzeaZWfgO15n1RCd4A2Nzb3qIgbgBi1J5Bmj2FPBLP-O5DhhG20",
   "executionArgs": {
     "projectName": "backend",
     "projectPath": "c:\\Users\\hqbak\\kenge\\backend",
-    "testIds": [
-      "TC001",
-      "TC002",
-      "TC006",
-      "TC007"
-    ],
-    "additionalInstruction": "Verify fixes for TC001, TC002, TC006, and TC007. Use the correct admin credentials and automation key.",
+    "testIds": [],
+    "additionalInstruction": "Verify fixed 401/403/500 errors. Password for testuser@example.com is 'Password123!'. Focus on tenant isolation and router creation with correct field aliases. Use sk-user-wr0eKZ_Ytg73zZIWxpNDQdWf65bUNwxqET31xUX7c6uNnMi5P4tH6hllD1TqnPiyPBBal8AzniRqDRddlzeaZWfgO15n1RCd4A2Nzb3qIgbgBi1J5Bmj2FPBLP-O5DhhG20 as automation key in 'x-api-key' header for login.",
     "serverMode": "development",
     "envs": {
-      "API_KEY": "sk-user-MrK0z6G-P25uVr3pLuLwm5f7ZJM_qb20XN5jDbihfRf3--OF19Y-9mCNitZhQ7CFYi9dCBfnm9RP7Ksa54AYZMg4XMTVGyf0i19ewS0sWv3_PDeIcxnaA7Z3LTyozEgbyaQ"
+      "API_KEY": "sk-user-G9nAmmvp4Y6XOAdPu2jPD0CnwTZ50OKkfzz6fkomJIJhm9oXxQEiIuh0pJS1jA0l9CBt_nuWkY_t8zBfF330gt9X_B2tIZWxox1HVKePlocohXBM10um1fi1s9eGDmNa10U"
     }
   },
-  "serverPort": 63492,
-  "proxy": "http://d8a46bee-3cbc-4e73-8e9b-f9cc489bb75c:dTqyLAhO80X2CtQV9cKuQkvwmHcFapzy@tun.testsprite.com:8080"
+  "serverPort": 61477,
+  "proxy": "http://c6ae5d9d-12fc-45eb-a0a4-b525a2d97fd3:sZ3C0Cp7T6nnaI8yogAnr77rTwxesqcs@tun.testsprite.com:8080"
 }

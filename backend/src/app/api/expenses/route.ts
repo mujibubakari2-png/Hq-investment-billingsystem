@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
+import { parseSafeDate, toISOSafe } from "@/lib/dateUtils";
 
 // GET /api/expenses
 export async function GET(req: NextRequest) {
@@ -9,7 +10,7 @@ export async function GET(req: NextRequest) {
         if (!userPayload) return errorResponse("Unauthorized", 401);
 
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
-        const tenantFilter = isSuperAdmin ? {} : { tenantId: userPayload.tenantId };
+        const tenantFilter = { tenantId: userPayload.tenantId };
 
         const { searchParams } = new URL(req.url);
         const category = searchParams.get("category") || "";
@@ -44,7 +45,7 @@ export async function GET(req: NextRequest) {
             category: e.category,
             description: e.description,
             amount: e.amount,
-            date: e.date.toLocaleDateString("en-US", { timeZone: "Africa/Dar_es_Salaam", month: "short", day: "numeric", year: "numeric" }),
+            date: toISOSafe(e.date),
             reference: e.reference,
             createdBy: e.createdBy.username,
         }));
@@ -70,7 +71,7 @@ export async function POST(req: NextRequest) {
             const admin = await prisma.user.findFirst({ 
                 where: { 
                     role: { in: ["ADMIN", "SUPER_ADMIN"] },
-                    ...(isSuperAdmin ? {} : { tenantId: userPayload.tenantId })
+                    ...({ tenantId: userPayload.tenantId })
                 } 
             });
             createdById = admin?.id;
@@ -81,14 +82,14 @@ export async function POST(req: NextRequest) {
         }
 
         const amount = parseFloat(body.amount) || parseFloat(body.amount_value) || 0;
-        const tenantIdValue = isSuperAdmin ? (body.tenantId || null) : userPayload.tenantId;
+        const tenantIdValue = userPayload.tenantId;
 
         const expense = await prisma.expense.create({
             data: {
                 category: body.category || "OTHER",
                 description: body.description || "N/A",
                 amount,
-                date: body.date ? new Date(body.date) : new Date(),
+                date: parseSafeDate(body.date) || new Date(),
                 reference: body.reference || `EXP-${Date.now()}`,
                 receipt: body.receipt,
                 createdById,

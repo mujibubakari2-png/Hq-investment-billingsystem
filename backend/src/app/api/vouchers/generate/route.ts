@@ -8,6 +8,23 @@ export async function POST(req: NextRequest) {
         const body = await req.json();
         const { packageId, routerId, createdById, count = 10, prefix = "", codeLength = 8, codeFormat = "alphanumeric-upper" } = body;
 
+        // Prefer logged-in user from JWT token, then body, then admin fallback
+        const currentUser = getUserFromRequest(req);
+        if (!currentUser) return errorResponse("Unauthorized", 401);
+        
+        const isSuperAdmin = currentUser.role === "SUPER_ADMIN";
+        const tenantIdValue = (currentUser.tenantId || null);
+
+        let finalCreatedById = currentUser.userId || createdById;
+        if (!finalCreatedById) {
+            const admin = await prisma.user.findFirst({ where: { role: { in: ["ADMIN", "SUPER_ADMIN"] } } });
+            finalCreatedById = admin?.id;
+        }
+
+        if (!finalCreatedById) {
+            return errorResponse("Creator user ID is required");
+        }
+
         // Validation - allow skipping createdById for tests
         if (!packageId) {
             return errorResponse("packageId is required");
@@ -22,19 +39,19 @@ export async function POST(req: NextRequest) {
             return errorResponse("Package not found", 404);
         }
 
+        if (tenantIdValue && pkg.tenantId && pkg.tenantId !== tenantIdValue) {
+            return errorResponse("Forbidden: Package belongs to another tenant", 403);
+        }
+
+        if (routerId) {
+            const router = await prisma.router.findUnique({ where: { id: routerId } });
+            if (!router) return errorResponse("Router not found", 404);
+            if (tenantIdValue && router.tenantId && router.tenantId !== tenantIdValue) {
+                return errorResponse("Forbidden: Router belongs to another tenant", 403);
+            }
+        }
+
         const actualPackageId = pkg.id;
-
-        // Prefer logged-in user from JWT token, then body, then admin fallback
-        const currentUser = getUserFromRequest(req);
-        let finalCreatedById = currentUser?.userId || createdById;
-        if (!finalCreatedById) {
-            const admin = await prisma.user.findFirst({ where: { role: { in: ["ADMIN", "SUPER_ADMIN"] } } });
-            finalCreatedById = admin?.id;
-        }
-
-        if (!finalCreatedById) {
-            return errorResponse("Creator user ID is required");
-        }
 
         // Code generation based on format
         const generateCode = (length: number, format: string): string => {
@@ -66,6 +83,7 @@ export async function POST(req: NextRequest) {
                     packageId: actualPackageId,
                     routerId,
                     createdById: finalCreatedById,
+                    tenantId: tenantIdValue
                 },
             });
             vouchers.push(voucher);

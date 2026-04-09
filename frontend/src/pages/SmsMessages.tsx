@@ -10,6 +10,7 @@ import PendingIcon from '@mui/icons-material/Pending';
 import SyncIcon from '@mui/icons-material/Sync';
 import { smsApi } from '../api/client';
 import type { SmsMessage } from '../types';
+import { formatDateTime } from '../utils/formatters';
 
 type StatusFilter = 'All' | 'Sent' | 'Failed' | 'Pending';
 
@@ -58,20 +59,6 @@ export default function SmsMessages() {
         sent: summaries?.sent || 0,
         failed: summaries?.failed || 0,
         pending: summaries?.pending || 0,
-    };
-
-    const formatDate = (dateStr: string) => {
-        try {
-            const d = new Date(dateStr);
-            if (isNaN(d.getTime())) return 'N/A';
-            return d.toLocaleString('en-US', {
-                timeZone: 'Africa/Dar_es_Salaam',
-                month: 'short', day: 'numeric', year: 'numeric',
-                hour: '2-digit', minute: '2-digit',
-            });
-        } catch {
-            return 'N/A';
-        }
     };
 
     const getStatusBadge = (status: string) => {
@@ -227,7 +214,7 @@ export default function SmsMessages() {
                                                 </span>
                                             </td>
                                             <td style={{ fontSize: '0.85rem', whiteSpace: 'nowrap' }}>
-                                                {formatDate(msg.sentAt)}
+                                                {formatDateTime(msg.sentAt)}
                                             </td>
                                         </tr>
                                     );

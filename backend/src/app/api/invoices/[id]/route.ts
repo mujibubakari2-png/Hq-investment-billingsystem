@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
+import { parseOptionalDate } from "@/lib/dateUtils";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
@@ -38,7 +39,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
             data: {
                 amount: body.amount ? parseFloat(body.amount) : undefined,
                 status: body.status?.toUpperCase(),
-                dueDate: body.dueDate ? new Date(body.dueDate) : undefined,
+                dueDate: parseOptionalDate(body.dueDate),
             },
         });
 

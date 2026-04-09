@@ -5,10 +5,13 @@ import { getMikroTikService } from "@/lib/mikrotik";
 // PUT /api/routers/[id]/hotspot/[userId] — Enable/Disable Hotspot user
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string; userId: string }> }) {
     try {
+        const userPayload = getUserFromRequest(req);
+        if (!userPayload) return errorResponse("Unauthorized", 401);
+
         const { id, userId } = await params;
         const body = await req.json();
 
-        const service = await getMikroTikService(id);
+        const service = await getMikroTikService(id, userPayload.tenantId);
         await service.updateHotspotUser(userId, {
             disabled: body.disabled,
             password: body.password,
@@ -24,10 +27,13 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 }
 
 // DELETE /api/routers/[id]/hotspot/[userId] — Delete Hotspot user
-export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string; userId: string }> }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string; userId: string }> }) {
     try {
+        const userPayload = getUserFromRequest(req);
+        if (!userPayload) return errorResponse("Unauthorized", 401);
+
         const { id, userId } = await params;
-        const service = await getMikroTikService(id);
+        const service = await getMikroTikService(id, userPayload.tenantId);
         await service.deleteHotspotUser(userId);
         return jsonResponse({ message: "Hotspot user deleted" });
     } catch (err: any) {

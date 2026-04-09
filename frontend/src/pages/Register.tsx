@@ -75,11 +75,24 @@ export default function Register() {
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
+        const queryParams = new URLSearchParams(window.location.search);
+        const selectedPlanName = queryParams.get('plan');
+
         axios.get('/api/saas-plans')
             .then(res => {
                 setPlans(res.data);
                 if (res.data.length > 0) {
-                    setFormData(prev => ({ ...prev, planId: res.data[0].id }));
+                    let initialPlanId = res.data[0].id;
+                    if (selectedPlanName) {
+                        const matchedPlan = res.data.find((p: any) => 
+                            p.name.toLowerCase().includes(selectedPlanName.toLowerCase()) ||
+                            selectedPlanName.toLowerCase().includes(p.name.toLowerCase())
+                        );
+                        if (matchedPlan) {
+                            initialPlanId = matchedPlan.id;
+                        }
+                    }
+                    setFormData(prev => ({ ...prev, planId: initialPlanId }));
                 }
             })
             .catch(err => console.error("Failed to load plans", err));

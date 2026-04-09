@@ -2,6 +2,7 @@ import ReceiptIcon from '@mui/icons-material/Receipt';
 import CloseIcon from '@mui/icons-material/Close';
 import PrintIcon from '@mui/icons-material/Print';
 import type { Invoice } from '../types';
+import { formatDate } from '../utils/formatters';
 
 interface ViewInvoiceModalProps {
     invoice: Invoice;
@@ -34,7 +35,7 @@ export default function ViewInvoiceModal({ invoice, onClose }: ViewInvoiceModalP
                 </div>
                 <div style="text-align: right;">
                     <span class="badge ${invoice.status.toLowerCase()}">${invoice.status}</span>
-                    <p class="meta" style="margin-top: 8px">Issued: ${invoice.issuedDate}<br/>Due: ${invoice.dueDate}</p>
+                    <p class="meta" style="margin-top: 8px">Issued: ${formatDate(invoice.issuedDate)}<br/>Due: ${formatDate(invoice.dueDate)}</p>
                 </div>
             </div>
             <table>
@@ -82,11 +83,11 @@ export default function ViewInvoiceModal({ invoice, onClose }: ViewInvoiceModalP
                         </div>
                         <div>
                             <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Issued Date</div>
-                            <div style={{ fontWeight: 500, marginTop: 4 }}>{invoice.issuedDate}</div>
+                            <div style={{ fontWeight: 500, marginTop: 4 }}>{formatDate(invoice.issuedDate)}</div>
                         </div>
                         <div>
                             <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Due Date</div>
-                            <div style={{ fontWeight: 500, marginTop: 4, color: invoice.status === 'Overdue' ? 'var(--danger)' : 'inherit' }}>{invoice.dueDate}</div>
+                            <div style={{ fontWeight: 500, marginTop: 4, color: invoice.status === 'Overdue' ? 'var(--danger)' : 'inherit' }}>{formatDate(invoice.dueDate)}</div>
                         </div>
                     </div>
 

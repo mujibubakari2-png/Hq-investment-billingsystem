@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
+import { parseOptionalDate } from "@/lib/dateUtils";
 
 // GET /api/subscriptions/[id]
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -33,8 +34,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         const data: any = {};
         if (body.packageId) data.packageId = body.packageId;
         if (body.routerId !== undefined) data.routerId = body.routerId || null;
-        if (body.expiresAt) data.expiresAt = new Date(body.expiresAt);
-        if (body.activatedAt) data.activatedAt = new Date(body.activatedAt);
+        if (body.expiresAt !== undefined) { const pd = parseOptionalDate(body.expiresAt); if (pd) data.expiresAt = pd; }
+        if (body.activatedAt !== undefined) { const pd = parseOptionalDate(body.activatedAt); if (pd) data.activatedAt = pd; }
         if (body.status) data.status = body.status;
         if (body.method) data.method = body.method;
 

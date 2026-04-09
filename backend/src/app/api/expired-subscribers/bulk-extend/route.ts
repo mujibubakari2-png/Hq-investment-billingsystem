@@ -1,10 +1,16 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
-import { jsonResponse, errorResponse } from "@/lib/auth";
+import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { getMikroTikService } from "@/lib/mikrotik";
 
 export async function POST(req: NextRequest) {
     try {
+        const userPayload = getUserFromRequest(req);
+        if (!userPayload) return errorResponse("Unauthorized", 401);
+
+        const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
+        const tenantFilter = { tenantId: userPayload.tenantId };
+
         const body = await req.json();
         const { subscriptionIds, durationDays = 30 } = body;
 
@@ -13,7 +19,7 @@ export async function POST(req: NextRequest) {
         }
 
         const subs = await prisma.subscription.findMany({
-            where: { id: { in: subscriptionIds }, status: "EXPIRED" },
+            where: { id: { in: subscriptionIds }, status: "EXPIRED", ...tenantFilter },
             include: { client: true, package: true, router: true },
         });
 

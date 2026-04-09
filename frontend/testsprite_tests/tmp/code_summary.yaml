@@ -1,13 +1,14 @@
 version: "2"
 type: frontend
 tech_stack:
-  - TypeScript
-  - React
-  - Vite
-  - Material UI (MUI)
-  - Axios
-  - Zustand
-  - React Router
+  - language: TypeScript
+  - framework: React
+  - build_tool: Vite
+  - routing: React Router DOM
+  - state_management: Zustand
+  - styling: Emotion, Material UI
+  - validation: Zod
+  - form_handling: React Hook Form
 routes:
   - path: /login
     file: src/pages/Login.tsx
@@ -16,34 +17,34 @@ routes:
   - path: /register
     file: src/pages/Register.tsx
     auth_required: false
-    description: User registration and onboarding
+    description: User registration page
   - path: /forgot-password
     file: src/pages/ForgotPassword.tsx
     auth_required: false
-    description: Forgot password and OTP verification
+    description: Password recovery page
   - path: /dashboard
     file: src/pages/Dashboard.tsx
     auth_required: true
-    description: Main dashboard overview
+    description: System overview and statistics dashboard
   - path: /clients
     file: src/pages/Clients.tsx
     auth_required: true
-    description: Client management page
-  - path: /routers
-    file: src/pages/Mikrotiks.tsx
-    auth_required: true
-    description: Router/Mikrotik management page
+    description: Client management and listing
   - path: /packages
     file: src/pages/Packages.tsx
     auth_required: true
-    description: Billing packages management
-  - path: /transactions
+    description: Service package management
+  - path: /all-transactions
     file: src/pages/AllTransactions.tsx
     auth_required: true
-    description: Financial transactions log
+    description: Financial transaction logs
+  - path: /mikrotiks
+    file: src/pages/Mikrotiks.tsx
+    auth_required: true
+    description: Router and network equipment management
 features:
-  - name: Authentication
-    description: Login and session management
+  - name: User Authentication
+    description: User login with username and password
     files:
       - src/pages/Login.tsx
       - src/stores/authStore.ts
@@ -51,13 +52,13 @@ features:
     user_interactions:
       - Fill username input
       - Fill password input
-      - Click Login button
+      - Click Sign In button
     api_calls:
       - method: POST
         endpoint: /api/auth/login
     auth_required: false
-  - name: Client Registration
-    description: Add new clients to the system
+  - name: Client Management
+    description: Create and manage ISP clients
     files:
       - src/pages/Clients.tsx
       - src/modals/AddClientModal.tsx
@@ -65,19 +66,21 @@ features:
     user_interactions:
       - Click Add Client button
       - Fill client details form
-      - Click Save
+      - Click Save button
     api_calls:
       - method: POST
         endpoint: /api/clients
+      - method: GET
+        endpoint: /api/clients
     auth_required: true
-  - name: Dashboard Visualization
-    description: Charts and summary cards for business metrics
+  - name: Dashboard Overview
+    description: View system-wide metrics and charts
     files:
       - src/pages/Dashboard.tsx
     entry_route: /dashboard
     user_interactions:
       - View revenue charts
-      - View subscriber growth
+      - Filter dashboard by router
     api_calls:
       - method: GET
         endpoint: /api/dashboard

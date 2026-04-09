@@ -8,7 +8,11 @@ export async function GET(req: NextRequest) {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
 
+        const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
+        const tenantFilter = { tenantId: userPayload.tenantId };
+
         const vpnUsers = await prisma.vpnUser.findMany({
+            where: { ...tenantFilter },
             include: { router: { select: { id: true, name: true, host: true } } },
             orderBy: { createdAt: "desc" },
         });
@@ -39,11 +43,12 @@ export async function GET(req: NextRequest) {
     }
 }
 
-// POST /api/vpn – create VPN user
 export async function POST(req: NextRequest) {
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+
+        const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
 
         const body = await req.json();
         const { username, password, fullName, protocol, profile, localAddress, remoteAddress, routerId, service } = body;
@@ -52,9 +57,18 @@ export async function POST(req: NextRequest) {
             return errorResponse("Username, password, and routerId are required", 400);
         }
 
+        // Verify router belongs to user's tenant
+        const router = await prisma.router.findUnique({ where: { id: routerId } });
+        if (!router) return errorResponse("Router not found", 404);
+        if (!isSuperAdmin && router.tenantId !== userPayload.tenantId) {
+            return errorResponse("Forbidden", 403);
+        }
+
         // Check for duplicate username
         const existing = await prisma.vpnUser.findUnique({ where: { username } });
         if (existing) return errorResponse("VPN username already exists", 409);
+
+        const tenantIdValue = userPayload.tenantId;
 
         const vpnUser = await prisma.vpnUser.create({
             data: {
@@ -68,6 +82,7 @@ export async function POST(req: NextRequest) {
                 service: service || "l2tp",
                 routerId,
                 status: "Active",
+                tenantId: tenantIdValue,
             },
         });
 

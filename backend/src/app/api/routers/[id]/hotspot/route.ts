@@ -3,10 +3,13 @@ import { jsonResponse, errorResponse } from "@/lib/auth";
 import { getMikroTikService } from "@/lib/mikrotik";
 
 // GET /api/routers/[id]/hotspot — List Hotspot users
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
+        const userPayload = getUserFromRequest(req);
+        if (!userPayload) return errorResponse("Unauthorized", 401);
+
         const { id } = await params;
-        const service = await getMikroTikService(id);
+        const service = await getMikroTikService(id, userPayload.tenantId);
         const users = await service.listHotspotUsers();
         return jsonResponse(users);
     } catch (err: any) {
@@ -17,6 +20,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 // POST /api/routers/[id]/hotspot — Create Hotspot user
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
+        const userPayload = getUserFromRequest(req);
+        if (!userPayload) return errorResponse("Unauthorized", 401);
+
         const { id } = await params;
         const body = await req.json();
 
@@ -24,7 +30,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             return errorResponse("Username and password are required");
         }
 
-        const service = await getMikroTikService(id);
+        const service = await getMikroTikService(id, userPayload.tenantId);
         const user = await service.createHotspotUser({
             name: body.name,
             password: body.password,

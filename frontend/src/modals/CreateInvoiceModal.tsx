@@ -12,7 +12,7 @@ interface CreateInvoiceModalProps {
 
 export default function CreateInvoiceModal({ onClose, onSave }: CreateInvoiceModalProps) {
     const [client, setClient] = useState('');
-    const [dueDate, setDueDate] = useState('');
+    const [dueDate, setDueDate] = useState(new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0]);
     const [status, setStatus] = useState('Draft');
     const [items, setItems] = useState([{ description: '', quantity: 1, unitPrice: 0 }]);
 

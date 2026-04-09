@@ -9,6 +9,7 @@ import type { Transaction } from '../types';
 import AddTransactionModal from '../modals/AddTransactionModal';
 import ViewTransactionModal from '../modals/ViewTransactionModal';
 import ConfirmDeleteModal from '../modals/ConfirmDeleteModal';
+import { formatDateTime, toTimestamp } from '../utils/formatters';
 
 export default function AllTransactions() {
     const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -66,8 +67,8 @@ export default function AllTransactions() {
                 type: 'Voucher',
                 method: 'voucher',
                 status: v.status === 'Used' ? 'Completed' : (v.status === 'Unused' ? 'Pending' : v.status),
-                date: v.createdAt !== "Invalid Date" ? v.createdAt : new Date().toLocaleDateString(),
-                timestamp: v.timestamp || 0,
+                date: v.createdAt || null,
+                timestamp: v.timestamp || toTimestamp(v.createdAt),
                 expiryDate: v.usedAt || null,
                 reference: v.code
             }));
@@ -89,8 +90,8 @@ export default function AllTransactions() {
 
             // Sort newest first logically and perfectly deterministically!
             combined.sort((a: any, b: any) => {
-                const timeA = typeof a.timestamp === 'number' ? a.timestamp : new Date(a.date).getTime();
-                const timeB = typeof b.timestamp === 'number' ? b.timestamp : new Date(b.date).getTime();
+                const timeA = typeof a.timestamp === 'number' && a.timestamp > 0 ? a.timestamp : toTimestamp(a.date);
+                const timeB = typeof b.timestamp === 'number' && b.timestamp > 0 ? b.timestamp : toTimestamp(b.date);
                 return (timeB || 0) - (timeA || 0);
             });
 
@@ -260,8 +261,8 @@ export default function AllTransactions() {
                                                 {tx.type || 'Manual'}
                                             </span>
                                         </td>
-                                        <td>{tx.date}</td>
-                                        <td>{tx.expiryDate || '—'}</td>
+                                        <td>{formatDateTime(tx.date)}</td>
+                                        <td>{tx.expiryDate ? formatDateTime(tx.expiryDate) : '—'}</td>
                                         <td style={{ textTransform: 'capitalize' }}>{tx.method}</td>
                                         <td>
                                             <span className={`badge ${tx.status === 'Completed' ? 'active' : tx.status === 'Pending' ? 'expired' : 'suspended'}`}>

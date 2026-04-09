@@ -1,11 +1,5 @@
-import { PrismaClient } from "@prisma/client";
-const prisma = new PrismaClient({
-    datasources: {
-        db: {
-            url: "postgresql://enterprisedb:Muu%4066487125@localhost:5444/kenge_isp?schema=public"
-        }
-    }
-});
+import prisma from "./src/lib/prisma";
+import "dotenv/config";
 async function main() {
     try {
         console.log("Checking for existing plans...");
