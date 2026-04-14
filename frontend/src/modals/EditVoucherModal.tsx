@@ -22,7 +22,7 @@ export default function EditVoucherModal({ voucher, onClose, onSave }: EditVouch
             setLoading(true);
             setError(null);
             // In case vouchersApi doesn't have update natively
-            await fetch(`/api/vouchers/${voucher.id}`, {
+            await fetch(`${(import.meta.env.VITE_API_URL as string) ?? ''}/api/vouchers/${voucher.id}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',

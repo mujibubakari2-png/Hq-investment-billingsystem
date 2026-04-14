@@ -98,7 +98,7 @@ export default function EditPlan() {
             packagesApi.list(),
             routersApi.list(),
             // Also fetch the specific subscription detail
-            fetch(`/api/subscriptions/${id}`, {
+            fetch(`${(import.meta.env.VITE_API_URL as string) ?? ''}/api/subscriptions/${id}`, {
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${localStorage.getItem('token')}`,

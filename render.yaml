@@ -1,0 +1,68 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# Render Blueprint — Kenge ISP Billing System
+# Docs: https://render.com/docs/blueprint-spec
+# ──────────────────────────────────────────────────────────────────────────────
+
+databases:
+  - name: kenge-db
+    databaseName: kenge_isp
+    user: kenge_user
+    plan: free          # upgrade to "starter" for production
+
+services:
+
+  # ── 1. Backend (Next.js API) ────────────────────────────────────────────────
+  - type: web
+    name: kenge-backend
+    env: node
+    rootDir: backend
+    buildCommand: npm install && npx prisma generate && npm run build
+    startCommand: npm start    # next start -p 3001
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: kenge-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true    # Render auto-generates a secure random value
+      - key: CORS_ORIGIN
+        value: https://kenge-frontend.onrender.com   # update after frontend is deployed
+      - key: GOOGLE_CLIENT_ID
+        sync: false            # set manually in Render dashboard
+
+  # ── 2. Frontend (Vite React SPA) ────────────────────────────────────────────
+  - type: web
+    name: kenge-frontend
+    env: static
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    plan: free
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html   # single-page app fallback
+    envVars:
+      - key: VITE_API_URL
+        value: https://kenge-backend.onrender.com   # update after backend is deployed
+      - key: VITE_GOOGLE_CLIENT_ID
+        sync: false            # set manually in Render dashboard
+
+  # ── 3. Landing Page (Next.js) ────────────────────────────────────────────────
+  - type: web
+    name: kenge-landing
+    env: node
+    rootDir: landing-page
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    plan: free
+    healthCheckPath: /
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_BILLING_SYSTEM_URL
+        value: https://kenge-frontend.onrender.com   # update after frontend is deployed
