@@ -145,7 +145,7 @@ export default function SystemUsers() {
     if (showAddUser) {
         return (
             <div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+                <div className="grid-2 gap-24">
                     {/* Profile Section */}
                     <div className="card" style={{ padding: 24 }}>
                         <h3 style={{ color: 'var(--primary)', fontWeight: 600, fontSize: '0.9rem', marginBottom: 16 }}>Profile</h3>

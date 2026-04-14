@@ -96,28 +96,28 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
 
 # ── 1. Create WireGuard Interface ─────────────────────────────
 /interface wireguard
-add name=wg-kenge listen-port=${config.listenPort} private-key="${config.routerPrivateKey}"
+add name=wg-hqinvestment listen-port=${config.listenPort} private-key="${config.routerPrivateKey}"
 # Public Key: ${config.routerPublicKey}
 
 # ── 2. Assign IP to WireGuard Interface ───────────────────────
 /ip address
-add address=${config.routerTunnelIp}/24 interface=wg-kenge network=10.200.0.0
+add address=${config.routerTunnelIp}/24 interface=wg-hqinvestment network=10.200.0.0
 
-# ── 3. Add Peer (Kenge Server) ────────────────────────────────
+# ── 3. Add Peer (HQInvestment Server) ────────────────────────────────
 /interface wireguard peers
-add interface=wg-kenge \\
+add interface=wg-hqinvestment \\
     public-key="${config.serverPublicKey}" \\
     preshared-key="${config.presharedKey}" \\
     allowed-address=10.200.0.0/24 \\
     endpoint-address=${config.serverEndpoint} \\
     endpoint-port=${config.serverPort} \\
     persistent-keepalive=25s \\
-    comment="Kenge ISP Server"
+    comment="HQInvestment ISP Server"
 
 # ── 4. Firewall Rules (Allow WireGuard) ───────────────────────
 /ip firewall filter
 add chain=input protocol=udp dst-port=${config.listenPort} action=accept \\
-    comment="Allow WireGuard - Kenge"
+    comment="Allow WireGuard - HQInvestment"
 add chain=forward in-interface=wg-kenge action=accept \\
     comment="Allow WG traffic"
 add chain=forward out-interface=wg-kenge action=accept \\
@@ -139,15 +139,15 @@ add dst-address=10.200.0.0/24 gateway=wg-kenge \\
 # Server Endpoint: ${config.serverEndpoint}:${config.serverPort}
 # ═══════════════════════════════════════════════════════════════`;
 
-    // Client config for the Kenge ISP server
+    // Client config for the HQInvestment ISP server
     const clientConfig = `# ═══════════════════════════════════════════════════════════════
-# WireGuard Client Config — Kenge ISP Server
+# WireGuard Client Config — HQInvestment ISP Server
 # For Router: ${config.routerName} (${config.routerId})
-# Keys are PERSISTENT — install this on the Kenge VPN server
+# Keys are PERSISTENT — install this on the HQInvestment VPN server
 # ═══════════════════════════════════════════════════════════════
 
 [Interface]
-# Kenge ISP Server side
+# HQInvestment ISP Server side
 PrivateKey = <SERVER_PRIVATE_KEY>
 Address = ${config.serverTunnelIp}/24
 DNS = 8.8.8.8, 1.1.1.1
@@ -197,7 +197,7 @@ PersistentKeepalive = 25`;
     };
 
     const activeConfig = activeTab === 'server' ? serverConfig : clientConfig;
-    const activeLabel = activeTab === 'server' ? 'Server (MikroTik)' : 'Client (Kenge)';
+    const activeLabel = activeTab === 'server' ? 'Server (MikroTik)' : 'Client (HQInvestment)';
 
     return (
         <div className="modal-overlay" onClick={onClose}>
@@ -315,7 +315,7 @@ PersistentKeepalive = 25`;
                             borderBottom: activeTab === 'client' ? '2px solid #15803d' : '2px solid transparent',
                         }}
                     >
-                        🌐 Client Config (Kenge Server)
+                        🌐 Client Config (HQInvestment Server)
                     </button>
                 </div>
 
@@ -364,7 +364,7 @@ PersistentKeepalive = 25`;
                                 <strong>Option 2:</strong> Copy and paste this script into MikroTik Terminal, then click "I Pasted It — Activate".<br />
                                 The system will switch to the WireGuard tunnel IP ({config.routerTunnelIp}) for all future API connections.
                               </>
-                            : 'Install this config on your Kenge VPN server to complete the tunnel. Replace <SERVER_PRIVATE_KEY> with your actual server private key.'
+                            : 'Install this config on your HQInvestment VPN server to complete the tunnel. Replace <SERVER_PRIVATE_KEY> with your actual server private key.'
                         }
                     </div>
                 </div>

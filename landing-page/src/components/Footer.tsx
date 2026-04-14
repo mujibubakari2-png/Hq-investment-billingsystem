@@ -11,7 +11,7 @@ export default function Footer() {
           <div className="space-y-6">
             <h3 className="text-2xl font-bold">HQInvestment <span className="text-secondary">Billing</span></h3>
             <p className="text-blue-100 leading-relaxed">
-              Empowering ISPs with reliable, automated billing and management solutions. Optimize your operations and grow your business today.
+              Trusted by hundreds of ISPs across East Africa. We simplify billing so you can focus on connecting more customers.
             </p>
             <div className="flex space-x-4">
               <Link href="#" className="p-2 bg-accent rounded-lg hover:bg-secondary transition-colors"><Facebook size={20} /></Link>
@@ -34,10 +34,11 @@ export default function Footer() {
           <div>
             <h4 className="text-xl font-bold mb-6">Services</h4>
             <ul className="space-y-4">
-              <li className="text-blue-100">Hotspot Billing</li>
-              <li className="text-blue-100">PPPoE Management</li>
-              <li className="text-blue-100">MikroTik Integration</li>
-              <li className="text-blue-100">SMS Notifications</li>
+              <li className="text-blue-100">Hotspot Voucher Billing</li>
+              <li className="text-blue-100">PPPoE Subscriber Management</li>
+              <li className="text-blue-100">MikroTik Auto-Provisioning</li>
+              <li className="text-blue-100">SMS Payment Notifications</li>
+              <li className="text-blue-100">Custom Voucher Portals</li>
             </ul>
           </div>
           <div>

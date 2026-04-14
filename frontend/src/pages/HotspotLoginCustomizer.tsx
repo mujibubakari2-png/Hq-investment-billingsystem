@@ -1008,7 +1008,7 @@ TROUBLESHOOTING:
                             <h4 style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12, color: 'var(--info)' }}>
                                 <PaletteIcon style={{ fontSize: 16 }} /> Colors
                             </h4>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                            <div className="grid-2 gap-16">
                                 <div>
                                     <label style={{ fontSize: '0.82rem', fontWeight: 500, marginBottom: 6, display: 'block' }}>Primary Color</label>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -1060,7 +1060,7 @@ TROUBLESHOOTING:
                             <h4 style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12, color: 'var(--info)' }}>
                                 <ViewModuleIcon style={{ fontSize: 16 }} /> Package Display Layout
                             </h4>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+                            <div className="grid-3 gap-10">
                                 {[
                                     { key: 'grid' as const, icon: <GridViewIcon />, label: 'Grid Layout', desc: 'Packages displayed in a clean vertical list format' },
                                     { key: 'horizontal' as const, icon: <ViewColumnIcon />, label: 'Horizontal', desc: 'Compact horizontal scrollable bar with buy buttons' },
@@ -1129,7 +1129,7 @@ TROUBLESHOOTING:
                             <h4 style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12, color: 'var(--primary)' }}>
                                 <BusinessIcon style={{ fontSize: 16 }} /> Company Information
                             </h4>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                            <div className="grid-2 gap-12">
                                 <div className="form-group">
                                     <label className="form-label" style={{ fontSize: '0.82rem' }}>Company Name</label>
                                     <input type="text" className="form-input" value={companyName} onChange={e => setCompanyName(e.target.value)} />

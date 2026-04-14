@@ -163,7 +163,7 @@ export default function BankPaymentConfig() {
             {/* Common Bank Paybill Numbers */}
             <div>
                 <h3 style={{ fontWeight: 700, fontSize: '0.95rem', marginBottom: 12 }}>Common Bank Paybill Numbers</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+                <div className="grid-4 gap-12">
                     {commonBanks.map(bank => (
                         <div key={bank.paybill} style={{
                             padding: '12px 16px', borderRadius: 'var(--radius-sm)',

@@ -113,8 +113,9 @@ export const toTimestamp = (date: any): number => {
 };
 
 export const formatCurrency = (amount: number): string => {
-    return new Intl.NumberFormat('en-TZ', {
+    return 'TZS ' + new Intl.NumberFormat('en-TZ', {
         minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
     }).format(amount);
 };
 
@@ -125,13 +126,17 @@ export const formatPhone = (phone: string): string => {
     return phone;
 };
 
+/**
+ * Generate a random password using the Web Crypto API (cryptographically secure).
+ * Math.random() should never be used for security-sensitive values.
+ */
 export const generatePassword = (length: number = 8): string => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    let password = '';
-    for (let i = 0; i < length; i++) {
-        password += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return password;
+    const array = new Uint8Array(length);
+    crypto.getRandomValues(array);
+    return Array.from(array)
+        .map((byte) => chars[byte % chars.length])
+        .join('');
 };
 
 export const generateUsername = (): string => {

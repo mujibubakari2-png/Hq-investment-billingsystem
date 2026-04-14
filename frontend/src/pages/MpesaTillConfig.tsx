@@ -124,7 +124,7 @@ export default function MpesaTillConfig() {
                         </div>
                     </div>
                 ) : (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
+                    <div className="grid-2 gap-16" style={{ marginBottom: 24 }}>
                         <div className="form-group">
                             <label className="form-label" style={{ fontWeight: 600 }}>
                                 Consumer Key <span style={{ color: '#e11d48' }}>*</span>
@@ -157,7 +157,7 @@ export default function MpesaTillConfig() {
                     📚 How M-Pesa Till Payments Work
                 </h3>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 24 }}>
+                <div className="grid-3 gap-16" style={{ marginBottom: 24 }}>
                     <div style={{
                         display: 'flex', alignItems: 'flex-start', gap: 12, padding: 16,
                         border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)',

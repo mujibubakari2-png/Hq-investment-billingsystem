@@ -126,7 +126,7 @@ export default function ForgotPassword() {
                             <KeyIcon style={{ fontSize: '2.5rem', color: '#ffffff' }} />
                         </div>
                         <h2 style={{ margin: '0 0 8px 0', fontSize: '1.5rem', fontWeight: 600 }}>Account Recovery</h2>
-                        <p style={{ margin: 0, fontSize: '0.95rem', opacity: 0.9 }}>Reset password or update profile</p>
+                        <p style={{ margin: 0, fontSize: '0.95rem', opacity: 0.9 }}>We'll get you back in within minutes.</p>
                     </div>
 
                     <div style={{ padding: '32px 32px 40px 32px' }}>
@@ -164,7 +164,7 @@ export default function ForgotPassword() {
                             <form onSubmit={handleFindAccount} className="fade-in">
                                 <div style={{ textAlign: 'center', marginBottom: '24px' }}>
                                     <label style={{ color: '#475569', fontWeight: 500, fontSize: '1.05rem' }}>
-                                        Enter your registered email
+                                        Enter the email address linked to your account
                                     </label>
                                 </div>
 
@@ -198,11 +198,11 @@ export default function ForgotPassword() {
                                     onMouseOut={(e) => { if (!loading && email) e.currentTarget.style.backgroundColor = '#ffbd00'; }}
                                 >
                                     <SearchIcon fontSize="small" />
-                                    {loading ? 'Searching...' : 'Find Account'}
+                                    {loading ? 'Searching...' : 'Search for My Account'}
                                 </button>
 
                                 <div style={{ textAlign: 'center', fontSize: '0.95rem', color: '#64748b' }}>
-                                    No account? <span onClick={() => navigate('/register')} style={{ color: '#ffbd00', fontWeight: 600, cursor: 'pointer' }}>Register</span>
+                                    New to HQInvestment? <span onClick={() => navigate('/register')} style={{ color: '#ffbd00', fontWeight: 600, cursor: 'pointer' }}>Sign up free</span>
                                 </div>
                             </form>
                         )}
@@ -222,7 +222,7 @@ export default function ForgotPassword() {
 
                                 <div style={{ textAlign: 'center', marginBottom: '16px' }}>
                                     <label style={{ color: '#475569', fontWeight: 500, fontSize: '1.05rem' }}>
-                                        Enter 6-digit code
+                                        Enter the 6-digit code from your email
                                     </label>
                                 </div>
 
@@ -261,7 +261,7 @@ export default function ForgotPassword() {
                                     onMouseOut={(e) => { if (!loading && otpInputs.join('').length === 6) e.currentTarget.style.backgroundColor = '#ffbd00'; }}
                                 >
                                     <CheckIcon fontSize="small" />
-                                    {loading ? 'Verifying...' : 'Verify'}
+                                    {loading ? 'Verifying...' : 'Verify & Continue →'}
                                 </button>
 
                                 <div style={{ textAlign: 'center', fontSize: '0.95rem', color: '#64748b' }}>
@@ -283,7 +283,7 @@ export default function ForgotPassword() {
                             <form className="fade-in" onSubmit={handleResetPassword}>
                                 <div style={{ textAlign: 'center', marginBottom: '24px' }}>
                                     <label style={{ color: '#475569', fontWeight: 500, fontSize: '1.05rem' }}>
-                                        Create a new password
+                                        Choose your new password
                                     </label>
                                 </div>
 
@@ -333,13 +333,13 @@ export default function ForgotPassword() {
                                 <div style={{ width: '60px', height: '60px', borderRadius: '50%', backgroundColor: '#10b981', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px auto' }}>
                                     <CheckIcon fontSize="large" />
                                 </div>
-                                <h3 style={{ margin: '0 0 16px 0', color: '#0f172a' }}>Success!</h3>
-                                <p style={{ color: '#64748b', marginBottom: '24px' }}>{success}</p>
+                                <h3 style={{ margin: '0 0 16px 0', color: '#0f172a' }}>Password Reset — You're Good to Go!</h3>
+                                <p style={{ color: '#64748b', marginBottom: '24px' }}>Your password has been updated. You can now sign in with your new credentials.</p>
                                 <button
                                     onClick={() => navigate('/login')}
                                     style={{ width: '100%', padding: '14px', backgroundColor: '#ffbd00', color: '#0f172a', border: 'none', borderRadius: '8px', fontSize: '1.05rem', fontWeight: 600, cursor: 'pointer' }}
                                 >
-                                    Return to Login
+                                    Sign In to Dashboard →
                                 </button>
                             </div>
                         )}

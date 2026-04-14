@@ -84,7 +84,7 @@ export default function MpesaPaybillConfig() {
                     </select>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+                <div className="grid-2 gap-16" style={{ marginBottom: 16 }}>
                     <div className="form-group">
                         <label className="form-label" style={{ fontWeight: 600 }}>
                             Shortcode Number <span style={{ color: '#e11d48' }}>*</span>
@@ -129,7 +129,7 @@ export default function MpesaPaybillConfig() {
                     🏢 Business Configuration
                 </h3>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
+                <div className="grid-2 gap-16" style={{ marginBottom: 20 }}>
                     <div className="form-group">
                         <label className="form-label" style={{ fontWeight: 600 }}>💡 Lipa Na M-pesa</label>
                         <select className="form-select" value={authType} onChange={e => setAuthType(e.target.value)}>

@@ -224,7 +224,7 @@ export default function VoucherCodes() {
             </div>
 
             {/* Summary stat cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
+            <div className="grid-2 gap-16" style={{ marginBottom: 20 }}>
                 <div style={{ background: '#e8f5e9', border: '1px solid #a5d6a7', borderRadius: 'var(--radius)', padding: '24px', textAlign: 'center' }}>
                     <div style={{ fontSize: '3rem', color: '#2e7d32', fontWeight: 700 }}>✓</div>
                     <div style={{ fontSize: '2.5rem', fontWeight: 700, color: '#2e7d32' }}>{unusedCount}</div>

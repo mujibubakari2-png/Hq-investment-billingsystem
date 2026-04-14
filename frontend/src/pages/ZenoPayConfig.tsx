@@ -147,7 +147,7 @@ export default function ZenoPayConfig() {
                     📱 Supported Networks
                 </h3>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 24 }}>
+                <div className="grid-3 gap-12" style={{ marginBottom: 24 }}>
                     {[
                         { name: 'M-Pesa Tanzania', color: '#16a34a', border: '#a7f3d0' },
                         { name: 'Tigo Pesa', color: '#e11d48', border: '#fecdd3' },

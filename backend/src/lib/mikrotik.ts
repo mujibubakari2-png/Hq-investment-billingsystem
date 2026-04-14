@@ -235,7 +235,7 @@ export class MikroTikService {
                 service: user.service || "pppoe",
                 profile: user.profile || "default",
                 disabled: user.disabled ? "true" : "false",
-                comment: user.comment || `Managed by Kenge ISP Billing`,
+                comment: user.comment || `Managed by HQInvestment ISP Billing`,
             });
 
             await this.log("create_pppoe_user", `Created PPPoE user: ${user.name}`, "success", user.name);
@@ -315,7 +315,7 @@ export class MikroTikService {
                 profile: user.profile || "default",
                 server: user.server || "all",
                 disabled: user.disabled ? "true" : "false",
-                comment: user.comment || `Managed by Kenge ISP Billing`,
+                comment: user.comment || `Managed by HQInvestment ISP Billing`,
             };
             if (user.macAddress) payload["mac-address"] = user.macAddress;
             if (user.limitUptime) payload["limit-uptime"] = user.limitUptime;
@@ -488,7 +488,7 @@ export class MikroTikService {
             const result = await this.apiRequest("/ppp/profile", "PUT", {
                 name: profile.name,
                 "rate-limit": profile.rateLimit,
-                comment: profile.comment || `Kenge ISP - ${profile.name}`,
+                comment: profile.comment || `HQInvestment ISP - ${profile.name}`,
             });
             await this.log("create_pppoe_profile", `Created PPPoE profile: ${profile.name} (${profile.rateLimit})`, "success");
             return { ...profile, id: result?.[".id"] || result?.ret };
@@ -504,7 +504,7 @@ export class MikroTikService {
                 name: profile.name,
                 "rate-limit": profile.rateLimit,
                 "shared-users": String(profile.sharedUsers || 1),
-                comment: profile.comment || `Kenge ISP - ${profile.name}`,
+                comment: profile.comment || `HQInvestment ISP - ${profile.name}`,
             });
             await this.log("create_hotspot_profile", `Created Hotspot profile: ${profile.name} (${profile.rateLimit})`, "success");
             return { ...profile, id: result?.[".id"] || result?.ret };

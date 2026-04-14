@@ -106,7 +106,7 @@ export default function AddRouterModal({ onClose, onSave, initialData }: AddRout
                         </div>
 
                         {/* Username + Password */}
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                        <div className="grid-2 gap-10">
                             <div className="form-group">
                                 <label className="form-label" style={{ fontSize: '0.82rem' }}>API Username</label>
                                 <input
@@ -173,7 +173,7 @@ export default function AddRouterModal({ onClose, onSave, initialData }: AddRout
                         </div>
 
                         {/* WireGuard & OpenVPN */}
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                        <div className="grid-2 gap-10">
                             <div
                                 onClick={() => setVpnMode('wireguard')}
                                 style={{

@@ -1,7 +1,0 @@
-.next/types/validator.ts(681,39): error TS2307: Cannot find module '../../src/app/api/temp-check-users/route.js' or its corresponding type declarations.
-.next/types/validator.ts(690,39): error TS2307: Cannot find module '../../src/app/api/temp-fix-roles/route.js' or its corresponding type declarations.
-.next/types/validator.ts(699,39): error TS2307: Cannot find module '../../src/app/api/test/route.js' or its corresponding type declarations.
-seed_plans.ts(1,10): error TS2305: Module '"@prisma/client"' has no exported member 'PrismaClient'.
-src/app/api/packages/[id]/route.ts(27,48): error TS2322: Type '{ name: any; }' is not assignable to type 'RouterWhereUniqueInput'.
-  Type '{ name: any; }' is not assignable to type '{ id: string; name_tenantId: RouterNameTenantIdCompoundUniqueInput; } & { id?: string | undefined; name_tenantId?: RouterNameTenantIdCompoundUniqueInput | undefined; ... 37 more ...; vpnUsers?: VpnUserListRelationFilter | undefined; }'.
-    Type '{ name: any; }' is missing the following properties from type '{ id: string; name_tenantId: RouterNameTenantIdCompoundUniqueInput; }': id, name_tenantId

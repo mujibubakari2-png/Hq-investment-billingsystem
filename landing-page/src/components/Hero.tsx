@@ -11,7 +11,7 @@ export default function Hero() {
           transition={{ duration: 0.6 }}
           className="text-4xl md:text-6xl font-extrabold text-primary mb-6"
         >
-          Reliable ISP <span className="text-secondary">Billing System</span>
+          Stop Chasing Payments. <span className="text-secondary">Start Running Your ISP.</span>
         </motion.h1>
         <motion.p 
           initial={{ opacity: 0, y: 20 }}
@@ -19,7 +19,7 @@ export default function Hero() {
           transition={{ duration: 0.6, delay: 0.2 }}
           className="text-lg md:text-xl text-gray-600 mb-10 max-w-3xl mx-auto"
         >
-          Manage your internet customers, payments, and subscriptions easily with our all-in-one solution for Hotspot and PPPoE networks.
+          HQInvestment automates billing, tracks every shilling, and keeps your Hotspot and PPPoE subscribers connected — so you can focus on growing your network, not chasing invoices.
         </motion.p>
         <motion.div 
           initial={{ opacity: 0, scale: 0.95 }}
@@ -31,11 +31,11 @@ export default function Hero() {
             href={`${process.env.NEXT_PUBLIC_BILLING_SYSTEM_URL}/register`}
             className="w-full sm:w-auto bg-primary text-white px-10 py-4 rounded-full text-lg font-bold shadow-lg hover:bg-accent hover:-translate-y-1 transition-all text-center"
           >
-            Get Started
+            Start Free Trial
           </a>
-          <button className="w-full sm:w-auto bg-white text-primary border-2 border-primary px-10 py-4 rounded-full text-lg font-bold hover:bg-blue-50 transition-all">
-            Learn More
-          </button>
+          <a href="#features" className="w-full sm:w-auto bg-white text-primary border-2 border-primary px-10 py-4 rounded-full text-lg font-bold hover:bg-blue-50 transition-all text-center">
+            See How It Works
+          </a>
         </motion.div>
       </div>
     </section>

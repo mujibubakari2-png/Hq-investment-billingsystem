@@ -96,10 +96,10 @@ export default function Dashboard() {
         : (hour < 12 ? '☀️ Good morning!' : hour < 18 ? '🌤️ Good afternoon!' : '🌙 Good night!');
 
     const revenueCards = [
-        { label: "Today's Revenue", value: fmt(stats?.todayRevenue ?? 0), subtitle: `${stats?.todayRechargesMobile || 0} users paid via payment channel`, change: null, color: '#e53935', icon: '💰' },
-        { label: 'Monthly Revenue', value: fmt(stats?.monthlyRevenue ?? 0), subtitle: `${stats?.monthlyRechargesMobile || 0} users paid via payment channel`, change: null, color: '#00bcd4', icon: '📊' },
-        { label: 'Active Users', value: String(stats?.activeSubscribers ?? 0), subtitle: `⚡ ${stats?.onlineUsers ?? 0} currently online`, change: null, color: '#4caf50', icon: '👥' },
-        { label: 'Total Customers', value: String(stats?.totalClients ?? 0), subtitle: `${stats?.newCustomersThisMonth || 0} active users within month`, change: null, color: '#9c27b0', icon: '🔋' },
+        { label: "Today's Revenue", value: fmt(stats?.todayRevenue ?? 0), subtitle: `${stats?.todayRechargesMobile || 0} payments received today`, change: null, color: '#e53935', icon: '💰' },
+        { label: 'Monthly Revenue', value: fmt(stats?.monthlyRevenue ?? 0), subtitle: `${stats?.monthlyRechargesMobile || 0} payments this month`, change: null, color: '#00bcd4', icon: '📊' },
+        { label: 'Active Subscribers', value: String(stats?.activeSubscribers ?? 0), subtitle: `⚡ ${stats?.onlineUsers ?? 0} currently online`, change: null, color: '#4caf50', icon: '👥' },
+        { label: 'Total Customers', value: String(stats?.totalClients ?? 0), subtitle: `${stats?.newCustomersThisMonth || 0} new this month`, change: null, color: '#9c27b0', icon: '🔋' },
     ];
 
     const voucherCards = [
@@ -129,14 +129,15 @@ export default function Dashboard() {
     }));
 
     if (loading && !stats) {
-        return <div style={{ padding: 60, textAlign: 'center', color: 'var(--text-muted)' }}>Loading dashboard...</div>;
+        return <div style={{ padding: 60, textAlign: 'center', color: 'var(--text-muted)' }}>Loading your dashboard...</div>;
     }
 
     if (error && !stats) {
         return (
             <div style={{ padding: 60, textAlign: 'center', color: 'var(--text-muted)' }}>
                 <ErrorIcon style={{ fontSize: 48, color: '#e53935', marginBottom: 16 }} />
-                <h3>{error}</h3>
+                <h3>Unable to load dashboard data</h3>
+                <p style={{ color: 'var(--text-secondary)', marginTop: 8 }}>Check your connection and try again.</p>
                 <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={() => fetchData()}>
                     <RefreshIcon style={{ fontSize: 16, marginRight: 8 }} /> Retry
                 </button>
@@ -220,7 +221,7 @@ export default function Dashboard() {
                             <div style={{ padding: '16px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
                                     <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#e53935', display: 'inline-block' }} />
-                                    <span>System updated successfully</span>
+                                    <span>System updated successfully — all services running normally</span>
                                 </div>
                                 <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Just now</div>
                             </div>

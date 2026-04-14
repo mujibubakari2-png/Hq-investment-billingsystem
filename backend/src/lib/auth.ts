@@ -53,9 +53,11 @@ export function getUserFromRequest(req: NextRequest): JwtPayload | null {
     const token = getTokenFromRequest(req);
     if (!token) return null;
     
-    // Automation key bypass for testing
+    // Automation key bypass — ONLY active in development/test environments.
+    // Never runs in production, preventing it from being a backdoor.
+    const isProduction = process.env.NODE_ENV === "production";
     const automationKey = process.env.AUTOMATION_KEY;
-    if (automationKey && token === automationKey) {
+    if (!isProduction && automationKey && token === automationKey) {
         return {
             userId: "automation-id",
             username: "automation",

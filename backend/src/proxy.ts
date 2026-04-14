@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 // In production, set CORS_ORIGIN to your frontend domain (e.g. "https://billing.hqinvestment.co.tz")
 const ALLOWED_ORIGIN = process.env.CORS_ORIGIN || "*";
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
     // Allow CORS for /api/packages so the hotspot login page can fetch packages
     if (request.method === "OPTIONS") {
         return new NextResponse(null, {

@@ -32,7 +32,7 @@ export default function ViewTransactionModal({ transaction, onClose }: ViewTrans
                 </div>
 
                 <div className="modal-body">
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                    <div className="grid-2 gap-16">
                         <div style={{ padding: '12px 0', borderBottom: '1px solid var(--border-light)' }}>
                             <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: 4 }}>Username</div>
                             <div style={{ fontWeight: 600 }}>{transaction.user}</div>

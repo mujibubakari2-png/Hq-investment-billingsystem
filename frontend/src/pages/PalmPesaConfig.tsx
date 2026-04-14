@@ -66,7 +66,7 @@ export default function PalmPesaConfig() {
                     ✏️ API Configuration
                 </h3>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+                <div className="grid-2 gap-16" style={{ marginBottom: 16 }}>
                     <div className="form-group">
                         <label className="form-label" style={{ fontWeight: 600 }}>
                             ✏️ API Account ID <span style={{ color: '#e11d48' }}>*</span>
@@ -128,7 +128,7 @@ export default function PalmPesaConfig() {
                     This webhook URL will receive payment notifications on callback. Set in the app callback section
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
+                <div className="grid-2 gap-16" style={{ marginBottom: 20 }}>
                     <div className="form-group">
                         <label className="form-label" style={{ fontWeight: 600 }}>
                             🔗 Success Return URL
@@ -194,7 +194,7 @@ export default function PalmPesaConfig() {
                     📱 Supported Networks
                 </h3>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 24 }}>
+                <div className="grid-3 gap-12" style={{ marginBottom: 24 }}>
                     {[
                         { name: 'M-Pesa Tanzania', color: '#16a34a', border: '#a7f3d0' },
                         { name: 'Tigo Pesa', color: '#e11d48', border: '#fecdd3' },

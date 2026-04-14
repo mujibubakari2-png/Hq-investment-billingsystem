@@ -4,33 +4,33 @@ import { Zap, Users, CreditCard, BarChart3, ShieldCheck, Router } from "lucide-r
 
 const features = [
   {
-    title: "Automated Billing",
-    description: "Generate and send invoices automatically. No more manual billing errors.",
+    title: "Zero Billing Errors",
+    description: "Invoices are generated and dispatched automatically on schedule — no manual entry, no missed payments, no angry customers.",
     icon: <Zap className="text-secondary" size={32} />,
   },
   {
-    title: "Customer Management",
-    description: "Keep track of all your internet subscribers and their subscription history.",
+    title: "Complete Subscriber Control",
+    description: "View every subscriber's plan, payment history, and connection status in one clean dashboard — from onboarding to renewal.",
     icon: <Users className="text-secondary" size={32} />,
   },
   {
-    title: "Payment Tracking",
-    description: "Real-time updates on payments and pending transactions.",
+    title: "Real-Time Payment Tracking",
+    description: "Know the moment a payment lands. Instantly reconcile M-Pesa, voucher, and bank transactions without lifting a finger.",
     icon: <CreditCard className="text-secondary" size={32} />,
   },
   {
-    title: "Reports & Analytics",
-    description: "Detailed insights into your business growth and network usage.",
+    title: "Business Intelligence Reports",
+    description: "Spot your most profitable plans, track churn, and identify growth trends with reports built for ISP operators.",
     icon: <BarChart3 className="text-secondary" size={32} />,
   },
   {
-    title: "Secure System",
-    description: "Enterprise-grade security for your data and your customers.",
+    title: "Enterprise-Grade Security",
+    description: "Bank-level data encryption, role-based access control, and audit logs keep your business and your customers safe.",
     icon: <ShieldCheck className="text-secondary" size={32} />,
   },
   {
-    title: "PPPoE & Hotspot Support",
-    description: "Full integration for both service types in a single dashboard.",
+    title: "Hotspot & PPPoE — One Platform",
+    description: "Manage WiFi vouchers and wired PPPoE clients from a single dashboard. No more juggling multiple tools.",
     icon: <Router className="text-secondary" size={32} />,
   },
 ];
@@ -40,9 +40,9 @@ export default function Features() {
     <section id="features" className="py-20 bg-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-5xl font-bold text-primary mb-4">Powerful Features</h2>
+          <h2 className="text-3xl md:text-5xl font-bold text-primary mb-4">Everything Your ISP Needs to Thrive</h2>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            Everything you need to run your ISP business efficiently and profitably.
+            Six powerful modules. One platform. No more spreadsheets or missed payments.
           </p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12">

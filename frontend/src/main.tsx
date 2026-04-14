@@ -5,14 +5,30 @@ import ErrorBoundary from './components/ErrorBoundary'
 import './index.css'
 import App from './App'
 
-const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '96960694156-pg7m1cjdqas9nelo83nicrq4ig3kuq3l.apps.googleusercontent.com';
+// Only initialize Google OAuth when a valid Client ID is provided.
+// Without this guard, GoogleOAuthProvider fires an origin_mismatch error
+// for every page load when the Client ID is missing or unconfigured.
+const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
+const isGoogleConfigured = !!googleClientId && googleClientId.length > 20;
 
-createRoot(document.getElementById('root')!).render(
+const AppTree = (
   <StrictMode>
     <ErrorBoundary>
-      <GoogleOAuthProvider clientId={clientId}>
-          <App />
-      </GoogleOAuthProvider>
+      <App />
     </ErrorBoundary>
-  </StrictMode>,
-)
+  </StrictMode>
+);
+
+createRoot(document.getElementById('root')!).render(
+  isGoogleConfigured
+    ? (
+        <StrictMode>
+          <ErrorBoundary>
+            <GoogleOAuthProvider clientId={googleClientId!}>
+              <App />
+            </GoogleOAuthProvider>
+          </ErrorBoundary>
+        </StrictMode>
+      )
+    : AppTree
+);

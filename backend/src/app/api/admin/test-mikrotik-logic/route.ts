@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
             if (url.includes("/rest/system/identity")) {
                 return Promise.resolve({
                     ok: true,
-                    text: () => Promise.resolve(JSON.stringify([{ name: "Mock-Kenge-Router" }]))
+                    text: () => Promise.resolve(JSON.stringify([{ name: "Mock-HQInvestment-Router" }]))
                 });
             }
             if (url.includes("/rest/system/resource")) {

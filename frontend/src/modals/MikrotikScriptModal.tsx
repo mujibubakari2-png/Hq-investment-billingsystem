@@ -17,7 +17,7 @@ export default function MikrotikScriptModal({ router, onClose }: MikrotikScriptM
     const routerIdCode = `MYR-${router.id.padStart(3, '0')}VBHBC`;
 
     const mikrotikScript = `# ═══════════════════════════════════════════════════════════════
-# KENGE ISP Billing - MikroTik Auto-Configuration Script
+# HQINVESTMENT ISP Billing - MikroTik Auto-Configuration Script
 # Router: ${router.name}
 # ID: ${routerIdCode}
 # Generated: ${new Date().toISOString().split('T')[0]}
@@ -63,20 +63,20 @@ add chain=input protocol=icmp action=accept comment="Allow Ping"
 add chain=input connection-state=established,related action=accept
 add chain=input action=drop comment="Drop all other input"
 
-# ── 7. RADIUS Client (Kenge ISP Billing) ─────────────────────
+# ── 7. RADIUS Client (HQInvestment ISP Billing) ───────────────────────
 /radius
-add service=hotspot address=127.0.0.1 secret=kenge-radius-secret \\
+add service=hotspot address=127.0.0.1 secret=hqinvestment-radius-secret \\
     authentication-port=1812 accounting-port=1813
 
 /ip hotspot profile set "hsprof-${router.name}" use-radius=yes radius-accounting=yes
 
 # ── 8. Walled Garden (Allow billing portal) ──────────────────
 /ip hotspot walled-garden
-add dst-host="*.hqinvestment.co.tz" action=allow comment="Kenge Billing Portal"
+add dst-host="*.hqinvestment.co.tz" action=allow comment="HQInvestment Billing Portal"
 
-# ── 9. System Scheduler (Auto-sync with Kenge) ───────────────
+# ── 9. System Scheduler (Auto-sync with HQInvestment) ───────────────────
 /system scheduler
-add name="kenge-sync" interval=5m on-event="/tool fetch url=\\"https://api.hqinvestment.co.tz/sync/${routerIdCode}\\" mode=https" \\
+add name="hqinvestment-sync" interval=5m on-event="/tool fetch url=\\"https://api.hqinvestment.co.tz/sync/${routerIdCode}\\" mode=https" \\
     start-time=startup
 
 # ── 10. Logging ──────────────────────────────────────────────
@@ -130,7 +130,7 @@ add topics=radius action=memory
                     display: 'flex', alignItems: 'center', gap: 8, borderBottom: '1px solid #c7d2fe',
                 }}>
                     <CheckCircleIcon style={{ fontSize: 16 }} />
-                    <span>This script auto-configures your MikroTik router for Kenge ISP billing. Paste into <strong>Terminal</strong> or upload as <strong>.rsc</strong> file.</span>
+                    <span>This script auto-configures your MikroTik router for HQInvestment ISP billing. Paste into <strong>Terminal</strong> or upload as <strong>.rsc</strong> file.</span>
                 </div>
 
                 {/* Script Content */}

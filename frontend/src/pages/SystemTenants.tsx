@@ -216,7 +216,7 @@ export default function SystemTenants() {
                         </p>
 
                         <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: 8 }}>Extend by:</label>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: '1.25rem' }}>
+                        <div className="grid-4 gap-8" style={{ marginBottom: '1.25rem' }}>
                             {[1, 3, 6, 12].map(m => (
                                 <button key={m} onClick={() => setExtendMonths(m)}
                                     style={{ padding: '10px 0', borderRadius: 8, border: `2px solid ${extendMonths === m ? '#7c3aed' : 'var(--border-light)'}`,

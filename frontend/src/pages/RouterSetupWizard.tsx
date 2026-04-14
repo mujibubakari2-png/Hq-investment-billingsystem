@@ -402,7 +402,7 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                                             </div>
                                         </div>
                                     </div>
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                                    <div className="grid-2 gap-10">
                                         <div onClick={() => setVpnMode('wireguard')} style={{
                                             border: vpnMode === 'wireguard' ? '2px solid #7c3aed' : '1px solid var(--border)',
                                             borderRadius: 'var(--radius-md)', padding: 12, cursor: 'pointer',
@@ -448,7 +448,7 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                                             <SettingsIcon style={{ fontSize: 16 }} /> VPN Server Settings
                                         </div>
                                         <div style={{ padding: 20 }}>
-                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                                            <div className="grid-2 gap-16">
                                                 <div className="form-group">
                                                     <label className="form-label">VPN Protocol</label>
                                                     <select className="form-select" value={vpnProtocol} onChange={e => setVpnProtocol(e.target.value)}>
@@ -562,7 +562,7 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                                             <div style={{ fontWeight: 600, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
                                                 <AddIcon style={{ fontSize: 16, color: '#7c3aed' }} /> New VPN Secret
                                             </div>
-                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                                            <div className="grid-2 gap-12">
                                                 <div className="form-group">
                                                     <label className="form-label">Username <span className="required">*</span></label>
                                                     <input className="form-input" placeholder="vpn-user01" value={vpnForm.username}
@@ -644,7 +644,7 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                                 🌐 Available Ethernet Interfaces
                             </div>
 
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                            <div className="grid-2 gap-12">
                                 {mockInterfaces.map((iface) => (
                                     <div key={iface.name} onClick={() => toggleInterface(iface.name)} style={{
                                         border: selectedInterfaces.includes(iface.name) ? '2px solid #0d9488' : '1px solid var(--border)',
@@ -698,7 +698,7 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                                 Configuration Summary
                             </div>
                             <div style={{ padding: 20 }}>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 12 }}>
+                                <div className="grid-2 gap-16" style={{ marginBottom: 12 }}>
                                     <div>
                                         <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
                                             <SettingsIcon style={{ fontSize: 14 }} /> Service Type:
@@ -714,7 +714,7 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                                     </div>
                                 </div>
                                 {vpnEnabled && (
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 12, paddingTop: 12, borderTop: '1px solid var(--border-light)' }}>
+                                    <div className="grid-2 gap-16" style={{ marginBottom: 12, paddingTop: 12, borderTop: '1px solid var(--border-light)' }}>
                                         <div>
                                             <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
                                                 <VpnKeyIcon style={{ fontSize: 14 }} /> VPN Server:

@@ -23,7 +23,7 @@ export default function PricingCard({ name, price, features, isPopular, delay = 
     >
       {isPopular && (
         <span className="absolute -top-4 bg-secondary text-white px-6 py-1 rounded-full text-sm font-bold uppercase tracking-wider">
-          Most Popular
+          Best Value
         </span>
       )}
       <h3 className="text-2xl font-bold text-primary mb-2">{name}</h3>
@@ -47,7 +47,7 @@ export default function PricingCard({ name, price, features, isPopular, delay = 
             : "bg-softBg text-primary border-2 border-primary hover:bg-primary hover:text-white"
         }`}
       >
-        Get Started
+        {isPopular ? `Get Started with ${name} →` : `Choose This Plan →`}
       </a>
     </motion.div>
   );

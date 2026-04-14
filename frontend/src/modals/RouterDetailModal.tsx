@@ -26,7 +26,7 @@ export default function RouterDetailModal({ router, onClose, onDelete }: RouterD
     const downloadScript = () => {
         const routerIdCode = `MYR-${router.id.padStart(3, '0')}VBHBC`;
         const script = `# ═══════════════════════════════════════════════════════════════
-# KENGE ISP Billing - MikroTik Auto-Configuration Script
+# HQINVESTMENT ISP Billing - MikroTik Auto-Configuration Script
 # Router: ${router.name}
 # ID: ${routerIdCode}
 # Generated: ${new Date().toISOString().split('T')[0]}
@@ -72,20 +72,20 @@ add chain=input protocol=icmp action=accept comment="Allow Ping"
 add chain=input connection-state=established,related action=accept
 add chain=input action=drop comment="Drop all other input"
 
-# ── 7. RADIUS Client (Kenge ISP Billing) ─────────────────────
+# ── 7. RADIUS Client (HQInvestment ISP Billing) ───────────────────────
 /radius
-add service=hotspot address=127.0.0.1 secret=kenge-radius-secret \\
+add service=hotspot address=127.0.0.1 secret=hqinvestment-radius-secret \\
     authentication-port=1812 accounting-port=1813
 
 /ip hotspot profile set "hsprof-${router.name}" use-radius=yes radius-accounting=yes
 
 # ── 8. Walled Garden (Allow billing portal) ──────────────────
 /ip hotspot walled-garden
-add dst-host="*.hqinvestment.co.tz" action=allow comment="Kenge Billing Portal"
+add dst-host="*.hqinvestment.co.tz" action=allow comment="HQInvestment Billing Portal"
 
-# ── 9. System Scheduler (Auto-sync with Kenge) ───────────────
+# ── 9. System Scheduler (Auto-sync with HQInvestment) ───────────────────
 /system scheduler
-add name="kenge-sync" interval=5m on-event="/tool fetch url=\\"https://api.hqinvestment.co.tz/sync/${routerIdCode}\\" mode=https" \\
+add name="hqinvestment-sync" interval=5m on-event="/tool fetch url=\\"https://api.hqinvestment.co.tz/sync/${routerIdCode}\\" mode=https" \\
     start-time=startup
 
 # ── 10. Logging ──────────────────────────────────────────────
@@ -180,7 +180,7 @@ add topics=radius action=memory
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, color: 'var(--primary)', fontWeight: 600, fontSize: '0.85rem' }}>
                             <VpnLockIcon style={{ fontSize: 16 }} /> VPN CONFIGURATION
                         </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                        <div className="grid-2 gap-8">
                             <button className="btn" style={{
                                 background: '#fef3c7', color: '#d97706', fontWeight: 600, border: '1px solid #fbbf24',
                                 padding: '10px 16px', borderRadius: 'var(--radius-sm)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,

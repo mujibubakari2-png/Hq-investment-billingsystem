@@ -188,7 +188,7 @@ export default function PaymentChannels() {
             </div>
 
             {/* Stats Cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 20 }}>
+            <div className="grid-3 gap-16" style={{ marginBottom: 20 }}>
                 <div style={{
                     background: '#dcfce7', borderRadius: 'var(--radius-md)', padding: '24px 16px',
                     textAlign: 'center',

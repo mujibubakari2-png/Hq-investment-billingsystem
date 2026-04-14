@@ -32,7 +32,7 @@ export default function Navbar() {
               href={`${process.env.NEXT_PUBLIC_BILLING_SYSTEM_URL}/register`}
               className="bg-primary text-white px-6 py-2 rounded-full font-medium hover:bg-accent transition-all inline-block"
             >
-              Get Started
+              Start Free Trial
             </Link>
           </div>
           <div className="md:hidden">
@@ -62,7 +62,7 @@ export default function Navbar() {
             onClick={() => setIsOpen(false)} 
             className="block w-full bg-primary text-white px-6 py-2 rounded-lg font-medium text-center"
           >
-            Get Started
+            Start Free Trial
           </Link>
         </div>
       )}

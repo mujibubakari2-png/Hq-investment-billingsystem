@@ -61,7 +61,7 @@ export default function SendBulkMessage() {
                         </h3>
 
                         {/* Row 1: Customer Group + Filter by Router */}
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+                        <div className="grid-2 gap-16" style={{ marginBottom: 16 }}>
                             <div className="form-group">
                                 <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--primary)', fontWeight: 600 }}>
                                     <GroupIcon style={{ fontSize: 16 }} /> Customer Group
@@ -87,7 +87,7 @@ export default function SendBulkMessage() {
                         </div>
 
                         {/* Row 2: Send Via + Batch Size */}
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+                        <div className="grid-2 gap-16" style={{ marginBottom: 16 }}>
                             <div className="form-group">
                                 <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--info)', fontWeight: 600 }}>
                                     <PhoneIcon style={{ fontSize: 16 }} /> Send Via
@@ -113,7 +113,7 @@ export default function SendBulkMessage() {
                         </div>
 
                         {/* Row 3: Delay + Test Mode */}
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
+                        <div className="grid-2 gap-16" style={{ marginBottom: 20 }}>
                             <div className="form-group">
                                 <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--primary)', fontWeight: 600 }}>
                                     <TimerIcon style={{ fontSize: 16 }} /> Delay Between Batches

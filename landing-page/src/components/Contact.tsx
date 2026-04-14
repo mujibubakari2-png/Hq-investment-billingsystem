@@ -34,9 +34,9 @@ export default function Contact() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-20 items-center">
           <div>
-            <h2 className="text-3xl md:text-5xl font-bold text-primary mb-6">Get in Touch</h2>
+            <h2 className="text-3xl md:text-5xl font-bold text-primary mb-6">Let's Find the Right Plan for Your Network</h2>
             <p className="text-lg text-gray-600 mb-10 leading-relaxed">
-              Have questions about our billing system? Want to see a demo? Our team is ready to help you optimize your ISP business.
+              Have questions? Need a custom quote? Our team of ISP billing experts typically responds within a few hours — not days.
             </p>
             <div className="space-y-6">
               <div className="flex items-center space-x-4">
@@ -62,36 +62,36 @@ export default function Contact() {
           >
             <form onSubmit={handleSubmit} className="space-y-6">
               <div>
-                <label className="block text-gray-700 font-medium mb-2">Name</label>
+                <label className="block text-gray-700 font-medium mb-2">Your Name</label>
                 <input
                   type="text"
                   required
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-secondary transition-all"
-                  placeholder="Your Full Name"
+                  placeholder="John Mwangi"
                 />
               </div>
               <div>
-                <label className="block text-gray-700 font-medium mb-2">Email Address</label>
+                <label className="block text-gray-700 font-medium mb-2">Work Email</label>
                 <input
                   type="email"
                   required
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-secondary transition-all"
-                  placeholder="your@email.com"
+                  placeholder="you@yourcompany.com"
                 />
               </div>
               <div>
-                <label className="block text-gray-700 font-medium mb-2">Message</label>
+                <label className="block text-gray-700 font-medium mb-2">How Can We Help?</label>
                 <textarea
                   required
                   rows={4}
                   value={formData.message}
                   onChange={(e) => setFormData({ ...formData, message: e.target.value })}
                   className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-secondary transition-all"
-                  placeholder="How can we help you?"
+                  placeholder="Tell us about your network size, current challenges, or which plan interests you."
                 />
               </div>
               <button
@@ -101,10 +101,10 @@ export default function Contact() {
                   status === "loading" ? "bg-gray-400" : "bg-primary hover:bg-accent"
                 }`}
               >
-                {status === "loading" ? "Sending..." : "Send Message"}
+                {status === "loading" ? "Sending..." : "Send Message →"}
               </button>
-              {status === "success" && <p className="text-green-600 font-medium text-center">Message sent successfully!</p>}
-              {status === "error" && <p className="text-red-600 font-medium text-center">Something went wrong. Please try again.</p>}
+              {status === "success" && <p className="text-green-600 font-medium text-center">Message received! We'll get back to you within a few hours.</p>}
+              {status === "error" && <p className="text-red-600 font-medium text-center">Something went wrong. Please try again or email us directly at support@hqinvestment.co.tz</p>}
             </form>
           </motion.div>
         </div>

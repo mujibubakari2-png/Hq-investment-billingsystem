@@ -13,7 +13,7 @@ export default function TechnicalSupport() {
                     </div>
                     <div>
                         <h1 className="page-title">Technical Support</h1>
-                        <p className="page-subtitle">Get help with your system</p>
+                        <p className="page-subtitle">We're here whenever you need us.</p>
                     </div>
                 </div>
             </div>
@@ -23,7 +23,7 @@ export default function TechnicalSupport() {
                     <div className="card-body" style={{ textAlign: 'center', padding: '32px 20px' }}>
                         <EmailIcon style={{ fontSize: 48, color: 'var(--info)', marginBottom: 12 }} />
                         <h3 style={{ marginBottom: 8 }}>Email Support</h3>
-                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: 16 }}>Send us an email and we'll respond within 24 hours</p>
+                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: 16 }}>Drop us an email and our team will get back to you within a few hours — even on weekends.</p>
                         <button className="btn btn-primary" onClick={() => window.location.href = 'mailto:support@hqinvestment.co.tz'}>support@hqinvestment.co.tz</button>
                     </div>
                 </div>
@@ -31,7 +31,7 @@ export default function TechnicalSupport() {
                     <div className="card-body" style={{ textAlign: 'center', padding: '32px 20px' }}>
                         <PhoneIcon style={{ fontSize: 48, color: 'var(--secondary)', marginBottom: 12 }} />
                         <h3 style={{ marginBottom: 8 }}>Phone Support</h3>
-                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: 16 }}>Call us during business hours (8AM - 6PM EAT)</p>
+                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: 16 }}>Speak directly with a technician. Available Monday – Saturday, 8 AM to 6 PM (EAT).</p>
                         <button className="btn btn-success" onClick={() => window.location.href = 'tel:+255621085215'}>+255 621 085 215 <br /> +255 766 487 125</button>
                     </div>
                 </div>
@@ -39,7 +39,7 @@ export default function TechnicalSupport() {
                     <div className="card-body" style={{ textAlign: 'center', padding: '32px 20px' }}>
                         <ChatIcon style={{ fontSize: 48, color: 'var(--purple)', marginBottom: 12 }} />
                         <h3 style={{ marginBottom: 8 }}>Live Chat</h3>
-                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: 16 }}>Chat with our support team in real-time</p>
+                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: 16 }}>Chat with our support team in real time. Coming soon — use email or phone for now.</p>
                         <button className="btn btn-secondary" onClick={() => alert('Live chat is coming soon! Please use email or phone for now.')}>Start Chat</button>
                     </div>
                 </div>

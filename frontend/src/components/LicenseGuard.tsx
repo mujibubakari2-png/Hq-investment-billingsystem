@@ -8,7 +8,7 @@ const BYPASS_PATHS = ['/restricted', '/renew', '/pending-approval'];
 export default function LicenseGuard() {
     const { user } = authStore.useAuth();
     const location = useLocation();
-    const [status, setStatus] = useState<'checking' | 'active' | 'restricted' | 'pending_approval'>('checking');
+    const [status, setStatus] = useState<'checking' | 'active' | 'restricted' | 'pending_approval' | 'error'>('checking');
 
     useEffect(() => {
         let mounted = true;
@@ -35,7 +35,9 @@ export default function LicenseGuard() {
                 }
             } catch (err) {
                 console.error('Failed to check license', err);
-                if (mounted) setStatus('active'); // fail open on network error
+                // Fail CLOSED — do not grant access on network errors.
+                // Users can retry by refreshing the page.
+                if (mounted) setStatus('error');
             }
         }
         
@@ -60,6 +62,33 @@ export default function LicenseGuard() {
                     animation: 'spin 0.8s linear infinite'
                 }} />
                 Verifying account status...
+            </div>
+        );
+    }
+
+    if (status === 'error') {
+        return (
+            <div style={{
+                height: '100vh', display: 'flex', flexDirection: 'column',
+                alignItems: 'center', justifyContent: 'center',
+                gap: '1rem', color: 'var(--text-secondary)', fontSize: '0.9rem',
+                textAlign: 'center', padding: '2rem'
+            }}>
+                <div style={{ fontSize: '2rem' }}>⚠️</div>
+                <strong style={{ color: 'var(--text-primary)' }}>Unable to verify account status</strong>
+                <p style={{ maxWidth: 320, margin: 0 }}>
+                    Could not connect to the server. Please check your connection and try again.
+                </p>
+                <button
+                    onClick={() => window.location.reload()}
+                    style={{
+                        padding: '0.5rem 1.25rem', borderRadius: 6,
+                        background: 'var(--primary)', color: '#fff',
+                        border: 'none', cursor: 'pointer', fontSize: '0.9rem'
+                    }}
+                >
+                    Retry
+                </button>
             </div>
         );
     }

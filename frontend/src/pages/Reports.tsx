@@ -97,7 +97,7 @@ export default function Reports() {
                 </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
+            <div className="grid-2 gap-20" style={{ marginBottom: 20 }}>
                 {/* Revenue Chart */}
                 <div className="card card-body">
                     <h3 style={{ marginBottom: 16, fontWeight: 600 }}>Daily Revenue (TZS)</h3>
@@ -133,7 +133,7 @@ export default function Reports() {
                 </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+            <div className="grid-2 gap-20">
                 {/* Expense Breakdown */}
                 <div className="card card-body">
                     <h3 style={{ marginBottom: 16, fontWeight: 600 }}>Expense by Category</h3>

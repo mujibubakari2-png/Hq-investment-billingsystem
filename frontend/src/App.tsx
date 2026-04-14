@@ -128,6 +128,23 @@ export default function App() {
           </Route>
           </Route>
         </Route>
+        {/* 404 — must be last */}
+        <Route path="*" element={
+          <div style={{
+            height: '100vh', display: 'flex', flexDirection: 'column',
+            alignItems: 'center', justifyContent: 'center',
+            gap: '0.75rem', color: 'var(--text-secondary)', fontFamily: 'inherit'
+          }}>
+            <div style={{ fontSize: '4rem', lineHeight: 1 }}>404</div>
+            <strong style={{ fontSize: '1.2rem', color: 'var(--text-primary)' }}>Page Not Found</strong>
+            <p style={{ margin: 0, fontSize: '0.9rem' }}>The page you requested does not exist.</p>
+            <a href="/dashboard" style={{
+              marginTop: '0.5rem', padding: '0.5rem 1.25rem',
+              background: 'var(--primary)', color: '#fff', borderRadius: 6,
+              textDecoration: 'none', fontSize: '0.9rem'
+            }}>Go to Dashboard</a>
+          </div>
+        } />
       </Routes>
     </BrowserRouter>
   );

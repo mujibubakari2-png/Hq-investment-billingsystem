@@ -8,6 +8,10 @@ import authStore from '../stores/authStore';
 import Footer from '../components/layout/Footer';
 import { GoogleLogin } from '@react-oauth/google';
 
+// Google login is only shown when a real Client ID is configured.
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
+const isGoogleConfigured = !!GOOGLE_CLIENT_ID && GOOGLE_CLIENT_ID.length > 20;
+
 export default function Login() {
     const navigate = useNavigate();
     const [username, setUsername] = useState('');
@@ -17,6 +21,12 @@ export default function Login() {
     const handleGoogleSuccess = async (credentialResponse: any) => {
         try {
             setLoading(true);
+            setError('');
+            if (!credentialResponse.credential) {
+                setError('Google did not return a credential. Please try again.');
+                setLoading(false);
+                return;
+            }
             const { token, user } = await authApi.googleLogin({
                 credential: credentialResponse.credential,
                 action: 'login'
@@ -24,9 +34,15 @@ export default function Login() {
             authStore.login(token, user);
             navigate('/dashboard', { replace: true });
         } catch (err: any) {
-            setError(err.message || "Google authentication failed");
+            setError(err.message || 'Google authentication failed. Please try again.');
             setLoading(false);
         }
+    };
+
+    const handleGoogleError = () => {
+        setError(
+            'Google Sign-In failed. If you are on localhost, ensure http://localhost:5175 is added as an Authorized JavaScript Origin in your Google Cloud Console for this Client ID.'
+        );
     };
     const [remember, setRemember] = useState(false);
     const [loading, setLoading] = useState(false);
@@ -71,29 +87,32 @@ export default function Login() {
                     </div>
                 </div>
                 <h2 style={{ color: '#008ee6', fontSize: '1.5rem', fontWeight: 600, textAlign: 'center', margin: '0 0 8px 0' }}>
-                    Welcome back!
+                    Welcome back to HQInvestment
                 </h2>
                 <p style={{ color: '#64748b', textAlign: 'center', margin: '0 0 16px 0', fontSize: '1rem' }}>
-                    Sign in to your account to continue
+                    Sign in to manage your network and billing
                 </p>
                 <div style={{ textAlign: 'center', marginBottom: '32px' }}>
                     <a href="/register" style={{ color: '#008ee6', textDecoration: 'none', fontWeight: 500, fontSize: '1rem' }}>
-                        Create a new account
+                        New here? Create your free account
                     </a>
                 </div>
                 
-                <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'center' }}>
-                    <GoogleLogin
-                        onSuccess={handleGoogleSuccess}
-                        onError={() => setError('Google Login Failed')}
-                        useOneTap
-                        width="100%"
-                    />
-                </div>
+                {isGoogleConfigured && (
+                    <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'center' }}>
+                        <GoogleLogin
+                            onSuccess={handleGoogleSuccess}
+                            onError={handleGoogleError}
+                            width="100%"
+                            // useOneTap is intentionally disabled — it requires additional
+                            // cross-origin configuration and causes origin_mismatch in dev.
+                        />
+                    </div>
+                )}
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '24px 0', color: '#94a3b8', fontSize: '0.85rem' }}>
                     <div style={{ flex: 1, height: '1px', backgroundColor: '#e2e8f0' }} />
-                    or sign in manually
+                    or continue with email
                     <div style={{ flex: 1, height: '1px', backgroundColor: '#e2e8f0' }} />
                 </div>
 
@@ -163,7 +182,7 @@ export default function Login() {
                         onMouseOver={e => !loading && (e.currentTarget.style.backgroundColor = '#008ee6')}
                         onMouseOut={e => !loading && (e.currentTarget.style.backgroundColor = '#00a3ff')}
                     >
-                        {loading ? 'Signing in...' : 'Sign in'}
+                        {loading ? 'Signing in...' : 'Sign In to Dashboard →'}
                     </button>
                 </form>
             </div>

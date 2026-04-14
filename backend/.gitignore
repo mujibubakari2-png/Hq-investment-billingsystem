@@ -40,3 +40,43 @@ yarn-error.log*
 next-env.d.ts
 
 /src/generated/prisma
+
+# Debug logs & error dumps in project root
+*.log
+dbcheck.log
+test_connect.log
+test_output.log
+error.txt
+error2.txt
+compile_errors.txt
+compile8.txt
+api-files.txt
+response.json
+
+# Standalone test/debug scripts left in root (should live in scripts/ or be deleted)
+check_*.ts
+check_*.js
+check_*.mjs
+test_*.ts
+test_*.js
+test2.js
+seed_tests.ts
+fix-*.ts
+fix-*.js
+expire-*.ts
+expire-*.js
+gen_token.ts
+list_routers.ts
+reset_pwd.ts
+restore_*.ts
+setup_*.ts
+update_*.ts
+ensure_user.ts
+see_err.js
+seed.sql
+re-fix_dates.js
+create-pending-user.js
+trigger-palmpesa-webhook.js
+
+# Landing page copy inside backend (canonical is the root landing-page/)
+/landing-page/

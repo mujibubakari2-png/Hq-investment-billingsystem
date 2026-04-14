@@ -223,9 +223,9 @@ export default function Register() {
                             {/* Connecting Line */}
                             <div style={{ position: 'absolute', top: '20px', left: 'calc(50% - 100px)', right: 'calc(50% - 100px)', height: '2px', backgroundColor: '#e2e8f0', zIndex: 0 }} />
 
-                            <StepIcon step={1} currentStep={step} label="User Info" />
-                            <StepIcon step={2} currentStep={step} label="Verify OTP" />
-                            <StepIcon step={3} currentStep={step} label="Company" />
+                            <StepIcon step={1} currentStep={step} label="Account Details" />
+                            <StepIcon step={2} currentStep={step} label="Verify Email" />
+                            <StepIcon step={3} currentStep={step} label="Your Business" />
                         </div>
 
                         {step === 1 && (
@@ -249,7 +249,7 @@ export default function Register() {
                                     <PersonIcon style={{ color: '#0ea5e9' }} /> Personal Information
                                 </h3>
 
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
+                                <div className="form-row" style={{ marginBottom: '20px' }}>
                                     <div>
                                         <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.9rem', fontWeight: 600, color: '#334155', marginBottom: '8px' }}>
                                             <PersonIcon fontSize="small" style={{ color: '#0ea5e9', fontSize: '1.1rem' }} /> Full Name
@@ -275,7 +275,7 @@ export default function Register() {
                                     </div>
                                 </div>
 
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
+                                <div className="form-row" style={{ marginBottom: '20px' }}>
                                     <div>
                                         <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.9rem', fontWeight: 600, color: '#334155', marginBottom: '8px' }}>
                                             <LockIcon fontSize="small" style={{ color: '#0ea5e9', fontSize: '1.1rem' }} /> Create Password
@@ -346,7 +346,7 @@ export default function Register() {
                                     <MailOutlineIcon style={{ fontSize: '2.5rem' }} />
                                 </div>
 
-                                <p style={{ color: '#475569', marginBottom: '24px' }}>Enter the 6-digit code sent to<br /><strong>{formData.email || 'your@email.com'}</strong></p>
+                                <p style={{ color: '#475569', marginBottom: '24px' }}>We've sent a 6-digit verification code to<br /><strong>{formData.email || 'your@email.com'}</strong><br /><span style={{ fontSize: '0.85rem', color: '#64748b' }}>Check your inbox — it should arrive within a minute.</span></p>
 
                                 <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', marginBottom: '32px' }}>
                                     {[0, 1, 2, 3, 4, 5].map(idx => (
@@ -394,7 +394,7 @@ export default function Register() {
                                     <input type="text" placeholder="Your Company Ltd" value={formData.companyName} onChange={e => updateField('companyName', e.target.value)} style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', boxSizing: 'border-box' }} />
                                 </div>
 
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px' }}>
+                                <div className="form-row" style={{ marginBottom: '24px' }}>
                                     <div>
                                         <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.9rem', fontWeight: 600, color: '#334155', marginBottom: '8px' }}>
                                             <LocationCityIcon fontSize="small" style={{ color: '#0ea5e9', fontSize: '1.1rem' }} /> City
@@ -428,7 +428,7 @@ export default function Register() {
                                 )}
 
                                 <button onClick={handleRegister} disabled={!formData.termsAccepted || loading} style={{ width: '100%', padding: '14px', backgroundColor: '#0ea5e9', color: '#ffffff', border: 'none', borderRadius: '8px', fontSize: '1rem', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', cursor: (formData.termsAccepted && !loading) ? 'pointer' : 'not-allowed', opacity: (formData.termsAccepted && !loading) ? 1 : 0.7, marginBottom: '16px' }}>
-                                    {loading ? 'Registering...' : '🚀 Complete Registration'}
+                                    {loading ? 'Setting up your account...' : '🚀 Launch My Billing System'}
                                 </button>
 
                                 <button onClick={handleBack} style={{ width: '100%', padding: '14px', backgroundColor: '#ffffff', color: '#64748b', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '1rem', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', cursor: 'pointer', marginBottom: '24px' }}>
@@ -442,7 +442,7 @@ export default function Register() {
                                         What happens next?
                                     </h4>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                        {['Email verification link sent to your inbox', 'Admin review (usually within 24 hours)', 'Approval confirmation via email and SMS', 'Start managing your billing instantly!'].map((text, i) => (
+                                        {['Your email address has been verified', 'Our team will review your account (usually within 24 hours)', 'You\'ll receive an approval notification via email and SMS', 'Your 10-day free trial starts automatically on approval — no credit card needed'].map((text, i) => (
                                             <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', fontSize: '0.85rem', color: '#475569' }}>
                                                 <div style={{ width: '20px', height: '20px', borderRadius: '50%', backgroundColor: '#0ea5e9', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 'bold', flexShrink: 0 }}>{i + 1}</div>
                                                 {text}
@@ -456,7 +456,7 @@ export default function Register() {
                     </div>
 
                     <div style={{ textAlign: 'center', marginTop: '24px', fontSize: '0.9rem', color: '#64748b' }}>
-                        Already have an account? <span onClick={() => navigate('/login')} style={{ color: '#0ea5e9', fontWeight: 600, cursor: 'pointer' }}>Sign in here &rarr;</span>
+                        Already have an account? <span onClick={() => navigate('/login')} style={{ color: '#0ea5e9', fontWeight: 600, cursor: 'pointer' }}>Sign in here →</span>
                     </div>
                 </div>
             </div>

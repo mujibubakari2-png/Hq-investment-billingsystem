@@ -1,8 +1,19 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { errorResponse, jsonResponse, hashPassword, signToken } from "@/lib/auth";
+import { checkRateLimit, getClientIp } from "@/lib/rateLimiter";
 
 export async function POST(req: NextRequest) {
+    // Rate limit: 5 registrations per hour per IP
+    const ip = getClientIp(req);
+    const rateLimit = checkRateLimit(ip, "register", { limit: 5, windowSeconds: 60 * 60 });
+    if (!rateLimit.allowed) {
+        return errorResponse(
+            `Too many registration attempts. Please try again in ${rateLimit.retryAfterSeconds} seconds.`,
+            429
+        );
+    }
+
     try {
         let body;
         try {
@@ -75,9 +86,10 @@ export async function POST(req: NextRequest) {
             return errorResponse("User already exists with this email", 409);
         }
 
-        // Check if we should skip registration flow for automation scripts ONLY
+        // Automation bypass — ONLY active in development/test environments, never in production
+        const isProduction = process.env.NODE_ENV === "production";
         const automationKey = process.env.AUTOMATION_KEY;
-        const isAutomation = (req.headers.get("x-automation-key") === automationKey || req.headers.get("x-api-key") === automationKey) && automationKey !== undefined;
+        const isAutomation = !isProduction && (req.headers.get("x-automation-key") === automationKey || req.headers.get("x-api-key") === automationKey) && automationKey !== undefined;
 
         if (isAutomation) {
             const hashedPassword = await hashPassword(password);

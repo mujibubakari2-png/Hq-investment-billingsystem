@@ -49,7 +49,7 @@ export default function ViewClientModal({ client, onClose, onEdit }: ViewClientM
                     </div>
 
                     {/* Info grid */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                    <div className="grid-2 gap-16">
                         {client.phone && (
                             <div className="info-item">
                                 <div className="info-label"><PhoneIcon style={{ fontSize: 14 }} /> Phone</div>
