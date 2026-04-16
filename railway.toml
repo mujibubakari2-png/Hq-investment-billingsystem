@@ -1,5 +1,6 @@
 # Railway multi-service configuration
 # This file defines 3 services: backend, frontend, and landing-page
+# Updated: 2026-04-16
 
 [[services]]
 id = "backend"
