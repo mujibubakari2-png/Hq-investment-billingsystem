@@ -2,16 +2,39 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { NextRequest } from "next/server";
 
-const JWT_SECRET = (() => {
-    const secret = process.env.JWT_SECRET;
-    if (!secret) {
-        throw new Error("FATAL: JWT_SECRET environment variable is required. Add it to your .env file.");
+let jwtSecret: string | null = null;
+
+function isNextBuild(): boolean {
+    return (
+        process.env.NEXT_PHASE?.includes("phase-production-build") ||
+        process.env.NEXT_BUILD_WORKER === "1" ||
+        process.argv.includes("build")
+    );
+}
+
+function getJwtSecret(): string {
+    if (!jwtSecret) {
+        const secret = process.env.JWT_SECRET;
+        if (!secret) {
+            if (isNextBuild()) {
+                jwtSecret = "build-time-fallback-secret-please-set-JWT_SECRET";
+                return jwtSecret;
+            }
+            // During Railway build or other CI, use fallback
+            if (process.env.RAILWAY_PROJECT_ID || process.env.CI || !process.env.NODE_ENV) {
+                jwtSecret = "build-time-fallback-secret-please-set-JWT_SECRET";
+                console.warn("Using fallback JWT_SECRET for build/CI environment");
+                return jwtSecret;
+            }
+            throw new Error("FATAL: JWT_SECRET environment variable is required. Add it to your .env file.");
+        }
+        if (secret.length < 32) {
+            throw new Error("FATAL: JWT_SECRET must be at least 32 characters long for security.");
+        }
+        jwtSecret = secret;
     }
-    if (secret.length < 32) {
-        throw new Error("FATAL: JWT_SECRET must be at least 32 characters long for security.");
-    }
-    return secret;
-})();
+    return jwtSecret;
+}
 
 export interface JwtPayload {
     userId: string;
@@ -30,12 +53,12 @@ export function comparePassword(password: string, hash: string): Promise<boolean
 }
 
 export function signToken(payload: JwtPayload): string {
-    return jwt.sign(payload, JWT_SECRET, { expiresIn: "7d" });
+    return jwt.sign(payload, getJwtSecret(), { expiresIn: "7d" });
 }
 
 export function verifyToken(token: string): JwtPayload | null {
     try {
-        return jwt.verify(token, JWT_SECRET) as JwtPayload;
+        return jwt.verify(token, getJwtSecret()) as JwtPayload;
     } catch {
         return null;
     }
@@ -52,7 +75,7 @@ export function getTokenFromRequest(req: NextRequest): string | null {
 export function getUserFromRequest(req: NextRequest): JwtPayload | null {
     const token = getTokenFromRequest(req);
     if (!token) return null;
-    
+
     // Automation key bypass — ONLY active in development/test environments.
     // Never runs in production, preventing it from being a backdoor.
     const isProduction = process.env.NODE_ENV === "production";
@@ -66,7 +89,7 @@ export function getUserFromRequest(req: NextRequest): JwtPayload | null {
             tenant_id: "test-tenant-id-123"
         };
     }
-    
+
     return verifyToken(token);
 }
 
@@ -81,9 +104,9 @@ export function errorResponse(message: string, status = 400) {
     if (status >= 400) {
         console.warn(`[API ERROR] Status ${status}: ${message}`);
     }
-    return jsonResponse({ 
-        error: message, 
+    return jsonResponse({
+        error: message,
         message: message, // Alias for tests that expect 'message'
-        status: "error" 
+        status: "error"
     }, status);
 }

@@ -587,6 +587,19 @@ model RadAcct {
   @@map("radacct")
 }
 
+model RateLimit {
+  id        String   @id @default(cuid())
+  key       String
+  count     Int      @default(0)
+  resetAt   DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([key])
+  @@index([resetAt])
+  @@map("rate_limits")
+}
+
 enum Role {
   SUPER_ADMIN
   ADMIN

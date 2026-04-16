@@ -1,28 +1,16 @@
 /**
- * Simple in-memory rate limiter for API routes.
+ * Simple database-based rate limiter for API routes.
  *
  * Limits requests per IP address within a sliding window.
- * Uses an in-memory store — suitable for a single-instance deployment.
- * For multi-instance/load-balanced setups, swap the store for Redis.
+ * Uses database store — suitable for multi-instance/serverless deployments.
  */
+
+import { prisma } from "./prisma";
 
 interface RateLimitEntry {
     count: number;
     resetAt: number; // Unix timestamp (ms)
 }
-
-// Store is module-level — persists for the lifetime of the process
-const store = new Map<string, RateLimitEntry>();
-
-// Clean up expired entries every 5 minutes to prevent memory leaks
-setInterval(() => {
-    const now = Date.now();
-    for (const [key, entry] of store.entries()) {
-        if (entry.resetAt <= now) {
-            store.delete(key);
-        }
-    }
-}, 5 * 60 * 1000);
 
 export interface RateLimitOptions {
     /** Maximum number of requests allowed in the window */
@@ -45,47 +33,79 @@ export interface RateLimitResult {
  * @param namespace - Prefix to namespace limits per route (e.g. "login", "register")
  * @param options   - Rate limit configuration
  */
-export function checkRateLimit(
+export async function checkRateLimit(
     key: string,
     namespace: string,
     options: RateLimitOptions
-): RateLimitResult {
+): Promise<RateLimitResult> {
     const storeKey = `${namespace}:${key}`;
     const now = Date.now();
     const windowMs = options.windowSeconds * 1000;
 
-    let entry = store.get(storeKey);
+    try {
+        // Try to find existing entry
+        let entry = await prisma.rateLimit.findUnique({
+            where: { key: storeKey }
+        });
 
-    // If no entry or window has expired, start a fresh window
-    if (!entry || entry.resetAt <= now) {
-        entry = { count: 1, resetAt: now + windowMs };
-        store.set(storeKey, entry);
+        if (!entry || entry.resetAt.getTime() <= now) {
+            // Create new or update expired entry
+            entry = await prisma.rateLimit.upsert({
+                where: { key: storeKey },
+                update: {
+                    count: 1,
+                    resetAt: new Date(now + windowMs),
+                    updatedAt: new Date()
+                },
+                create: {
+                    key: storeKey,
+                    count: 1,
+                    resetAt: new Date(now + windowMs)
+                }
+            });
+            return {
+                allowed: true,
+                remaining: options.limit - 1,
+                resetAt: entry.resetAt.getTime(),
+                retryAfterSeconds: 0,
+            };
+        }
+
+        // Increment count
+        entry = await prisma.rateLimit.update({
+            where: { key: storeKey },
+            data: {
+                count: { increment: 1 },
+                updatedAt: new Date()
+            }
+        });
+
+        if (entry.count > options.limit) {
+            const retryAfterSeconds = Math.ceil((entry.resetAt.getTime() - now) / 1000);
+            return {
+                allowed: false,
+                remaining: 0,
+                resetAt: entry.resetAt.getTime(),
+                retryAfterSeconds,
+            };
+        }
+
+        return {
+            allowed: true,
+            remaining: options.limit - entry.count,
+            resetAt: entry.resetAt.getTime(),
+            retryAfterSeconds: 0,
+        };
+    } catch (error) {
+        // If database fails, allow request to prevent blocking
+        console.error('Rate limit check failed:', error);
         return {
             allowed: true,
             remaining: options.limit - 1,
-            resetAt: entry.resetAt,
+            resetAt: now + windowMs,
             retryAfterSeconds: 0,
         };
     }
-
-    entry.count += 1;
-
-    if (entry.count > options.limit) {
-        const retryAfterSeconds = Math.ceil((entry.resetAt - now) / 1000);
-        return {
-            allowed: false,
-            remaining: 0,
-            resetAt: entry.resetAt,
-            retryAfterSeconds,
-        };
-    }
-
-    return {
-        allowed: true,
-        remaining: options.limit - entry.count,
-        resetAt: entry.resetAt,
-        retryAfterSeconds: 0,
-    };
 }
 
 /**

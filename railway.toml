@@ -11,6 +11,8 @@ builder = "NIXPACKS"
 
 [services.build.env]
 NODE_ENV = "production"
+JWT_SECRET = "build-time-fallback-secret-please-set-JWT_SECRET"
+DATABASE_URL = "postgresql://dummy:dummy@localhost:5432/dummy"
 
 [services.deploy]
 startCommand = "npm run start"
