@@ -11,67 +11,72 @@
 - [ ] Go to https://railway.app
 - [ ] Sign up/login with GitHub
 - [ ] Create new project: "Kenge ISP Billing"
-- [ ] Connect to GitHub repository
+- [ ] **Enable Auto-Deploy**: Connect to GitHub repository
 
 ## Phase 3: Deploy Backend Service
 - [ ] Click "New Project" → "Deploy from GitHub"
-- [ ] Select repository
-- [ ] Set root directory: `backend/`
-- [ ] Wait for initial deployment
+- [ ] Select repository: `mujibubakari2-png/Hq-investment-billingsystem`
+- [ ] Railway auto-detects services and deploys them
+- [ ] **Auto-deploy enabled**: Every push to master triggers deployment
 - [ ] Add PostgreSQL plugin:
   - [ ] Railway dashboard → Add → Database → PostgreSQL
   - [ ] Plugin auto-generates DATABASE_URL
-- [ ] Set environment variables:
+- [ ] Set environment variables in Railway dashboard:
   - [ ] `DATABASE_URL` (auto-generated)
   - [ ] `JWT_SECRET` (your generated secret)
   - [ ] `NODE_ENV=production`
   - [ ] `GOOGLE_CLIENT_ID` (if using Google auth)
-  - [ ] `CORS_ORIGIN` (set later after frontend deploys)
-- [ ] Wait for redeployment
-- [ ] Copy backend service URL
+  - [ ] `CORS_ORIGIN` (set after frontend deploys)
+- [ ] Railway automatically redeploys with new env vars
 
 ## Phase 4: Deploy Frontend Service
-- [ ] Add new service from same repo
-- [ ] Set root directory: `frontend/`
-- [ ] Set environment variables:
+- [ ] Railway auto-created frontend service from GitHub
+- [ ] Set environment variables in Railway dashboard:
   - [ ] `VITE_API_URL=https://[backend-service-url]`
   - [ ] `VITE_GOOGLE_CLIENT_ID` (same as backend)
-- [ ] Wait for deployment
-- [ ] Copy frontend service URL
+- [ ] Copy frontend service URL for CORS setting
 
 ## Phase 5: Update Backend CORS
-- [ ] Go back to backend service
+- [ ] Go back to backend service in Railway
 - [ ] Update `CORS_ORIGIN` with frontend URL
-- [ ] Wait for redeployment
+- [ ] Railway auto-redeploys backend
 
 ## Phase 6: Deploy Landing Page Service
-- [ ] Add new service from same repo
-- [ ] Set root directory: `landing-page/`
+- [ ] Railway auto-created landing-page service
 - [ ] No environment variables needed
-- [ ] Wait for deployment
+- [ ] Deploys automatically
 
 ## Phase 7: Database Setup
 - [ ] Run migrations: `railway run npx prisma migrate deploy`
 - [ ] Seed database: `railway run npx prisma db seed`
 - [ ] Verify database connection
 
-## Phase 8: Testing
+## Phase 8: Verify Auto-Deploy
+- [ ] Make a small change (add comment to README)
+- [ ] Push to GitHub master branch
+- [ ] Watch Railway dashboard - should auto-deploy
+- [ ] Check all services are healthy
+
+## Phase 9: Testing
 - [ ] Test backend health endpoint
 - [ ] Test frontend loads and connects to backend
 - [ ] Test landing page loads
 - [ ] Test user authentication (if applicable)
 - [ ] Test database operations
 
-## Phase 9: Custom Domain (Optional)
-- [ ] Go to each service settings
+## Phase 10: Custom Domain (Optional)
+- [ ] Go to each service settings in Railway
 - [ ] Add custom domain
 - [ ] Update DNS records
 - [ ] Update CORS_ORIGIN with custom domain
 
-## Phase 10: Monitoring
-- [ ] Check Railway logs for errors
-- [ ] Monitor resource usage
-- [ ] Set up alerts if needed
+## Phase 11: GitHub Actions (Optional Advanced Setup)
+If you want more control, set up GitHub Actions:
+- [ ] Go to GitHub repository → Settings → Secrets
+- [ ] Add `RAILWAY_TOKEN` secret (get from Railway Account → Tokens)
+- [ ] Add `RAILWAY_PROJECT_ID` secret (from Railway project settings)
+- [ ] GitHub Actions will auto-deploy on every push
+- [ ] Includes automatic database migrations
 
 ---
 
@@ -144,6 +149,7 @@ If issues occur:
 ## Success Criteria ✅
 
 - [ ] All 3 services deployed successfully
+- [ ] Auto-deploy working (push triggers deployment)
 - [ ] Backend API responding
 - [ ] Frontend loads and connects to backend
 - [ ] Landing page accessible
@@ -153,4 +159,4 @@ If issues occur:
 
 ---
 
-**Need help?** Refer to `RAILWAY_DEPLOYMENT.md` for detailed instructions.
+**Need help?** Refer to `AUTO_DEPLOYMENT.md` and `RAILWAY_DEPLOYMENT.md` for detailed instructions.
