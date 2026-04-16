@@ -1,0 +1,19 @@
+{
+  "name": "kenge-isp-monorepo",
+  "version": "1.0.0",
+  "description": "ISP Billing System - Multi-service monorepo",
+  "private": true,
+  "scripts": {
+    "dev": "echo 'Use individual service dev commands'",
+    "build": "echo 'Build handled by Railway services'",
+    "start": "echo 'Start handled by Railway services'"
+  },
+  "workspaces": [
+    "backend",
+    "frontend",
+    "landing-page"
+  ],
+  "keywords": ["isp", "billing", "monorepo"],
+  "author": "HQ Investment",
+  "license": "UNLICENSED"
+}
