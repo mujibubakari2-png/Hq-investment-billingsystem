@@ -1,0 +1,101 @@
+[build]
+builder = "NIXPACKS"
+
+[deploy]
+startCommand = "npm run start"
+healthcheckPath = "/api/health"
+healthcheckTimeout = 300
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10
+
+[build.env]
+NODE_ENV = "production"
+
+[[services]]
+id = "backend"
+source = { repo = ".", path = "backend" }
+
+[services.build]
+builder = "NIXPACKS"
+
+[services.build.env]
+NODE_ENV = "production"
+
+[services.deploy]
+startCommand = "npm run start"
+healthcheckPath = "/api/health"
+healthcheckTimeout = 300
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10
+
+[services.env]
+# Database
+DATABASE_URL = "postgresql://postgres:password@containers-us-west-1.railway.app:5432/railway"
+
+# Authentication
+JWT_SECRET = "your-super-secure-jwt-secret-here-at-least-32-characters"
+GOOGLE_CLIENT_ID = "your-google-client-id"
+AUTOMATION_KEY = "dev-automation-key"
+
+# Email (optional - for notifications)
+SMTP_HOST = "smtp.gmail.com"
+SMTP_PORT = "587"
+SMTP_SECURE = "false"
+SMTP_USER = "your-email@gmail.com"
+SMTP_PASS = "your-app-password"
+SMTP_FROM = "noreply@yourdomain.com"
+
+# CORS and URLs
+CORS_ORIGIN = "https://frontend-production-xxxx.railway.app"
+NEXT_PUBLIC_APP_URL = "https://frontend-production-xxxx.railway.app"
+
+# Cron jobs
+CRON_SECRET = "your-cron-secret-here"
+
+[[services]]
+id = "frontend"
+source = { repo = ".", path = "frontend" }
+
+[services.build]
+builder = "NIXPACKS"
+
+[services.build.env]
+NODE_ENV = "production"
+
+[services.deploy]
+startCommand = "npm run preview -- --host 0.0.0.0 --port $PORT"
+healthcheckPath = "/"
+healthcheckTimeout = 300
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10
+
+[services.env]
+# API URL - Update with your backend service URL
+VITE_API_URL = "https://backend-production-xxxx.railway.app"
+
+# Google OAuth
+VITE_GOOGLE_CLIENT_ID = "your-google-client-id"
+
+# Build settings
+NODE_ENV = "production"
+
+[[services]]
+id = "landing-page"
+source = { repo = ".", path = "landing-page" }
+
+[services.build]
+builder = "NIXPACKS"
+
+[services.build.env]
+NODE_ENV = "production"
+
+[services.deploy]
+startCommand = "npm run start"
+healthcheckPath = "/"
+healthcheckTimeout = 300
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10
+
+[services.env]
+# Landing page specific env vars (if any)
+NODE_ENV = "production"
