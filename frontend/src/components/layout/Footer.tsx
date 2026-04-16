@@ -3,12 +3,12 @@ import authStore from '../../stores/authStore';
 export default function Footer() {
     const { user } = authStore.useAuth();
     // Fallback to 'HQ Investment' if the user is not logged in or doesn't have a name
-    const tenantName = (user as any)?.companyName || user?.fullName || 'HQ Investment';
+    const tenantName = user?.fullName || 'HQ Investment';
 
     return (
         <div style={{
             textAlign: 'center',
-            padding: '12px 20px', 
+            padding: '12px 20px',
             color: '#e2e8f0',
             width: 'fit-content',
             alignSelf: 'center',
@@ -18,7 +18,7 @@ export default function Footer() {
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: '4px', 
+            gap: '4px',
             background: 'linear-gradient(90deg, #1e40af 0%, #0f172a 100%)',
             borderTop: '3px solid #3b82f6',
             borderTopLeftRadius: '12px',
@@ -32,8 +32,8 @@ export default function Footer() {
             </span>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <span style={{ color: '#cbd5e1', fontSize: '0.75rem' }}>Powered by</span>
-                <span style={{ 
-                    fontWeight: 700, 
+                <span style={{
+                    fontWeight: 700,
                     color: '#60a5fa',
                     letterSpacing: '0.5px',
                     fontSize: '0.75rem'

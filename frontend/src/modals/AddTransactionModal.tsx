@@ -5,9 +5,20 @@ import CheckIcon from '@mui/icons-material/Check';
 import { packagesApi, routersApi } from '../api/client';
 import type { Package, Router } from '../types';
 
+interface TransactionData {
+    username: string;
+    planId: string;
+    amount: string;
+    type: string;
+    method: string;
+    reference: string;
+    router: string;
+    notes: string;
+}
+
 interface AddTransactionModalProps {
     onClose: () => void;
-    onSave?: (data: object) => void;
+    onSave?: (data: TransactionData) => void;
 }
 
 export default function AddTransactionModal({ onClose, onSave }: AddTransactionModalProps) {

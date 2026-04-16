@@ -84,7 +84,7 @@ export default function Register() {
                 if (res.data.length > 0) {
                     let initialPlanId = res.data[0].id;
                     if (selectedPlanName) {
-                        const matchedPlan = res.data.find((p: any) => 
+                        const matchedPlan = res.data.find((p: any) =>
                             p.name.toLowerCase().includes(selectedPlanName.toLowerCase()) ||
                             selectedPlanName.toLowerCase().includes(p.name.toLowerCase())
                         );
@@ -133,7 +133,7 @@ export default function Register() {
                 setError("Please enter the complete 6-digit OTP.");
                 return;
             }
-            
+
             setLoading(true);
             setError('');
             try {
@@ -148,7 +148,7 @@ export default function Register() {
             setStep(prev => Math.min(prev + 1, 3));
         }
     };
-    
+
     const handleOtpChange = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
         const val = e.target.value;
         if (/[^0-9]/.test(val)) return;
@@ -195,13 +195,11 @@ export default function Register() {
         setLoading(true);
         try {
             const res = await authApi.register({
+                username: formData.email,
                 fullName: formData.fullName,
                 email: formData.email,
                 phone: formData.phone,
                 password: formData.password,
-                companyName: formData.companyName,
-                planId: formData.planId,
-                otp: formData.otp.join('')
             });
             alert(res.message || "Registration complete!");
             navigate('/login');
@@ -323,7 +321,7 @@ export default function Register() {
                                         </div>
                                     </div>
                                 </div>
-                                
+
                                 {error && (
                                     <div style={{ padding: '12px', backgroundColor: '#fee2e2', color: '#b91c1c', borderRadius: '8px', marginBottom: '24px', fontSize: '0.9rem' }}>
                                         {error}
@@ -350,12 +348,12 @@ export default function Register() {
 
                                 <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', marginBottom: '32px' }}>
                                     {[0, 1, 2, 3, 4, 5].map(idx => (
-                                        <input 
-                                            key={idx} 
+                                        <input
+                                            key={idx}
                                             id={`otp-${idx}`}
-                                            type="text" 
-                                            maxLength={1} 
-                                            value={formData.otp[idx]} 
+                                            type="text"
+                                            maxLength={1}
+                                            value={formData.otp[idx]}
                                             onChange={(e) => handleOtpChange(idx, e)}
                                             onKeyDown={(e) => handleOtpKeyDown(idx, e)}
                                             style={{ width: '48px', height: '56px', fontSize: '1.5rem', textAlign: 'center', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', transition: 'border-color 0.2s', boxSizing: 'border-box' }}

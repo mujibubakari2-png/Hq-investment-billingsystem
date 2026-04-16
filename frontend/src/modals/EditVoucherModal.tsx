@@ -33,8 +33,9 @@ export default function EditVoucherModal({ voucher, onClose, onSave }: EditVouch
 
             onSave();
             onClose();
-        } catch (err: any) {
-            setError(err.message || 'Failed to update voucher');
+        } catch (err: unknown) {
+            const errorMessage = err instanceof Error ? err.message : 'Failed to update voucher';
+            setError(errorMessage);
         } finally {
             setLoading(false);
         }
@@ -79,7 +80,7 @@ export default function EditVoucherModal({ voucher, onClose, onSave }: EditVouch
 
                     <div className="form-group">
                         <label className="form-label">Status</label>
-                        <select className="form-select" value={status} onChange={e => setStatus(e.target.value as any)}>
+                        <select className="form-select" value={status} onChange={e => setStatus(e.target.value as 'Unused' | 'Used' | 'Expired' | 'Revoked')}>
                             <option value="Unused">Unused</option>
                             <option value="Used">Used</option>
                             <option value="Expired">Expired</option>

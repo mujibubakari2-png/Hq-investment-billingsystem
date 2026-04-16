@@ -124,7 +124,7 @@ export default function HotspotLoginCustomizer() {
         };
         loadPackages();
     }, [selectedRouterId, routers]);
- 
+
     // Load existing settings for the selected router
     useEffect(() => {
         if (!selectedRouterId) return;
@@ -135,7 +135,9 @@ export default function HotspotLoginCustomizer() {
                     if (settings.primaryColor) setPrimaryColor(settings.primaryColor);
                     if (settings.accentColor) setAccentColor(settings.accentColor);
                     if (settings.selectedFont) setSelectedFont(settings.selectedFont);
-                    if (settings.layout) setLayout(settings.layout);
+                    if (settings.layout && ['grid', 'horizontal', 'vertical'].includes(settings.layout)) {
+                        setLayout(settings.layout as 'grid' | 'horizontal' | 'vertical');
+                    }
                     if (settings.enableAds !== undefined) setEnableAds(settings.enableAds);
                     if (settings.adMessage) setAdMessage(settings.adMessage);
                     if (settings.enableRememberMe !== undefined) setEnableRememberMe(settings.enableRememberMe);
@@ -637,7 +639,7 @@ export default function HotspotLoginCustomizer() {
 </body>
 </html>`;
     };
- 
+
     const handleSaveSettings = async () => {
         if (!selectedRouterId) return;
         setSaving(true);
@@ -1098,12 +1100,12 @@ TROUBLESHOOTING:
                             {enableAds && (
                                 <div style={{ marginLeft: 24, padding: '10px 14px', background: '#f8fafc', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
                                     <label style={{ display: 'block', fontSize: '0.78rem', color: '#475569', marginBottom: 6, fontWeight: 600 }}>Advertisement Text</label>
-                                    <input 
-                                        type="text" 
-                                        value={adMessage} 
+                                    <input
+                                        type="text"
+                                        value={adMessage}
                                         onChange={e => setAdMessage(e.target.value)}
                                         placeholder="Type your advertisement completely..."
-                                        style={{ width: '100%', padding: '8px 12px', border: '1px solid #cbd5e1', borderRadius: 4, fontSize: '0.85rem' }} 
+                                        style={{ width: '100%', padding: '8px 12px', border: '1px solid #cbd5e1', borderRadius: 4, fontSize: '0.85rem' }}
                                     />
                                     <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: 6 }}>You can use emojis like 🎉, ⚡ locally!</div>
                                 </div>
@@ -1207,7 +1209,7 @@ TROUBLESHOOTING:
                                 {enableAds && (
                                     <div style={{
                                         background: `linear-gradient(90deg, ${accentColor}10, ${primaryColor}10)`,
-                                        padding: '6px 10px', textAlign: 'center', fontSize: '0.55rem', 
+                                        padding: '6px 10px', textAlign: 'center', fontSize: '0.55rem',
                                         color: primaryColor, fontWeight: 600
                                     }}>
                                         {adMessage || '🎉 Special offer! Get extra data on all packages today!'}
@@ -1228,7 +1230,7 @@ TROUBLESHOOTING:
                                             { name: 'SIKU 3', price: 2450, duration: 3, durationUnit: 'Days' },
                                             { name: 'SIKU 7', price: 5000, duration: 7, durationUnit: 'Days' },
                                         ]).map((pkg: any, i: number) => (
-                                            <div key={i} 
+                                            <div key={i}
                                                 onClick={() => {
                                                     setPreviewPaymentPkg(pkg);
                                                     setPreviewPaymentStep('initial');
@@ -1319,7 +1321,7 @@ TROUBLESHOOTING:
                                 {/* Preview Payment Simulation Overlay */}
                                 {previewPaymentPkg && (
                                     <div style={{
-                                        position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', 
+                                        position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)',
                                         display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 15,
                                         zIndex: 10, borderRadius: '0 0 12px 12px',
                                         fontFamily: selectedFont
@@ -1330,25 +1332,25 @@ TROUBLESHOOTING:
                                                 <div style={{ fontSize: '0.75rem', fontWeight: 700 }}>{previewPaymentPkg.name}</div>
                                                 <div style={{ fontSize: '0.85rem', fontWeight: 700 }}>TSH {previewPaymentPkg.price.toLocaleString()}</div>
                                             </div>
-                                            
+
                                             {previewPaymentStep === 'initial' && (
                                                 <div style={{ padding: 15 }}>
                                                     <div style={{ marginBottom: 10 }}>
                                                         <label style={{ display: 'block', fontSize: '0.6rem', color: '#666', marginBottom: 4 }}>Enter Mobile Number</label>
-                                                        <input 
-                                                            type="tel" 
-                                                            placeholder="0XXXXXXXXX" 
+                                                        <input
+                                                            type="tel"
+                                                            placeholder="0XXXXXXXXX"
                                                             value={previewPhone}
                                                             onChange={e => setPreviewPhone(e.target.value)}
-                                                            style={{ width: '100%', padding: '6px 8px', border: '1px solid #ddd', borderRadius: 6, fontSize: '0.7rem' }} 
+                                                            style={{ width: '100%', padding: '6px 8px', border: '1px solid #ddd', borderRadius: 6, fontSize: '0.7rem' }}
                                                         />
                                                     </div>
                                                     <div style={{ display: 'flex', gap: 6 }}>
-                                                        <button 
+                                                        <button
                                                             onClick={() => setPreviewPaymentStep('waiting')}
                                                             style={{ flex: 2, background: accentColor, color: '#fff', border: 'none', padding: '6px', borderRadius: 6, fontSize: '0.65rem', fontWeight: 700, cursor: 'pointer' }}
                                                         >Pay Now</button>
-                                                        <button 
+                                                        <button
                                                             onClick={() => setPreviewPaymentPkg(null)}
                                                             style={{ flex: 1, background: '#94a3b8', color: '#fff', border: 'none', padding: '6px', borderRadius: 6, fontSize: '0.65rem', fontWeight: 700, cursor: 'pointer' }}
                                                         >Cancel</button>
@@ -1363,7 +1365,7 @@ TROUBLESHOOTING:
                                                     </div>
                                                     <div style={{ fontSize: '0.65rem', color: '#475569', marginBottom: 12 }}>Please enter your PIN on your phone.</div>
                                                     <div className="preview-spinner" style={{ width: 20, height: 20, border: `2px solid ${accentColor}20`, borderTopColor: accentColor, borderRadius: '50%', margin: '0 auto' }}></div>
-                                                    <button 
+                                                    <button
                                                         onClick={() => {
                                                             setPreviewPaymentStep('success');
                                                             setTimeout(() => setPreviewPaymentPkg(null), 2500);

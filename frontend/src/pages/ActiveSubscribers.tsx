@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import PersonIcon from '@mui/icons-material/Person';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import AddIcon from '@mui/icons-material/Add';
@@ -16,12 +16,18 @@ import { formatDate } from '../utils/formatters';
 import type { ActiveSubscriber, Router } from '../types';
 import ConfirmDeleteModal from '../modals/ConfirmDeleteModal';
 
+interface SubscriptionSummaries {
+    totalActive: number;
+    online: number;
+    offline: number;
+}
+
 export default function ActiveSubscribers() {
     const navigate = useNavigate();
     const [subs, setSubs] = useState<ActiveSubscriber[]>([]);
     const [loading, setLoading] = useState(true);
     const [deleteId, setDeleteId] = useState<string | null>(null);
-    
+
     // Filters & Pagination
     const [activeTab, setActiveTab] = useState<'All' | 'PPPoE' | 'Hotspot'>('All');
     const [onlineFilter, setOnlineFilter] = useState<'All' | 'Online' | 'Offline'>('All');
@@ -31,9 +37,9 @@ export default function ActiveSubscribers() {
     const [entriesPerPage, setEntriesPerPage] = useState<number | 'All'>(25);
     const [currentPage, setCurrentPage] = useState(1);
     const [totalSubs, setTotalSubs] = useState(0);
-    const [summaries, setSummaries] = useState<any>(null);
+    const [summaries, setSummaries] = useState<SubscriptionSummaries | null>(null);
 
-    const fetchSubs = async () => {
+    const fetchSubs = useCallback(async () => {
         setLoading(true);
         try {
             const res = await activeSubscribersApi.list({
@@ -46,13 +52,14 @@ export default function ActiveSubscribers() {
             });
             setSubs((res.data || []) as unknown as ActiveSubscriber[]);
             setTotalSubs(res.total || 0);
-            setSummaries(res.summaries || null);
+            const summariesData = (res.summaries as unknown) as SubscriptionSummaries | undefined;
+            setSummaries(summariesData || null);
         } catch (err) {
             console.error('Failed to fetch active subscriptions:', err);
         } finally {
             setLoading(false);
         }
-    };
+    }, [searchTerm, activeTab, onlineFilter, routerFilter, currentPage, entriesPerPage]);
 
     const fetchRouters = async () => {
         try {
@@ -65,7 +72,7 @@ export default function ActiveSubscribers() {
 
     useEffect(() => {
         fetchSubs();
-    }, [searchTerm, activeTab, onlineFilter, routerFilter, currentPage, entriesPerPage]);
+    }, [fetchSubs]);
 
     useEffect(() => {
         fetchRouters();
@@ -78,8 +85,8 @@ export default function ActiveSubscribers() {
         total: summaries?.totalActive || 0,
         online: summaries?.online || 0,
         offline: summaries?.offline || 0,
-        pppoe: summaries?.pppoe || 0,
-        hotspot: summaries?.hotspot || 0,
+        pppoe: 0,
+        hotspot: 0,
     };
 
 
@@ -326,13 +333,13 @@ export default function ActiveSubscribers() {
                 {/* Pagination */}
                 <div className="pagination">
                     <div className="pagination-info">
-                        Showing {totalSubs === 0 ? 0 : (currentPage - 1) * (entriesPerPage === 'All' ? totalSubs : (entriesPerPage as number)) + 1} 
-                        to {entriesPerPage === 'All' ? totalSubs : Math.min(currentPage * (entriesPerPage as number), totalSubs)} 
+                        Showing {totalSubs === 0 ? 0 : (currentPage - 1) * (entriesPerPage === 'All' ? totalSubs : (entriesPerPage as number)) + 1}
+                        to {entriesPerPage === 'All' ? totalSubs : Math.min(currentPage * (entriesPerPage as number), totalSubs)}
                         of {totalSubs} subscribers
                     </div>
                     <div className="pagination-buttons">
-                        <button 
-                            className="pagination-btn" 
+                        <button
+                            className="pagination-btn"
                             disabled={currentPage === 1}
                             onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                             style={{ opacity: currentPage === 1 ? 0.5 : 1 }}
@@ -350,8 +357,8 @@ export default function ActiveSubscribers() {
                             </button>
                         ))}
 
-                        <button 
-                            className="pagination-btn" 
+                        <button
+                            className="pagination-btn"
                             disabled={currentPage === (entriesPerPage === 'All' ? 1 : Math.max(1, Math.ceil(totalSubs / (entriesPerPage as number))))}
                             onClick={() => setCurrentPage(p => Math.min(entriesPerPage === 'All' ? 1 : Math.max(1, Math.ceil(totalSubs / (entriesPerPage as number))), p + 1))}
                             style={{ opacity: currentPage === (entriesPerPage === 'All' ? 1 : Math.max(1, Math.ceil(totalSubs / (entriesPerPage as number)))) ? 0.5 : 1 }}

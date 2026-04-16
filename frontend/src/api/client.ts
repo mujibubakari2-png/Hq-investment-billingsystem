@@ -84,18 +84,24 @@ export const authApi = {
         post<{ message: string; otp: string }>('/auth/register/request-otp', data),
     verifyRegisterOtp: (data: { email: string; otp: string }) =>
         post<{ message: string }>('/auth/register/verify-otp', data),
-    register: (data: any) =>
-        post<{ message: string; token: string; user: any }>('/auth/register', data),
+    register: (data: {
+        username: string;
+        email: string;
+        password: string;
+        fullName: string;
+        phone?: string;
+    }) =>
+        post<{ message: string; token: string; user: { id: string; username: string; email: string; role: string; phone?: string; fullName?: string } }>('/auth/register', data),
 
     // Password Recovery
     requestPasswordResetOtp: (data: { email?: string; phone?: string; identifier?: string }) =>
         post<{ message: string; otp?: string }>('/auth/forgot-password/request-otp', data),
     verifyPasswordResetOtp: (data: { email: string; otp: string }) =>
         post<{ message: string }>('/auth/forgot-password/verify-otp', data),
-    resetPassword: (data: any) =>
+    resetPassword: (data: { email: string; otp: string; newPassword: string }) =>
         post<{ message: string }>('/auth/forgot-password/reset', data),
     googleLogin: (data: { credential: string; action: 'login' | 'register' }) =>
-        post<{ message: string; token: string; user: any }>('/auth/google', data),
+        post<{ message: string; token: string; user: { id: string; username: string; email: string; role: string; phone?: string; fullName?: string } }>('/auth/google', data),
 };
 
 // ── Profile ─────────────────────────────────────────────────────────────────
@@ -209,10 +215,10 @@ export const subscriptionsApi = {
 export const expiredSubscribersApi = {
     list: (params?: Record<string, string | number>) => {
         const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
-        return get<{ data: Array<any>; total: number; summaries: any }>(`/expired-subscribers${qs}`);
+        return get<{ data: Array<Record<string, unknown>>; total: number; summaries: Record<string, unknown> }>(`/expired-subscribers${qs}`);
     },
     bulkExtend: (subscriptionIds: string[]) => {
-        return post<{ message: string; successes: string[]; failures: any[] }>('/expired-subscribers/bulk-extend', { subscriptionIds });
+        return post<{ message: string; successes: string[]; failures: Array<{ id: string; error: string }> }>('/expired-subscribers/bulk-extend', { subscriptionIds });
     },
 };
 
@@ -221,7 +227,7 @@ export const expiredSubscribersApi = {
 export const activeSubscribersApi = {
     list: (params?: Record<string, string | number>) => {
         const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
-        return get<{ data: Array<any>; total: number; summaries: any }>(`/active-subscribers${qs}`);
+        return get<{ data: Array<Record<string, unknown>>; total: number; summaries: Record<string, unknown> }>(`/active-subscribers${qs}`);
     },
 };
 
@@ -246,7 +252,7 @@ export const transactionsApi = {
 export const mobileTransactionsApi = {
     list: (params?: Record<string, string | number>) => {
         const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
-        return get<{ data: Array<any>; total: number; activeGateways: string[]; summaries: any }>(`/mobile-transactions${qs}`);
+        return get<{ data: Array<Record<string, unknown>>; total: number; activeGateways: string[]; summaries: Record<string, unknown> }>(`/mobile-transactions${qs}`);
     },
 };
 
@@ -260,7 +266,7 @@ export const routersApi = {
     }>>('/routers'),
     listPaginated: (params?: Record<string, string | number>) => {
         const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
-        return get<{ data: Array<any>; total: number }>(`/routers${qs}`);
+        return get<{ data: Array<Record<string, unknown>>; total: number }>(`/routers${qs}`);
     },
     get: (id: string) => get<Record<string, unknown>>(`/routers/${id}`),
     create: (data: Record<string, unknown>) => post<Record<string, unknown>>('/routers', data),
@@ -268,51 +274,51 @@ export const routersApi = {
     delete: (id: string) => del<{ message: string }>(`/routers/${id}`),
 
     // Test connection
-    testConnection: (id: string) => post<{ success: boolean; message: string; info?: any }>(`/routers/${id}/test`, {}),
+    testConnection: (id: string) => post<{ success: boolean; message: string; info?: Record<string, unknown> }>(`/routers/${id}/test`, {}),
 
     // PPPoE
     pppoe: {
-        list: (routerId: string) => get<Array<any>>(`/routers/${routerId}/pppoe`),
-        create: (routerId: string, data: any) => post<any>(`/routers/${routerId}/pppoe`, data),
-        update: (routerId: string, userId: string, data: any) => put<any>(`/routers/${routerId}/pppoe/${userId}`, data),
-        delete: (routerId: string, userId: string) => del<any>(`/routers/${routerId}/pppoe/${userId}`),
+        list: (routerId: string) => get<Array<Record<string, unknown>>>(`/routers/${routerId}/pppoe`),
+        create: (routerId: string, data: Record<string, unknown>) => post<Record<string, unknown>>(`/routers/${routerId}/pppoe`, data),
+        update: (routerId: string, userId: string, data: Record<string, unknown>) => put<Record<string, unknown>>(`/routers/${routerId}/pppoe/${userId}`, data),
+        delete: (routerId: string, userId: string) => del<Record<string, unknown>>(`/routers/${routerId}/pppoe/${userId}`),
     },
 
     // Hotspot
     hotspot: {
-        list: (routerId: string) => get<Array<any>>(`/routers/${routerId}/hotspot`),
-        create: (routerId: string, data: any) => post<any>(`/routers/${routerId}/hotspot`, data),
-        update: (routerId: string, userId: string, data: any) => put<any>(`/routers/${routerId}/hotspot/${userId}`, data),
-        delete: (routerId: string, userId: string) => del<any>(`/routers/${routerId}/hotspot/${userId}`),
+        list: (routerId: string) => get<Array<Record<string, unknown>>>(`/routers/${routerId}/hotspot`),
+        create: (routerId: string, data: Record<string, unknown>) => post<Record<string, unknown>>(`/routers/${routerId}/hotspot`, data),
+        update: (routerId: string, userId: string, data: Record<string, unknown>) => put<Record<string, unknown>>(`/routers/${routerId}/hotspot/${userId}`, data),
+        delete: (routerId: string, userId: string) => del<Record<string, unknown>>(`/routers/${routerId}/hotspot/${userId}`),
     },
 
     // Sessions
     sessions: {
-        list: (routerId: string) => get<Array<any>>(`/routers/${routerId}/sessions`),
+        list: (routerId: string) => get<Array<Record<string, unknown>>>(`/routers/${routerId}/sessions`),
         disconnect: (routerId: string, data: { sessionId: string; service: string; username?: string }) =>
-            post<any>(`/routers/${routerId}/sessions/disconnect`, data),
+            post<Record<string, unknown>>(`/routers/${routerId}/sessions/disconnect`, data),
     },
 
     // Profiles
     profiles: {
-        list: (routerId: string, type?: string) => get<any>(`/routers/${routerId}/profiles${type ? `?type=${type}` : ''}`),
-        create: (routerId: string, data: any) => post<any>(`/routers/${routerId}/profiles`, data),
+        list: (routerId: string, type?: string) => get<Record<string, unknown>>(`/routers/${routerId}/profiles${type ? `?type=${type}` : ''}`),
+        create: (routerId: string, data: Record<string, unknown>) => post<Record<string, unknown>>(`/routers/${routerId}/profiles`, data),
     },
 
     // Logs
     logs: {
         list: (params?: Record<string, string>) => {
             const qs = params ? '?' + new URLSearchParams(params).toString() : '';
-            return get<{ data: Array<any>; total: number }>(`/routers/logs${qs}`);
+            return get<{ data: Array<Record<string, unknown>>; total: number }>(`/routers/logs${qs}`);
         },
     },
 
     // WireGuard
     wireguard: {
-        getConfig: (routerId: string) => get<any>(`/routers/${routerId}/wireguard`),
-        activate: (routerId: string) => post<any>(`/routers/${routerId}/wireguard`, { action: 'activate' }),
-        deactivate: (routerId: string) => post<any>(`/routers/${routerId}/wireguard`, { action: 'deactivate' }),
-        pushConfig: (routerId: string) => post<any>(`/routers/${routerId}/wireguard`, { action: 'push-config' }),
+        getConfig: (routerId: string) => get<Record<string, unknown>>(`/routers/${routerId}/wireguard`),
+        activate: (routerId: string) => post<Record<string, unknown>>(`/routers/${routerId}/wireguard`, { action: 'activate' }),
+        deactivate: (routerId: string) => post<Record<string, unknown>>(`/routers/${routerId}/wireguard`, { action: 'deactivate' }),
+        pushConfig: (routerId: string) => post<Record<string, unknown>>(`/routers/${routerId}/wireguard`, { action: 'push-config' }),
     },
 };
 
@@ -404,9 +410,24 @@ export const settingsApi = {
 
 // ── Hotspot Settings ────────────────────────────────────────────────────────
 
+export interface HotspotSettings {
+    id: string;
+    routerId: string;
+    primaryColor: string;
+    accentColor: string;
+    selectedFont: string;
+    layout: string;
+    enableAds: boolean;
+    enableAnnouncement: boolean;
+    enableRememberMe: boolean;
+    companyName?: string;
+    customerCareNumber?: string;
+    adMessage?: string;
+}
+
 export const hotspotSettingsApi = {
-    get: (routerId: string) => get<any>(`/hotspot-settings?routerId=${routerId}`),
-    update: (data: any) => post<any>('/hotspot-settings', data),
+    get: (routerId: string) => get<HotspotSettings>(`/hotspot-settings?routerId=${routerId}`),
+    update: (data: Partial<HotspotSettings>) => post<HotspotSettings>('/hotspot-settings', data),
 };
 
 // ── Reports ─────────────────────────────────────────────────────────────────

@@ -5,6 +5,12 @@ import CheckIcon from '@mui/icons-material/Check';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 
+interface InvoiceItem {
+    description: string;
+    quantity: number;
+    unitPrice: number;
+}
+
 interface CreateInvoiceModalProps {
     onClose: () => void;
     onSave: (data: Record<string, unknown>) => void;
@@ -12,9 +18,9 @@ interface CreateInvoiceModalProps {
 
 export default function CreateInvoiceModal({ onClose, onSave }: CreateInvoiceModalProps) {
     const [client, setClient] = useState('');
-    const [dueDate, setDueDate] = useState(new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0]);
+    const [dueDate, setDueDate] = useState(() => new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0]);
     const [status, setStatus] = useState('Draft');
-    const [items, setItems] = useState([{ description: '', quantity: 1, unitPrice: 0 }]);
+    const [items, setItems] = useState<InvoiceItem[]>([{ description: '', quantity: 1, unitPrice: 0 }]);
 
     const addItem = () => {
         setItems([...items, { description: '', quantity: 1, unitPrice: 0 }]);
@@ -24,9 +30,15 @@ export default function CreateInvoiceModal({ onClose, onSave }: CreateInvoiceMod
         setItems(items.filter((_, i) => i !== index));
     };
 
-    const updateItem = (index: number, field: string, value: string | number) => {
+    const updateItem = (index: number, field: keyof InvoiceItem, value: string | number) => {
         const updated = [...items];
-        (updated[index] as any)[field] = value;
+        if (field === 'description' && typeof value === 'string') {
+            updated[index].description = value;
+        } else if (field === 'quantity' && typeof value === 'number') {
+            updated[index].quantity = value;
+        } else if (field === 'unitPrice' && typeof value === 'number') {
+            updated[index].unitPrice = value;
+        }
         setItems(updated);
     };
 

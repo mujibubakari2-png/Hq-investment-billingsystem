@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { jsonResponse, errorResponse } from "@/lib/auth";
+import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { getMikroTikService } from "@/lib/mikrotik";
 
 // GET /api/routers/[id]/pppoe — List PPPoE users
