@@ -1,7 +1,7 @@
 // ── Central API client for the ISP Billing System ──────────────────────────
 
 // In dev: VITE_API_URL is unset so BASE = '/api' (Vite dev proxy forwards to localhost:3001).
-// In prod: VITE_API_URL = 'https://kenge-backend.onrender.com' so calls go directly to the API.
+// In prod: VITE_API_URL = 'https://backend-name.railway.app' so calls go directly to the API.
 const BASE = `${(import.meta.env.VITE_API_URL as string) ?? ''}/api`;
 
 function authHeaders(): Record<string, string> {
