@@ -2,7 +2,7 @@
   "name": "landing-page",
   "version": "0.1.1",
   "private": true,
-  "description": "Landing page service with Next.js 15.1.11 security fixes",
+  "description": "Landing page service with Next.js 15.1.6",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
