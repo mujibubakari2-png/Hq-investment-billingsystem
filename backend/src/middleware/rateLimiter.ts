@@ -74,7 +74,7 @@ const defaultLimit: UserRateLimitConfig = {
 function getRateLimitKey(request: NextRequest, userId?: string): string {
     const ip = request.headers.get('x-forwarded-for') ||
         request.headers.get('x-real-ip') ||
-        request.ip ||
+        request.headers.get('x-forwarded-proto') ||
         'unknown';
     return userId ? `${ip}:${userId}` : ip;
 }
