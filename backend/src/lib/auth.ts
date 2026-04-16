@@ -16,14 +16,10 @@ function getJwtSecret(): string {
     if (!jwtSecret) {
         const secret = process.env.JWT_SECRET;
         if (!secret) {
-            if (isNextBuild()) {
+            // Use fallback for build time or CI environments
+            if (isNextBuild() || process.env.RAILWAY_PROJECT_ID || process.env.CI || process.env.VERCEL || process.env.NETLIFY) {
                 jwtSecret = "build-time-fallback-secret-please-set-JWT_SECRET";
-                return jwtSecret;
-            }
-            // During Railway build or other CI, use fallback
-            if (process.env.RAILWAY_PROJECT_ID || process.env.CI || !process.env.NODE_ENV) {
-                jwtSecret = "build-time-fallback-secret-please-set-JWT_SECRET";
-                console.warn("Using fallback JWT_SECRET for build/CI environment");
+                console.warn("WARNING: Using fallback JWT_SECRET for build/CI environment. Ensure JWT_SECRET is set in production!");
                 return jwtSecret;
             }
             throw new Error("FATAL: JWT_SECRET environment variable is required. Add it to your .env file.");
