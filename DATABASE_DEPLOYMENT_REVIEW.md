@@ -88,7 +88,7 @@ File: `backend/prisma/migrations/radius_tenant_triggers.sql`
 ### ✅ **railway.toml Setup**
 ```
 Database configuration:
-- DATABASE_URL = "postgresql://postgres:password@nozomi.proxy.rlwy.net:20350/railway"
+- DATABASE_URL = "postgresql://postgres:ZwRajwXCUBbBqxCoGeqJQsihvlqyCePs@postgres.railway.internal:5432/railway"
 - NODE_ENV = "production"
 - JWT_SECRET = "5deed8661cd0e80017907acb9012ae57054bc2e341bb64db9f683c888fb8fc9f"
 - CORS_ORIGIN = "https://frontend-production-440c.up.railway.app"
