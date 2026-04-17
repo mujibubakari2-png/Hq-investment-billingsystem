@@ -8,6 +8,10 @@ JWT_SECRET=5deed8661cd0e80017907acb9012ae57054bc2e341bb64db9f683c888fb8fc9f
 DATABASE_URL=postgresql://postgres:ZwRajwXCUBbBqxCoGeqJQsihvlqyCePs@postgres.railway.internal:5432/railway
 ```
 
+## Railway PostgreSQL Database
+- **Connection URL**: postgresql://postgres:ZwRajwXCUBbBqxCoGeqJQsihvlqyCePs@postgres.railway.internal:5432/railway
+- **Web Interface**: https://postgres-production-acde.up.railway.app/
+
 ## Frontend Service (https://frontend-production-440c.up.railway.app)
 ```
 VITE_API_URL=https://backend-production-5d9f.up.railway.app

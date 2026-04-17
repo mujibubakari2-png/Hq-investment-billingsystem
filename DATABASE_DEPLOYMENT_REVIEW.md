@@ -94,6 +94,10 @@ Database configuration:
 - CORS_ORIGIN = "https://frontend-production-440c.up.railway.app"
 ```
 
+**Railway PostgreSQL Web Interface:**
+- URL: https://postgres-production-acde.up.railway.app/
+- Use this URL to access your database through Railway's web interface
+
 **Environment Variables to Set**:
 | Variable | Status | Required |
 |----------|--------|----------|
