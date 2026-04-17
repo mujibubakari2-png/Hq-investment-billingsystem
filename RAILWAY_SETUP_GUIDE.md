@@ -9,7 +9,7 @@ Your frontend, backend, and landing page are deployed but not connected because 
 Set these environment variables in your Railway backend service:
 
 ```
-CORS_ORIGIN=https://frontend-production-8781.up.railway.app
+CORS_ORIGIN=https://frontend-production-440c.up.railway.app
 NODE_ENV=production
 JWT_SECRET=<generate a new 64-character random string>
 ```
@@ -18,7 +18,7 @@ JWT_SECRET=<generate a new 64-character random string>
 1. Go to your Railway dashboard → Backend service
 2. Click on "Variables" tab
 3. Add/update these variables:
-   - `CORS_ORIGIN` = `https://frontend-production-8781.up.railway.app`
+   - `CORS_ORIGIN` = `https://frontend-production-440c.up.railway.app`
    - `NODE_ENV` = `production`
    - `JWT_SECRET` = Generate using: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
    - Keep `DATABASE_URL` (Railway auto-sets this)
@@ -27,7 +27,7 @@ JWT_SECRET=<generate a new 64-character random string>
 Set these environment variables in your Railway frontend service:
 
 ```
-VITE_API_URL=https://backend-production-e0c5.up.railway.app
+VITE_API_URL=https://backend-production-5d9f.up.railway.app
 VITE_GOOGLE_CLIENT_ID=<your Google Client ID if using>
 ```
 
@@ -35,13 +35,13 @@ VITE_GOOGLE_CLIENT_ID=<your Google Client ID if using>
 1. Go to your Railway dashboard → Frontend service
 2. Click on "Variables" tab
 3. Add/update these variables:
-   - `VITE_API_URL` = `https://backend-production-e0c5.up.railway.app`
+   - `VITE_API_URL` = `https://backend-production-5d9f.up.railway.app`
    - `VITE_GOOGLE_CLIENT_ID` = Your Google OAuth Client ID (or leave empty)
 
 ### Landing Page Service Configuration (Optional)
 If the landing page needs backend access:
 ```
-VITE_API_URL=https://backend-production-e0c5.up.railway.app
+VITE_API_URL=https://backend-production-5d9f.up.railway.app
 VITE_GOOGLE_CLIENT_ID=<your Google Client ID if using>
 ```
 
@@ -68,7 +68,7 @@ Option 2 (PowerShell):
 ## Testing Connection
 
 After setting all variables and restarting services:
-1. Visit `https://frontend-production-8781.up.railway.app`
+1. Visit `https://frontend-production-440c.up.railway.app`
 2. Try to login with credentials (admin/admin123)
 3. Check browser console (F12) for any errors
 4. Check Railway service logs for backend errors

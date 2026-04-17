@@ -88,10 +88,10 @@ File: `backend/prisma/migrations/radius_tenant_triggers.sql`
 ### ✅ **railway.toml Setup**
 ```
 Database configuration:
-- DATABASE_URL = ""           (auto-set by Railway PostgreSQL)
+- DATABASE_URL = "postgresql://postgres:password@nozomi.proxy.rlwy.net:20350/railway"
 - NODE_ENV = "production"
-- JWT_SECRET = ""             (you set: 5deed8661cd0e80017...)
-- CORS_ORIGIN = "${{frontend.RAILWAY_STATIC_URL}}"
+- JWT_SECRET = "5deed8661cd0e80017907acb9012ae57054bc2e341bb64db9f683c888fb8fc9f"
+- CORS_ORIGIN = "https://frontend-production-440c.up.railway.app"
 ```
 
 **Environment Variables to Set**:
@@ -160,7 +160,7 @@ The backend includes health checks to verify database connectivity before accept
 
 2. **Set CORS_ORIGIN in Railway Backend Service**
    ```
-   CORS_ORIGIN=https://frontend-production-8781.up.railway.app
+   CORS_ORIGIN=https://frontend-production-440c.up.railway.app
    ```
 
 3. **Set NODE_ENV to production**
