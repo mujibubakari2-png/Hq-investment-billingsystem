@@ -3,15 +3,21 @@ node_modules/
 .pnp
 .pnp.js
 /package-lock.json
+pnpm-lock.yaml.bak
+*.lock
+*.tgz
 
 # Testing
 coverage/
+.nyc_output/
+test-results/
 
 # Production
 dist/
 build/
 .next/
 out/
+*.tar.gz
 
 # Environment Variables
 .env
@@ -28,6 +34,9 @@ out/
 *.swp
 *.swo
 *.DS_Store
+.sublime-project
+.sublime-workspace
+*.iml
 
 # Logs & debug output
 npm-debug.log*
@@ -45,9 +54,30 @@ backend/response.json
 # Generated files
 backend/src/generated/
 backend/tsconfig.tsbuildinfo
+frontend/dist/
+frontend/.vite/
+
+# Database
+*.sqlite
+*.sqlite3
+*.db
+
+# OS Files
+Thumbs.db
+.AppleDouble
+.LSOverride
+*.swp
+*.swo
+*~
 
 # Project specific
 frontend/node_modules/
+backend/node_modules/
+landing-page/node_modules/
+
+# Deployment
+.env.*.local
+dist-*.tar.gz
 backend/node_modules/
 frontend/dist/
 backend/.next/

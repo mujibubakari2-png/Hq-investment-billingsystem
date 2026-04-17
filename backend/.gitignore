@@ -19,10 +19,12 @@
 
 # production
 /build
+dist/
 
 # misc
 .DS_Store
 *.pem
+.env.local
 
 # debug
 npm-debug.log*
@@ -30,7 +32,10 @@ yarn-debug.log*
 yarn-error.log*
 
 # env files (can opt-in for committing if needed)
-.env*
+.env
+.env.development.local
+.env.test.local
+.env.production.local
 
 # vercel
 .vercel
@@ -38,6 +43,24 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
+.AppleDouble
+
+# Project specific
+error.txt
+error2.txt
+dbcheck.log
+test_output.log
+test_connect.log
+response.json
 
 /src/generated/prisma
 
