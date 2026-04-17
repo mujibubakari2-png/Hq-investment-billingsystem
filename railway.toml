@@ -40,8 +40,8 @@ SMTP_PASS = ""
 SMTP_FROM = "noreply@yourdomain.com"
 
 # CORS and URLs
-CORS_ORIGIN = "*"
-NEXT_PUBLIC_APP_URL = "http://localhost:5173/"
+CORS_ORIGIN = "${{frontend.RAILWAY_STATIC_URL}}"
+NEXT_PUBLIC_APP_URL = "${{landing-page.RAILWAY_STATIC_URL}}"
 
 # Cron jobs
 CRON_SECRET = "your-cron-secret-here"
@@ -66,7 +66,7 @@ restartPolicyMaxRetries = 10
 
 [services.env]
 # API URL - Update with your backend service URL
-VITE_API_URL = ""
+VITE_API_URL = "${{backend.RAILWAY_STATIC_URL}}"
 
 # Google OAuth
 VITE_GOOGLE_CLIENT_ID = ""
