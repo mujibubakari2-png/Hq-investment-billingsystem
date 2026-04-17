@@ -56,19 +56,21 @@ export default function GenerateVouchersModal({ onClose, onGenerate }: GenerateV
             return;
         }
         setError(null);
-        
+
         let currentUserId = undefined;
         try {
             const userStr = localStorage.getItem('user');
             if (userStr) {
                 currentUserId = JSON.parse(userStr).id;
             }
-        } catch (e) {}
+        } catch {
+            // Ignore parsing errors
+        }
 
         if (onGenerate) {
-            onGenerate({ 
+            onGenerate({
                 packageType, routerId, packageId, count, codeLength, codeFormat, prefix, smsPhone, sendSms,
-                createdById: currentUserId 
+                createdById: currentUserId
             } as VoucherConfig);
         }
         onClose();
@@ -164,9 +166,9 @@ export default function GenerateVouchersModal({ onClose, onGenerate }: GenerateV
                                     ] as const).map((f, i) => (
                                         <button
                                             key={f.value}
-                                            style={{ 
-                                                padding: '8px 16px', 
-                                                border: '1px solid var(--border)', 
+                                            style={{
+                                                padding: '8px 16px',
+                                                border: '1px solid var(--border)',
                                                 background: codeFormat === f.value ? '#333' : '#fff',
                                                 color: codeFormat === f.value ? '#fff' : 'var(--text-primary)',
                                                 fontWeight: 600,
@@ -202,10 +204,10 @@ export default function GenerateVouchersModal({ onClose, onGenerate }: GenerateV
                                             onChange={e => setSmsPhone(e.target.value)}
                                             style={{ flex: 1, borderTopRightRadius: 0, borderBottomRightRadius: 0 }}
                                         />
-                                        <div 
-                                            style={{ 
-                                                display: 'flex', alignItems: 'center', gap: 6, 
-                                                padding: '0 14px', border: '1px solid var(--border)', 
+                                        <div
+                                            style={{
+                                                display: 'flex', alignItems: 'center', gap: 6,
+                                                padding: '0 14px', border: '1px solid var(--border)',
                                                 borderLeft: 'none', background: '#f9fafb',
                                                 borderTopRightRadius: 'var(--radius)', borderBottomRightRadius: 'var(--radius)'
                                             }}

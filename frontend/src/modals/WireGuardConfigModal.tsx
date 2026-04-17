@@ -50,9 +50,10 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
             try {
                 setLoading(true);
                 const data = await routersApi.wireguard.getConfig(router.id);
-                setConfig(data);
-            } catch (err: any) {
-                setError(err.message || 'Failed to load WireGuard configuration');
+                setConfig((data as unknown) as WgConfig);
+            } catch (err: unknown) {
+                const errorMessage = err instanceof Error ? err.message : 'Failed to load WireGuard configuration';
+                setError(errorMessage);
             } finally {
                 setLoading(false);
             }
@@ -185,12 +186,18 @@ PersistentKeepalive = 25`;
             else if (action === 'deactivate') result = await routersApi.wireguard.deactivate(router.id);
             else result = await routersApi.wireguard.pushConfig(router.id);
 
-            setActionResult({ success: result.success, message: result.message });
-            if (result.success) {
-                setConfig({ ...config, enabled: action !== 'deactivate', configuredAt: new Date().toISOString() });
+            const resultObj = (result as unknown) as Record<string, unknown>;
+            const success = typeof resultObj.success === 'boolean' ? (resultObj.success as boolean) : false;
+            const message = typeof resultObj.message === 'string' ? (resultObj.message as string) : 'Action completed';
+            setActionResult({ success, message });
+            if (success) {
+                if (config) {
+                    setConfig({ ...config, enabled: action !== 'deactivate', configuredAt: new Date().toISOString() });
+                }
             }
-        } catch (err: any) {
-            setActionResult({ success: false, message: err.message || 'Action failed' });
+        } catch (err: unknown) {
+            const errorMessage = err instanceof Error ? err.message : 'Action failed';
+            setActionResult({ success: false, message: errorMessage });
         } finally {
             setActionLoading(null);
         }
@@ -363,7 +370,7 @@ PersistentKeepalive = 25`;
                                 <strong>Option 1:</strong> Click "Auto-Push to Router" to configure automatically via API.<br />
                                 <strong>Option 2:</strong> Copy and paste this script into MikroTik Terminal, then click "I Pasted It — Activate".<br />
                                 The system will switch to the WireGuard tunnel IP ({config.routerTunnelIp}) for all future API connections.
-                              </>
+                            </>
                             : 'Install this config on your HQInvestment VPN server to complete the tunnel. Replace <SERVER_PRIVATE_KEY> with your actual server private key.'
                         }
                     </div>

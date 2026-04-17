@@ -8,12 +8,15 @@ source = { repo = ".", path = "backend" }
 
 [services.build]
 builder = "NIXPACKS"
+buildCommand = "pnpm install && pnpm run build"
 
 [services.build.env]
 NODE_ENV = "production"
+JWT_SECRET = ""
+DATABASE_URL = ""
 
 [services.deploy]
-startCommand = "npm run start"
+startCommand = "pnpm run start -- --port $PORT"
 healthcheckPath = "/api/health"
 healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"
@@ -21,10 +24,10 @@ restartPolicyMaxRetries = 10
 
 [services.env]
 # Database
-DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/kenge_isp"
+DATABASE_URL = ""
 
 # Authentication
-JWT_SECRET = "kenge-isp-secret-key-change-in-production-2026"
+JWT_SECRET = ""
 GOOGLE_CLIENT_ID = ""
 AUTOMATION_KEY = "dev-automation-key"
 
@@ -49,12 +52,13 @@ source = { repo = ".", path = "frontend" }
 
 [services.build]
 builder = "NIXPACKS"
+buildCommand = "pnpm install && pnpm run build"
 
 [services.build.env]
 NODE_ENV = "production"
 
 [services.deploy]
-startCommand = "npm run preview -- --host 0.0.0.0 --port $PORT"
+startCommand = "pnpm run preview -- --host 0.0.0.0 --port $PORT"
 healthcheckPath = "/"
 healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"
@@ -76,12 +80,13 @@ source = { repo = ".", path = "landing-page" }
 
 [services.build]
 builder = "NIXPACKS"
+buildCommand = "pnpm install && pnpm run build"
 
 [services.build.env]
 NODE_ENV = "production"
 
 [services.deploy]
-startCommand = "npm run start"
+startCommand = "pnpm run start -- --port $PORT"
 healthcheckPath = "/"
 healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"

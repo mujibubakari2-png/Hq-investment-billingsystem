@@ -22,7 +22,16 @@ export default function AllTransactions() {
     const [deleteId, setDeleteId] = useState<string | null>(null);
     const [availableMethods, setAvailableMethods] = useState<string[]>([]);
 
-    const handleAddTransaction = async (data: any) => {
+    const handleAddTransaction = async (data: {
+        username: string;
+        planId: string;
+        amount: string;
+        type: string;
+        method: string;
+        reference: string;
+        router: string;
+        notes: string;
+    }) => {
         try {
             await transactionsApi.create(data);
             setShowAddModal(false);
@@ -43,35 +52,45 @@ export default function AllTransactions() {
             ]);
 
             // Parse settings to get active gateways
-            const data = (settingsRes as any).data || settingsRes;
+            const settingsData = settingsRes as Record<string, string>;
             let activeGws: string[] = [];
-            if (data?.paymentGateways) {
+            const paymentGatewaysStr = settingsData['paymentGateways'] || settingsData['payment_gateways'];
+            if (typeof paymentGatewaysStr === 'string' && paymentGatewaysStr) {
                 try {
-                    const parsed = JSON.parse(data.paymentGateways);
+                    const parsed = JSON.parse(paymentGatewaysStr);
                     if (Array.isArray(parsed)) {
-                        activeGws = parsed.filter(g => g.enabled).map(g => g.name);
+                        activeGws = parsed
+                            .filter((g: Record<string, unknown>) => g.enabled)
+                            .map((g: Record<string, unknown>) => String(g.name));
                     }
-                } catch (e) { }
+                } catch (e) {
+                    // Ignore parsing errors
+                }
             }
             setAvailableMethods(activeGws);
 
             const txs = (txRes.data || []) as unknown as Transaction[];
-            const vs = (vRes.data || []) as any[];
+            const vs = (vRes.data || []) as unknown as Record<string, unknown>[];
 
             // Map vouchers into Transaction shape
-            const mappedVouchers: Transaction[] = vs.map(v => ({
-                id: v.id,
-                user: v.usedBy || v.createdBy || 'Unassigned',
-                planName: v.plan || 'Voucher',
-                amount: 0, 
-                type: 'Voucher',
-                method: 'voucher',
-                status: v.status === 'Used' ? 'Completed' : (v.status === 'Unused' ? 'Pending' : v.status),
-                date: v.createdAt || null,
-                timestamp: v.timestamp || toTimestamp(v.createdAt),
-                expiryDate: v.usedAt || null,
-                reference: v.code
-            }));
+            const mappedVouchers: Transaction[] = vs.map((v: Record<string, unknown>) => {
+                let status: 'Completed' | 'Pending' | 'Failed' = 'Pending';
+                if (v.status === 'Used') status = 'Completed';
+                else if (v.status === 'Expired' || v.status === 'Revoked') status = 'Failed';
+
+                return {
+                    id: String(v.id || ''),
+                    user: String(v.usedBy || v.createdBy || 'Unassigned'),
+                    planName: String(v.plan || 'Voucher'),
+                    amount: 0,
+                    type: 'Voucher' as const,
+                    method: 'voucher',
+                    status,
+                    date: String(v.createdAt || new Date().toISOString()),
+                    expiryDate: (v.usedAt as string | null) || undefined,
+                    reference: String(v.code || '')
+                };
+            });
 
             // Filter out transactions that aren't from activated payment channels (or manual/vouchers)
             // User requested: "all vouchers and all transaction which payed from any payment channel which is configured and activated"
@@ -82,8 +101,8 @@ export default function AllTransactions() {
             const validMethodsUpper = [...activeGws.map(g => g.toUpperCase()), 'VOUCHER', 'MANUAL'];
             combined = combined.filter(tx => {
                 if (tx.method) {
-                    return validMethodsUpper.includes(tx.method.toUpperCase()) || 
-                           validMethodsUpper.some(m => tx.method.toUpperCase().includes(m));
+                    return validMethodsUpper.includes(tx.method.toUpperCase()) ||
+                        validMethodsUpper.some(m => tx.method.toUpperCase().includes(m));
                 }
                 return true;
             });
@@ -102,9 +121,9 @@ export default function AllTransactions() {
     useEffect(() => { fetchTransactions(); }, []);
 
     const filtered = transactions.filter(tx => {
-        const matchSearch = (tx.user || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
-                            (tx.planName || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
-                            (tx.reference || '').toLowerCase().includes(searchTerm.toLowerCase());
+        const matchSearch = (tx.user || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (tx.planName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (tx.reference || '').toLowerCase().includes(searchTerm.toLowerCase());
         const matchMethod = methodFilter === 'All' || (tx.method || '').toLowerCase() === methodFilter.toLowerCase();
         const matchStatus = statusFilter === 'All' || tx.status === statusFilter;
         return matchSearch && matchMethod && matchStatus;
@@ -120,8 +139,8 @@ export default function AllTransactions() {
 
     // Pagination calculations
     const totalPages = entriesPerPage === 'All' ? 1 : Math.max(1, Math.ceil(filtered.length / entriesPerPage));
-    const paginatedTxs = entriesPerPage === 'All' 
-        ? filtered 
+    const paginatedTxs = entriesPerPage === 'All'
+        ? filtered
         : filtered.slice((currentPage - 1) * entriesPerPage, currentPage * entriesPerPage);
 
     return (
@@ -189,9 +208,9 @@ export default function AllTransactions() {
                 <div className="table-toolbar">
                     <div className="table-toolbar-left">
                         <div className="show-entries">
-                            Show 
-                            <select 
-                                value={entriesPerPage} 
+                            Show
+                            <select
+                                value={entriesPerPage}
                                 onChange={e => setEntriesPerPage(e.target.value === 'All' ? 'All' : Number(e.target.value))}
                             >
                                 <option value={10}>10</option>
@@ -289,15 +308,15 @@ export default function AllTransactions() {
                         Showing {filtered.length === 0 ? 0 : (currentPage - 1) * (entriesPerPage === 'All' ? filtered.length : entriesPerPage) + 1} to {entriesPerPage === 'All' ? filtered.length : Math.min(currentPage * entriesPerPage, filtered.length)} of {filtered.length} entries
                     </div>
                     <div className="pagination-buttons">
-                        <button 
-                            className="pagination-btn" 
-                            disabled={currentPage === 1} 
+                        <button
+                            className="pagination-btn"
+                            disabled={currentPage === 1}
                             onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                             style={{ opacity: currentPage === 1 ? 0.5 : 1, cursor: currentPage === 1 ? 'not-allowed' : 'pointer' }}
                         >
                             Previous
                         </button>
-                        
+
                         {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
                             <button
                                 key={page}
@@ -307,10 +326,10 @@ export default function AllTransactions() {
                                 {page}
                             </button>
                         ))}
-                        
-                        <button 
-                            className="pagination-btn" 
-                            disabled={currentPage === totalPages} 
+
+                        <button
+                            className="pagination-btn"
+                            disabled={currentPage === totalPages}
                             onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                             style={{ opacity: currentPage === totalPages ? 0.5 : 1, cursor: currentPage === totalPages ? 'not-allowed' : 'pointer' }}
                         >

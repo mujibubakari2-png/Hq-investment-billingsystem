@@ -8,11 +8,12 @@ import VpnLockIcon from '@mui/icons-material/VpnLock';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import RouterIcon from '@mui/icons-material/Router';
+import type { Router } from '../types';
 
 interface AddRouterModalProps {
     onClose: () => void;
-    onSave?: (data: any) => void;
-    initialData?: any;
+    onSave?: (data: Partial<Router>) => void;
+    initialData?: Partial<Router>;
 }
 
 export default function AddRouterModal({ onClose, onSave, initialData }: AddRouterModalProps) {
@@ -20,9 +21,11 @@ export default function AddRouterModal({ onClose, onSave, initialData }: AddRout
     const [host, setHost] = useState(initialData?.host || '');
     const [apiPort, setApiPort] = useState(initialData?.apiPort?.toString() || initialData?.port?.toString() || '8728');
     const [username, setUsername] = useState(initialData?.username || 'admin');
-    const [accessCode, setAccessCode] = useState(initialData?.password || initialData?.accessCode || '');
+    const [accessCode, setAccessCode] = useState(initialData?.password || '');
     const [showAccessCode, setShowAccessCode] = useState(false);
-    const [vpnMode, setVpnMode] = useState<'hybrid' | 'wireguard' | 'openvpn'>(initialData?.vpnMode || 'hybrid');
+    const [vpnMode, setVpnMode] = useState<'hybrid' | 'wireguard' | 'openvpn'>(
+        (initialData?.vpnMode as 'hybrid' | 'wireguard' | 'openvpn') || 'hybrid'
+    );
     const [description, setDescription] = useState(initialData?.description || '');
 
     const handleSave = () => {
@@ -30,7 +33,15 @@ export default function AddRouterModal({ onClose, onSave, initialData }: AddRout
             alert('Router name and IP address are required');
             return;
         }
-        if (onSave) onSave({ routerName, host, apiPort, username, accessCode, vpnMode, description });
+        if (onSave) onSave({
+            name: routerName,
+            host,
+            apiPort: parseInt(apiPort, 10),
+            username,
+            password: accessCode,
+            vpnMode,
+            description
+        });
     };
 
     return (

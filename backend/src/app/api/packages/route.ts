@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
+import { createPackageSchema, validateData } from "@/lib/validation";
 
 // GET /api/packages
 export async function GET(req: NextRequest) {
@@ -10,7 +11,7 @@ export async function GET(req: NextRequest) {
 
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
         const tenantFilter = { tenantId: userPayload.tenantId };
-        
+
         const { searchParams } = new URL(req.url);
         const type = searchParams.get("type") || "";
         const status = searchParams.get("status") || "";
@@ -89,15 +90,17 @@ export async function POST(req: NextRequest) {
 
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
         const tenantFilter = { tenantId: userPayload.tenantId };
-        
+
         const body = await req.json();
 
-        // Validation
-        if (!body.name) return errorResponse("Package name is required");
-        if (!body.price) return errorResponse("Price is required");
-        if (!body.duration) return errorResponse("Duration is required");
+        // Validate input
+        const validation = validateData(createPackageSchema, body);
+        if (!validation.success) {
+            return errorResponse(`Validation errors: ${validation.errors.join(', ')}`, 400);
+        }
+        const validatedData = validation.data;
 
-        let routerId = body.routerId || body.router;
+        let routerId = validatedData.routerId;
         if (routerId) {
             const router = await prisma.router.findFirst({
                 where: {
@@ -112,23 +115,12 @@ export async function POST(req: NextRequest) {
             routerId = router.id;
         }
 
-        const tenantIdValue = userPayload.tenantId;
-
         const pkg = await prisma.package.create({
             data: {
-                name: body.name,
-                type: body.type === "PPPoE" || body.type === "PPPOE" ? "PPPOE" : "HOTSPOT",
-                category: body.category === "Business" || body.category === "BUSINESS" ? "BUSINESS" : "PERSONAL",
-                uploadSpeed: parseFloat(body.uploadSpeed) || 0,
-                uploadUnit: body.uploadUnit || "M",
-                downloadSpeed: parseFloat(body.downloadSpeed) || 0,
-                downloadUnit: body.downloadUnit || "M",
-                price: parseFloat(body.price),
-                duration: parseInt(body.duration),
-                durationUnit: (body.durationUnit || "DAYS").toUpperCase() as any,
+                ...validatedData,
                 routerId: routerId || null,
                 status: "ACTIVE",
-                tenantId: tenantIdValue
+                tenantId: userPayload.tenantId
             },
         });
 

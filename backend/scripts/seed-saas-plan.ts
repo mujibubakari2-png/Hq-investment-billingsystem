@@ -1,4 +1,4 @@
-import { PrismaClient } from "./src/generated/prisma/client";
+import { PrismaClient } from "../src/generated/prisma";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { parse } from "url";
 import * as dotenv from 'dotenv';
@@ -10,7 +10,7 @@ const prisma = new PrismaClient({ adapter });
 
 async function main() {
     console.log("🌱 Seeding SaaS Plan...");
-    
+
     let plan = await prisma.saasPlan.findFirst();
     if (!plan) {
         plan = await prisma.saasPlan.create({

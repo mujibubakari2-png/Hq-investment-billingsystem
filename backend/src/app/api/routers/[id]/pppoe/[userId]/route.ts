@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { jsonResponse, errorResponse } from "@/lib/auth";
+import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { getMikroTikService } from "@/lib/mikrotik";
 
 // PUT /api/routers/[id]/pppoe/[userId] — Enable/Disable PPPoE user

@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
         // Validate phone format - only if it looks like a phone number (mostly numeric)
         const phoneDigits = phone.replace(/\D/g, "");
         const isNumeric = /^\d+$/.test(phone) || (phoneDigits.length > 0 && phoneDigits.length === phone.length);
-        
+
         if (isNumeric && phoneDigits.length < 9) {
             return errorResponse("Invalid phone number length", 400);
         }
@@ -60,9 +60,9 @@ export async function POST(req: NextRequest) {
                     OR: [
                         { name: packageId },
                         // If it's a number like "1", just pick any active package for the test
-                        ...( /^\d+$/.test(packageId) ? [{ status: "ACTIVE" as any }] : []),
+                        ...(/^\d+$/.test(packageId) ? [{ status: "ACTIVE" as any }] : []),
                         // If it's a test string, just pick any active package
-                        ...( process.env.NODE_ENV !== "production" ? [{ status: "ACTIVE" as any }] : [])
+                        ...(process.env.NODE_ENV !== "production" ? [{ status: "ACTIVE" as any }] : [])
                     ]
                 },
                 include: { router: true },
@@ -104,7 +104,7 @@ export async function POST(req: NextRequest) {
         } else {
             // Generate a username from phone (e.g., HS-0621085215)
             const username = `HS-${cleanPhone.slice(-10)}`;
-            
+
             // Check if username already exists, add suffix if needed
             let finalUsername = username;
             let suffix = 1;
@@ -146,12 +146,12 @@ export async function POST(req: NextRequest) {
         // ── Initiate Mobile Money STK Push ──
         // Use the specified payment channel or the first active one
         const paymentChannel = await prisma.paymentChannel.findFirst({
-            where: { 
+            where: {
                 OR: [
                     { name: { contains: method, mode: "insensitive" } },
                     { provider: { contains: method, mode: "insensitive" } },
                 ],
-                status: "ACTIVE" 
+                status: "ACTIVE"
             },
         }) || await prisma.paymentChannel.findFirst({
             where: { status: "ACTIVE" },
@@ -192,7 +192,7 @@ export async function POST(req: NextRequest) {
         } else {
             // Demo mode: Auto-complete the transaction after 5 seconds
             checkoutRequestId = `DEMO-${Date.now()}`;
-            
+
             // Simulate delayed payment completion
             setTimeout(async () => {
                 try {
@@ -303,7 +303,7 @@ async function completeHotspotPurchase(
             // Let's refetch client to get phone for password
             const client = await prisma.client.findUnique({ where: { id: clientId } });
             const password = client?.phone || "123456";
-            
+
             await mikrotik.activateService(client?.username || `HS-${clientId.slice(0, 8)}`, password, pkg.name, "hotspot");
 
             await prisma.routerLog.create({
@@ -332,5 +332,3 @@ async function completeHotspotPurchase(
     console.log(`✅ Hotspot purchase completed: ${reference} → ${pkg.name}`);
 }
 
-// Export for use by callback
-export { completeHotspotPurchase };

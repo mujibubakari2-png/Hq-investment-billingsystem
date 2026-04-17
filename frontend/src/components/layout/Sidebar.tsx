@@ -140,10 +140,11 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 
     useEffect(() => {
         const fetchBrand = () => {
-            settingsApi.get().then((res: any) => {
-                const data = res.data || res;
-                if (data?.companyName) {
-                    const parts = data.companyName.trim().split(' ');
+            settingsApi.get().then((res: Record<string, string>) => {
+                const data = typeof res === 'object' ? res : {};
+                const companyName = data?.companyName || data?.['company_name'];
+                if (companyName && typeof companyName === 'string') {
+                    const parts = companyName.trim().split(' ');
                     if (parts.length > 1) {
                         setBrand({ main: parts[0], sub: parts.slice(1).join(' ') });
                     } else {
@@ -196,19 +197,19 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                             <div key={section.title} className="nav-section">
                                 <div className="nav-section-title">{section.title}</div>
                                 {filteredItems.map((item) => (
-                                <NavLink
-                                    key={item.path}
-                                    to={item.path}
-                                    className={`nav-item ${location.pathname === item.path ? 'active' : ''}`}
-                                    onClick={onClose}
-                                >
-                                    <span className="nav-icon">{iconMap[item.icon]}</span>
-                                    <span className="nav-label">{item.label}</span>
-                                </NavLink>
-                            ))}
-                        </div>
-                    );
-                })}
+                                    <NavLink
+                                        key={item.path}
+                                        to={item.path}
+                                        className={`nav-item ${location.pathname === item.path ? 'active' : ''}`}
+                                        onClick={onClose}
+                                    >
+                                        <span className="nav-icon">{iconMap[item.icon]}</span>
+                                        <span className="nav-label">{item.label}</span>
+                                    </NavLink>
+                                ))}
+                            </div>
+                        );
+                    })}
                 </nav>
             </aside>
         </>

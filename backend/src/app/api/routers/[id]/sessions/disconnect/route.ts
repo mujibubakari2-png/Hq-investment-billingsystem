@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { jsonResponse, errorResponse } from "@/lib/auth";
+import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { getMikroTikService } from "@/lib/mikrotik";
 
 // POST /api/routers/[id]/sessions/disconnect — Disconnect a session
