@@ -6,7 +6,7 @@ import { checkRateLimit, getClientIp } from "@/lib/rateLimiter";
 export async function POST(req: NextRequest) {
     // Rate limit: 10 attempts per 15 minutes per IP
     const ip = getClientIp(req);
-    const rateLimit = checkRateLimit(ip, "login", { limit: 10, windowSeconds: 15 * 60 });
+    const rateLimit = await checkRateLimit(ip, "login", { limit: 10, windowSeconds: 15 * 60 });
     if (!rateLimit.allowed) {
         return errorResponse(
             `Too many login attempts. Please try again in ${rateLimit.retryAfterSeconds} seconds.`,
@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
         } catch (e) {
             return errorResponse("Invalid JSON in request body", 400);
         }
-        
+
         const username = body.username || body.email;
         const password = body.password;
 
@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
 
         const automationKey = process.env.AUTOMATION_KEY;
         const isAutomation = (req.headers.get("x-automation-key") === automationKey || req.headers.get("x-api-key") === automationKey) && automationKey !== undefined;
-        
+
         const valid = isAutomation || await comparePassword(password, user.password);
         console.log(`[LOGIN RESULT] User: ${username}, Success: ${valid}`);
         if (!valid) {

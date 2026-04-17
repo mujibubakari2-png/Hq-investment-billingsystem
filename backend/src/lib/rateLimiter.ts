@@ -81,11 +81,27 @@ export async function checkRateLimit(
         });
 
         if (entry.count > options.limit) {
-            const retryAfterSeconds = Math.ceil((entry.resetAt.getTime() - now) / 1000);
+            // Check if resetAt is valid
+            const isValidResetAt = entry.resetAt instanceof Date && !isNaN(entry.resetAt.getTime());
+            const resetTime = isValidResetAt ? entry.resetAt.getTime() : (now + windowMs);
+            
+            // If resetAt was invalid, update it in the database for future requests
+            if (!isValidResetAt) {
+                // Update in background, don't wait
+                prisma.rateLimit.update({
+                    where: { key: storeKey },
+                    data: {
+                        resetAt: new Date(now + windowMs),
+                        updatedAt: new Date()
+                    }
+                }).catch(err => console.error('Failed to update invalid rate limit entry:', err));
+            }
+            
+            const retryAfterSeconds = Math.max(1, Math.ceil((resetTime - now) / 1000));
             return {
                 allowed: false,
                 remaining: 0,
-                resetAt: entry.resetAt.getTime(),
+                resetAt: resetTime,
                 retryAfterSeconds,
             };
         }

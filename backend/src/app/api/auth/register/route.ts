@@ -6,7 +6,7 @@ import { checkRateLimit, getClientIp } from "@/lib/rateLimiter";
 export async function POST(req: NextRequest) {
     // Rate limit: 5 registrations per hour per IP
     const ip = getClientIp(req);
-    const rateLimit = checkRateLimit(ip, "register", { limit: 5, windowSeconds: 60 * 60 });
+    const rateLimit = await checkRateLimit(ip, "register", { limit: 5, windowSeconds: 60 * 60 });
     if (!rateLimit.allowed) {
         return errorResponse(
             `Too many registration attempts. Please try again in ${rateLimit.retryAfterSeconds} seconds.`,
@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
         } catch (e) {
             return errorResponse("Invalid JSON in request body", 400);
         }
-        
+
         const email = body.email;
         const password = body.password;
         const fullName = body.fullName || body.name || email?.split('@')[0] || "New User";
