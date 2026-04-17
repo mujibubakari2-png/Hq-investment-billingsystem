@@ -52,7 +52,7 @@ source = { repo = ".", path = "frontend" }
 
 [services.build]
 builder = "NIXPACKS"
-buildCommand = "pnpm install && pnpm run build"
+buildCommand = "pnpm run build"
 
 [services.build.env]
 NODE_ENV = "production"
