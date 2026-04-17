@@ -8,7 +8,7 @@ import crypto from "crypto";
 export async function POST(req: NextRequest) {
     // Rate limit: 20 Google auth attempts per 15 minutes per IP
     const ip = getClientIp(req);
-    const rateLimit = checkRateLimit(ip, "google-auth", { limit: 20, windowSeconds: 15 * 60 });
+    const rateLimit = await checkRateLimit(ip, "google-auth", { limit: 20, windowSeconds: 15 * 60 });
     if (!rateLimit.allowed) {
         return errorResponse(
             `Too many requests. Please try again in ${rateLimit.retryAfterSeconds} seconds.`,
