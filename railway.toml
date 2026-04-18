@@ -1,16 +1,11 @@
-# Railway multi-service configuration
-# This file defines 3 services: backend, frontend, and landing-page
-# Updated: 2026-04-16
+# Railway backend service configuration
+# Updated: 2026-04-18
 
-[[services]]
-id = "backend"
-source = { repo = ".", path = "backend" }
-
-[services.build]
+[build]
 builder = "NIXPACKS"
 buildCommand = "./build.sh"
 
-[services.build.env]
+[build.env]
 NODE_ENV = "production"
 PNPM_HOME = "/usr/local/bin"
 JWT_SECRET = "5deed8661cd0e80017907acb9012ae57054bc2e341bb64db9f683c888fb8fc9f"
@@ -18,14 +13,14 @@ DATABASE_URL = "postgresql://postgres:MgIqXNpCJxZpTPOgodBgtoZYnOrcgsUD@postgres.
 RAILWAY_NO_DB_SETUP = "true"
 NIXPACKS_NODE_VERSION = "20.19.0"
 
-[services.deploy]
+[deploy]
 startCommand = "npm install -g pnpm && ./setup-db.sh && pnpm run start -- --port $PORT"
 healthcheckPath = "/api/health"
 healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 10
 
-[services.env]
+[env]
 # Database
 DATABASE_URL = "postgresql://postgres:MgIqXNpCJxZpTPOgodBgtoZYnOrcgsUD@postgres.railway.internal:5432/railway"
 
