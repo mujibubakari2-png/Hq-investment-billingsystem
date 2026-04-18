@@ -21,7 +21,7 @@ NIXPACKS_NODE_VERSION = "20.19.0"
 [services.deploy]
 startCommand = "cd backend && chmod +x start.sh && ./start.sh"
 healthcheckPath = "/api/health"
-healthcheckTimeout = 300
+healthcheckTimeout = 600
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 10
 
