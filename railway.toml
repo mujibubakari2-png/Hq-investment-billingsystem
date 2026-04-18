@@ -19,7 +19,7 @@ RAILWAY_NO_DB_SETUP = "true"
 NIXPACKS_NODE_VERSION = "20.19.0"
 
 [services.deploy]
-startCommand = "cd backend && pnpm run start"
+startCommand = "cd backend && chmod +x start.sh && ./start.sh"
 healthcheckPath = "/api/health"
 healthcheckTimeout = 600
 restartPolicyType = "ON_FAILURE"
@@ -48,9 +48,6 @@ NEXT_PUBLIC_APP_URL = "https://landing-page-production-d2f7.up.railway.app"
 
 # Cron jobs
 CRON_SECRET = "your-cron-secret-here"
-
-# Disable Prisma seeding
-PRISMA_SEED = "false"
 
 [[services]]
 id = "frontend"
