@@ -4,11 +4,11 @@
 
 [[services]]
 id = "backend"
-source = { repo = ".", path = "backend" }
+source = { repo = "." }
 
 [services.build]
 builder = "NIXPACKS"
-buildCommand = "npm install -g pnpm && pnpm install --frozen-lockfile && pnpm run build && npx prisma db push && npx prisma db seed"
+buildCommand = "cd backend && npm install -g pnpm && pnpm install --frozen-lockfile && pnpm run build && npx prisma db push && npx prisma db seed"
 
 [services.build.env]
 NODE_ENV = "production"
@@ -50,11 +50,11 @@ CRON_SECRET = "your-cron-secret-here"
 
 [[services]]
 id = "frontend"
-source = { repo = ".", path = "frontend" }
+source = { repo = "." }
 
 [services.build]
 builder = "NIXPACKS"
-buildCommand = "npm install -g pnpm && pnpm install --frozen-lockfile && pnpm run build"
+buildCommand = "cd frontend && npm install -g pnpm && pnpm install --frozen-lockfile && pnpm run build"
 
 [services.build.env]
 NODE_ENV = "production"
@@ -79,11 +79,11 @@ NODE_ENV = "production"
 
 [[services]]
 id = "landing-page"
-source = { repo = ".", path = "landing-page" }
+source = { repo = "." }
 
 [services.build]
 builder = "NIXPACKS"
-buildCommand = "npm install -g pnpm && pnpm install --frozen-lockfile && pnpm run build"
+buildCommand = "cd landing-page && npm install -g pnpm && pnpm install --frozen-lockfile && pnpm run build"
 
 [services.build.env]
 NODE_ENV = "production"
