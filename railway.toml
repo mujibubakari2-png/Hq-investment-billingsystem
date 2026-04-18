@@ -8,7 +8,7 @@ source = { repo = ".", path = "backend" }
 
 [services.build]
 builder = "NIXPACKS"
-buildCommand = "echo 'Starting backend build...' && npm install -g pnpm && pnpm install --frozen-lockfile && pnpm run build && npx prisma db push && npx prisma db seed"
+buildCommand = "npm install -g pnpm && pnpm install --frozen-lockfile && pnpm run build"
 
 [services.build.env]
 NODE_ENV = "production"
