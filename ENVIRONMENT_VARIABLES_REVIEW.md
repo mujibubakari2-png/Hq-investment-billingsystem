@@ -39,7 +39,7 @@ GOOGLE_CLIENT_ID="96960694156-pg7m1cjdqas9nelo83nicrq4ig3kuq3l.apps.googleuserco
 CORS_ORIGIN=https://frontend-production-440c.up.railway.app
 NODE_ENV=production
 JWT_SECRET=5deed8661cd0e80017907acb9012ae57054bc2e341bb64db9f683c888fb8fc9f
-DATABASE_URL=postgresql://postgres:ZwRajwXCUBbBqxCoGeqJQsihvlqyCePs@postgres.railway.internal:5432/railway
+DATABASE_URL=postgresql://postgres:MgIqXNpCJxZpTPOgodBgtoZYnOrcgsUD@postgres.railway.internal:5432/railway
 ```
 
 ---
@@ -124,7 +124,7 @@ VITE_GOOGLE_CLIENT_ID=96960694156-pg7m1cjdqas9nelo83nicrq4ig3kuq3l.apps.googleus
 CORS_ORIGIN=https://frontend-production-440c.up.railway.app
 NODE_ENV=production
 JWT_SECRET=5deed8661cd0e80017907acb9012ae57054bc2e341bb64db9f683c888fb8fc9f
-DATABASE_URL=postgresql://postgres:ZwRajwXCUBbBqxCoGeqJQsihvlqyCePs@postgres.railway.internal:5432/railway
+DATABASE_URL=postgresql://postgres:MgIqXNpCJxZpTPOgodBgtoZYnOrcgsUD@postgres.railway.internal:5432/railway
 ```
 
 #### Frontend Service:

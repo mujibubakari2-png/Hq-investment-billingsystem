@@ -67,7 +67,7 @@ npx prisma db push
 If Method 1 fails:
 
 1. **Access Railway PostgreSQL:**
-   - Go to: https://postgres-production-acde.up.railway.app/
+   - Go to: https://postgres-production-caa91.up.railway.app/
    - Use the web interface to run SQL commands
 
 2. **Generate Schema SQL:**
@@ -110,7 +110,7 @@ Ensure these are set in Railway Backend Service:
 CORS_ORIGIN=https://frontend-production-440c.up.railway.app
 NODE_ENV=production
 JWT_SECRET=5deed8661cd0e80017907acb9012ae57054bc2e341bb64db9f683c888fb8fc9f
-DATABASE_URL=postgresql://postgres:ZwRajwXCUBbBqxCoGeqJQsihvlqyCePs@postgres.railway.internal:5432/railway
+DATABASE_URL=postgresql://postgres:MgIqXNpCJxZpTPOgodBgtoZYnOrcgsUD@postgres.railway.internal:5432/railway
 ```
 
 ---
