@@ -91,7 +91,7 @@ export default function Dashboard() {
 
     const greetName = user?.username || 'User';
     const hour = now.getHours();
-    const greeting = tenantIdParam 
+    const greeting = tenantIdParam
         ? `Viewing dashboard for tenant: ${tenantIdParam}`
         : (hour < 12 ? '☀️ Good morning!' : hour < 18 ? '🌤️ Good afternoon!' : '🌙 Good night!');
 
@@ -603,7 +603,7 @@ export default function Dashboard() {
                                         padding: '8px 14px',
                                     }}
                                     labelStyle={{ color: '#90caf9', fontWeight: 600, marginBottom: 4 }}
-                                    formatter={(value: any) => [`Revenue: ${(value ?? 0).toLocaleString()}.00`, '']}
+                                    formatter={(value: number | undefined) => [`Revenue: ${(value ?? 0).toLocaleString()}.00`, '']}
                                 />
                                 <Area
                                     type="monotone"
