@@ -25,4 +25,9 @@ fi
 
 # Start the application
 cd /app/backend
+echo "🚀 Starting Next.js application..."
+echo "PORT environment variable: $PORT"
+echo "NODE_ENV: $NODE_ENV"
+echo "Current directory: $(pwd)"
+echo "Starting command: pnpm run start"
 pnpm run start
