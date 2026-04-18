@@ -1,0 +1,16 @@
+[build]
+builder = "NIXPACKS"
+buildCommand = "npm install -g pnpm && pnpm install --frozen-lockfile && pnpm run build"
+
+[build.env]
+NODE_ENV = "production"
+NIXPACKS_NODE_VERSION = "20.19.0"
+
+[deploy]
+# Next.js start: must bind to Railway's $PORT
+# "next start -p $PORT" is the correct way — avoids pnpm script shell-expansion issues
+startCommand = "node_modules/.bin/next start -p ${PORT:-3000}"
+healthcheckPath = "/"
+healthcheckTimeout = 120
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5

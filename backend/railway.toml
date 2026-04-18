@@ -1,0 +1,18 @@
+[build]
+builder = "NIXPACKS"
+buildCommand = "chmod +x build.sh && ./build.sh"
+
+[build.env]
+NODE_ENV = "production"
+NIXPACKS_NODE_VERSION = "20.19.0"
+PNPM_HOME = "/usr/local/bin"
+
+[deploy]
+# start.sh exports $PORT and calls: exec node_modules/.bin/next start -p "$PORT"
+# This ensures Railway's dynamically assigned $PORT is bound so the service
+# shows "Online" instead of "Complete"
+startCommand = "chmod +x start.sh && ./start.sh"
+healthcheckPath = "/api/health"
+healthcheckTimeout = 300
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5
