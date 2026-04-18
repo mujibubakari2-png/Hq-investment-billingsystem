@@ -1,6 +1,6 @@
 [build]
 builder = "NIXPACKS"
-buildCommand = "npm install -g pnpm && pnpm install --frozen-lockfile && pnpm run build"
+buildCommand = "npm install -g pnpm && pnpm install --no-frozen-lockfile && pnpm run build"
 
 [build.env]
 NODE_ENV = "production"
