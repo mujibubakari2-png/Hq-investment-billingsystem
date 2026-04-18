@@ -45,7 +45,23 @@ Your Railway PostgreSQL database is empty and needs the schema to be applied. Th
 
 ## 🛠️ Solution: Apply Database Schema
 
-### Method 1: Prisma Database Push (Recommended)
+### ✅ **Automatic Deployment (Recommended)**
+
+The database schema and seeding are now **automatically applied** during Railway deployment:
+
+```toml
+# railway.toml - Backend Service Build Command
+buildCommand = "npm install -g pnpm && pnpm install --frozen-lockfile && pnpm run build && npx prisma db push && npx prisma db seed"
+```
+
+**What happens automatically:**
+1. ✅ Install dependencies
+2. ✅ Build the application
+3. ✅ **Apply database schema** (`npx prisma db push`)
+4. ✅ **Seed the database** (`npx prisma db seed`)
+5. ✅ Start the application
+
+### Method 2: Manual Execution (If needed)
 
 Since your project uses Prisma without migration files, use `prisma db push`:
 
