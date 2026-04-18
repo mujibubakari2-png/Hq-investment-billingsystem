@@ -1,19 +1,15 @@
 [build]
 builder = "NIXPACKS"
-# Nixpacks auto-runs: pnpm install (detects pnpm-lock.yaml)
-# We only need to generate Prisma client and build Next.js
-buildCommand = "npx prisma generate && npx next build"
+buildCommand = "npm install -g pnpm && pnpm install --frozen-lockfile && pnpm run build"
 
 [build.env]
 NODE_ENV = "production"
 NIXPACKS_NODE_VERSION = "20.19.0"
 
 [deploy]
-# Use npx to ensure the binary is always found regardless of PATH
-# $PORT is Railway's dynamically assigned port - MUST bind to this
-startCommand = "npx next start -p $PORT"
+startCommand = "pnpm run start"
 healthcheckPath = "/api/health"
-healthcheckTimeout = 300
+healthcheckTimeout = 120
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 5
 
