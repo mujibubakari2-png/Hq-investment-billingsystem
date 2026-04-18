@@ -13,8 +13,9 @@ buildCommand = "npm install -g pnpm && pnpm install --frozen-lockfile && pnpm ru
 [services.build.env]
 NODE_ENV = "production"
 PNPM_HOME = "/usr/local/bin"
-JWT_SECRET = ""
-DATABASE_URL = ""
+JWT_SECRET = "5deed8661cd0e80017907acb9012ae57054bc2e341bb64db9f683c888fb8fc9f"
+DATABASE_URL = "postgresql://postgres:MgIqXNpCJxZpTPOgodBgtoZYnOrcgsUD@postgres.railway.internal:5432/railway"
+NIXPACKS_NO_DB_SETUP = "true"
 NIXPACKS_NODE_VERSION = "20.19.0"
 
 [services.deploy]
