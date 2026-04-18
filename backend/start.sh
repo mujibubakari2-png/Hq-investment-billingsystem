@@ -12,4 +12,4 @@ echo "🚀 Starting backend on port ${PORT}..."
 
 # Call next start directly with the resolved PORT to guarantee it listens
 # on Railway's assigned port (avoids shell-expansion issues in pnpm scripts)
-exec node_modules/.bin/next start -p "$PORT"
+exec node_modules/.bin/next start --hostname 0.0.0.0 --port "$PORT"
