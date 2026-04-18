@@ -19,7 +19,7 @@ RAILWAY_NO_DB_SETUP = "true"
 NIXPACKS_NODE_VERSION = "20.19.0"
 
 [services.deploy]
-startCommand = "npm install -g pnpm && pnpm run start -- --port $PORT"
+startCommand = "npm install -g pnpm && ./setup-db.sh && pnpm run start -- --port $PORT"
 healthcheckPath = "/api/health"
 healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"
