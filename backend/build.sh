@@ -10,7 +10,8 @@ echo "📦 Installing dependencies..."
 pnpm install --frozen-lockfile
 
 echo "🗃️ Generating Prisma client..."
-npx prisma generate
+# Temporarily disabled prisma generate to prevent seeding
+# npx prisma generate
 
 echo "🔨 Building application..."
 pnpm run build
