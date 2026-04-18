@@ -6,7 +6,7 @@
   "packageManager": "pnpm@9.15.0",
   "scripts": {
     "dev": "vite --port 5175",
-    "build": "vite build",
+    "build": "npx tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview --port 5175",
     "test": "vitest",

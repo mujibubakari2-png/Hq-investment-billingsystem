@@ -603,7 +603,10 @@ export default function Dashboard() {
                                         padding: '8px 14px',
                                     }}
                                     labelStyle={{ color: '#90caf9', fontWeight: 600, marginBottom: 4 }}
-                                    formatter={(value: number | undefined) => [`Revenue: ${(value ?? 0).toLocaleString()}.00`, '']}
+                                    formatter={(value: string | number | undefined) => {
+                                        const amount = typeof value === 'number' ? value : Number(value ?? 0);
+                                        return [`Revenue: ${amount.toLocaleString()}.00`, ''];
+                                    }}
                                 />
                                 <Area
                                     type="monotone"
