@@ -3,8 +3,9 @@ set -e
 
 echo "🚀 Starting Railway build process for backend..."
 
-# Change to backend directory
-cd backend
+# Copy pnpm-lock.yaml from parent directory (monorepo root)
+echo "📋 Copying pnpm-lock.yaml from monorepo root..."
+cp ../pnpm-lock.yaml ./
 
 # Install pnpm globally
 echo "📦 Installing pnpm..."
@@ -17,6 +18,12 @@ pnpm install --frozen-lockfile
 # Generate Prisma client
 echo "🗃️ Generating Prisma client..."
 npx prisma generate
+
+# Build the application
+echo "🔨 Building application..."
+pnpm run build
+
+echo "✅ Build process complete! Database setup will happen during deployment."
 
 # Build the application
 echo "🔨 Building application..."
