@@ -603,17 +603,7 @@ export default function Dashboard() {
                                         padding: '8px 14px',
                                     }}
                                     labelStyle={{ color: '#90caf9', fontWeight: 600, marginBottom: 4 }}
-                                    formatter={(value: any) => {
-                                        let amount: number;
-                                        if (Array.isArray(value)) {
-                                            amount = typeof value[0] === 'number' ? value[0] : Number(value[0] ?? 0);
-                                        } else if (typeof value === 'number') {
-                                            amount = value;
-                                        } else {
-                                            amount = Number(value ?? 0);
-                                        }
-                                        return [`Revenue: ${amount.toLocaleString()}.00`, ''];
-                                    }}
+                                    formatter={(value: any) => [`Revenue: ${(value ?? 0).toLocaleString()}.00`, '']}
                                 />
                                 <Area
                                     type="monotone"
