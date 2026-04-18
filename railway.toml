@@ -4,11 +4,11 @@
 
 [[services]]
 id = "backend"
-source = { repo = ".", path = "backend" }
+source = { repo = ".", path = "." }
 
 [services.build]
 builder = "NIXPACKS"
-buildCommand = "./build.sh"
+buildCommand = "cd backend && ./build.sh"
 
 [services.build.env]
 NODE_ENV = "production"
@@ -19,7 +19,7 @@ RAILWAY_NO_DB_SETUP = "true"
 NIXPACKS_NODE_VERSION = "20.19.0"
 
 [services.deploy]
-startCommand = "npm install -g pnpm && ./setup-db.sh && pnpm run start -- --port $PORT"
+startCommand = "cd backend && npm install -g pnpm && ./setup-db.sh && pnpm run start -- --port $PORT"
 healthcheckPath = "/api/health"
 healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"
