@@ -33,12 +33,15 @@ async function main() {
     console.log("  ✓ Cleared existing data");
 
     // ─── Saas Plans ─────────────────────────────────────────────────────
+    const now = new Date().toISOString();
     const basicPlan = await prisma.saasPlan.create({
         data: {
             id: "plan_basic",
             name: "Basic Plan",
             price: 50000,
             clientLimit: 100,
+            createdAt: now,
+            updatedAt: now,
         }
     });
 
@@ -48,6 +51,8 @@ async function main() {
             name: "Standard Plan",
             price: 150000,
             clientLimit: 500,
+            createdAt: now,
+            updatedAt: now,
         }
     });
 
@@ -57,6 +62,8 @@ async function main() {
             name: "Premium Plan",
             price: 500000,
             clientLimit: 2000,
+            createdAt: now,
+            updatedAt: now,
         }
     });
 
