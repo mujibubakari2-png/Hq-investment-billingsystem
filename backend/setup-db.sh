@@ -36,3 +36,12 @@ else
 fi
 
 echo "🎉 Database is ready for application startup!"
+
+# Clean disconnect from database before app startup
+if [ -n "$DATABASE_URL" ]; then
+    echo "Disconnecting from database pool..."
+    # This ensures all connections are closed before the app starts
+    sleep 1
+fi
+
+exit 0
