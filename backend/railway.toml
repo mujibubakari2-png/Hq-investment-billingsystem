@@ -9,9 +9,14 @@ NIXPACKS_NODE_VERSION = "20.19.0"
 [deploy]
 # Next.js server: must bind to 0.0.0.0 and Railway's $PORT
 # Using shell expansion ${PORT:-3001} as a safe fallback
-startCommand = "PORT=${PORT:-3001} pnpm run start"
+startCommand = "pnpm run start -- --hostname 0.0.0.0 --port ${PORT:-3001}"
 healthcheckPath = "/api/health"
 healthcheckTimeout = 120
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 5
+
+[deploy.env]
+CORS_ORIGIN = "https://hq-frontend.up.railway.app"
+NEXT_PUBLIC_APP_URL = "https://hq-frontend.up.railway.app"
+NODE_ENV = "production"
 
