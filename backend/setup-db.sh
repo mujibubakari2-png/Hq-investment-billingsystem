@@ -3,6 +3,9 @@ set -e
 
 echo "🗄️ Setting up database during deployment..."
 
+# Change to backend directory
+cd backend
+
 # Check if DATABASE_URL is available
 if [ -z "$DATABASE_URL" ]; then
     echo "❌ DATABASE_URL not set, cannot setup database"
