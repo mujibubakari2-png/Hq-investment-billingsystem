@@ -8,15 +8,16 @@ source = { repo = ".", path = "backend" }
 
 [services.build]
 builder = "NIXPACKS"
-buildCommand = "pnpm install && pnpm run build"
+buildCommand = "npm install -g pnpm && pnpm install --frozen-lockfile && pnpm run build"
 
 [services.build.env]
 NODE_ENV = "production"
+PNPM_HOME = "/usr/local/bin"
 JWT_SECRET = ""
 DATABASE_URL = ""
 
 [services.deploy]
-startCommand = "pnpm run start -- --port $PORT"
+startCommand = "npm install -g pnpm && pnpm run start -- --port $PORT"
 healthcheckPath = "/api/health"
 healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"
@@ -52,7 +53,7 @@ source = { repo = ".", path = "frontend" }
 
 [services.build]
 builder = "NIXPACKS"
-buildCommand = "pnpm run build"
+buildCommand = "npm install -g pnpm && pnpm install --frozen-lockfile && pnpm run build"
 
 [services.build.env]
 NODE_ENV = "production"
@@ -80,13 +81,13 @@ source = { repo = ".", path = "landing-page" }
 
 [services.build]
 builder = "NIXPACKS"
-buildCommand = "pnpm install && pnpm run build"
+buildCommand = "npm install -g pnpm && pnpm install --frozen-lockfile && pnpm run build"
 
 [services.build.env]
 NODE_ENV = "production"
 
 [services.deploy]
-startCommand = "pnpm run start -- --port $PORT"
+startCommand = "npm install -g pnpm && pnpm run start -- --port $PORT"
 healthcheckPath = "/"
 healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"
