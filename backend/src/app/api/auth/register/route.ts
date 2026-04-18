@@ -4,9 +4,9 @@ import { errorResponse, jsonResponse, hashPassword, signToken } from "@/lib/auth
 import { checkRateLimit, getClientIp } from "@/lib/rateLimiter";
 
 export async function POST(req: NextRequest) {
-    // Rate limit: 5 registrations per hour per IP
+    // Rate limit: 10 registrations per 30 minutes per IP
     const ip = getClientIp(req);
-    const rateLimit = await checkRateLimit(ip, "register", { limit: 5, windowSeconds: 60 * 60 });
+    const rateLimit = await checkRateLimit(ip, "register", { limit: 10, windowSeconds: 30 * 60 });
     if (!rateLimit.allowed) {
         return errorResponse(
             `Too many registration attempts. Please try again in ${rateLimit.retryAfterSeconds} seconds.`,

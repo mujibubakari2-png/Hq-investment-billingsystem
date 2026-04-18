@@ -84,7 +84,7 @@ export async function checkRateLimit(
             // Check if resetAt is valid
             const isValidResetAt = entry.resetAt instanceof Date && !isNaN(entry.resetAt.getTime());
             const resetTime = isValidResetAt ? entry.resetAt.getTime() : (now + windowMs);
-            
+
             // If resetAt was invalid, update it in the database for future requests
             if (!isValidResetAt) {
                 // Update in background, don't wait
@@ -96,7 +96,7 @@ export async function checkRateLimit(
                     }
                 }).catch(err => console.error('Failed to update invalid rate limit entry:', err));
             }
-            
+
             const retryAfterSeconds = Math.max(1, Math.ceil((resetTime - now) / 1000));
             return {
                 allowed: false,
