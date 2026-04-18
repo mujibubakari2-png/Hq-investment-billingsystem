@@ -9,9 +9,6 @@
     "start": "next start -p 3001",
     "test": "vitest"
   },
-  "prisma": {
-    "seed": "tsx prisma/seed.ts"
-  },
   "lint-staged": {
     "*.{ts,tsx}": [
       "eslint --fix",
