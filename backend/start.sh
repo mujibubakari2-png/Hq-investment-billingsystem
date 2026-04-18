@@ -25,4 +25,4 @@ fi
 
 # Start the application
 cd /app/backend
-pnpm run start -- --port $PORT
+pnpm run start
