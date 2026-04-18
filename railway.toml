@@ -49,6 +49,9 @@ NEXT_PUBLIC_APP_URL = "https://landing-page-production-d2f7.up.railway.app"
 # Cron jobs
 CRON_SECRET = "your-cron-secret-here"
 
+# Disable Prisma seeding
+PRISMA_SEED = "false"
+
 [[services]]
 id = "frontend"
 source = { repo = ".", path = "frontend" }
