@@ -15,6 +15,7 @@ NODE_ENV = "production"
 PNPM_HOME = "/usr/local/bin"
 JWT_SECRET = ""
 DATABASE_URL = ""
+NIXPACKS_NODE_VERSION = "20.19.0"
 
 [services.deploy]
 startCommand = "npm install -g pnpm && pnpm run start -- --port $PORT"
@@ -57,6 +58,7 @@ buildCommand = "npm install -g pnpm && pnpm install --frozen-lockfile && pnpm ru
 
 [services.build.env]
 NODE_ENV = "production"
+NIXPACKS_NODE_VERSION = "20.19.0"
 
 [services.deploy]
 startCommand = "pnpm run preview -- --host 0.0.0.0 --port $PORT"
@@ -85,6 +87,7 @@ buildCommand = "npm install -g pnpm && pnpm install --frozen-lockfile && pnpm ru
 
 [services.build.env]
 NODE_ENV = "production"
+NIXPACKS_NODE_VERSION = "20.19.0"
 
 [services.deploy]
 startCommand = "npm install -g pnpm && pnpm run start -- --port $PORT"
