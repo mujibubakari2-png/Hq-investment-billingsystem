@@ -19,7 +19,7 @@ RAILWAY_NO_DB_SETUP = "true"
 NIXPACKS_NODE_VERSION = "20.19.0"
 
 [services.deploy]
-startCommand = "cd backend && npm install -g pnpm && pnpm install --frozen-lockfile && npx prisma db push --accept-data-loss && npx prisma db seed && pnpm run start"
+startCommand = "cd backend && pnpm run start"
 healthcheckPath = "/api/health"
 healthcheckTimeout = 600
 restartPolicyType = "ON_FAILURE"
