@@ -1,0 +1,16 @@
+[build]
+builder = "NIXPACKS"
+buildCommand = "npm install -g pnpm && pnpm install --frozen-lockfile && npx prisma generate && pnpm run build"
+
+[build.env]
+NODE_ENV = "production"
+NIXPACKS_NODE_VERSION = "20.19.0"
+
+[deploy]
+# Backend service: bind to 0.0.0.0 and Railway's $PORT.
+# Use the backend package's next start command and let Railway set PORT.
+startCommand = "PORT=${PORT:-3001} pnpm run start"
+healthcheckPath = "/api/health"
+healthcheckTimeout = 120
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5
