@@ -19,11 +19,13 @@ RAILWAY_NO_DB_SETUP = "true"
 NIXPACKS_NODE_VERSION = "20.19.0"
 
 [services.deploy]
+# Directly bind to Railway's $PORT — bypasses pnpm script shell-expansion issues
+# that cause the service to show "Complete" instead of "Online"
 startCommand = "cd backend && chmod +x start.sh && ./start.sh"
 healthcheckPath = "/api/health"
-healthcheckTimeout = 600
+healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"
-restartPolicyMaxRetries = 10
+restartPolicyMaxRetries = 5
 
 [services.env]
 # Database
@@ -62,11 +64,12 @@ NODE_ENV = "production"
 NIXPACKS_NODE_VERSION = "20.19.0"
 
 [services.deploy]
-startCommand = "pnpm run preview -- --host 0.0.0.0 --port $PORT"
+# Serve the pre-built Vite static output on Railway's assigned $PORT
+startCommand = "pnpm run preview -- --host 0.0.0.0 --port ${PORT:-4173}"
 healthcheckPath = "/"
-healthcheckTimeout = 300
+healthcheckTimeout = 120
 restartPolicyType = "ON_FAILURE"
-restartPolicyMaxRetries = 10
+restartPolicyMaxRetries = 5
 
 [services.env]
 # API URL - Update with your backend service URL
@@ -91,11 +94,12 @@ NODE_ENV = "production"
 NIXPACKS_NODE_VERSION = "20.19.0"
 
 [services.deploy]
-startCommand = "npm install -g pnpm && pnpm run start -- --port $PORT"
+# Next.js landing page: bind to Railway's $PORT directly
+startCommand = "node_modules/.bin/next start -p ${PORT:-3000}"
 healthcheckPath = "/"
-healthcheckTimeout = 300
+healthcheckTimeout = 120
 restartPolicyType = "ON_FAILURE"
-restartPolicyMaxRetries = 10
+restartPolicyMaxRetries = 5
 
 [services.env]
 # Landing page specific env vars (if any)
