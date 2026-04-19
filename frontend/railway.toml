@@ -1,0 +1,5 @@
+[build]
+  command = "pnpm install --no-frozen-lockfile && pnpm build"
+
+[deploy]
+  command = "pnpm start"
