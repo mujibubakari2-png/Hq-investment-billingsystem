@@ -4,6 +4,9 @@
     "description": "ISP Billing System - Multi-service monorepo",
     "private": true,
     "packageManager": "pnpm@9.15.0",
+    "engines": {
+        "node": ">=24.0.0"
+    },
     "scripts": {
         "dev": "echo 'Use individual service dev commands'",
         "build": "echo 'Build handled by Railway services'",
