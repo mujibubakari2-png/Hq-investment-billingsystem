@@ -24,6 +24,7 @@ const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
 try {
     globalForPrisma.prisma = globalForPrisma.prisma || new PrismaClient({
         adapter,
+        errorFormat: 'pretty',
         log: process.env.NODE_ENV === 'development' ? ['query', 'info', 'warn', 'error'] : ['error']
     });
     console.log("[DATABASE] Prisma client created successfully");

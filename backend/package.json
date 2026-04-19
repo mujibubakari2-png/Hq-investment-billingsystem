@@ -7,7 +7,9 @@
     "dev": "next dev --hostname 0.0.0.0 --port 3001",
     "build": "prisma generate && next build",
     "start": "next start",
-    "test": "vitest"
+    "test": "vitest",
+    "db:seed": "npx tsx scripts/seed.ts",
+    "db:migrate": "npx prisma migrate deploy"
   },
   "engines": {
     "node": ">=24.0.0"

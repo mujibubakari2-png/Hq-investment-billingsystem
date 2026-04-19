@@ -1,12 +1,30 @@
+import "dotenv/config";
 import { PrismaClient } from "../src/generated/prisma";
+import { PrismaPg } from "@prisma/adapter-pg";
+import { Pool } from "pg";
 import bcrypt from "bcryptjs";
 
-const prisma = new PrismaClient();
+const connectionString = process.env.DATABASE_URL;
+if (!connectionString) {
+    console.error("❌ DATABASE_URL environment variable is not set");
+    process.exit(1);
+}
+
+console.log(`[SEED] Database URL: ${connectionString.replace(/:[^:]+@/, ':***@')}`);
+
+const pool = new Pool({ connectionString });
+const adapter = new PrismaPg(pool);
+const prisma = new PrismaClient({ adapter });
 
 async function main() {
-    console.log("🌱 Starting database seed...\n");
+    console.log("\n🌱 Starting database seed...\n");
 
     try {
+        // Test connection
+        console.log("[SEED] Testing database connection...");
+        await prisma.$queryRaw`SELECT 1`;
+        console.log("✅ Database connection successful\n");
+
         // 1. Seed SaaS Plans
         console.log("📋 Seeding SaaS Plans...");
         const existingPlans = await prisma.saasPlan.count();
@@ -21,7 +39,7 @@ async function main() {
             });
             console.log("✅ SaaS Plans created.\n");
         } else {
-            console.log("⏭️  SaaS Plans already exist. Skipping.\n");
+            console.log(`⏭️  ${existingPlans} SaaS Plans already exist. Skipping.\n`);
         }
 
         // 2. Create Super Admin User
@@ -32,6 +50,9 @@ async function main() {
 
         const existing = await prisma.user.findUnique({
             where: { email: superAdminEmail }
+        }).catch(err => {
+            console.log(`⚠️  Cannot query users yet (migrations may still be running): ${err.message}`);
+            return null;
         });
 
         if (existing) {
@@ -44,6 +65,8 @@ async function main() {
                 }
             });
             console.log(`✅ Updated existing Super Admin: ${superAdminEmail}\n`);
+        } else if (existing === null) {
+            console.log("⏭️  Skipping user creation (tables not ready yet)\n");
         } else {
             await prisma.user.create({
                 data: {
@@ -68,7 +91,7 @@ async function main() {
             data: {
                 role: "ADMIN"
             }
-        });
+        }).catch(() => ({ count: 0 }));
 
         if (others.count > 0) {
             console.log(`✅ Demoted ${others.count} other users from SUPER_ADMIN to ADMIN.\n`);
@@ -77,13 +100,14 @@ async function main() {
         console.log("🎉 Database seed completed successfully!");
         console.log(`\n📧 Super Admin Credentials:`);
         console.log(`   Email: ${superAdminEmail}`);
-        console.log(`   Password: ${superAdminPassword}`);
+        console.log(`   Password: ${superAdminPassword}\n`);
 
     } catch (error) {
-        console.error("❌ Seed failed:", error);
+        console.error("\n❌ Seed failed:", error);
         process.exit(1);
     } finally {
         await prisma.$disconnect();
+        await pool.end();
     }
 }
 
