@@ -50,12 +50,16 @@ async function checkMigrations() {
             ORDER BY table_name
         `;
 
+        // List all tables found in the database
         console.log(`📋 Found ${tables.length} tables in database:`);
-        if (tables.length === 0) {
-            console.error(`❌ NO TABLES FOUND!`);
-            console.error(`   This means migrations did not run successfully.`);
-            console.error(`   Expected tables: users, clients, packages, subscriptions, etc.`);
-            console.error(`   Please check Railway deployment logs for migration errors.`);
+        if (tables.length > 0) {
+            for (const table of tables) {
+                console.log(`   - ${table.table_name}`);
+            }
+        } else {
+            console.error(`❌ NO TABLES FOUND in 'public' schema!`);
+            console.error(`   This means 'prisma db push' or 'prisma migrate deploy' did not run successfully.`);
+            console.error(`   Please check your Railway build/deploy logs.`);
             process.exit(1);
         }
 
