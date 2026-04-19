@@ -5,6 +5,9 @@ buildCommand = "npm install -g pnpm && pnpm install --no-frozen-lockfile && npx 
 [build.env]
 NODE_ENV = "production"
 NIXPACKS_NODE_VERSION = "20.19.0"
+PNPM_VERSION = "9.15.0"
+RAILPACK_NODE_VERSION = "20.19.0"
+NIXPACKS_INSTALL_CMD = "pnpm install --no-frozen-lockfile"
 
 [deploy]
 # Next.js server: must bind to 0.0.0.0 and Railway's $PORT
