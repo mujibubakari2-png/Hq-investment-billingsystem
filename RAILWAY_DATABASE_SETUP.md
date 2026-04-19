@@ -73,11 +73,23 @@ The backend is configured to:
 ### Expected Log Output:
 ```
 [DATABASE] Connecting to: postgresql://***@containers-us-west-xxx.railway.app:***
-[DATABASE] Connection pool created (max: 5, idle timeout: 30000ms)
-[DATABASE] Prisma client created successfully
 
 [SEED] Testing database connection...
-✅ Database connection successful
+✅ Database connection successful (XXXms)
+
+📋 Seeding SaaS Plans...
+✅ SaaS Plans created.
+
+👤 Creating Super Admin user...
+✅ Created new Super Admin: superadmin@hqinvestment.co.tz
+
+[DB-TEST] Testing database connection...
+✅ Basic connection successful
+📋 Found 29 tables
+📊 SaaS plans count: 3
+👥 Users count: 1
+🎉 Database connection test completed successfully!
+```
 
 📋 Seeding SaaS Plans...
 ✅ SaaS Plans created.

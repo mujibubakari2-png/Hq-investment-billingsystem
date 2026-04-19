@@ -5,6 +5,8 @@
   buildCommand = "pnpm install && pnpm build"
 
 [deploy]
-  startCommand = "npx prisma migrate deploy --skip-verify || true && npx tsx scripts/seed.ts || true && pnpm start"
+  startCommand = "npx prisma migrate deploy --skip-verify && npx tsx scripts/seed.ts && npx tsx scripts/test-db.ts && pnpm start"
   restartPolicyType = "on_failure"
   restartPolicyMaxRetries = 5
+  healthcheckPath = "/api/health"
+  healthcheckTimeout = 300
