@@ -2,7 +2,10 @@
 
 // In dev: VITE_API_URL is unset so BASE = '/api' (Vite dev proxy forwards to localhost:3001).
 // In prod: VITE_API_URL = 'https://backend-name.railway.app' so calls go directly to the API.
-const BASE = `${(import.meta.env.VITE_API_URL as string) ?? ''}/api`;
+const API_URL = (import.meta.env.VITE_API_URL as string) ?? '';
+// Remove trailing slash if present to avoid double slashes
+const CLEAN_API_URL = API_URL.endsWith('/') ? API_URL.slice(0, -1) : API_URL;
+const BASE = `${CLEAN_API_URL}/api`;
 
 function authHeaders(): Record<string, string> {
     const token = localStorage.getItem('token');
@@ -10,29 +13,38 @@ function authHeaders(): Record<string, string> {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-    const res = await fetch(`${BASE}${path}`, {
-        ...init,
-        headers: {
-            'Content-Type': 'application/json',
-            ...authHeaders(),
-            ...(init?.headers as Record<string, string>),
-        },
-    });
+    const fullUrl = `${BASE}${path}`;
+    try {
+        const res = await fetch(fullUrl, {
+            ...init,
+            headers: {
+                'Content-Type': 'application/json',
+                ...authHeaders(),
+                ...(init?.headers as Record<string, string>),
+            },
+        });
 
-    if (res.status === 401) {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        window.location.href = '/login';
-        throw new Error('Unauthorized');
+        if (res.status === 401) {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = '/login';
+            throw new Error('Unauthorized');
+        }
+
+        const data = await res.json();
+
+        if (!res.ok) {
+            throw new Error(data.error || 'Request failed');
+        }
+
+        return data as T;
+    } catch (error: any) {
+        console.error(`[API ERROR] ${init?.method || 'GET'} ${fullUrl}:`, error);
+        if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
+            throw new Error(`Unable to connect to the server at ${fullUrl}. Please check your internet connection or ensure VITE_API_URL is correctly set.`);
+        }
+        throw error;
     }
-
-    const data = await res.json();
-
-    if (!res.ok) {
-        throw new Error(data.error || 'Request failed');
-    }
-
-    return data as T;
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
