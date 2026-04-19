@@ -4,9 +4,9 @@ buildCommand = "cd backend && npx prisma generate && pnpm run build"
 
 [build.env]
 NODE_ENV = "production"
-NIXPACKS_NODE_VERSION = "22"
+NIXPACKS_NODE_VERSION = "24.0.0"
 PNPM_VERSION = "9.15.0"
-RAILPACK_NODE_VERSION = "22"
+RAILPACK_NODE_VERSION = "24.0.0"
 NIXPACKS_INSTALL_CMD = "pnpm install --no-frozen-lockfile"
 
 [deploy]
