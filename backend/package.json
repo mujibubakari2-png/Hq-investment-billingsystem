@@ -12,6 +12,8 @@
     "db:seed": "npx tsx scripts/seed.ts",
     "db:migrate": "npx prisma migrate deploy",
     "db:test": "node scripts/test-db.js",
+    "db:check-migrations": "node scripts/check-migrations.js",
+    "db:fix-migrations": "node scripts/fix-migrations.js",
     "db:generate": "prisma generate"
   },
   "engines": {
