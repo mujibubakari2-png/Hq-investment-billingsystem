@@ -1,0 +1,4 @@
+* text=auto
+
+# Enforce LF for pnpm-lock.yaml to prevent frozen-lockfile errors on Linux
+pnpm-lock.yaml text eol=lf
