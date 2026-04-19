@@ -6,6 +6,7 @@ buildCommand = "cd backend && npx prisma generate && pnpm run build"
 NODE_ENV = "production"
 NIXPACKS_NODE_VERSION = "20.19.0"
 PNPM_VERSION = "9.15.0"
+RAILPACK_NODE_VERSION = "20.19.0"
 
 [deploy]
 # Backend service: bind to 0.0.0.0 and Railway's $PORT.

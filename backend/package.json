@@ -9,6 +9,9 @@
     "start": "next start",
     "test": "vitest"
   },
+  "engines": {
+    "node": ">=20.19.0"
+  },
   "lint-staged": {
     "*.{ts,tsx}": [
       "eslint --fix",
