@@ -11,6 +11,9 @@
         "dev": "pnpm -r dev",
         "build": "pnpm --filter backend build",
         "start": "pnpm --filter backend start",
+        "build:landing": "pnpm --filter landing-page build",
+        "start:landing": "pnpm --filter landing-page start",
+        "build:frontend": "pnpm --filter frontend build",
         "build:all": "pnpm -r build",
         "start:all": "pnpm -r start"
     },
