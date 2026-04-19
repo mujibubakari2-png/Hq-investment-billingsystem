@@ -1,12 +1,10 @@
 # Railway deployment configuration for the backend service.
-# This file is used when the backend package is deployed directly.
 
 [build]
-  command = "pnpm install && pnpm build"
+  builder = "nixpacks"
+  buildCommand = "pnpm install && pnpm build"
 
 [deploy]
-  command = "npx prisma migrate deploy --skip-verify || true && npx tsx scripts/seed.ts || true && pnpm start"
-  
-  # Graceful timeout to allow seed script time to complete
-  startCommand = "pnpm start"
+  startCommand = "npx prisma migrate deploy --skip-verify || true && npx tsx scripts/seed.ts || true && pnpm start"
   restartPolicyType = "on_failure"
+  restartPolicyMaxRetries = 5
