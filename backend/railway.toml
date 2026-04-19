@@ -1,0 +1,5 @@
+[build]
+  command = "pnpm install && pnpm build"
+
+[deploy]
+  command = "pnpm start"
