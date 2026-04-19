@@ -1,0 +1,12 @@
+# Railway repository deployment configuration for the backend service.
+# Replace project/service values once Railway has linked the repository.
+project = "YOUR_RAILWAY_PROJECT_ID"
+service = "YOUR_SERVICE_ID"
+branch = "master"
+
+[build]
+  command = "pnpm install && pnpm --filter backend build"
+  root = "."
+
+[deploy]
+  command = "pnpm --filter backend start"

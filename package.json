@@ -9,8 +9,10 @@
     },
     "scripts": {
         "dev": "pnpm -r dev",
-        "build": "pnpm -r build",
-        "start": "pnpm -r start"
+        "build": "pnpm --filter backend build",
+        "start": "pnpm --filter backend start",
+        "build:all": "pnpm -r build",
+        "start:all": "pnpm -r start"
     },
     "workspaces": [
         "backend",
