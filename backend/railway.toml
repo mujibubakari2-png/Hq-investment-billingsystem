@@ -5,4 +5,4 @@
   command = "pnpm install && pnpm build"
 
 [deploy]
-  command = "npx prisma migrate deploy && pnpm start"
+  command = "npx prisma migrate deploy && npx tsx scripts/seed.ts && pnpm start"
