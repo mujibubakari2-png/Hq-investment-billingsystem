@@ -1,0 +1,9 @@
+# Railway deployment configuration for the frontend service.
+# This file allows pnpm to reconcile the workspace lockfile during build.
+
+[build]
+  command = "pnpm install --no-frozen-lockfile && pnpm build"
+  root = "."
+
+[deploy]
+  command = "pnpm start"
