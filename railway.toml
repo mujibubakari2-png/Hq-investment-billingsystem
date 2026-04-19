@@ -1,6 +1,6 @@
 [build]
 builder = "NIXPACKS"
-buildCommand = "npm install -g pnpm && pnpm install --frozen-lockfile && npx prisma generate && pnpm run build"
+buildCommand = "npm install -g pnpm && pnpm install --no-frozen-lockfile && npx prisma generate && pnpm run build"
 
 [build.env]
 NODE_ENV = "production"
