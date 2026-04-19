@@ -20,4 +20,7 @@ export default defineConfig({
       clientPort: 5175,
     },
   },
+  preview: {
+    allowedHosts: ['hq-frontend.up.railway.app'],
+  },
 })
