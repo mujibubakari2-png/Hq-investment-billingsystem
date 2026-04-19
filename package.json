@@ -5,7 +5,7 @@
     "private": true,
     "packageManager": "pnpm@9.15.0",
     "engines": {
-        "node": ">=24.0.0"
+        "node": ">=22.12.0"
     },
     "scripts": {
         "dev": "echo 'Use individual service dev commands'",

@@ -4,9 +4,9 @@ buildCommand = "npm install -g pnpm && pnpm install --no-frozen-lockfile && npx 
 
 [build.env]
 NODE_ENV = "production"
-NIXPACKS_NODE_VERSION = "24"
+NIXPACKS_NODE_VERSION = "22"
 PNPM_VERSION = "9.15.0"
-RAILPACK_NODE_VERSION = "24"
+RAILPACK_NODE_VERSION = "22"
 NIXPACKS_INSTALL_CMD = "pnpm install --no-frozen-lockfile"
 
 [deploy]
