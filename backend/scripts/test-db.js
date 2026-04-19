@@ -17,7 +17,8 @@ console.log(`[DB-TEST] Environment: ${process.env.NODE_ENV || 'development'}`);
 
 async function testConnection() {
     let pool: Pool;
-    let prisma: PrismaClient;
+    let prisma: PrismaClient | undefined;
+    let adapter: PrismaPg | undefined;
 
     try {
         // Test basic connection pool
@@ -31,7 +32,7 @@ async function testConnection() {
             application_name: "kenge_isp_test"
         });
 
-        const adapter = new PrismaPg(pool);
+        adapter = new PrismaPg(pool);
         prisma = new PrismaClient({ adapter });
 
         // Test 1: Basic connection
@@ -43,7 +44,7 @@ async function testConnection() {
 
         // Test 2: Check if tables exist
         console.log(`[DB-TEST] Checking database schema...`);
-        const tables = await prisma.$queryRaw`
+        const tables = await prisma.$queryRaw<{ table_name: string }[]>`
             SELECT table_name
             FROM information_schema.tables
             WHERE table_schema = 'public'
@@ -85,24 +86,25 @@ async function testConnection() {
 
     } catch (error) {
         console.error(`\n❌ Database connection test failed:`);
-        console.error(`   Error: ${error.message}`);
+        const err = error as Error;
+        console.error(`   Error: ${err.message}`);
 
-        if (error.code) {
-            console.error(`   Code: ${error.code}`);
+        if ('code' in err && err.code) {
+            console.error(`   Code: ${err.code}`);
         }
 
         console.error(`\n🔍 Troubleshooting:`);
 
-        if (error.message.includes('ENOTFOUND') || error.message.includes('ECONNREFUSED')) {
+        if (err.message.includes('ENOTFOUND') || err.message.includes('ECONNREFUSED')) {
             console.error(`   - Database host not reachable`);
             console.error(`   - Check DATABASE_URL format and network connectivity`);
-        } else if (error.message.includes('authentication failed')) {
+        } else if (err.message.includes('authentication failed')) {
             console.error(`   - Database credentials incorrect`);
             console.error(`   - Check DATABASE_URL username/password`);
-        } else if (error.message.includes('does not exist')) {
+        } else if (err.message.includes('does not exist')) {
             console.error(`   - Database does not exist`);
             console.error(`   - Check DATABASE_URL database name`);
-        } else if (error.message.includes('relation') && error.message.includes('does not exist')) {
+        } else if (err.message.includes('relation') && err.message.includes('does not exist')) {
             console.error(`   - Tables not created yet`);
             console.error(`   - Run migrations first: npx prisma migrate deploy`);
         }

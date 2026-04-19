@@ -5,15 +5,17 @@
   "packageManager": "pnpm@9.15.0",
   "scripts": {
     "dev": "next dev --hostname 0.0.0.0 --port 3001",
-    "build": "prisma generate && next build",
+    "build": "next build",
+    "build:full": "prisma generate && next build",
     "start": "next start",
     "test": "vitest",
     "db:seed": "npx tsx scripts/seed.ts",
     "db:migrate": "npx prisma migrate deploy",
-    "db:test": "npx tsx scripts/test-db.ts"
+    "db:test": "node scripts/test-db.js",
+    "db:generate": "prisma generate"
   },
   "engines": {
-    "node": ">=24.0.0"
+    "node": ">=18.0.0"
   },
   "lint-staged": {
     "*.{ts,tsx}": [

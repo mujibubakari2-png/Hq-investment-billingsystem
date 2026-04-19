@@ -5,7 +5,8 @@
   buildCommand = "pnpm install && pnpm build"
 
 [deploy]
-  startCommand = "npx prisma migrate deploy --skip-verify && npx tsx scripts/seed.ts && npx tsx scripts/test-db.ts && pnpm start"
+  nixpacksPlan = { "phases" = { "install" = { "dependsOn" = ["setup"] }, "build" = { "dependsOn" = ["install"] }, "start" = { "dependsOn" = ["build"] } } }
+  startCommand = "npx prisma generate && npx prisma migrate deploy --skip-verify && npx tsx scripts/seed.ts && node scripts/test-db.js && pnpm start"
   restartPolicyType = "on_failure"
   restartPolicyMaxRetries = 5
   healthcheckPath = "/api/health"
