@@ -20,12 +20,12 @@ let adapter: PrismaPg;
 
 try {
     const isProduction = process.env.NODE_ENV === "production";
-    
+
     // Production: Adjust pool size for Railway (smaller to conserve resources)
     // Development: Use smaller pool
     const maxConnections = isProduction ? 5 : 5;
     const idleTimeoutMillis = isProduction ? 30000 : 10000;
-    
+
     pool = new Pool({
         connectionString,
         max: maxConnections,
@@ -34,7 +34,7 @@ try {
         statement_timeout: 30000,
         application_name: "kenge_isp_backend"
     });
-    
+
     adapter = new PrismaPg(pool);
     console.log(`[DATABASE] Connection pool created (max: ${maxConnections}, idle timeout: ${idleTimeoutMillis}ms)`);
 } catch (error) {
