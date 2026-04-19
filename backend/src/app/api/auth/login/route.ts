@@ -3,7 +3,13 @@ import prisma from "@/lib/prisma";
 import { comparePassword, signToken, jsonResponse, errorResponse } from "@/lib/auth";
 import { checkRateLimit, getClientIp } from "@/lib/rateLimiter";
 
+export async function GET() {
+    return jsonResponse({ message: "Login endpoint is reachable. Please use POST to authenticate." });
+}
+
 export async function POST(req: NextRequest) {
+    console.log(`[LOGIN] Incoming request: ${req.method} ${req.url}`);
+    
     // Rate limit: 20 attempts per 2 minutes per IP
     const ip = getClientIp(req);
     const rateLimit = await checkRateLimit(ip, "login", { limit: 20, windowSeconds: 2 * 60 });
