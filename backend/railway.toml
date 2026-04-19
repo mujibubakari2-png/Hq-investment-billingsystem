@@ -2,7 +2,7 @@
 
 [build]
   builder = "nixpacks"
-  buildCommand = "pnpm install && pnpm build"
+  buildCommand = "pnpm install --no-frozen-lockfile && pnpm build"
 
 [deploy]
   nixpacksPlan = { "phases" = { "install" = { "dependsOn" = ["setup"] }, "build" = { "dependsOn" = ["install"] }, "start" = { "dependsOn" = ["build"] } } }

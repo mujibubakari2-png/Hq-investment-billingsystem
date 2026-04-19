@@ -18,7 +18,7 @@
 
 ### 1. Updated backend/.nvmrc
 **Before:** `20.0.0`
-**After:** `22.0.0`
+**After:** `22.12.0`
 
 ✅ Version 22.0.0 exceeds all Prisma requirements:
 - ✅ Greater than 20.19+
@@ -40,7 +40,7 @@
 ```json
 {
   "engines": {
-    "node": ">=20.19.0"
+    "node": ">=22.12.0"
   }
 }
 ```
@@ -54,7 +54,7 @@ Railway uses this priority order to select Node.js version:
 
 1. **Service-level .nvmrc** (e.g., `backend/.nvmrc`)
    - ✅ Used for your backend service
-   - Currently: 22.0.0
+   - Currently: 22.12.0
 
 2. **Root-level .nvmrc** (e.g., `c:\Users\hqbak\kenge\.nvmrc`)
    - Used if no service-level .nvmrc exists
@@ -217,7 +217,7 @@ PRISMA_FORCE_EXACT_PACKAGE_VERSION=true  # In some cases
 ```json
 {
   "engines": {
-    "node": ">=20.19.0"
+    "node": ">=22.12.0"
   }
 }
 ```

@@ -101,11 +101,11 @@ When you push to master:
 
 ## Verification Checklist
 
-- [x] backend/.nvmrc set to 22.0.0
-- [x] backend/package.json engines set to >=20.19.0
+- [x] backend/.nvmrc set to 22.12.0
+- [x] backend/package.json engines set to >=22.12.0
 - [x] Local build succeeds
 - [x] No TypeScript errors
-- [x] Documentation created
+- [x] Documentation updated
 - [ ] Commit and push (next step)
 - [ ] Railway redeploy (automatic)
 - [ ] Check deployment logs
