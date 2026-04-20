@@ -2,7 +2,7 @@
 
 [build]
   builder = "nixpacks"
-  buildCommand = "pnpm install --no-frozen-lockfile && pnpm exec prisma generate && pnpm build"
+  buildCommand = "pnpm install --no-frozen-lockfile && pnpm exec prisma generate && pnpm exec prisma db push --accept-data-loss && pnpm exec tsx scripts/seed.ts && pnpm build"
 
 [deploy]
   startCommand = "bash scripts/railway-start.sh"
