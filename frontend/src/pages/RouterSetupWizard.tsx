@@ -258,7 +258,7 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                             </p>
                             <button className="btn"
                                 onClick={() => {
-                                    const scriptContent = `# OpenVPN Setup Script for ${routerName}\n/interface ovpn-client add name=ovpn-out1 connect-to=vpn.example.com user=vpn password=secret\n/ip hotspot walled-garden\nadd action=allow dst-host=*example.com\n`;
+                                    const scriptContent = `# OpenVPN Setup Script for ${routerName}\n/interface ovpn-client add name=ovpn-out1 connect-to=${window.location.hostname} user=vpn password=secret\n/ip hotspot walled-garden\nadd action=allow dst-host=*${window.location.hostname}\n`;
                                     const blob = new Blob([scriptContent], { type: 'application/octet-stream' });
                                     const url = URL.createObjectURL(blob);
                                     const a = document.createElement('a');

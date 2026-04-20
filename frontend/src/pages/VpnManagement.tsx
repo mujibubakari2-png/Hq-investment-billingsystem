@@ -76,7 +76,10 @@ export default function VpnManagement() {
             return;
         }
         try {
-            await vpnApi.create(formData);
+            const result = await vpnApi.create(formData) as any;
+            if (result && result.warning) {
+                alert('Warning: ' + result.warning);
+            }
             setShowAddModal(false);
             setFormData({ username: '', password: '', fullName: '', protocol: 'L2TP', profile: 'default', localAddress: '', remoteAddress: '', routerId: '', service: 'l2tp' });
             fetchData();

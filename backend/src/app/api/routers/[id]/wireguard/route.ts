@@ -157,7 +157,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
         const tunnelIp = router.wgTunnelIp || "10.200.0.1";
         const listenPort = router.wgListenPort || 13231;
-        const serverEndpoint = router.wgServerEndpoint || process.env.WG_SERVER_ENDPOINT || "vpn.billing-system.local";
+        
+        // Use request host as fallback if no endpoint is configured (match GET logic)
+        const requestHost = req.headers.get("host")?.split(":")[0];
+        const serverEndpoint = router.wgServerEndpoint || process.env.WG_SERVER_ENDPOINT || requestHost || "vpn.billing-system.local";
         const serverPort = parseInt(process.env.WG_SERVER_PORT || "51820");
 
         if (action === "push-config") {

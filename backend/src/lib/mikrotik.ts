@@ -589,6 +589,43 @@ export class MikroTikService {
         }
     }
 
+    // ══════════════════════════════════════════════════════════════════════════
+    // VPN USER MANAGEMENT (/ppp/secret)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    async createVpnUser(user: { name: string; password: string; service: string; profile: string; localAddress?: string | null; remoteAddress?: string | null }): Promise<void> {
+        try {
+            await this.apiRequest("/ppp/secret", "PUT", {
+                name: user.name,
+                password: user.password,
+                service: user.service || "any",
+                profile: user.profile || "default",
+                "local-address": user.localAddress || undefined,
+                "remote-address": user.remoteAddress || undefined,
+                comment: `VPN User managed by HQInvestment`,
+            });
+            await this.log("create_vpn_user", `Created VPN user: ${user.name} (${user.service})`, "success", user.name);
+        } catch (err: any) {
+            await this.log("create_vpn_user", `Failed to create VPN user ${user.name}: ${err.message}`, "error", user.name);
+            throw err;
+        }
+    }
+
+    async deleteVpnUser(username: string): Promise<void> {
+        try {
+            // Find user ID first
+            const users = await this.apiRequest("/ppp/secret");
+            const user = (users || []).find((u: any) => u.name === username);
+            if (user?.[".id"]) {
+                await this.apiRequest(`/ppp/secret/${user[".id"]}`, "DELETE");
+                await this.log("delete_vpn_user", `Deleted VPN user: ${username}`, "success", username);
+            }
+        } catch (err: any) {
+            await this.log("delete_vpn_user", `Failed to delete VPN user ${username}: ${err.message}`, "error", username);
+            throw err;
+        }
+    }
+
     /**
      * Create bandwidth profile from a package definition
      */

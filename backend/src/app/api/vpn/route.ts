@@ -86,6 +86,27 @@ export async function POST(req: NextRequest) {
             },
         });
 
+        // ── 2. Push to MikroTik (if not WireGuard which is manual/API-push later) ──
+        if (protocol !== "WireGuard") {
+            try {
+                const { getMikroTikService } = await import("@/lib/mikrotik");
+                const mt = await getMikroTikService(routerId, userPayload.tenantId);
+                await mt.createVpnUser({
+                    name: username,
+                    password: password,
+                    service: service || "any",
+                    profile: profile || "default",
+                    localAddress: localAddress,
+                    remoteAddress: remoteAddress,
+                });
+            } catch (err: any) {
+                console.error("Failed to push VPN user to MikroTik:", err);
+                // We keep the DB record but warn (or we could roll back)
+                // For now, let's return a 201 but with a message if it failed
+                return jsonResponse({ ...vpnUser, warning: "Saved to database but failed to push to router: " + err.message }, 201);
+            }
+        }
+
         return jsonResponse(vpnUser, 201);
     } catch (e) {
         console.error("VPN create error:", e);

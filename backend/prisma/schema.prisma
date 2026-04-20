@@ -465,7 +465,7 @@ model TenantPayment {
 
 model VpnUser {
   id            String    @id @default(cuid())
-  username      String    @unique
+  username      String
   password      String
   fullName      String?
   protocol      String    @default("L2TP")
@@ -485,12 +485,13 @@ model VpnUser {
   router        Router    @relation(fields: [routerId], references: [id])
   tenant        Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
+  @@unique([username, tenantId])
   @@map("vpn_users")
 }
 
 model RadiusUser {
   id              String    @id @default(cuid())
-  username        String    @unique
+  username        String
   password        String
   fullName        String?
   authType        String    @default("PAP")
@@ -509,6 +510,7 @@ model RadiusUser {
   tenant          Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId])
+  @@unique([username, tenantId])
   @@map("radius_users")
 }
 
