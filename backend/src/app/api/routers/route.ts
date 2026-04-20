@@ -94,26 +94,28 @@ export async function POST(req: NextRequest) {
             return errorResponse("Router name contains invalid characters", 400);
         }
 
-        // Normalize numeric fields — both port and apiPort come from the same "API Port" form field
-        const rawPort = body.apiPort || body.port;
-        const port = rawPort ? parseInt(rawPort.toString()) : 8728;
-        const apiPort = port;
+        // Normalize numeric fields
+        const port = body.port ? parseInt(body.port.toString()) : (body.apiPort ? parseInt(body.apiPort.toString()) : 8728);
+        const apiPort = body.apiPort ? parseInt(body.apiPort.toString()) : port;
 
         // Relaxed host validation: allows IPs, domains, and simple hostnames
         if (!host || host.length < 3) {
-            return errorResponse("Invalid host format");
+            return errorResponse("Invalid host format (must be at least 3 characters)");
         }
 
-        // Validate port
+        // Validate ports
         if (isNaN(port) || port < 1 || port > 65535) {
             return errorResponse("Invalid port number (must be 1-65535)");
+        }
+        if (isNaN(apiPort) || apiPort < 1 || apiPort > 65535) {
+            return errorResponse("Invalid API port number (must be 1-65535)");
         }
 
         const existing = await prisma.router.findFirst({ where: { name, ...tenantFilter } });
         const isDev = process.env.NODE_ENV !== "production";
         
         if (existing && !isDev) {
-            return errorResponse("Router name already exists in your tenant");
+            return errorResponse(`Router with name "${name}" already exists in your tenant`);
         }
 
         const routerData = {
@@ -139,8 +141,9 @@ export async function POST(req: NextRequest) {
         await prisma.routerLog.create({
             data: {
                 routerId: router.id,
-                action: "router_created",
-                details: `Router "${router.name}" added (${router.host}:${router.apiPort})`,
+                tenantId: tenantIdValue,
+                action: existing ? "router_updated" : "router_created",
+                details: `Router "${router.name}" ${existing ? 'updated' : 'added'} (${router.host}:${router.apiPort})`,
                 status: "success",
             },
         });

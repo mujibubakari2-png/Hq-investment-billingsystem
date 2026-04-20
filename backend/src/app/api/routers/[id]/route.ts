@@ -50,8 +50,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         if (body.host) data.host = body.host;
         if (body.username !== undefined) data.username = body.username;
         if (body.password !== undefined) data.password = body.password;
-        if (body.port) data.port = parseInt(body.port);
-        if (body.apiPort) data.apiPort = parseInt(body.apiPort);
+        if (body.port) data.port = parseInt(body.port.toString());
+        if (body.apiPort) data.apiPort = parseInt(body.apiPort.toString());
         if (body.vpnMode) data.vpnMode = body.vpnMode;
         if (body.description !== undefined) data.description = body.description;
         if (body.status) data.status = body.status.toUpperCase();
@@ -62,6 +62,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         await prisma.routerLog.create({
             data: {
                 routerId: id,
+                tenantId: existingRouter.tenantId,
                 action: "router_updated",
                 details: `Router "${router.name}" settings updated`,
                 status: "success",

@@ -76,12 +76,12 @@ export default function Mikrotiks() {
     const handleAddRouter = async (data: any) => {
         try {
             const res = await routersApi.create({
-                name: data.routerName,
+                name: data.name,
                 host: data.host || '0.0.0.0',
                 username: data.username || 'admin',
-                password: data.accessCode,
-                port: parseInt(data.apiPort) || 8728,
-                apiPort: parseInt(data.apiPort) || 8728,
+                password: data.password,
+                port: data.apiPort || 8728,
+                apiPort: data.apiPort || 8728,
                 vpnMode: data.vpnMode,
                 description: data.description,
             });
@@ -98,12 +98,12 @@ export default function Mikrotiks() {
         if (!selectedRouterToEdit) return;
         try {
             await routersApi.update(selectedRouterToEdit.id, {
-                name: data.routerName,
+                name: data.name,
                 host: data.host,
                 username: data.username,
-                password: data.accessCode,
-                port: parseInt(data.apiPort) || undefined,
-                apiPort: parseInt(data.apiPort) || undefined,
+                password: data.password,
+                port: data.apiPort || undefined,
+                apiPort: data.apiPort || undefined,
                 vpnMode: data.vpnMode,
                 description: data.description,
             });
