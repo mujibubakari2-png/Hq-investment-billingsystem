@@ -62,9 +62,9 @@ export async function GET(req: NextRequest) {
         }
 
         return jsonResponse(mapped);
-    } catch (e) {
-        console.error(e);
-        return errorResponse("Internal server error", 500);
+    } catch (e: any) {
+        console.error("[ROUTER GET ERROR]:", e);
+        return errorResponse(`Failed to fetch routers: ${e.message || "Internal server error"}`, 500);
     }
 }
 
@@ -99,10 +99,9 @@ export async function POST(req: NextRequest) {
         const port = rawPort ? parseInt(rawPort.toString()) : 8728;
         const apiPort = port;
 
-        // Validate IP or domain for host
-        const hostRegex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$|^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\-]*[A-Za-z0-9])$/;
-        if (!hostRegex.test(host)) {
-            return errorResponse("Invalid host format (must be IP or valid domain)");
+        // Relaxed host validation: allows IPs, domains, and simple hostnames
+        if (!host || host.length < 3) {
+            return errorResponse("Invalid host format");
         }
 
         // Validate port
@@ -170,8 +169,8 @@ export async function POST(req: NextRequest) {
                 config: `/api/routers/${router.id}/config`
             }
         }, 201);
-    } catch (e) {
-        console.error(e);
-        return errorResponse("Internal server error", 500);
+    } catch (e: any) {
+        console.error("[ROUTER CREATE ERROR]:", e);
+        return errorResponse(`Failed to create router: ${e.message || "Internal server error"}`, 500);
     }
 }

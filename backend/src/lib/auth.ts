@@ -90,10 +90,15 @@ export function getUserFromRequest(req: NextRequest): JwtPayload | null {
 }
 
 export function jsonResponse(data: any, status = 200) {
-    return new Response(JSON.stringify(data), {
-        status,
-        headers: { "Content-Type": "application/json" },
-    });
+    return new Response(
+        JSON.stringify(data, (key, value) =>
+            typeof value === "bigint" ? value.toString() : value
+        ),
+        {
+            status,
+            headers: { "Content-Type": "application/json" },
+        }
+    );
 }
 
 export function errorResponse(message: string, status = 400) {
