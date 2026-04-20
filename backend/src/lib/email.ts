@@ -5,15 +5,21 @@ import nodemailer from "nodemailer";
  * Handles OTP and system notifications using SMTP.
  */
 
-const smtpConfig = {
+const smtpConfig: any = {
     host: process.env.SMTP_HOST || "smtp.ethereal.email",
     port: Number(process.env.SMTP_PORT) || 587,
-    secure: process.env.SMTP_SECURE === "true",
+    secure: process.env.SMTP_SECURE === "true", // true for 465, false for other ports
     auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS,
     },
+    tls: {
+        // Do not fail on invalid certs
+        rejectUnauthorized: false
+    }
 };
+
+console.log(`[EMAIL] SMTP Configuration: Host=${smtpConfig.host}, Port=${smtpConfig.port}, Secure=${smtpConfig.secure}, User=${smtpConfig.auth.user ? "Set" : "Not Set"}`);
 
 const transporter = nodemailer.createTransport(smtpConfig);
 
