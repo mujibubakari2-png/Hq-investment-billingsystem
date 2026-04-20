@@ -41,7 +41,7 @@ async function fixMigrations() {
 
     } catch (error) {
         console.error(`\n❌ Migration fix failed:`);
-        const err = error as Error;
+        const err = error;
         console.error(`   Error: ${err.message}`);
 
         console.error(`\n🔍 Troubleshooting steps:`);

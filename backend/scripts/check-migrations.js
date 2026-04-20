@@ -16,9 +16,9 @@ console.log(`[MIGRATION-CHECK] Database URL: ${connectionString.replace(/:[^:]+@
 console.log(`[MIGRATION-CHECK] Environment: ${process.env.NODE_ENV || 'development'}`);
 
 async function checkMigrations() {
-    let pool: Pool;
-    let prisma: PrismaClient | undefined;
-    let adapter: PrismaPg | undefined;
+    let pool;
+    let prisma;
+    let adapter;
 
     try {
         // Create connection pool
@@ -42,7 +42,7 @@ async function checkMigrations() {
 
         // Check if tables exist
         console.log(`[MIGRATION-CHECK] Checking for database tables...`);
-        const tables = await prisma.$queryRaw<{ table_name: string }[]>`
+        const tables = await prisma.$queryRaw`
             SELECT table_name
             FROM information_schema.tables
             WHERE table_schema = 'public'
@@ -102,7 +102,7 @@ async function checkMigrations() {
 
     } catch (error) {
         console.error(`\n❌ Migration check failed:`);
-        const err = error as Error;
+        const err = error;
         console.error(`   Error: ${err.message}`);
 
         if ('code' in err && err.code) {

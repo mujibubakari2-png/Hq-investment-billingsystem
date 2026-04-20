@@ -16,9 +16,9 @@ console.log(`[DB-TEST] Database URL: ${connectionString.replace(/:[^:]+@/, ':***
 console.log(`[DB-TEST] Environment: ${process.env.NODE_ENV || 'development'}`);
 
 async function testConnection() {
-    let pool: Pool;
-    let prisma: PrismaClient | undefined;
-    let adapter: PrismaPg | undefined;
+    let pool;
+    let prisma;
+    let adapter;
 
     try {
         // Test basic connection pool
@@ -44,7 +44,7 @@ async function testConnection() {
 
         // Test 2: Check if tables exist
         console.log(`[DB-TEST] Checking database schema...`);
-        const tables = await prisma.$queryRaw<{ table_name: string }[]>`
+        const tables = await prisma.$queryRaw`
             SELECT table_name
             FROM information_schema.tables
             WHERE table_schema = 'public'
@@ -86,7 +86,7 @@ async function testConnection() {
 
     } catch (error) {
         console.error(`\n❌ Database connection test failed:`);
-        const err = error as Error;
+        const err = error;
         console.error(`   Error: ${err.message}`);
 
         if ('code' in err && err.code) {
