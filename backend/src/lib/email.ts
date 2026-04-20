@@ -1,0 +1,97 @@
+import nodemailer from "nodemailer";
+
+/**
+ * Centralized email service for HQ Investment ISP Billing System.
+ * Handles OTP and system notifications using SMTP.
+ */
+
+const smtpConfig = {
+    host: process.env.SMTP_HOST || "smtp.ethereal.email",
+    port: Number(process.env.SMTP_PORT) || 587,
+    secure: process.env.SMTP_SECURE === "true",
+    auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+    },
+};
+
+const transporter = nodemailer.createTransport(smtpConfig);
+
+export async function sendEmail({
+    to,
+    subject,
+    text,
+    html,
+}: {
+    to: string;
+    subject: string;
+    text: string;
+    html: string;
+}) {
+    const from = process.env.SMTP_FROM || '"HQ INVESTMENT" <no-reply@hqinvestment.co.tz>';
+
+    console.log(`[EMAIL] Attempting to send email to ${to} (Host: ${smtpConfig.host})`);
+
+    try {
+        // Test connection before sending if we are using custom SMTP
+        if (process.env.SMTP_HOST) {
+            await transporter.verify();
+        }
+
+        const info = await transporter.sendMail({
+            from,
+            to,
+            subject,
+            text,
+            html,
+        });
+
+        console.log(`[EMAIL] Email sent successfully: ${info.messageId}`);
+        return { success: true, messageId: info.messageId };
+    } catch (error: any) {
+        console.error("[EMAIL] Failed to send email:", error.message);
+        
+        // Provide helpful troubleshooting info in logs
+        if (error.code === 'ECONNREFUSED') {
+            console.error("[EMAIL] Troubleshooting: Connection refused. Check SMTP_HOST and SMTP_PORT.");
+        } else if (error.code === 'EAUTH') {
+            console.error("[EMAIL] Troubleshooting: Authentication failed. Check SMTP_USER and SMTP_PASS.");
+        }
+
+        return { 
+            success: false, 
+            error: error.message,
+            code: error.code
+        };
+    }
+}
+
+export async function sendOtpEmail(email: string, otp: string, type: 'registration' | 'password-reset' = 'registration') {
+    const isRegistration = type === 'registration';
+    const subject = isRegistration ? "Your Registration Verification Code" : "Your Password Reset Code";
+    const title = isRegistration ? "HQ INVESTMENT Verification" : "HQ INVESTMENT Password Reset";
+    const message = isRegistration 
+        ? "Thank you for registering. Your 6-digit verification code is:" 
+        : "We received a request to reset your password. Your 6-digit verification code is:";
+
+    const html = `
+        <div style="font-family: sans-serif; padding: 20px; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #eee; border-radius: 10px;">
+            <h2 style="color: #1a1a2e;">${title}</h2>
+            <p>${message}</p>
+            <div style="background-color: #f4f4f7; padding: 20px; text-align: center; border-radius: 5px; margin: 20px 0;">
+                <h1 style="margin: 0; letter-spacing: 5px; font-size: 32px; color: #6366f1;">${otp}</h1>
+            </div>
+            <p style="font-size: 14px; color: #666;">This code will expire in 30 minutes.</p>
+            <p style="font-size: 12px; color: #999; margin-top: 30px; border-top: 1px solid #eee; padding-top: 10px;">
+                If you did not request this code, please ignore this email.
+            </p>
+        </div>
+    `;
+
+    return sendEmail({
+        to: email,
+        subject,
+        text: `${message} ${otp}. It will expire in 30 minutes.`,
+        html,
+    });
+}

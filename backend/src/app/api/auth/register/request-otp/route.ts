@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { errorResponse, jsonResponse } from "@/lib/auth";
-import nodemailer from "nodemailer";
+import { sendOtpEmail } from "@/lib/email";
 
 export async function POST(req: NextRequest) {
     try {
@@ -23,43 +23,32 @@ export async function POST(req: NextRequest) {
             data: {
                 email,
                 otp,
-                expiresAt: new Date(Date.now() + 30 * 60 * 1000), // 30 minutes from now
+                expiresAt: new Date(Date.now() + 30 * 60 * 1000), // 30 minutes
             }
         });
 
-        // Set up email transport
-        const transporter = nodemailer.createTransport({
-            host: process.env.SMTP_HOST || "smtp.ethereal.email",
-            port: Number(process.env.SMTP_PORT) || 587,
-            secure: process.env.SMTP_SECURE === "true",
-            auth: {
-                user: process.env.SMTP_USER,
-                pass: process.env.SMTP_PASS,
-            },
-        });
+        // Send the email
+        const emailResult = await sendOtpEmail(email, otp, 'registration');
 
-        const mailOptions = {
-            from: process.env.SMTP_FROM || '"HQ INVESTMENT" <no-reply@hqinvestment.local>',
-            to: email,
-            subject: "Your Registration Verification Code",
-            text: `Your verification code is: ${otp}. It will expire in 30 minutes.`,
-            html: `<div style="font-family: sans-serif; padding: 20px;">
-                    <h2>HQ INVESTMENT Verification</h2>
-                    <p>Thank you for registering. Your 6-digit verification code is:</p>
-                    <h3 style="background-color: #f4f4f4; padding: 10px; display: inline-block; letter-spacing: 2px;">${otp}</h3>
-                    <p>This code will expire in 30 minutes.</p>
-                   </div>`
-        };
-
-        // Attempt to send email
-        try {
-            await transporter.sendMail(mailOptions);
-            console.log("Email sent successfully to", email);
-        } catch (mailError) {
-            console.error("Failed to send OTP via email. Check SMTP settings:", mailError);
+        if (!emailResult.success) {
+            // Log full error internally
+            console.error(`[AUTH] Failed to send registration OTP to ${email}:`, emailResult.error);
+            
+            // In development, we might still want to return success for testing
+            const isDev = process.env.NODE_ENV === 'development';
+            if (!isDev) {
+                return errorResponse(
+                    "Failed to send verification email. Please check your system email configuration (SMTP).", 
+                    500
+                );
+            }
         }
 
-        return jsonResponse({ message: "OTP process initated", otp });
+        return jsonResponse({ 
+            message: "Verification code sent to your email.", 
+            // In dev mode, return OTP for easy testing without working email
+            otp: process.env.NODE_ENV === 'development' ? otp : undefined 
+        });
     } catch (e: any) {
         console.error("REGISTER OTP ERROR:", e);
         return errorResponse(e.message || "Internal server error", 500);
