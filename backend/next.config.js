@@ -11,6 +11,7 @@ const nextConfig = {
         unoptimized: true, // Disable image optimization to speed up builds
     },
     // Build performance
+    output: 'standalone',
     webpack: (config, { buildId, dev, isServer, defaultLoaders, webpack }) => {
         // Reduce memory usage during build
         if (!dev && !isServer) {
