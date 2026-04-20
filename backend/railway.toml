@@ -10,4 +10,5 @@
   restartPolicyType = "on_failure"
   restartPolicyMaxRetries = 5
   healthcheckPath = "/api/health"
-  healthcheckTimeout = 300
+  healthcheckTimeout = 30
+  healthcheckInterval = 60
