@@ -34,14 +34,11 @@ export async function POST(req: NextRequest) {
             // Log full error internally
             console.error(`[AUTH] Failed to send registration OTP to ${email}:`, emailResult.error);
             
-            // In development, we might still want to return success for testing
-            const isDev = process.env.NODE_ENV === 'development';
-            if (!isDev) {
-                return errorResponse(
-                    "Failed to send verification email. Please check your system email configuration (SMTP).", 
-                    500
-                );
-            }
+            // Return the specific SMTP error to help the user fix their config
+            return errorResponse(
+                `Email error: ${emailResult.error}. Please check your SMTP settings in Railway.`, 
+                500
+            );
         }
 
         return jsonResponse({ 

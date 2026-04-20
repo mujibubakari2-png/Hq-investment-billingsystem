@@ -40,7 +40,8 @@ export async function sendEmail({
 
     try {
         // Test connection before sending if we are using custom SMTP
-        if (process.env.SMTP_HOST) {
+        if (process.env.SMTP_HOST && process.env.SMTP_HOST !== "smtp.ethereal.email") {
+            console.log(`[EMAIL] Verifying connection to ${smtpConfig.host}...`);
             await transporter.verify();
         }
 
@@ -56,17 +57,19 @@ export async function sendEmail({
         return { success: true, messageId: info.messageId };
     } catch (error: any) {
         console.error("[EMAIL] Failed to send email:", error.message);
+        console.error("[EMAIL] Error Code:", error.code);
+        console.error("[EMAIL] Full Error:", JSON.stringify(error));
         
-        // Provide helpful troubleshooting info in logs
-        if (error.code === 'ECONNREFUSED') {
-            console.error("[EMAIL] Troubleshooting: Connection refused. Check SMTP_HOST and SMTP_PORT.");
-        } else if (error.code === 'EAUTH') {
-            console.error("[EMAIL] Troubleshooting: Authentication failed. Check SMTP_USER and SMTP_PASS.");
+        let userFriendlyError = error.message;
+        if (error.code === 'EAUTH') {
+            userFriendlyError = "Authentication failed. Please verify your SMTP_USER and SMTP_PASS (App Password).";
+        } else if (error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT') {
+            userFriendlyError = `Could not connect to ${smtpConfig.host}:${smtpConfig.port}. Check your firewall or port settings.`;
         }
 
         return { 
             success: false, 
-            error: error.message,
+            error: userFriendlyError,
             code: error.code
         };
     }

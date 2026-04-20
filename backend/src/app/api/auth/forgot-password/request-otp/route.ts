@@ -43,13 +43,10 @@ export async function POST(req: NextRequest) {
         if (!emailResult.success) {
             console.error(`[AUTH] Failed to send password reset OTP to ${email}:`, emailResult.error);
             
-            const isDev = process.env.NODE_ENV === 'development';
-            if (!isDev) {
-                return errorResponse(
-                    "Failed to send password reset email. Please check your system email configuration (SMTP).", 
-                    500
-                );
-            }
+            return errorResponse(
+                `Email error: ${emailResult.error}. Please check your SMTP settings in Railway.`, 
+                500
+            );
         }
 
         // For TestSprite/Automation
