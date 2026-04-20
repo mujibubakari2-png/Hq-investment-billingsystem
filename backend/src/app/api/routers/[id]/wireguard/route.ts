@@ -87,7 +87,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         const tunnelIp = router.wgTunnelIp || "10.200.0.1";
         const serverTunnelIp = "10.200.0.2";
         const listenPort = router.wgListenPort || 13231;
-        const serverEndpoint = router.wgServerEndpoint || process.env.WG_SERVER_ENDPOINT || "vpn.hqinvestment.co.tz";
+        const serverEndpoint = router.wgServerEndpoint || process.env.WG_SERVER_ENDPOINT || "vpn.billing-system.local";
         const serverPort = parseInt(process.env.WG_SERVER_PORT || "51820");
 
         return jsonResponse({
@@ -154,7 +154,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
         const tunnelIp = router.wgTunnelIp || "10.200.0.1";
         const listenPort = router.wgListenPort || 13231;
-        const serverEndpoint = router.wgServerEndpoint || process.env.WG_SERVER_ENDPOINT || "vpn.hqinvestment.co.tz";
+        const serverEndpoint = router.wgServerEndpoint || process.env.WG_SERVER_ENDPOINT || "vpn.billing-system.local";
         const serverPort = parseInt(process.env.WG_SERVER_PORT || "51820");
 
         if (action === "push-config") {

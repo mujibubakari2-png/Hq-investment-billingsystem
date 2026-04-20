@@ -36,7 +36,7 @@ export async function sendEmail({
     text: string;
     html: string;
 }) {
-    const from = process.env.SMTP_FROM || '"HQ INVESTMENT" <no-reply@hqinvestment.co.tz>';
+    const from = process.env.SMTP_FROM || `"${process.env.APP_NAME || "HQ INVESTMENT"}" <${process.env.SMTP_USER || "no-reply@billing-system.local"}>`;
 
     console.log(`[EMAIL] Attempting to send email to ${to} (Host: ${smtpConfig.host})`);
 

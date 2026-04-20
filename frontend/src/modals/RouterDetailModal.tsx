@@ -81,11 +81,11 @@ add service=hotspot address=127.0.0.1 secret=hqinvestment-radius-secret \\
 
 # ── 8. Walled Garden (Allow billing portal) ──────────────────
 /ip hotspot walled-garden
-add dst-host="*.hqinvestment.co.tz" action=allow comment="HQInvestment Billing Portal"
+add dst-host="*.${window.location.hostname}" action=allow comment="Billing Portal"
 
 # ── 9. System Scheduler (Auto-sync with HQInvestment) ───────────────────
 /system scheduler
-add name="hqinvestment-sync" interval=5m on-event="/tool fetch url=\\"https://api.hqinvestment.co.tz/sync/${routerIdCode}\\" mode=https" \\
+add name="billing-sync" interval=5m on-event="/tool fetch url=\\"${(import.meta.env.VITE_API_URL || window.location.origin).replace(/\/$/, '')}/api/sync/${routerIdCode}\\" mode=https" \\
     start-time=startup
 
 # ── 10. Logging ──────────────────────────────────────────────
