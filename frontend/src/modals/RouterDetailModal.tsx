@@ -36,29 +36,38 @@ export default function RouterDetailModal({ router, onClose, onDelete }: RouterD
 /system identity set name="${router.name}"
 
 # ── 2. Hotspot Server Setup ───────────────────────────────────
-/ip hotspot profile
-add name="hsprof-${router.name}" hotspot-address=192.168.88.1 dns-name="${router.name.toLowerCase().replace(/\s+/g, '-')}.hotspot" \\
-    html-directory=hotspot login-by=http-chap,http-pap,cookie,mac-cookie \\
-    http-cookie-lifetime=3d
+:if ([:len [/ip hotspot profile find name="hsprof-${router.name}"]] = 0) do={
+    /ip hotspot profile add name="hsprof-${router.name}" hotspot-address=192.168.88.1 dns-name="${router.name.toLowerCase().replace(/\s+/g, '-')}.hotspot" \\
+        html-directory=hotspot login-by=http-chap,http-pap,cookie,mac-cookie \\
+        http-cookie-lifetime=3d
+}
 
-/ip pool
-add name="hs-pool-${router.name}" ranges=192.168.88.2-192.168.88.254
+:if ([:len [/ip pool find name="hs-pool-${router.name}"]] = 0) do={
+    /ip pool add name="hs-pool-${router.name}" ranges=192.168.88.2-192.168.88.254
+}
 
-/ip hotspot
-add name="hotspot-${router.name}" interface=ether2 address-pool="hs-pool-${router.name}" \\
-    profile="hsprof-${router.name}" disabled=no
+:if ([:len [/ip hotspot find name="hotspot-${router.name}"]] = 0) do={
+    /ip hotspot add name="hotspot-${router.name}" interface=ether2 address-pool="hs-pool-${router.name}" \\
+        profile="hsprof-${router.name}" disabled=no
+}
 
 # ── 3. DHCP Server ───────────────────────────────────────────
-/ip address add address=192.168.88.1/24 interface=ether2
+:if ([:len [/ip address find address="192.168.88.1/24"]] = 0) do={
+    /ip address add address=192.168.88.1/24 interface=ether2
+}
 
-/ip dhcp-server network
-add address=192.168.88.0/24 gateway=192.168.88.1 dns-server=8.8.8.8,1.1.1.1
+:if ([:len [/ip dhcp-server network find address="192.168.88.0/24"]] = 0) do={
+    /ip dhcp-server network add address=192.168.88.0/24 gateway=192.168.88.1 dns-server=8.8.8.8,1.1.1.1
+}
 
-/ip dhcp-server
-add name="dhcp-${router.name}" interface=ether2 address-pool="hs-pool-${router.name}" disabled=no
+:if ([:len [/ip dhcp-server find name="dhcp-${router.name}"]] = 0) do={
+    /ip dhcp-server add name="dhcp-${router.name}" interface=ether2 address-pool="hs-pool-${router.name}" disabled=no
+}
 
 # ── 4. NAT (Masquerade) ──────────────────────────────────────
-/ip firewall nat add chain=srcnat out-interface=ether1 action=masquerade
+:if ([:len [/ip firewall nat find action=masquerade chain=srcnat out-interface=ether1]] = 0) do={
+    /ip firewall nat add chain=srcnat out-interface=ether1 action=masquerade
+}
 
 # ── 5. DNS Settings ──────────────────────────────────────────
 /ip dns set servers=8.8.8.8,1.1.1.1 allow-remote-requests=yes
