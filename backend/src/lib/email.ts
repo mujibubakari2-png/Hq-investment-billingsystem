@@ -16,7 +16,9 @@ const smtpConfig: any = {
     tls: {
         // Do not fail on invalid certs
         rejectUnauthorized: false
-    }
+    },
+    // Force IPv4 (resolves ENETUNREACH errors with IPv6 in some environments)
+    family: 4
 };
 
 console.log(`[EMAIL] SMTP Configuration: Host=${smtpConfig.host}, Port=${smtpConfig.port}, Secure=${smtpConfig.secure}, User=${smtpConfig.auth.user ? "Set" : "Not Set"}`);
@@ -65,6 +67,8 @@ export async function sendEmail({
             userFriendlyError = "Authentication failed. Please verify your SMTP_USER and SMTP_PASS (App Password).";
         } else if (error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT') {
             userFriendlyError = `Could not connect to ${smtpConfig.host}:${smtpConfig.port}. Check your firewall or port settings.`;
+        } else if (error.code === 'ENETUNREACH') {
+            userFriendlyError = `Network unreachable. Try changing SMTP_PORT to 465 and setting SMTP_SECURE to true.`;
         }
 
         return { 
