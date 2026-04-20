@@ -5,20 +5,26 @@ import nodemailer from "nodemailer";
  * Handles OTP and system notifications using SMTP.
  */
 
+const isGmail = (process.env.SMTP_HOST || "").includes("gmail.com");
+
 const smtpConfig: any = {
-    host: process.env.SMTP_HOST || "smtp.ethereal.email",
-    port: Number(process.env.SMTP_PORT) || 587,
-    secure: process.env.SMTP_SECURE === "true", // true for 465, false for other ports
+    // If it's Gmail, Nodemailer can handle settings automatically using 'service'
+    service: isGmail ? "gmail" : undefined,
+    host: !isGmail ? (process.env.SMTP_HOST || "smtp.ethereal.email") : undefined,
+    port: Number(process.env.SMTP_PORT) || (isGmail ? 465 : 587),
+    // 465 is ALWAYS secure, 587 is STARTTLS (secure: false)
+    secure: process.env.SMTP_SECURE === "true" || Number(process.env.SMTP_PORT) === 465,
     auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS,
     },
     tls: {
-        // Do not fail on invalid certs
         rejectUnauthorized: false
     },
-    // Force IPv4 (resolves ENETUNREACH errors with IPv6 in some environments)
-    family: 4
+    family: 4,
+    // Add a timeout to fail faster if the network is blocked
+    connectionTimeout: 10000, 
+    greetingTimeout: 10000
 };
 
 console.log(`[EMAIL] SMTP Configuration: Host=${smtpConfig.host}, Port=${smtpConfig.port}, Secure=${smtpConfig.secure}, User=${smtpConfig.auth.user ? "Set" : "Not Set"}`);
