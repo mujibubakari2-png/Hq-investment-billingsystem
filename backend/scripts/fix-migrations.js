@@ -24,7 +24,7 @@ async function fixMigrations() {
         console.log(`✅ Migrations deployed`);
 
         console.log(`[MIGRATION-FIX] Step 3: Verifying migrations...`);
-        execSync("node scripts/check-migrations.js", { stdio: "inherit" });
+        execSync("npx tsx scripts/check-migrations.js", { stdio: "inherit" });
         console.log(`✅ Migrations verified`);
 
         console.log(`[MIGRATION-FIX] Step 4: Seeding database...`);
@@ -32,7 +32,7 @@ async function fixMigrations() {
         console.log(`✅ Database seeded`);
 
         console.log(`[MIGRATION-FIX] Step 5: Final connection test...`);
-        execSync("node scripts/test-db.js", { stdio: "inherit" });
+        execSync("npx tsx scripts/test-db.js", { stdio: "inherit" });
         console.log(`✅ Connection test passed`);
 
         console.log(`\n🎉 Database migration fix completed successfully!`);

@@ -11,10 +11,13 @@
     "test": "vitest",
     "db:seed": "npx tsx scripts/seed.ts",
     "db:migrate": "npx prisma migrate deploy",
-    "db:test": "node scripts/test-db.js",
-    "db:check-migrations": "node scripts/check-migrations.js",
-    "db:fix-migrations": "node scripts/fix-migrations.js",
+    "db:test": "npx tsx scripts/test-db.js",
+    "db:check-migrations": "npx tsx scripts/check-migrations.js",
+    "db:fix-migrations": "npx tsx scripts/fix-migrations.js",
     "db:generate": "prisma generate"
+  },
+  "prisma": {
+    "seed": "npx tsx scripts/seed.ts"
   },
   "engines": {
     "node": ">=22.12.0"
