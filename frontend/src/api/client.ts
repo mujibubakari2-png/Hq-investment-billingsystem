@@ -4,7 +4,7 @@
 // In prod: VITE_API_URL = 'https://backend-name.railway.app' so calls go directly to the API.
 const API_URL = (import.meta.env.VITE_API_URL as string) ?? '';
 // Remove trailing slash if present to avoid double slashes
-const CLEAN_API_URL = API_URL.endsWith('/') ? API_URL.slice(0, -1) : API_URL;
+export const CLEAN_API_URL = API_URL.endsWith('/') ? API_URL.slice(0, -1) : API_URL;
 const BASE = `${CLEAN_API_URL}/api`;
 
 function authHeaders(): Record<string, string> {

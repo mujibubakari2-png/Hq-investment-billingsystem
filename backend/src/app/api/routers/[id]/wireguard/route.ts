@@ -85,9 +85,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         }
 
         const tunnelIp = router.wgTunnelIp || "10.200.0.1";
-        const serverTunnelIp = "10.200.0.2";
+        const serverTunnelIp = tunnelIp.replace(/\.\d+$/, ".254"); // Default server to .254 in same subnet
         const listenPort = router.wgListenPort || 13231;
-        const serverEndpoint = router.wgServerEndpoint || process.env.WG_SERVER_ENDPOINT || "vpn.billing-system.local";
+        
+        // Use request host as fallback if no endpoint is configured
+        const requestHost = req.headers.get("host")?.split(":")[0];
+        const serverEndpoint = router.wgServerEndpoint || process.env.WG_SERVER_ENDPOINT || requestHost || "vpn.billing-system.local";
         const serverPort = parseInt(process.env.WG_SERVER_PORT || "51820");
 
         return jsonResponse({

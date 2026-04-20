@@ -16,7 +16,7 @@ import GridViewIcon from '@mui/icons-material/GridView';
 import WifiIcon from '@mui/icons-material/Wifi';
 import RouterIcon from '@mui/icons-material/Router';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
-import { routersApi, settingsApi, packagesApi, hotspotSettingsApi } from '../api/client';
+import { routersApi, settingsApi, packagesApi, hotspotSettingsApi, CLEAN_API_URL } from '../api/client';
 import authStore from '../stores/authStore';
 import type { Router } from '../types';
 
@@ -52,6 +52,7 @@ export default function HotspotLoginCustomizer() {
     const [enableRememberMe, setEnableRememberMe] = useState(true);
     const [companyName, setCompanyName] = useState('');
     const [customerCareNumber, setCustomerCareNumber] = useState('');
+    const [backendUrl, setBackendUrl] = useState(CLEAN_API_URL || '');
     const [saving, setSaving] = useState(false);
 
     // Live preview
@@ -143,6 +144,7 @@ export default function HotspotLoginCustomizer() {
                     if (settings.enableRememberMe !== undefined) setEnableRememberMe(settings.enableRememberMe);
                     if (settings.companyName) setCompanyName(settings.companyName);
                     if (settings.customerCareNumber) setCustomerCareNumber(settings.customerCareNumber);
+                    if (settings.backendUrl) setBackendUrl(settings.backendUrl);
                 }
             } catch (err) {
                 console.error('Failed to load hotspot settings:', err);
@@ -444,7 +446,7 @@ export default function HotspotLoginCustomizer() {
 
     <script>
         // ── Configuration ──
-        var API_BASE = '${window.location.origin.includes("localhost") ? "http://localhost:3000" : window.location.origin}';
+        var API_BASE = '${backendUrl || CLEAN_API_URL || window.location.origin}';
         var ROUTER_ID = '${selectedRouterId}';
         var ACCENT = '${accentColor}';
         var PRIMARY = '${primaryColor}';
@@ -654,7 +656,8 @@ export default function HotspotLoginCustomizer() {
                 adMessage,
                 enableRememberMe,
                 companyName,
-                customerCareNumber
+                customerCareNumber,
+                backendUrl
             });
             alert('Customization settings saved successfully!');
         } catch (err) {
@@ -1129,9 +1132,9 @@ TROUBLESHOOTING:
                         {/* Company Information */}
                         <div style={{ marginBottom: 20 }}>
                             <h4 style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12, color: 'var(--primary)' }}>
-                                <BusinessIcon style={{ fontSize: 16 }} /> Company Information
+                                <BusinessIcon style={{ fontSize: 16 }} /> Company & System Information
                             </h4>
-                            <div className="grid-2 gap-12">
+                            <div className="grid-2 gap-12" style={{ marginBottom: 12 }}>
                                 <div className="form-group">
                                     <label className="form-label" style={{ fontSize: '0.82rem' }}>Company Name</label>
                                     <input type="text" className="form-input" value={companyName} onChange={e => setCompanyName(e.target.value)} />
@@ -1139,6 +1142,19 @@ TROUBLESHOOTING:
                                 <div className="form-group">
                                     <label className="form-label" style={{ fontSize: '0.82rem' }}>Customer Care Number</label>
                                     <input type="text" className="form-input" value={customerCareNumber} onChange={e => setCustomerCareNumber(e.target.value)} />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="form-label" style={{ fontSize: '0.82rem' }}>Backend API URL Override</label>
+                                <input 
+                                    type="text" 
+                                    className="form-input" 
+                                    value={backendUrl} 
+                                    onChange={e => setBackendUrl(e.target.value)} 
+                                    placeholder="https://your-backend.railway.app"
+                                />
+                                <div className="form-hint" style={{ fontSize: '0.72rem', marginTop: 4 }}>
+                                    The public URL of this billing system backend. Used for payments and voucher redemption.
                                 </div>
                             </div>
                         </div>

@@ -27,6 +27,10 @@ export default function AddRouterModal({ onClose, onSave, initialData }: AddRout
         (initialData?.vpnMode as 'hybrid' | 'wireguard' | 'openvpn') || 'hybrid'
     );
     const [description, setDescription] = useState(initialData?.description || '');
+    const [showAdvanced, setShowAdvanced] = useState(false);
+    const [wgTunnelIp, setWgTunnelIp] = useState(initialData?.wgTunnelIp || '10.200.0.1');
+    const [wgServerEndpoint, setWgServerEndpoint] = useState(initialData?.wgServerEndpoint || '');
+    const [wgListenPort, setWgListenPort] = useState(initialData?.wgListenPort?.toString() || '13231');
 
     const handleSave = () => {
         if (!routerName || !host) {
@@ -40,7 +44,10 @@ export default function AddRouterModal({ onClose, onSave, initialData }: AddRout
             username,
             password: accessCode,
             vpnMode,
-            description
+            description,
+            wgTunnelIp,
+            wgServerEndpoint,
+            wgListenPort: parseInt(wgListenPort, 10)
         });
     };
 
@@ -238,6 +245,63 @@ export default function AddRouterModal({ onClose, onSave, initialData }: AddRout
                             onChange={e => setDescription(e.target.value)}
                             style={{ resize: 'vertical' }}
                         />
+                    </div>
+
+                    {/* Advanced Settings Toggle */}
+                    <div style={{ marginBottom: 16 }}>
+                        <button 
+                            type="button"
+                            onClick={() => setShowAdvanced(!showAdvanced)}
+                            style={{ 
+                                background: 'transparent', border: 'none', color: 'var(--primary)', 
+                                fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer',
+                                display: 'flex', alignItems: 'center', gap: 4, padding: 0
+                            }}
+                        >
+                            {showAdvanced ? '− Hide Advanced Settings' : '+ Show Advanced Settings'}
+                        </button>
+
+                        {showAdvanced && (
+                            <div style={{ 
+                                marginTop: 12, padding: 16, background: '#f8fafc', 
+                                border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)' 
+                            }}>
+                                <div style={{ fontWeight: 600, fontSize: '0.85rem', marginBottom: 12 }}>🔒 VPN Advanced Configuration</div>
+                                
+                                <div className="form-group" style={{ marginBottom: 12 }}>
+                                    <label className="form-label">WireGuard Tunnel IP (Router)</label>
+                                    <input 
+                                        className="form-input" 
+                                        value={wgTunnelIp} 
+                                        onChange={e => setWgTunnelIp(e.target.value)} 
+                                        placeholder="10.200.0.1"
+                                    />
+                                    <div className="form-hint">Private IP for the router in the VPN tunnel</div>
+                                </div>
+
+                                <div className="grid-2 gap-10">
+                                    <div className="form-group">
+                                        <label className="form-label">VPN Server Endpoint</label>
+                                        <input 
+                                            className="form-input" 
+                                            value={wgServerEndpoint} 
+                                            onChange={e => setWgServerEndpoint(e.target.value)} 
+                                            placeholder="vpn.example.com"
+                                        />
+                                        <div className="form-hint">Leave blank to use current domain</div>
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label">WireGuard Port</label>
+                                        <input 
+                                            className="form-input" 
+                                            value={wgListenPort} 
+                                            onChange={e => setWgListenPort(e.target.value)} 
+                                            placeholder="13231"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* Info banner */}

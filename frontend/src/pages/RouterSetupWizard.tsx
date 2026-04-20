@@ -197,8 +197,9 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                 lines.push('/interface ovpn-server server set enabled=yes certificate=none auth=sha1,md5 cipher=aes128-cbc,aes192-cbc,aes256-cbc default-profile=default');
             }
             if (vpnMode === 'hybrid' || vpnMode === 'wireguard') {
+                const wgAddress = routerData?.wgTunnelIp || '10.200.0.1';
                 lines.push('/interface wireguard add listen-port=13231 name=wireguard1',
-                    '/ip address add address=10.10.10.1/24 interface=wireguard1');
+                    `/ip address add address=${wgAddress}/24 interface=wireguard1`);
             }
             if (vpnMode === 'openvpn' || vpnMode === 'hybrid') {
                 lines.push(`/ip ipsec peer add address=0.0.0.0/0 exchange-mode=main secret=${ipsecSecret}`,
