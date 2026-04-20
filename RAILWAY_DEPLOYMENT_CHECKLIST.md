@@ -36,8 +36,8 @@ In your Railway project, configure or create the **backend** service:
 |----------|-------|
 | `DATABASE_URL` | Paste the PostgreSQL DATABASE_URL |
 | `NODE_ENV` | `production` |
-| `NEXTAUTH_SECRET` | Generate with: `openssl rand -base64 32` or `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"` |
-| `NEXTAUTH_URL` | Leave empty or set to your backend domain (Railway will assign one) |
+| `JWT_SECRET` | Generate with: `openssl rand -base64 32` or `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"` |
+| `CORS_ORIGIN` | `https://<frontend-domain>.railway.app` |
 | `GOOGLE_CLIENT_ID` | `96960694156-pg7m1cjdqas9nelo83nicrq4ig3kuq3l.apps.googleusercontent.com` |
 
 #### Build & Start Configuration
@@ -201,8 +201,8 @@ DATABASE_URL = postgresql://postgres:XXX@containers-us-west-XX.railway.app:5432/
 ```
 DATABASE_URL = <copy from postgres>
 NODE_ENV = production
-NEXTAUTH_SECRET = <generate random 32-byte string>
-NEXTAUTH_URL = <leave empty or use assigned domain>
+JWT_SECRET = <generate random 32-byte string>
+CORS_ORIGIN = <your frontend domain>
 GOOGLE_CLIENT_ID = 96960694156-pg7m1cjdqas9nelo83nicrq4ig3kuq3l.apps.googleusercontent.com
 ```
 
@@ -251,6 +251,6 @@ psql "postgresql://user:pass@host:port/db"
 | Service | Purpose | Root Dir | Env Variables |
 |---------|---------|----------|---|
 | Postgres | Database | N/A | DATABASE_URL (exported) |
-| Backend | Next.js API | ./backend | DATABASE_URL, NODE_ENV, NEXTAUTH_SECRET |
+| Backend | Next.js API | ./backend | DATABASE_URL, NODE_ENV, JWT_SECRET |
 | Frontend | Vite React | ./frontend | VITE_API_URL (reference backend domain) |
 

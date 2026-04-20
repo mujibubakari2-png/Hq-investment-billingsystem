@@ -53,8 +53,8 @@ In the Backend Service settings, set these variables:
 |----------|-------|-------|
 | `DATABASE_URL` | `postgresql://...` | Copy from Postgres service |
 | `NODE_ENV` | `production` | For production deployment |
-| `NEXTAUTH_SECRET` | Generate secure random | Use: `openssl rand -base64 32` |
-| `NEXTAUTH_URL` | `https://backend-name.railway.app` | Your backend domain |
+| `JWT_SECRET` | Generate secure random | Use: `openssl rand -base64 32` |
+| `CORS_ORIGIN` | `https://your-frontend-domain.railway.app` | Frontend origin for API requests |
 
 **How to set environment variables:**
 1. Backend Service → Settings → "Deploy" section
@@ -214,8 +214,8 @@ DATABASE_URL=postgresql://user:pass@host:port/db
 ```
 DATABASE_URL=<reference from Postgres>
 NODE_ENV=production
-NEXTAUTH_SECRET=<random 32-byte string>
-NEXTAUTH_URL=<backend domain>
+JWT_SECRET=<random 32-byte string>
+CORS_ORIGIN=<frontend domain>
 ```
 
 **Frontend Service:**

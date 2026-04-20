@@ -2,11 +2,11 @@
 
 [build]
   builder = "nixpacks"
-  buildCommand = "pnpm install --no-frozen-lockfile && npx prisma generate && pnpm build"
+  buildCommand = "pnpm install --no-frozen-lockfile && pnpm exec prisma generate && pnpm build"
 
 [deploy]
   nixpacksPlan = { "phases" = { "install" = { "dependsOn" = ["setup"] }, "build" = { "dependsOn" = ["install"] }, "start" = { "dependsOn" = ["build"] } } }
-  startCommand = "echo '🚀 Starting Railway deployment...' && echo '📋 Checking DATABASE_URL...' && if [ -z \"$DATABASE_URL\" ]; then echo '❌ DATABASE_URL not set - exiting'; exit 1; fi && echo '🔧 Generating Prisma client...' && npx prisma generate && echo '🗄️ Syncing database schema...' && (npx prisma migrate deploy --skip-verify || npx prisma db push --accept-data-loss) && echo '🔍 Verifying migrations...' && node scripts/check-migrations.js && echo '🌱 Seeding database...' && npx tsx scripts/seed.ts && echo '🧪 Testing database connection...' && node scripts/test-db.js && echo '🚀 Starting application...' && pnpm start"
+  startCommand = "echo '🚀 Starting Railway deployment...' && echo '📋 Checking DATABASE_URL...' && if [ -z \"$DATABASE_URL\" ]; then echo '❌ DATABASE_URL not set - exiting'; exit 1; fi && echo '🔧 Generating Prisma client...' && pnpm exec prisma generate && echo '🗄️ Syncing database schema...' && (pnpm exec prisma migrate deploy --skip-verify || pnpm exec prisma db push --accept-data-loss) && echo '🔍 Verifying migrations...' && node scripts/check-migrations.js && echo '🌱 Seeding database...' && pnpm exec tsx scripts/seed.ts && echo '🧪 Testing database connection...' && node scripts/test-db.js && echo '🚀 Starting application...' && pnpm start"
   restartPolicyType = "on_failure"
   restartPolicyMaxRetries = 5
   healthcheckPath = "/api/health"

@@ -14,18 +14,18 @@ function isNextBuild(): boolean {
 
 function getJwtSecret(): string {
     if (!jwtSecret) {
-        const secret = process.env.JWT_SECRET;
+        const secret = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET;
         if (!secret) {
             // Use fallback for build time or CI environments
             if (isNextBuild() || process.env.RAILWAY_PROJECT_ID || process.env.CI || process.env.VERCEL || process.env.NETLIFY) {
                 jwtSecret = "build-time-fallback-secret-please-set-JWT_SECRET";
-                console.warn("WARNING: Using fallback JWT_SECRET for build/CI environment. Ensure JWT_SECRET is set in production!");
+                console.warn("WARNING: Using fallback JWT_SECRET/NEXTAUTH_SECRET for build/CI environment. Ensure JWT_SECRET is set in production!");
                 return jwtSecret;
             }
-            throw new Error("FATAL: JWT_SECRET environment variable is required. Add it to your .env file.");
+            throw new Error("FATAL: JWT_SECRET or NEXTAUTH_SECRET environment variable is required. Add it to your .env file.");
         }
         if (secret.length < 32) {
-            throw new Error("FATAL: JWT_SECRET must be at least 32 characters long for security.");
+            throw new Error("FATAL: JWT_SECRET or NEXTAUTH_SECRET must be at least 32 characters long for security.");
         }
         jwtSecret = secret;
     }

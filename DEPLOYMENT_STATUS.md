@@ -59,7 +59,8 @@
 3. Add Environment Variables:
    - `DATABASE_URL`: Paste from Postgres service
    - `NODE_ENV`: `production`
-   - `NEXTAUTH_SECRET`: Generate random 32-byte string
+   - `JWT_SECRET`: Generate random 32-byte string
+   - `CORS_ORIGIN`: `https://<frontend-domain>.railway.app`
    - `GOOGLE_CLIENT_ID`: `96960694156-pg7m1cjdqas9nelo83nicrq4ig3kuq3l.apps.googleusercontent.com`
 4. Trigger deployment
 
