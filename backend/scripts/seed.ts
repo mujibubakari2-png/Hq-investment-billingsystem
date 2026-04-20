@@ -22,7 +22,7 @@ const pool = new Pool({
     connectionTimeoutMillis: 10000,
     statement_timeout: 30000,
     application_name: "kenge_isp_seed",
-    ssl: connectionString.includes('localhost') ? false : { rejectUnauthorized: false }
+    ssl: connectionString.includes('localhost') || connectionString.includes('127.0.0.1') ? false : { rejectUnauthorized: false }
 });
 
 const adapter = new PrismaPg(pool);
