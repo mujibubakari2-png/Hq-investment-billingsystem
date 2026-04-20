@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
     try {
-        const email = "mujibubakari2@gmail.com";
+        const email = "superadmin@hqinvestment.co.tz";
         const password = "hq-admin-2026";
         const hashedPassword = await hashPassword(password);
         

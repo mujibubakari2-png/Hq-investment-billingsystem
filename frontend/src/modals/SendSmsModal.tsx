@@ -67,7 +67,7 @@ export default function SendSmsModal({ templates = [], onClose, onSend, defaultR
                             <input
                                 type="text"
                                 className="form-input"
-                                placeholder="Phone number e.g. 255700000000"
+                                placeholder="Phone number e.g. 255XXXXXXXXX"
                                 value={recipientPhone}
                                 onChange={e => setRecipientPhone(e.target.value)}
                             />

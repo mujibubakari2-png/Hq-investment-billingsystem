@@ -66,7 +66,7 @@ export default function AddSystemUserModal({ onClose, onSave }: AddSystemUserMod
                         </div>
                         <div className="form-group">
                             <label className="form-label">Phone Number</label>
-                            <input type="text" className="form-input" placeholder="255700000000" value={phone} onChange={e => setPhone(e.target.value)} />
+                            <input type="text" className="form-input" placeholder="255XXXXXXXXX" value={phone} onChange={e => setPhone(e.target.value)} />
                         </div>
                     </div>
 

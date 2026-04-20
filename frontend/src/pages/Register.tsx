@@ -66,7 +66,7 @@ export default function Register() {
 
     // Form data
     const [formData, setFormData] = useState({
-        fullName: 'mujibu bakkari', email: 'mujibubakari@gmail.com', phone: '255700000000', password: 'Muu@1212', confirmPassword: 'Muu@1212',
+        fullName: '', email: '', phone: '', password: '', confirmPassword: '',
         otp: ['', '', '', '', '', ''],
         companyName: '', city: '', country: '', termsAccepted: false, planId: ''
     });
