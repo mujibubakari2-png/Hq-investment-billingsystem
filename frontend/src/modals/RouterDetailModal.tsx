@@ -37,22 +37,22 @@ export default function RouterDetailModal({ router, onClose, onDelete }: RouterD
 
 # ── 2. Hotspot Server Setup ───────────────────────────────────
 /ip hotspot profile
-add name="hsprof-${router.name}" hotspot-address=10.10.0.1 dns-name="${router.name.toLowerCase().replace(/\s+/g, '-')}.hotspot" \\
+add name="hsprof-${router.name}" hotspot-address=192.168.88.1 dns-name="${router.name.toLowerCase().replace(/\s+/g, '-')}.hotspot" \\
     html-directory=hotspot login-by=http-chap,http-pap,cookie,mac-cookie \\
     http-cookie-lifetime=3d
 
 /ip pool
-add name="hs-pool-${router.name}" ranges=10.10.0.2-10.10.0.254
+add name="hs-pool-${router.name}" ranges=192.168.88.2-192.168.88.254
 
 /ip hotspot
 add name="hotspot-${router.name}" interface=ether2 address-pool="hs-pool-${router.name}" \\
     profile="hsprof-${router.name}" disabled=no
 
 # ── 3. DHCP Server ───────────────────────────────────────────
-/ip address add address=10.10.0.1/24 interface=ether2
+/ip address add address=192.168.88.1/24 interface=ether2
 
 /ip dhcp-server network
-add address=10.10.0.0/24 gateway=10.10.0.1 dns-server=8.8.8.8,1.1.1.1
+add address=192.168.88.0/24 gateway=192.168.88.1 dns-server=8.8.8.8,1.1.1.1
 
 /ip dhcp-server
 add name="dhcp-${router.name}" interface=ether2 address-pool="hs-pool-${router.name}" disabled=no
@@ -74,7 +74,7 @@ add chain=input action=drop comment="Drop all other input"
 
 # ── 7. RADIUS Client (HQInvestment ISP Billing) ───────────────────────
 /radius
-add service=hotspot address=127.0.0.1 secret=hqinvestment-radius-secret \\
+add service=hotspot address=${window.location.hostname} secret=hqinvestment-radius-secret \\
     authentication-port=1812 accounting-port=1813
 
 /ip hotspot profile set "hsprof-${router.name}" use-radius=yes radius-accounting=yes

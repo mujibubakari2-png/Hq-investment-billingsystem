@@ -99,6 +99,18 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
     const [vpnDns, setVpnDns] = useState('8.8.8.8');
     const [ipsecSecret, setIpsecSecret] = useState('MyISPVpnKey2024!');
 
+    // PPPoE & Hotspot IP Settings
+    const [pppoeLocalAddress, setPppoeLocalAddress] = useState('10.10.10.1');
+    const [pppoePoolStart, setPppoePoolStart] = useState('10.10.10.2');
+    const [pppoePoolEnd, setPppoePoolEnd] = useState('10.10.10.254');
+    
+    const [hotspotLocalAddress, setHotspotLocalAddress] = useState('192.168.88.1');
+    const [hotspotPoolStart, setHotspotPoolStart] = useState('192.168.88.2');
+    const [hotspotPoolEnd, setHotspotPoolEnd] = useState('192.168.88.254');
+
+    const [radiusAddress, setRadiusAddress] = useState(window.location.hostname || '127.0.0.1');
+    const [radiusSecret, setRadiusSecret] = useState('radiax2024');
+
     const addVpnSecret = () => {
         if (!vpnForm.username || !vpnForm.password) {
             alert('Username and Password are required.'); return;
@@ -162,16 +174,17 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
         }
         if (serviceType === 'pppoe' || serviceType === 'both') {
             lines.push('', '# ===== PPPoE Server =====',
-                '/ip pool add name=pppoe-pool ranges=10.10.10.2-10.10.10.254',
-                '/ppp profile add name=radiax-pppoe local-address=10.10.10.1 remote-address=pppoe-pool dns-server=8.8.8.8,8.8.4.4',
+                `/ip pool add name=pppoe-pool ranges=${pppoePoolStart}-${pppoePoolEnd}`,
+                `/ppp profile add name=radiax-pppoe local-address=${pppoeLocalAddress} remote-address=pppoe-pool dns-server=8.8.8.8,8.8.4.4`,
                 `/interface pppoe-server server add service-name=radiax-pppoe interface=${selectedInterfaces[0] || 'ether2-LAN'} default-profile=radiax-pppoe authentication=pap,chap,mschap1,mschap2 disabled=no`,
             );
         }
         if (serviceType === 'hotspot' || serviceType === 'both') {
+            const hotspotNetwork = hotspotLocalAddress.split('.').slice(0, 3).join('.') + '.0/24';
             lines.push('', '# ===== Hotspot Server =====',
-                '/ip pool add name=hotspot-pool ranges=192.168.1.2-192.168.1.254',
-                '/ip address add address=192.168.1.1/24 interface=radiax_bridge',
-                '/ip hotspot profile add name=radiax-hotspot hotspot-address=192.168.1.1 dns-name=login.spot login-by=http-chap,http-pap',
+                `/ip pool add name=hotspot-pool ranges=${hotspotPoolStart}-${hotspotPoolEnd}`,
+                `/ip address add address=${hotspotLocalAddress}/24 interface=radiax_bridge`,
+                `/ip hotspot profile add name=radiax-hotspot hotspot-address=${hotspotLocalAddress} dns-name=login.spot login-by=http-chap,http-pap`,
                 '/ip hotspot add name=hotspot1 interface=radiax_bridge address-pool=hotspot-pool profile=radiax-hotspot disabled=no',
             );
         }
@@ -196,7 +209,7 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
             });
         }
         lines.push('', '# ===== RADIUS Client =====',
-            '/radius add service=hotspot,ppp address=127.0.0.1 secret=radiax2024 authentication-port=1812 accounting-port=1813',
+            `/radius add service=hotspot,ppp address=${radiusAddress} secret=${radiusSecret} authentication-port=1812 accounting-port=1813`,
             '/ip hotspot profile set radiax-hotspot use-radius=yes',
             '', '# Configuration complete', '');
 
@@ -336,6 +349,74 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                                     <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', lineHeight: 1.6, whiteSpace: 'pre-line' }}>{svc.detail}</div>
                                 </div>
                             ))}
+                        </div>
+
+                        {/* Configurable IP Settings Section */}
+                        <div style={{ maxWidth: 750, margin: '30px auto 0', textAlign: 'left', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)', padding: 24, background: '#f8fafc' }}>
+                            <h3 style={{ fontSize: '1rem', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <SettingsIcon style={{ fontSize: 18, color: 'var(--primary)' }} /> IP & RADIUS Configuration
+                            </h3>
+
+                            <div className="grid-2 gap-20">
+                                {/* PPPoE Settings */}
+                                {(serviceType === 'pppoe' || serviceType === 'both') && (
+                                    <div style={{ background: '#fff', padding: 16, borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-light)' }}>
+                                        <div style={{ fontWeight: 600, fontSize: '0.85rem', marginBottom: 12, color: '#0d9488' }}>PPPoE Network Settings</div>
+                                        <div className="form-group">
+                                            <label className="form-label">Local Gateway Address</label>
+                                            <input className="form-input" value={pppoeLocalAddress} onChange={e => setPppoeLocalAddress(e.target.value)} placeholder="10.10.10.1" />
+                                        </div>
+                                        <div className="grid-2 gap-10">
+                                            <div className="form-group">
+                                                <label className="form-label">Pool Start</label>
+                                                <input className="form-input" value={pppoePoolStart} onChange={e => setPppoePoolStart(e.target.value)} placeholder="10.10.10.2" />
+                                            </div>
+                                            <div className="form-group">
+                                                <label className="form-label">Pool End</label>
+                                                <input className="form-input" value={pppoePoolEnd} onChange={e => setPppoePoolEnd(e.target.value)} placeholder="10.10.10.254" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Hotspot Settings */}
+                                {(serviceType === 'hotspot' || serviceType === 'both') && (
+                                    <div style={{ background: '#fff', padding: 16, borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-light)' }}>
+                                        <div style={{ fontWeight: 600, fontSize: '0.85rem', marginBottom: 12, color: '#0d9488' }}>Hotspot Network Settings</div>
+                                        <div className="form-group">
+                                            <label className="form-label">Hotspot Gateway Address</label>
+                                            <input className="form-input" value={hotspotLocalAddress} onChange={e => setHotspotLocalAddress(e.target.value)} placeholder="192.168.88.1" />
+                                        </div>
+                                        <div className="grid-2 gap-10">
+                                            <div className="form-group">
+                                                <label className="form-label">Pool Start</label>
+                                                <input className="form-input" value={hotspotPoolStart} onChange={e => setHotspotPoolStart(e.target.value)} placeholder="192.168.88.2" />
+                                            </div>
+                                            <div className="form-group">
+                                                <label className="form-label">Pool End</label>
+                                                <input className="form-input" value={hotspotPoolEnd} onChange={e => setHotspotPoolEnd(e.target.value)} placeholder="192.168.88.254" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* RADIUS Settings */}
+                                <div style={{ background: '#fff', padding: 16, borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-light)', gridColumn: (serviceType === 'both' ? 'span 2' : 'auto') }}>
+                                    <div style={{ fontWeight: 600, fontSize: '0.85rem', marginBottom: 12, color: '#4338ca' }}>RADIUS Server Settings</div>
+                                    <div className="grid-2 gap-10">
+                                        <div className="form-group">
+                                            <label className="form-label">RADIUS Server IP/Host</label>
+                                            <input className="form-input" value={radiusAddress} onChange={e => setRadiusAddress(e.target.value)} placeholder="Server IP" />
+                                            <div className="form-hint">Address of your billing server</div>
+                                        </div>
+                                        <div className="form-group">
+                                            <label className="form-label">RADIUS Shared Secret</label>
+                                            <input className="form-input" value={radiusSecret} onChange={e => setRadiusSecret(e.target.value)} placeholder="Secret key" />
+                                            <div className="form-hint">Must match server configuration</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 );
