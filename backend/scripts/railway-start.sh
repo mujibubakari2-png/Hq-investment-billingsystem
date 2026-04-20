@@ -34,10 +34,38 @@ fi
 # 3. Seeding
 echo "🌱 Running database seed..."
 if ! pnpm exec tsx scripts/seed.ts; then
-    echo "⚠️  Seed script failed, but continuing to start application..."
+    echo "❌ ERROR: Seed script failed."
+    # If seeding fails, we might want to stop here to avoid running an empty app
+    # but for now we'll just log it clearly.
 fi
 
-# 4. Final Diagnostics
+# 4. Data Verification
+echo "📊 Verifying data..."
+pnpm exec tsx -e '
+import { PrismaClient } from "./src/generated/prisma";
+import { PrismaPg } from "@prisma/adapter-pg";
+import { Pool } from "pg";
+
+async function check() {
+  const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+  const adapter = new PrismaPg(pool);
+  const prisma = new PrismaClient({ adapter });
+  try {
+    const userCount = await prisma.user.count();
+    const planCount = await prisma.saasPlan.count();
+    console.log(`✅ Verification complete: ${userCount} users, ${planCount} SaaS plans found.`);
+    if (userCount === 0) console.log("⚠️ WARNING: No users found after seeding!");
+  } catch (e) {
+    console.log("❌ Verification failed:", e.message);
+  } finally {
+    await prisma.$disconnect();
+    await pool.end();
+  }
+}
+check();
+'
+
+# 5. Final Diagnostics
 echo "✅ Database preparation completed."
 
 # 5. Start Application

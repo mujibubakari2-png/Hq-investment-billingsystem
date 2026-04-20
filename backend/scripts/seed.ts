@@ -67,12 +67,16 @@ async function main() {
         const superAdminPassword = "hq-admin-2026";
         const hashedPassword = await bcrypt.hash(superAdminPassword, 12);
 
-        const existing = await prisma.user.findUnique({
-            where: { email: superAdminEmail }
-        }).catch(err => {
-            console.log(`⚠️  Cannot query users yet (migrations may still be running): ${err.message}`);
-            return null;
-        });
+        let existing = null;
+        try {
+            existing = await prisma.user.findUnique({
+                where: { email: superAdminEmail }
+            });
+        } catch (err) {
+            console.error(`❌ Error querying users table: ${(err as Error).message}`);
+            console.log("🔍 This usually means the table 'users' does not exist yet.");
+            throw err; // Re-throw to be caught by the main catch block
+        }
 
         if (existing) {
             await prisma.user.update({
@@ -84,8 +88,6 @@ async function main() {
                 }
             });
             console.log(`✅ Updated existing Super Admin: ${superAdminEmail}\n`);
-        } else if (existing === null) {
-            console.log("⏭️  Skipping user creation (tables not ready yet)\n");
         } else {
             await prisma.user.create({
                 data: {
