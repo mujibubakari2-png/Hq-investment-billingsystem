@@ -29,7 +29,8 @@ async function testConnection() {
             idleTimeoutMillis: 5000,
             connectionTimeoutMillis: 5000,
             statement_timeout: 10000,
-            application_name: "kenge_isp_test"
+            application_name: "kenge_isp_test",
+            ssl: connectionString.includes('localhost') ? false : { rejectUnauthorized: false }
         });
 
         adapter = new PrismaPg(pool);

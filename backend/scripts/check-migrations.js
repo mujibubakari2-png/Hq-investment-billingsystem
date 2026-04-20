@@ -29,7 +29,8 @@ async function checkMigrations() {
             idleTimeoutMillis: 5000,
             connectionTimeoutMillis: 5000,
             statement_timeout: 10000,
-            application_name: "kenge_isp_migration_check"
+            application_name: "kenge_isp_migration_check",
+            ssl: connectionString.includes('localhost') ? false : { rejectUnauthorized: false }
         });
 
         adapter = new PrismaPg(pool);

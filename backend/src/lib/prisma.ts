@@ -32,7 +32,8 @@ try {
         idleTimeoutMillis,
         connectionTimeoutMillis: 10000,
         statement_timeout: 30000,
-        application_name: "kenge_isp_backend"
+        application_name: "kenge_isp_backend",
+        ssl: connectionString.includes('localhost') ? false : { rejectUnauthorized: false }
     });
 
     adapter = new PrismaPg(pool);
