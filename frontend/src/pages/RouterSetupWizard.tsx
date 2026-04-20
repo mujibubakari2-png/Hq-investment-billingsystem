@@ -184,6 +184,8 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
             lines.push('', '# ===== Hotspot Server =====',
                 `/ip pool add name=hotspot-pool ranges=${hotspotPoolStart}-${hotspotPoolEnd}`,
                 `/ip address add address=${hotspotLocalAddress}/24 interface=radiax_bridge`,
+                `/ip dhcp-server network add address=${hotspotNetwork} gateway=${hotspotLocalAddress} dns-server=8.8.8.8,1.1.1.1`,
+                `/ip dhcp-server add name=dhcp-hotspot interface=radiax_bridge address-pool=hotspot-pool disabled=no`,
                 `/ip hotspot profile add name=radiax-hotspot hotspot-address=${hotspotLocalAddress} dns-name=login.spot login-by=http-chap,http-pap`,
                 '/ip hotspot add name=hotspot1 interface=radiax_bridge address-pool=hotspot-pool profile=radiax-hotspot disabled=no',
             );

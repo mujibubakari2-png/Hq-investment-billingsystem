@@ -64,11 +64,13 @@ export async function POST(req: NextRequest) {
             return errorResponse("Forbidden", 403);
         }
 
-        // Check for duplicate username
-        const existing = await prisma.vpnUser.findUnique({ where: { username } });
-        if (existing) return errorResponse("VPN username already exists", 409);
-
         const tenantIdValue = userPayload.tenantId;
+
+        // Check for duplicate username within the same tenant
+        const existing = await prisma.vpnUser.findFirst({ 
+            where: { username, tenantId: tenantIdValue } 
+        });
+        if (existing) return errorResponse("VPN username already exists for this tenant", 409);
 
         const vpnUser = await prisma.vpnUser.create({
             data: {

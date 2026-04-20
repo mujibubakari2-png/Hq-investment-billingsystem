@@ -53,10 +53,13 @@ export async function POST(req: NextRequest) {
             return errorResponse("Username and password are required", 400);
         }
 
-        const existing = await prisma.radiusUser.findUnique({ where: { username } });
-        if (existing) return errorResponse("RADIUS username already exists", 409);
-
         const tenantId = getAssignTenantId(userPayload, body.tenantId);
+
+        // Check for duplicate username within the same tenant
+        const existing = await prisma.radiusUser.findFirst({ 
+            where: { username, tenantId } 
+        });
+        if (existing) return errorResponse("RADIUS username already exists for this tenant", 409);
 
         const user = await prisma.radiusUser.create({
             data: {
