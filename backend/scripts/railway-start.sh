@@ -7,13 +7,35 @@ if [ -z "$DATABASE_URL" ]; then
     echo "⚠️  WARNING: DATABASE_URL is not set. Database features will fail."
 fi
 
-# 2. START THE APPLICATION IN THE BACKGROUND
-# This ensures the app can start responding to health checks immediately
+# 2. START TAILSCALE (If Auth Key is provided)
+if [ -n "$TAILSCALE_AUTHKEY" ]; then
+    echo "🌐 Starting Tailscale..."
+    # Ensure /dev/net/tun exists (needed for Tailscale in some environments)
+    mkdir -p /dev/net
+    if [ ! -c /dev/net/tun ]; then
+        mknod /dev/net/tun c 10 200 || echo "⚠️ Could not create /dev/net/tun. Tailscale might run in userspace-networking mode."
+    fi
+
+    # Start tailscaled in the background
+    # --tun=userspace-networking is used as a fallback if TUN is not available
+    tailscaled --tun=userspace-networking --socks5-server=localhost:1055 --outbound-http-proxy-listen=localhost:1055 &
+    
+    # Wait for tailscaled to be ready
+    sleep 2
+    
+    # Authenticate and bring up the interface
+    echo "🔑 Authenticating with Tailscale..."
+    tailscale up --authkey="$TAILSCALE_AUTHKEY" --hostname="kenge-backend" --accept-routes
+    
+    echo "✅ Tailscale is active."
+fi
+
+# 3. START THE APPLICATION IN THE BACKGROUND
 echo "🚀 Starting Next.js application on port ${PORT:-3000}..."
 pnpm run next:start &
 APP_PID=$!
 
-# 3. RUN DATABASE TASKS IN PARALLEL
+# 4. RUN DATABASE TASKS IN PARALLEL
 # We use a subshell in the background so it doesn't block the health check
 (
     echo "🔧 [Background] Starting database preparation..."
@@ -62,6 +84,6 @@ check();
 '
 ) &
 
-# 4. WAIT FOR THE APPLICATION PROCESS
+# 5. WAIT FOR THE APPLICATION PROCESS
 # This keeps the container running and logs the app output
 wait $APP_PID
