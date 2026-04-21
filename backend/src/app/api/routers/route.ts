@@ -82,12 +82,12 @@ export async function POST(req: NextRequest) {
         const tenantFilter = { tenantId: tenantIdValue };
 
         const name = body.name || body.routerName || body.hostname || body.router_name || body.name;
-        const host = body.host || body.hostIP || body.ipAddress || body.address || body.ip;
+        const host = body.host || body.hostIP || body.ipAddress || body.address || body.ip || "0.0.0.0";
         const password = body.password || body.accessCode || body.secret || body.sharedSecret || "";
 
         if (!name) return errorResponse("Router name is required");
-        if (!host) return errorResponse("Host IP/domain is required");
-        if (!password) return errorResponse("Router secret/password is required");
+        // if (!host) return errorResponse("Host IP/domain is required"); // Now optional for VPN-based routers
+        if (!password) return errorResponse("Router access code / password is required");
 
         // Validate router name (simple check for tests)
         if (name.includes("!")) {
@@ -98,8 +98,8 @@ export async function POST(req: NextRequest) {
         const port = body.port ? parseInt(body.port.toString()) : (body.apiPort ? parseInt(body.apiPort.toString()) : 8728);
         const apiPort = body.apiPort ? parseInt(body.apiPort.toString()) : port;
 
-        // Relaxed host validation: allows IPs, domains, and simple hostnames
-        if (!host || host.length < 3) {
+        // Relaxed host validation
+        if (host !== "0.0.0.0" && host.length < 3) {
             return errorResponse("Invalid host format (must be at least 3 characters)");
         }
 
