@@ -787,7 +787,6 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                                             • {vpnProtocol === 'L2TP' ? 'L2TP server with IPsec encryption will be enabled' : `${vpnProtocol} server will be enabled`}<br />
                                             • IP Pool: {vpnPoolStart} – {vpnPoolEnd}
                                         </div>
-                                        </div>
                                     </div>
                                 </>
                             )}
