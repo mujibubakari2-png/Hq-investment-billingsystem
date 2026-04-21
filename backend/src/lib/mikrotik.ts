@@ -168,7 +168,8 @@ export class MikroTikService {
             if (err.cause?.code === "EHOSTUNREACH" || err.cause?.code === "ENETUNREACH") {
                 throw new Error(`Router ${this.conn.host} appears unreachable. Check network routing, firewalls, and ensure the IP is public or accessible from this server.`);
             }
-            throw new Error(`Failed to connect to ${this.conn.host}: ${err.message}`);
+            const causeMsg = err.cause ? ` (${err.cause.message || err.cause.code})` : '';
+            throw new Error(`Failed to connect to ${this.conn.host}${causeMsg}: ${err.message}`);
         }
     }
 
