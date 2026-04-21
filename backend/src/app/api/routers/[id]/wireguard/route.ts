@@ -65,10 +65,30 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         let wgPublicKey = router.wgPublicKey;
         let wgPeerPublicKey = router.wgPeerPublicKey;
         let wgPresharedKey = router.wgPresharedKey;
+        let tunnelIp = router.wgTunnelIp;
 
-// Server-side keys (for the HQInvestment server)
-const serverPrivateKey = process.env.WG_SERVER_PRIVATE_KEY || generateWireGuardKey();
-const serverPublicKey = process.env.WG_SERVER_PUBLIC_KEY || derivePublicKeyPlaceholder(serverPrivateKey);
+        // Server-side keys (for the HQInvestment server)
+        const serverPrivateKey = process.env.WG_SERVER_PRIVATE_KEY || generateWireGuardKey();
+        const serverPublicKey = process.env.WG_SERVER_PUBLIC_KEY || derivePublicKeyPlaceholder(serverPrivateKey);
+
+        // Logic to assign a unique Tunnel IP if not set or if it's the default and already used
+        if (!tunnelIp || tunnelIp === "10.200.0.1") {
+            const allWgRouters = await prisma.router.findMany({
+                where: { id: { not: id }, wgTunnelIp: { not: null } },
+                select: { wgTunnelIp: true }
+            });
+            const usedIps = allWgRouters.map(r => r.wgTunnelIp);
+            
+            if (!tunnelIp || usedIps.includes("10.200.0.1")) {
+                // Find first free IP from 10.200.0.1 to 10.200.0.250
+                let nextIp = 1;
+                while (usedIps.includes(`10.200.0.${nextIp}`) && nextIp < 250) {
+                    nextIp++;
+                }
+                tunnelIp = `10.200.0.${nextIp}`;
+                await updateRouterWgFields(id, { wgTunnelIp: tunnelIp });
+            }
+        }
 
         if (!wgPrivateKey) {
             wgPrivateKey = generateWireGuardKey();
@@ -81,6 +101,7 @@ const serverPublicKey = process.env.WG_SERVER_PUBLIC_KEY || derivePublicKeyPlace
                 wgPublicKey,
                 wgPeerPublicKey,
                 wgPresharedKey,
+                wgTunnelIp: tunnelIp, // Save assigned IP
             });
         } else if (process.env.WG_SERVER_PUBLIC_KEY && wgPeerPublicKey !== process.env.WG_SERVER_PUBLIC_KEY) {
             // Update the peer public key if the environment variable changes
@@ -88,8 +109,7 @@ const serverPublicKey = process.env.WG_SERVER_PUBLIC_KEY || derivePublicKeyPlace
             await updateRouterWgFields(id, { wgPeerPublicKey });
         }
 
-        const tunnelIp = router.wgTunnelIp || "10.200.0.1";
-        const serverTunnelIp = tunnelIp.replace(/\.\d+$/, ".254"); // Default server to .254 in same subnet
+        const serverTunnelIp = tunnelIp!.replace(/\.\d+$/, ".254"); // Default server to .254 in same subnet
         const listenPort = router.wgListenPort || 13231;
         
         // Use request host as fallback if no endpoint is configured
@@ -177,9 +197,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                         name: "wg-kenge",
                         "listen-port": String(listenPort),
                         "private-key": router.wgPrivateKey,
+                        comment: "Kenge VPN Interface"
                     });
                 } catch (e: any) {
                     if (!e.message?.includes("already")) throw e;
+                    // If already exists, we might want to update the private key?
+                    // For now, assume it's correct or managed manually.
                 }
 
                 // Step 2: Assign IP address
@@ -188,6 +211,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                         address: `${tunnelIp}/24`,
                         interface: "wg-kenge",
                         network: "10.200.0.0",
+                        comment: "Kenge VPN Address"
                     });
                 } catch (e: any) {
                     if (!e.message?.includes("already")) console.warn("IP note:", e.message);
@@ -209,19 +233,37 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                     if (!e.message?.includes("already")) console.warn("Peer note:", e.message);
                 }
 
-                // Step 4: Firewall
-                try {
-                    await service.apiRequestPublic("/ip/firewall/filter", "PUT", {
+                // Step 4: Firewall Rules (Input and Forward)
+                // Use place-before="0" to ensure rules are at the top of the chain
+                const firewallRules = [
+                    {
                         chain: "input", protocol: "udp", "dst-port": String(listenPort),
-                        action: "accept", comment: "Allow WireGuard - Kenge",
-                    });
-                } catch (e: any) { console.warn("FW note:", e.message); }
+                        action: "accept", comment: "Allow WireGuard - Kenge", "place-before": "0"
+                    },
+                    {
+                        chain: "forward", "in-interface": "wg-kenge",
+                        action: "accept", comment: "Allow WG traffic", "place-before": "0"
+                    },
+                    {
+                        chain: "forward", "out-interface": "wg-kenge",
+                        action: "accept", comment: "Allow WG return traffic", "place-before": "0"
+                    }
+                ];
+
+                for (const rule of firewallRules) {
+                    try {
+                        await service.apiRequestPublic("/ip/firewall/filter", "PUT", rule);
+                    } catch (e: any) {
+                        // Ignore if exactly the same rule exists (some versions of ROS might allow duplicates if comment is different)
+                        console.warn("FW note:", e.message);
+                    }
+                }
 
                 // Step 5: NAT
                 try {
                     await service.apiRequestPublic("/ip/firewall/nat", "PUT", {
                         chain: "srcnat", "out-interface": "wg-kenge",
-                        action: "masquerade", comment: "NAT WireGuard - Kenge",
+                        action: "masquerade", comment: "NAT WireGuard - Kenge", "place-before": "0"
                     });
                 } catch (e: any) { console.warn("NAT note:", e.message); }
 
@@ -233,26 +275,52 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                     });
                 } catch (e: any) { console.warn("Route note:", e.message); }
 
-                // Mark as configured and switch host to tunnel IP
-                await updateRouterWgFields(id, {
+                // Verification Step: Try to reach the router via its NEW tunnel IP before switching the host in DB
+                let tunnelVerified = false;
+                try {
+                    // Create a temporary service instance with the tunnel IP
+                    const tunnelService = await getMikroTikService(id, userPayload.tenantId);
+                    // Override the host manually for verification
+                    (tunnelService as any).conn.host = tunnelIp;
+                    (tunnelService as any).baseUrl = `http://${tunnelIp}:80`;
+                    
+                    const test = await tunnelService.testConnection();
+                    if (test.success) {
+                        tunnelVerified = true;
+                    }
+                } catch (e: any) {
+                    console.warn("Tunnel verification failed:", e.message);
+                }
+
+                // Update router state
+                const updateData: Record<string, any> = {
                     wgEnabled: true,
                     wgConfiguredAt: new Date(),
-                    host: tunnelIp,
-                });
+                };
+
+                // Only switch the host if the tunnel is verified working
+                // This prevents "losing" the router if the tunnel fails to come up
+                if (tunnelVerified) {
+                    updateData.host = tunnelIp;
+                }
+
+                await updateRouterWgFields(id, updateData);
 
                 await prisma.routerLog.create({
                     data: {
                         routerId: id,
                         action: "wireguard_pushed",
-                        details: `WireGuard config auto-pushed to ${router.name}. Connection switched to tunnel IP ${tunnelIp}.`,
+                        details: `WireGuard config auto-pushed to ${router.name}.${tunnelVerified ? ` Connection switched to tunnel IP ${tunnelIp}.` : " Tunnel verification failed - keeping current host."}`,
                         status: "success",
                     },
                 });
 
                 return jsonResponse({
                     success: true,
-                    message: `WireGuard configured on ${router.name}. Tunnel IP: ${tunnelIp}.`,
-                    tunnelVerified: false,
+                    message: tunnelVerified 
+                        ? `WireGuard configured and verified on ${router.name}. Tunnel IP: ${tunnelIp}.`
+                        : `WireGuard configured on ${router.name}, but tunnel is not yet reachable. Keeping original host IP for now.`,
+                    tunnelVerified,
                 });
 
             } catch (err: any) {
@@ -266,7 +334,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 });
                 return jsonResponse({
                     success: false,
-                    message: `Failed to auto-configure: ${err.message}. Use manual setup instead.`,
+                    message: `Failed to auto-configure: ${err.message}. Ensure the router is reachable and try manual setup.`,
                 }, 200);
             }
         }
