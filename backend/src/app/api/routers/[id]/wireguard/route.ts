@@ -324,9 +324,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                     wgConfiguredAt: new Date(),
                 };
 
-                // Only switch the host if the tunnel is verified working
-                // This prevents "losing" the router if the tunnel fails to come up
-                if (tunnelVerified) {
+                // Only switch the host if the tunnel is verified working AND it's not already localhost
+                // This prevents "losing" the router if it's using an SSH tunnel
+                if (tunnelVerified && router.host !== 'localhost' && router.host !== '127.0.0.1') {
                     updateData.host = tunnelIp;
                 }
 
@@ -366,11 +366,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         }
 
         // Default: manual activate (user pasted the script)
-        await updateRouterWgFields(id, {
+        const updateData: Record<string, any> = {
             wgEnabled: true,
             wgConfiguredAt: new Date(),
-            host: tunnelIp,
-        });
+        };
+
+        // Only update host if it's not already using a tunnel (localhost)
+        if (router.host !== 'localhost' && router.host !== '127.0.0.1') {
+            updateData.host = tunnelIp;
+        }
+
+        await updateRouterWgFields(id, updateData);
 
         await prisma.routerLog.create({
             data: {
