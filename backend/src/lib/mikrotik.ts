@@ -88,11 +88,7 @@ export class MikroTikService {
         const useHttps = process.env.MIKROTIK_USE_HTTPS === "true";
         const restPort = conn.port === 8728 || conn.port === 8729 ? (useHttps ? 443 : 80) : conn.port;
         const protocol = useHttps ? "https" : "http";
-        
-        // If the host is 'localhost' or '127.0.0.1', we assume an SSH tunnel is being used.
-        // In this case, we use the specific port assigned to this router's tunnel.
-        const isTunnel = conn.host === 'localhost' || conn.host === '127.0.0.1';
-        this.baseUrl = `${protocol}://${conn.host}:${isTunnel ? conn.port : restPort}`;
+        this.baseUrl = `${protocol}://${conn.host}:${restPort}`;
     }
 
     // ── Internal HTTP helper for RouterOS REST API ───────────────────────────

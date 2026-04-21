@@ -2,6 +2,3 @@
 NIXPACKS_NODE_VERSION = "22.12.0"
 NODE_VERSION = "22.12.0"
 pnpm_version = "9.15.0"
-
-[phases.setup]
-nixPkgs = ["nodejs", "pnpm", "dropbear"]

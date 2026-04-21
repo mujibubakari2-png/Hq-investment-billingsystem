@@ -7,9 +7,6 @@ if [ -z "$DATABASE_URL" ]; then
     echo "⚠️  WARNING: DATABASE_URL is not set. Database features will fail."
 fi
 
-# 1.5 Start SSH Tunnel for MikroTik
-bash scripts/setup-ssh-tunnel.sh &
-
 # 2. START THE APPLICATION IN THE BACKGROUND
 # This ensures the app can start responding to health checks immediately
 echo "🚀 Starting Next.js application on port ${PORT:-3000}..."
