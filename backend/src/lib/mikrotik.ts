@@ -121,12 +121,30 @@ export class MikroTikService {
             let res;
             try {
                 res = await fetch(url, fetchOptions);
-            } catch (firstErr) {
-                // If the base URL was HTTPS and the request failed, try HTTP as a fallback
+            } catch (firstErr: any) {
+                // If the base URL was HTTPS and the request failed (or timed out), try HTTP as a fallback
                 if (this.baseUrl.startsWith('https')) {
+                    clearTimeout(timeout);
                     const httpUrl = url.replace('https://', 'http://');
-                    res = await fetch(httpUrl, fetchOptions);
+                    
+                    // Create a fresh controller for the fallback attempt
+                    const fallbackController = new AbortController();
+                    const fallbackTimeout = setTimeout(() => fallbackController.abort(), timeoutMs);
+                    
+                    const fallbackOptions = {
+                        ...fetchOptions,
+                        signal: fallbackController.signal
+                    };
+
+                    try {
+                        res = await fetch(httpUrl, fallbackOptions);
+                        clearTimeout(fallbackTimeout);
+                    } catch (secondErr) {
+                        clearTimeout(fallbackTimeout);
+                        throw firstErr; // Throw original error if fallback also fails
+                    }
                 } else {
+                    clearTimeout(timeout);
                     throw firstErr;
                 }
             }
