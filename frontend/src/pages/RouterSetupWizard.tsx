@@ -107,7 +107,7 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
         }
     }, [routerId]);
 
-    // Perform check when entering Connection step
+    // Perform check when entering specific steps
     useEffect(() => {
         if (currentStep === 1) {
             checkConnection();
@@ -116,11 +116,15 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
             fetchInterfaces();
         }
         if (currentStep === 6) {
-            // Initial verification check
+            // Verification step - test connection again
             setVerifyStatus('checking');
-            routersApi.testConnection(routerId || '').then(res => {
-                setVerifyStatus(res.success ? 'success' : 'failed');
-            }).catch(() => setVerifyStatus('failed'));
+            if (routerId) {
+                routersApi.testConnection(routerId)
+                    .then(res => setVerifyStatus(res.success ? 'success' : 'failed'))
+                    .catch(() => setVerifyStatus('failed'));
+            } else {
+                setVerifyStatus('failed');
+            }
         }
     }, [currentStep]);
 
@@ -194,10 +198,14 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
             if (vpnEnabled && vpnSecrets.length > 0 && routerId) {
                 vpnSecrets.forEach(s => {
                     vpnApi.create({
-                        username: s.username, password: s.password,
-                        protocol: s.protocol, profile: s.profile,
-                        localAddress: s.localAddress, remoteAddress: s.remoteAddress,
-                        routerId: routerId, service: s.protocol.toLowerCase(),
+                        username: s.username,
+                        password: s.password,
+                        protocol: s.protocol,
+                        profile: s.profile,
+                        localAddress: s.localAddress,
+                        remoteAddress: s.remoteAddress,
+                        routerId: routerId,
+                        service: s.protocol.toLowerCase(),
                     }).catch(console.error);
                 });
             }
@@ -386,6 +394,12 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                                     <h3 style={{ color: 'var(--danger)', marginBottom: 6 }}>Router is Offline</h3>
                                     <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: 20 }}>
                                         {connectionError || 'Could not establish connection to the router.'}
+                                        {routerData?.host?.startsWith('10.') && (
+                                            <div style={{ marginTop: 12, padding: 10, background: '#fff5f5', border: '1px solid #fed7d7', borderRadius: 6, color: '#c53030', fontSize: '0.82rem', textAlign: 'left' }}>
+                                                <strong>VPN Hint:</strong> This router uses a private IP ({routerData.host}). 
+                                                Ensure your <strong>WireGuard</strong> or <strong>OpenVPN</strong> tunnel is connected on the router.
+                                            </div>
+                                        )}
                                     </p>
                                     <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
                                         <button className="btn btn-secondary" onClick={checkConnection}>
