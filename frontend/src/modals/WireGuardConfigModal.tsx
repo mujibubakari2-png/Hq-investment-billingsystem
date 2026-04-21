@@ -89,56 +89,84 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
     }
 
     // Build MikroTik server script with CORRECT syntax (single backslash for line continuation)
-    const serverConfig = `# ═══════════════════════════════════════════════════════════════
-# WireGuard Server Config — MikroTik RouterOS
-# Router: ${config.routerName} (${config.routerId})
-# Generated keys are PERSISTENT — same on every view
-# ═══════════════════════════════════════════════════════════════
+    const serverConfig = `# ============================================
+# WireGuard VPN Configuration
+# ============================================
+# Router: ${config.routerName}
+# Device ID: ${config.routerId}
+# VPN IP: ${config.routerTunnelIp}
+# Generated: ${new Date().toLocaleString()}
+# ============================================
 
-# ── 1. Create WireGuard Interface ─────────────────────────────
-/interface wireguard
-add name=wg-kenge listen-port=${config.listenPort} private-key="${config.routerPrivateKey}"
-# Public Key: ${config.routerPublicKey}
+# ============================================
+# STEP 1: Create Management User
+# ============================================
+/user add name=admin_kenge password="${router.password || 'admin'}" group=full comment="Management User - DO NOT DELETE"
 
-# ── 2. Assign IP to WireGuard Interface ───────────────────────
-/ip address
-add address=${config.routerTunnelIp}/24 interface=wg-kenge network=10.200.0.0
+# ============================================
+# STEP 2: Set Router Identity
+# ============================================
+/system identity set name="${config.routerName}"
 
-# ── 3. Add Peer (Kenge Server) ────────────────────────────────
-/interface wireguard peers
-add interface=wg-kenge \\
+# ============================================
+# STEP 3: WireGuard Interface
+# ============================================
+/interface wireguard add \\
+    name=wg-kenge \\
+    listen-port=${config.listenPort} \\
+    private-key="${config.routerPrivateKey}" \\
+    comment="Kenge VPN Interface"
+
+# ============================================
+# STEP 4: WireGuard Peer
+# ============================================
+/interface wireguard peers add \\
+    interface=wg-kenge \\
     public-key="${config.serverPublicKey}" \\
     preshared-key="${config.presharedKey}" \\
-    allowed-address=10.200.0.0/24 \\
     endpoint-address=${config.serverEndpoint} \\
     endpoint-port=${config.serverPort} \\
+    allowed-address=10.200.0.0/24 \\
     persistent-keepalive=25s \\
     comment="Kenge ISP Server"
 
-# ── 4. Firewall Rules (Allow WireGuard) ───────────────────────
-/ip firewall filter
-add chain=input protocol=udp dst-port=${config.listenPort} action=accept \\
-    comment="Allow WireGuard - Kenge"
-add chain=forward in-interface=wg-kenge action=accept \\
-    comment="Allow WG traffic"
-add chain=forward out-interface=wg-kenge action=accept \\
-    comment="Allow WG return traffic"
+# ============================================
+# STEP 5: IP Address
+# ============================================
+/ip address add address=${config.routerTunnelIp}/24 interface=wg-kenge comment="VPN Address"
 
-# ── 5. NAT for WireGuard Tunnel ───────────────────────────────
-/ip firewall nat
-add chain=srcnat out-interface=wg-kenge action=masquerade \\
-    comment="NAT WireGuard traffic"
+# ============================================
+# STEP 6: Route
+# ============================================
+/ip route add dst-address=10.200.0.0/24 gateway=wg-kenge comment="VPN Route"
 
-# ── 6. Routes ────────────────────────────────────────────────
-/ip route
-add dst-address=10.200.0.0/24 gateway=wg-kenge \\
-    comment="WireGuard subnet route"
+# ============================================
+# STEP 7: Firewall
+# ============================================
+/ip firewall filter add chain=input action=accept protocol=udp dst-port=${config.listenPort} comment="Allow WireGuard VPN" place-before=0
+/ip firewall filter add chain=forward action=accept in-interface=wg-kenge comment="Allow VPN Traffic" place-before=0
+/ip firewall filter add chain=forward action=accept out-interface=wg-kenge comment="Allow VPN Return Traffic" place-before=0
 
-# ═══════════════════════════════════════════════════════════════
-# ✅ WireGuard configured for "${config.routerName}"
-# Tunnel Address: ${config.routerTunnelIp}/24
-# Server Endpoint: ${config.serverEndpoint}:${config.serverPort}
-# ═══════════════════════════════════════════════════════════════`;
+# ============================================
+# STEP 8: DNS
+# ============================================
+/ip dns set servers=8.8.8.8,8.8.4.4 allow-remote-requests=yes
+
+# ============================================
+# Configuration Complete!
+# ============================================
+# Management Credentials:
+# - Username: admin_kenge
+# - Password: ${router.password || 'admin'}
+#
+# VPN Configuration:
+# - VPN IP: ${config.routerTunnelIp}
+# - Endpoint: ${config.serverEndpoint}:${config.serverPort}
+# - Interface: wg-kenge
+# - Listen Port: ${config.listenPort}
+#
+# IMPORTANT: Save these credentials securely!
+# ============================================`;
 
     // Client config for the HQInvestment ISP server
     const clientConfig = `# ═══════════════════════════════════════════════════════════════

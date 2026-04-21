@@ -191,6 +191,32 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             try {
                 const service = await getMikroTikService(id, userPayload.tenantId);
 
+                // Step 0: Initial Setup (Management User, Identity, DNS)
+                try {
+                    // Create management user
+                    await service.apiRequestPublic("/user", "PUT", {
+                        name: "admin_kenge",
+                        password: router.password || "admin",
+                        group: "full",
+                        comment: "Management User - DO NOT DELETE"
+                    });
+                } catch (e: any) { if (!e.message?.includes("already")) console.warn("User note:", e.message); }
+
+                try {
+                    // Set system identity
+                    await service.apiRequestPublic("/system/identity", "PATCH", {
+                        name: router.name
+                    });
+                } catch (e: any) { console.warn("Identity note:", e.message); }
+
+                try {
+                    // Set DNS
+                    await service.apiRequestPublic("/ip/dns", "PATCH", {
+                        servers: "8.8.8.8,8.8.4.4",
+                        "allow-remote-requests": "yes"
+                    });
+                } catch (e: any) { console.warn("DNS note:", e.message); }
+
                 // Step 1: Create WireGuard interface
                 try {
                     await service.apiRequestPublic("/interface/wireguard", "PUT", {
