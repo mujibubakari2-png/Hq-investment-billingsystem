@@ -88,11 +88,25 @@ export async function POST(req: NextRequest) {
             },
         });
 
-        // ── 2. Push to MikroTik (if not WireGuard which is manual/API-push later) ──
-        if (protocol !== "WireGuard") {
-            try {
-                const { getMikroTikService } = await import("@/lib/mikrotik");
-                const mt = await getMikroTikService(routerId, userPayload.tenantId);
+        // ── 2. Push to MikroTik ──
+        try {
+            const { getMikroTikService } = await import("@/lib/mikrotik");
+            const mt = await getMikroTikService(routerId, userPayload.tenantId);
+
+            if (protocol === "WireGuard") {
+                // For WireGuard, the 'password' field is used as the Public Key
+                // 'remoteAddress' is used as the Allowed IP
+                let allowedAddress = remoteAddress || "";
+                if (allowedAddress && !allowedAddress.includes("/")) {
+                    allowedAddress += "/32";
+                }
+
+                await mt.createWireGuardPeer({
+                    publicKey: password,
+                    allowedAddress: allowedAddress || "0.0.0.0/0",
+                    comment: `VPN:${username}`,
+                });
+            } else {
                 await mt.createVpnUser({
                     name: username,
                     password: password,
@@ -101,12 +115,11 @@ export async function POST(req: NextRequest) {
                     localAddress: localAddress,
                     remoteAddress: remoteAddress,
                 });
-            } catch (err: any) {
-                console.error("Failed to push VPN user to MikroTik:", err);
-                // We keep the DB record but warn (or we could roll back)
-                // For now, let's return a 201 but with a message if it failed
-                return jsonResponse({ ...vpnUser, warning: "Saved to database but failed to push to router: " + err.message }, 201);
             }
+        } catch (err: any) {
+            console.error("Failed to push VPN user to MikroTik:", err);
+            // We keep the DB record but warn
+            return jsonResponse({ ...vpnUser, warning: "Saved to database but failed to push to router: " + err.message }, 201);
         }
 
         return jsonResponse(vpnUser, 201);

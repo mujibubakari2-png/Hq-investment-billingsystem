@@ -644,6 +644,62 @@ export class MikroTikService {
         }
     }
 
+    // ══════════════════════════════════════════════════════════════════════════
+    // WIREGUARD PEER MANAGEMENT (/interface/wireguard/peers)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    async createWireGuardPeer(peer: { publicKey: string; allowedAddress: string; comment?: string; interface?: string }): Promise<void> {
+        try {
+            // 1. Find a WireGuard interface if not specified
+            let iface = peer.interface;
+            if (!iface) {
+                const interfaces = await this.apiRequest("/interface/wireguard");
+                if (interfaces && interfaces.length > 0) {
+                    // Try to find wg-kenge first, then wireguard1, then the first one
+                    const kenge = interfaces.find((i: any) => i.name === "wg-kenge");
+                    const wg1 = interfaces.find((i: any) => i.name === "wireguard1");
+                    iface = kenge?.name || wg1?.name || interfaces[0].name;
+                } else {
+                    // Create one if none exists
+                    iface = "wg-kenge";
+                    await this.apiRequest("/interface/wireguard", "PUT", {
+                        name: iface,
+                        comment: "Auto-created by HQInvestment",
+                        "listen-port": "13231"
+                    });
+                }
+            }
+
+            // 2. Create the peer
+            await this.apiRequest("/interface/wireguard/peers", "PUT", {
+                interface: iface,
+                "public-key": peer.publicKey,
+                "allowed-address": peer.allowedAddress,
+                comment: peer.comment || "Managed by HQInvestment",
+            });
+            await this.log("create_wg_peer", `Created WireGuard peer: ${peer.comment} on ${iface}`, "success");
+        } catch (err: any) {
+            await this.log("create_wg_peer", `Failed to create WG peer: ${err.message}`, "error");
+            throw err;
+        }
+    }
+
+    async deleteWireGuardPeer(publicKeyOrComment: string): Promise<void> {
+        try {
+            // Find the peer by public key or comment
+            const peers = await this.apiRequest("/interface/wireguard/peers");
+            const peer = (peers || []).find((p: any) => p["public-key"] === publicKeyOrComment || p.comment === publicKeyOrComment);
+            
+            if (peer?.[".id"]) {
+                await this.apiRequest(`/interface/wireguard/peers/${peer[".id"]}`, "DELETE");
+                await this.log("delete_wg_peer", `Deleted WireGuard peer: ${publicKeyOrComment}`, "success");
+            }
+        } catch (err: any) {
+            await this.log("delete_wg_peer", `Failed to delete WG peer ${publicKeyOrComment}: ${err.message}`, "error");
+            throw err;
+        }
+    }
+
     /**
      * Create bandwidth profile from a package definition
      */
