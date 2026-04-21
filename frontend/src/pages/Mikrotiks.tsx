@@ -80,8 +80,8 @@ export default function Mikrotiks() {
                 host: data.host || '0.0.0.0',
                 username: data.username || 'admin',
                 password: data.password,
-                port: data.apiPort || 8728,
-                apiPort: data.apiPort || 8728,
+                port: data.port,
+                apiPort: data.apiPort,
                 vpnMode: data.vpnMode,
                 description: data.description,
             });
@@ -270,10 +270,12 @@ export default function Mikrotiks() {
                                     <td>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                             <span style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>{router.host}</span>
-                                            <span style={{
-                                                padding: '1px 6px', borderRadius: 4, fontSize: '0.65rem', fontWeight: 600,
-                                                background: '#f3f4f6', color: '#6b7280',
-                                            }}>:{router.port || 8728}</span>
+                                            {router.port && (
+                                                <span style={{
+                                                    padding: '1px 6px', borderRadius: 4, fontSize: '0.65rem', fontWeight: 600,
+                                                    background: '#f3f4f6', color: '#6b7280',
+                                                }}>:{router.port}</span>
+                                            )}
                                         </div>
                                     </td>
                                     <td>

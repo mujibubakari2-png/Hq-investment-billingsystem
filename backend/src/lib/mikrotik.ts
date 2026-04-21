@@ -205,7 +205,25 @@ export class MikroTikService {
         }
     }
 
+    async listInterfaces(): Promise<any[]> {
+        try {
+            const interfaces = await this.apiRequest("/interface/ethernet");
+            return (interfaces || []).map((i: any) => ({
+                name: i.name,
+                type: i.type || "ether",
+                mac: i["mac-address"] || "",
+                status: i.running === "true" || i.running === true ? "Up" : "Down",
+                disabled: i.disabled === "true" || i.disabled === true,
+                comment: i.comment || "",
+            }));
+        } catch (err: any) {
+            await this.log("list_interfaces", err.message, "error");
+            throw err;
+        }
+    }
+
     // ══════════════════════════════════════════════════════════════════════════
+
     // PPPoE USER MANAGEMENT
     // ══════════════════════════════════════════════════════════════════════════
 

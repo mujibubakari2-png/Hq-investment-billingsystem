@@ -166,7 +166,7 @@ add topics=radius action=memory
                     }}>
                         {([
                             { label: 'IP Address', value: router.host, mono: true },
-                            { label: 'API Port', value: String(router.port || 8728), mono: true },
+                            { label: 'API Port', value: router.port ? String(router.port) : '—', mono: true },
                             { label: 'Type', value: router.type || 'RouterOS', mono: false },
                             { label: 'Active Users', value: String(router.activeUsers || 0), mono: false },
                             { label: 'CPU Load', value: `${router.cpuLoad || 0}%`, mono: false },

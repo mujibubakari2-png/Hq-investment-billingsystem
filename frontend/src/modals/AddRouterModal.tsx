@@ -28,6 +28,11 @@ export default function AddRouterModal({ onClose, onSave, initialData }: AddRout
     );
     const [description, setDescription] = useState(initialData?.description || '');
     const [status, setStatus] = useState<'Online' | 'Offline'>(initialData?.status === 'Online' ? 'Online' : 'Offline');
+    const [showAdvanced, setShowAdvanced] = useState(false);
+    const [host, setHost] = useState(initialData?.host || "0.0.0.0");
+    const [username, setUsername] = useState(initialData?.username || "admin");
+    const [port, setPort] = useState<number | undefined>(initialData?.port || undefined);
+    const [apiPort, setApiPort] = useState<number | undefined>(initialData?.apiPort || undefined);
 
     const handleSave = () => {
         if (!routerName || !accessCode) {
@@ -40,10 +45,10 @@ export default function AddRouterModal({ onClose, onSave, initialData }: AddRout
             vpnMode,
             description,
             status,
-            host: initialData?.host || "0.0.0.0", // Default for new routers
-            username: initialData?.username || "admin",
-            port: initialData?.port || 8728,
-            apiPort: initialData?.apiPort || 8728,
+            host: host,
+            username: username,
+            port: port,
+            apiPort: apiPort,
         });
     };
 
@@ -288,6 +293,80 @@ export default function AddRouterModal({ onClose, onSave, initialData }: AddRout
                                 fontSize: '0.95rem'
                             }}
                         />
+                    </div>
+
+                    {/* Advanced Settings Toggle */}
+                    <div style={{ marginBottom: 20 }}>
+                        <button 
+                            type="button" 
+                            onClick={() => setShowAdvanced(!showAdvanced)}
+                            style={{ 
+                                background: 'transparent', border: 'none', color: 'var(--primary)', 
+                                fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer',
+                                display: 'flex', alignItems: 'center', gap: 6, padding: 0
+                            }}
+                        >
+                            {showAdvanced ? '− Hide Advanced Settings' : '+ Show Advanced Settings (Host, User & Port)'}
+                        </button>
+
+                        {showAdvanced && (
+                            <div style={{ 
+                                marginTop: 16, padding: 20, background: 'var(--bg-input)', 
+                                border: '1.5px solid var(--border)', borderRadius: 'var(--radius)',
+                                animation: 'fadeIn 0.3s ease-out'
+                            }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+                                    <div className="form-group">
+                                        <label className="form-label" style={{ fontSize: '0.8rem', fontWeight: 700, marginBottom: 8, display: 'block' }}>
+                                            Router IP / Host Address
+                                        </label>
+                                        <input
+                                            type="text"
+                                            className="form-input"
+                                            placeholder="e.g., 192.168.88.1"
+                                            value={host}
+                                            onChange={e => setHost(e.target.value)}
+                                            style={{ height: 44, fontSize: '0.9rem' }}
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label" style={{ fontSize: '0.8rem', fontWeight: 700, marginBottom: 8, display: 'block' }}>
+                                            API Username
+                                        </label>
+                                        <input
+                                            type="text"
+                                            className="form-input"
+                                            placeholder="admin"
+                                            value={username}
+                                            onChange={e => setUsername(e.target.value)}
+                                            style={{ height: 44, fontSize: '0.9rem' }}
+                                        />
+                                    </div>
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                                    <div className="form-group">
+                                        <label className="form-label" style={{ fontSize: '0.8rem', fontWeight: 700, marginBottom: 8, display: 'block' }}>
+                                            API Port (Optional)
+                                        </label>
+                                        <input
+                                            type="number"
+                                            className="form-input"
+                                            placeholder="e.g., 8728"
+                                            value={apiPort || ''}
+                                            onChange={e => {
+                                                const val = e.target.value ? parseInt(e.target.value) : undefined;
+                                                setApiPort(val);
+                                                setPort(val);
+                                            }}
+                                            style={{ height: 44, fontSize: '0.9rem' }}
+                                        />
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', fontSize: '0.75rem', color: 'var(--text-secondary)', paddingTop: 20 }}>
+                                        Leave blank for defaults.
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* Initial Status */}

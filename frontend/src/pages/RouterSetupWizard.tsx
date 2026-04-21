@@ -42,14 +42,6 @@ interface EthernetInterface {
     status: 'Up' | 'Down';
 }
 
-const mockInterfaces: EthernetInterface[] = [
-    { name: 'ether1-ISP', type: 'ether', mac: 'D4:01:C3:8B:99:EA', status: 'Up' },
-    { name: 'ether2-LAN', type: 'ether', mac: 'D4:01:C3:8B:99:EB', status: 'Down' },
-    { name: 'ether3-HOTSPOT', type: 'ether', mac: 'D4:01:C3:8B:99:EC', status: 'Up' },
-    { name: 'ether4-HOTSPOT', type: 'ether', mac: 'D4:01:C3:8B:99:ED', status: 'Down' },
-    { name: 'ether5-HOTSPOT', type: 'ether', mac: 'D4:01:C3:8B:99:EE', status: 'Down' },
-];
-
 interface VpnSecret {
     id?: string;
     username: string;
@@ -73,11 +65,64 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
 
     const routerId = routerProp?.id || paramId;
 
+    const [interfaces, setInterfaces] = useState<EthernetInterface[]>([]);
+    const [loadingInterfaces, setLoadingInterfaces] = useState(false);
+    const [connectionStatus, setConnectionStatus] = useState<'checking' | 'online' | 'offline'>('checking');
+    const [connectionError, setConnectionError] = useState<string | null>(null);
+
+    const checkConnection = async () => {
+        if (!routerId) return;
+        setConnectionStatus('checking');
+        setConnectionError(null);
+        try {
+            const res = await routersApi.testConnection(routerId);
+            if (res.success) {
+                setConnectionStatus('online');
+            } else {
+                setConnectionStatus('offline');
+                setConnectionError(res.message);
+            }
+        } catch (err: any) {
+            setConnectionStatus('offline');
+            setConnectionError(err.message || 'Failed to connect');
+        }
+    };
+
+    const fetchInterfaces = async () => {
+        if (!routerId) return;
+        setLoadingInterfaces(true);
+        try {
+            const data = await routersApi.listInterfaces(routerId);
+            setInterfaces(data);
+        } catch (err) {
+            console.error('Failed to fetch interfaces:', err);
+        } finally {
+            setLoadingInterfaces(false);
+        }
+    };
+
     useEffect(() => {
         if (!routerData && routerId) {
             routersApi.get(routerId).then(data => setRouterData(data)).catch(console.error);
         }
     }, [routerId]);
+
+    // Perform check when entering Connection step
+    useEffect(() => {
+        if (currentStep === 1) {
+            checkConnection();
+        }
+        if (currentStep === 4) {
+            fetchInterfaces();
+        }
+        if (currentStep === 6) {
+            // Initial verification check
+            setVerifyStatus('checking');
+            routersApi.testConnection(routerId || '').then(res => {
+                setVerifyStatus(res.success ? 'success' : 'failed');
+            }).catch(() => setVerifyStatus('failed'));
+        }
+    }, [currentStep]);
 
     const routerName = routerData?.name || 'Loading...';
 
@@ -134,6 +179,15 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
     const [verifyStatus, setVerifyStatus] = useState<'checking' | 'success' | 'failed'>('failed');
 
     const handleNext = () => {
+        if (currentStep === 1 && connectionStatus !== 'online') {
+            alert('Please wait for connection check or ensure router is online.');
+            return;
+        }
+        if (currentStep === 4 && selectedInterfaces.length === 0) {
+            alert('Please select at least one interface.');
+            return;
+        }
+
         if (currentStep < steps.length - 1) {
             setCurrentStep(currentStep + 1);
         } else {
@@ -303,21 +357,46 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                     <div style={{ textAlign: 'center', padding: '30px 0' }}>
                         <CableIcon style={{ fontSize: 56, color: 'var(--text-secondary)', marginBottom: 16 }} />
                         <h2 style={{ marginBottom: 6 }}>Router Connection Status</h2>
-                        <p style={{ color: 'var(--text-secondary)', marginBottom: 30 }}>Monitoring router connection</p>
+                        <p style={{ color: 'var(--text-secondary)', marginBottom: 30 }}>Monitoring router connection to our VPN network</p>
 
                         <div style={{
                             maxWidth: 500, margin: '0 auto', padding: 40,
                             border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)',
                             background: 'var(--bg-surface)',
                         }}>
-                            <CheckCircleIcon style={{ fontSize: 56, color: '#16a34a', marginBottom: 16 }} />
-                            <h3 style={{ color: '#16a34a', marginBottom: 6 }}>Router is Online!</h3>
-                            <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>VPN connection established successfully</p>
-
-                            <button className="btn" style={{ background: '#16a34a', color: '#fff', fontWeight: 600, padding: '10px 24px', borderRadius: 'var(--radius-sm)', marginTop: 24 }}
-                                onClick={handleNext}>
-                                Continue to Service Selection <ArrowForwardIcon fontSize="small" />
-                            </button>
+                            {connectionStatus === 'checking' ? (
+                                <>
+                                    <RefreshIcon className="spin" style={{ fontSize: 56, color: 'var(--primary)', marginBottom: 16 }} />
+                                    <h3 style={{ color: 'var(--primary)', marginBottom: 6 }}>Checking Connection...</h3>
+                                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Please wait while we verify the VPN tunnel status</p>
+                                </>
+                            ) : connectionStatus === 'online' ? (
+                                <>
+                                    <CheckCircleIcon style={{ fontSize: 56, color: '#16a34a', marginBottom: 16 }} />
+                                    <h3 style={{ color: '#16a34a', marginBottom: 6 }}>Router is Online!</h3>
+                                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>VPN connection established successfully</p>
+                                    <button className="btn" style={{ background: '#16a34a', color: '#fff', fontWeight: 600, padding: '10px 24px', borderRadius: 'var(--radius-sm)', marginTop: 24 }}
+                                        onClick={handleNext}>
+                                        Continue to Service Selection <ArrowForwardIcon fontSize="small" />
+                                    </button>
+                                </>
+                            ) : (
+                                <>
+                                    <CancelIcon style={{ fontSize: 56, color: 'var(--danger)', marginBottom: 16 }} />
+                                    <h3 style={{ color: 'var(--danger)', marginBottom: 6 }}>Router is Offline</h3>
+                                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: 20 }}>
+                                        {connectionError || 'Could not establish connection to the router.'}
+                                    </p>
+                                    <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+                                        <button className="btn btn-secondary" onClick={checkConnection}>
+                                            <RefreshIcon fontSize="small" /> Try Again
+                                        </button>
+                                        <button className="btn btn-secondary" onClick={() => setCurrentStep(0)}>
+                                            <ArrowBackIcon fontSize="small" /> Check Instructions
+                                        </button>
+                                    </div>
+                                </>
+                            )}
                         </div>
                     </div>
                 );
@@ -708,6 +787,7 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                                             • {vpnProtocol === 'L2TP' ? 'L2TP server with IPsec encryption will be enabled' : `${vpnProtocol} server will be enabled`}<br />
                                             • IP Pool: {vpnPoolStart} – {vpnPoolEnd}
                                         </div>
+                                        </div>
                                     </div>
                                 </>
                             )}
@@ -724,32 +804,49 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                         <p style={{ color: 'var(--text-secondary)', marginBottom: 24 }}>Choose ethernet ports for your services</p>
 
                         <div style={{ maxWidth: 650, margin: '0 auto', textAlign: 'left' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, fontWeight: 600 }}>
-                                🌐 Available Ethernet Interfaces
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600 }}>
+                                    🌐 Available Ethernet Interfaces
+                                </div>
+                                <button className="btn btn-secondary" style={{ padding: '4px 10px', fontSize: '0.75rem' }} onClick={fetchInterfaces}>
+                                    <RefreshIcon fontSize="inherit" /> Refresh
+                                </button>
                             </div>
 
-                            <div className="grid-2 gap-12">
-                                {mockInterfaces.map((iface) => (
-                                    <div key={iface.name} onClick={() => toggleInterface(iface.name)} style={{
-                                        border: selectedInterfaces.includes(iface.name) ? '2px solid #0d9488' : '1px solid var(--border)',
-                                        borderRadius: 'var(--radius-sm)', padding: '14px 16px', cursor: 'pointer',
-                                        background: selectedInterfaces.includes(iface.name) ? '#f0fdfa' : '#fff',
-                                        display: 'flex', alignItems: 'center', justifyContent: 'space-between', transition: 'all 0.2s',
-                                    }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                            <input type="checkbox" checked={selectedInterfaces.includes(iface.name)}
-                                                onChange={() => toggleInterface(iface.name)} style={{ width: 16, height: 16 }} />
-                                            <div>
-                                                <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{iface.name}</div>
-                                                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{iface.type} - {iface.mac}</div>
+                            {loadingInterfaces ? (
+                                <div style={{ textAlign: 'center', padding: 40, border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)', background: '#fff' }}>
+                                    <RefreshIcon className="spin" style={{ color: 'var(--primary)', marginBottom: 10 }} />
+                                    <p style={{ color: 'var(--text-secondary)' }}>Fetching interfaces from {routerName}...</p>
+                                </div>
+                            ) : interfaces.length === 0 ? (
+                                <div style={{ textAlign: 'center', padding: 40, border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)', background: '#fff' }}>
+                                    <WarningAmberIcon style={{ color: '#d97706', fontSize: 32, marginBottom: 10 }} />
+                                    <p style={{ color: 'var(--text-secondary)' }}>No ethernet interfaces found. Please check connection.</p>
+                                </div>
+                            ) : (
+                                <div className="grid-2 gap-12">
+                                    {interfaces.map((iface) => (
+                                        <div key={iface.name} onClick={() => toggleInterface(iface.name)} style={{
+                                            border: selectedInterfaces.includes(iface.name) ? '2px solid #0d9488' : '1px solid var(--border)',
+                                            borderRadius: 'var(--radius-sm)', padding: '14px 16px', cursor: 'pointer',
+                                            background: selectedInterfaces.includes(iface.name) ? '#f0fdfa' : '#fff',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'space-between', transition: 'all 0.2s',
+                                        }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                                <input type="checkbox" checked={selectedInterfaces.includes(iface.name)}
+                                                    onChange={() => toggleInterface(iface.name)} style={{ width: 16, height: 16 }} />
+                                                <div>
+                                                    <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{iface.name}</div>
+                                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{iface.type} - {iface.mac}</div>
+                                                </div>
                                             </div>
+                                            <span style={{ fontSize: '0.75rem', fontWeight: 500, color: iface.status === 'Up' ? '#16a34a' : '#9ca3af', display: 'flex', alignItems: 'center', gap: 4 }}>
+                                                ⊙ {iface.status}
+                                            </span>
                                         </div>
-                                        <span style={{ fontSize: '0.75rem', fontWeight: 500, color: iface.status === 'Up' ? '#16a34a' : '#9ca3af', display: 'flex', alignItems: 'center', gap: 4 }}>
-                                            ⊙ {iface.status}
-                                        </span>
-                                    </div>
-                                ))}
-                            </div>
+                                    ))}
+                                </div>
+                            )}
 
                             <div style={{
                                 marginTop: 20, padding: '12px 16px',
@@ -759,7 +856,7 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                                 <InfoOutlinedIcon style={{ fontSize: 18, color: '#1d4ed8', marginTop: 2 }} />
                                 <div style={{ fontSize: '0.85rem', color: '#1e40af' }}>
                                     <strong>Bridge Information:</strong><br />
-                                    radiax_pppoe bridge will be created for PPPoE server with selected interfaces.
+                                    A bridge will be created and selected interfaces will be added as ports.
                                 </div>
                             </div>
                         </div>
@@ -902,7 +999,12 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                                     <DnsIcon style={{ fontSize: 16 }} /> PPPoE Server Status
                                 </div>
                                 <div style={{ padding: 20, textAlign: 'center' }}>
-                                    {verifyStatus === 'failed' ? (
+                                    {verifyStatus === 'checking' ? (
+                                        <>
+                                            <RefreshIcon className="spin" style={{ fontSize: 40, color: 'var(--primary)', marginBottom: 8 }} />
+                                            <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Checking PPPoE server...</div>
+                                        </>
+                                    ) : verifyStatus === 'failed' ? (
                                         <>
                                             <CancelIcon style={{ fontSize: 40, color: 'var(--primary)', marginBottom: 8 }} />
                                             <div style={{ color: 'var(--primary)', fontWeight: 600, marginBottom: 4 }}>Configuration Failed</div>
@@ -925,7 +1027,12 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                                         <VpnKeyIcon style={{ fontSize: 16 }} /> VPN Server Status
                                     </div>
                                     <div style={{ padding: 20, textAlign: 'center' }}>
-                                        {verifyStatus === 'failed' ? (
+                                        {verifyStatus === 'checking' ? (
+                                            <>
+                                                <RefreshIcon className="spin" style={{ fontSize: 40, color: '#7c3aed', marginBottom: 8 }} />
+                                                <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Checking VPN status...</div>
+                                            </>
+                                        ) : verifyStatus === 'failed' ? (
                                             <>
                                                 <CancelIcon style={{ fontSize: 40, color: '#d97706', marginBottom: 8 }} />
                                                 <div style={{ color: '#d97706', fontWeight: 600, marginBottom: 4 }}>Pending Setup</div>

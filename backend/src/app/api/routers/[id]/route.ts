@@ -46,15 +46,30 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         const body = await req.json();
 
         const data: any = {};
-        if (body.name) data.name = body.name;
-        if (body.host) data.host = body.host;
-        if (body.username !== undefined) data.username = body.username;
-        if (body.password !== undefined) data.password = body.password;
-        if (body.port) data.port = parseInt(body.port.toString());
-        if (body.apiPort) data.apiPort = parseInt(body.apiPort.toString());
+        // Handle aliases
+        const name = body.name || body.routerName || body.hostname || body.router_name;
+        const host = body.host || body.hostIP || body.ipAddress || body.address || body.ip;
+        const password = body.password || body.accessCode || body.secret || body.sharedSecret;
+        const username = body.username || body.user;
+
+        if (name) data.name = name;
+        if (host) data.host = host;
+        if (username !== undefined) data.username = username;
+        if (password !== undefined) data.password = password;
+        
+        // Port handling - allow null to override defaults
+        if (body.port !== undefined || body.apiPort !== undefined) {
+            const portVal = body.port !== undefined ? body.port : body.apiPort;
+            data.port = portVal === null ? null : parseInt(portVal.toString());
+            
+            const apiPortVal = body.apiPort !== undefined ? body.apiPort : portVal;
+            data.apiPort = apiPortVal === null ? null : parseInt(apiPortVal.toString());
+        }
+
         if (body.vpnMode) data.vpnMode = body.vpnMode;
         if (body.description !== undefined) data.description = body.description;
         if (body.status) data.status = body.status.toUpperCase();
+        if (body.accountingEnabled !== undefined) data.accountingEnabled = !!body.accountingEnabled;
 
         const router = await prisma.router.update({ where: { id }, data });
 
@@ -69,7 +84,12 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
             },
         });
 
-        return jsonResponse(router);
+        return jsonResponse({
+            ...router,
+            status: router.status === "ONLINE" ? "Online" : "Offline",
+            router_id: router.id, // Alias
+            ip: router.host, // Alias
+        });
     } catch {
         return errorResponse("Internal server error", 500);
     }

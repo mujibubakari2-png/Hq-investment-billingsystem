@@ -26,8 +26,10 @@ export async function GET(req: NextRequest) {
 
         let mapped = routers.map((r) => ({
             id: r.id,
+            router_id: r.id, // Alias
             name: r.name,
             host: r.host,
+            ip: r.host, // Alias
             username: r.username,
             password: r.password,
             port: r.port,
@@ -45,6 +47,8 @@ export async function GET(req: NextRequest) {
             packageCount: r._count.packages,
             subscriberCount: r._count.subscriptions,
             tenant_id: r.tenantId, // Alias for tests
+            createdAt: toISOSafe(r.createdAt),
+            updatedAt: toISOSafe(r.updatedAt),
         }));
 
         if (isPaginated) {
@@ -55,7 +59,8 @@ export async function GET(req: NextRequest) {
                 );
             }
             const page = parseInt(searchParams.get("page") || "1");
-            const limit = searchParams.get("limit") === "All" ? 999999 : parseInt(searchParams.get("limit") || "25");
+            const limitVal = searchParams.get("limit");
+            const limit = limitVal === "All" ? 999999 : parseInt(limitVal || "25");
             const total = mapped.length;
             const paginated = mapped.slice((page - 1) * limit, page * limit);
             return jsonResponse({ data: paginated, total });
@@ -95,7 +100,7 @@ export async function POST(req: NextRequest) {
         }
 
         // Normalize numeric fields
-        const port = body.port ? parseInt(body.port.toString()) : (body.apiPort ? parseInt(body.apiPort.toString()) : 8728);
+        const port = body.port ? parseInt(body.port.toString()) : (body.apiPort ? parseInt(body.apiPort.toString()) : null);
         const apiPort = body.apiPort ? parseInt(body.apiPort.toString()) : port;
 
         // Relaxed host validation
@@ -104,10 +109,10 @@ export async function POST(req: NextRequest) {
         }
 
         // Validate ports
-        if (isNaN(port) || port < 1 || port > 65535) {
+        if (port !== null && (isNaN(port) || port < 1 || port > 65535)) {
             return errorResponse("Invalid port number (must be 1-65535)");
         }
-        if (isNaN(apiPort) || apiPort < 1 || apiPort > 65535) {
+        if (apiPort !== null && (isNaN(apiPort) || apiPort < 1 || apiPort > 65535)) {
             return errorResponse("Invalid API port number (must be 1-65535)");
         }
 
@@ -118,10 +123,10 @@ export async function POST(req: NextRequest) {
             return errorResponse(`Router with name "${name}" already exists in your tenant`);
         }
 
-        const routerData = {
+        const routerData: any = {
             name,
             host,
-            username: body.username || "admin",
+            username: body.username || body.user || "admin",
             password: password,
             port: port,
             apiPort: apiPort,
@@ -133,6 +138,11 @@ export async function POST(req: NextRequest) {
             tenantId: tenantIdValue
         };
 
+        // WireGuard configuration fields
+        if (body.wgTunnelIp) routerData.wgTunnelIp = body.wgTunnelIp;
+        if (body.wgServerEndpoint !== undefined) routerData.wgServerEndpoint = body.wgServerEndpoint;
+        if (body.wgListenPort) routerData.wgListenPort = parseInt(body.wgListenPort.toString());
+
         const router = existing 
             ? await prisma.router.update({ where: { id: existing.id }, data: routerData })
             : await prisma.router.create({ data: routerData });
@@ -143,29 +153,20 @@ export async function POST(req: NextRequest) {
                 routerId: router.id,
                 tenantId: tenantIdValue,
                 action: existing ? "router_updated" : "router_created",
-                details: `Router "${router.name}" ${existing ? 'updated' : 'added'} (${router.host}:${router.apiPort})`,
+                details: `Router "${router.name}" ${existing ? 'updated' : 'added'} (${router.host}:${router.apiPort || 'N/A'})`,
                 status: "success",
             },
         });
 
         return jsonResponse({
-            id: router.id,
+            ...router,
             router_id: router.id, // Alias for tests
-            name: router.name,
             routerName: router.name, // Alias
             hostname: router.name, // Alias
-            host: router.host,
             ip: router.host, // Alias
             hostIP: router.host, // Alias
-            port: router.port,
-            apiPort: router.apiPort,
-            type: router.type,
-            vpnMode: router.vpnMode,
-            description: router.description,
-            status: router.status,
-            accountingEnabled: (router as any).accountingEnabled,
-            tenantId: router.tenantId,
             tenant_id: router.tenantId, // Alias for tests
+            status: router.status === "ONLINE" ? "Online" : "Offline",
             setupInstructions: "To configure your router, please copy the auto-configuration script from the dashboard.",
             downloadLinks: {
                 script: `/api/routers/${router.id}/script`,

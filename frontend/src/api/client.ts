@@ -285,6 +285,9 @@ export const routersApi = {
     update: (id: string, data: Record<string, unknown>) => put<Record<string, unknown>>(`/routers/${id}`, data),
     delete: (id: string) => del<{ message: string }>(`/routers/${id}`),
 
+    // Interfaces
+    listInterfaces: (id: string) => get<any[]>(`/routers/${id}/interfaces`),
+
     // Test connection
     testConnection: (id: string) => post<{ success: boolean; message: string; info?: Record<string, unknown> }>(`/routers/${id}/test`, {}),
 
