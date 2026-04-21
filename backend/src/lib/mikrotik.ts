@@ -83,11 +83,12 @@ export class MikroTikService {
         this.conn = conn;
         this.routerId = routerId;
         this.tenantId = tenantId || null;
-        // RouterOS REST API runs on the HTTP port (default 80), NOT the API port (8728)
-        // The apiPort (8728) is for the RouterOS terminal API protocol
-        // For REST: use port 80 (http) or 443 (https)
-        const restPort = conn.port === 8728 || conn.port === 8729 ? 80 : conn.port;
-        this.baseUrl = `http://${conn.host}:${restPort}`;
+        // RouterOS REST API runs on the HTTP (80) or HTTPS (443) port, not the terminal API port (8728)
+        // Determine protocol based on environment or port. Prefer HTTPS if enabled.
+        const useHttps = process.env.MIKROTIK_USE_HTTPS === "true";
+        const restPort = conn.port === 8728 || conn.port === 8729 ? (useHttps ? 443 : 80) : conn.port;
+        const protocol = useHttps ? "https" : "http";
+        this.baseUrl = `${protocol}://${conn.host}:${restPort}`;
     }
 
     // ── Internal HTTP helper for RouterOS REST API ───────────────────────────
@@ -98,17 +99,37 @@ export class MikroTikService {
             "Content-Type": "application/json",
             "Authorization": "Basic " + Buffer.from(`${this.conn.username}:${this.conn.password}`).toString("base64"),
         };
+        const timeoutMs = parseInt(process.env.MIKROTIK_TIMEOUT_MS || "8000");
 
         try {
             const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 8000); // 8s timeout
+            const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
-            const res = await fetch(url, {
+            const fetchOptions: any = {
                 method,
                 headers,
                 body: body ? JSON.stringify(body) : undefined,
                 signal: controller.signal,
-            });
+            };
+            // If using HTTPS and insecure flag is set, allow self‑signed certificates
+            if (this.baseUrl.startsWith('https') && process.env.MIKROTIK_INSECURE === 'true') {
+                const https = require('https');
+                fetchOptions.agent = new https.Agent({ rejectUnauthorized: false });
+            }
+
+            // Perform the HTTP request with fallback from HTTPS to HTTP if needed
+            let res;
+            try {
+                res = await fetch(url, fetchOptions);
+            } catch (firstErr) {
+                // If the base URL was HTTPS and the request failed, try HTTP as a fallback
+                if (this.baseUrl.startsWith('https')) {
+                    const httpUrl = url.replace('https://', 'http://');
+                    res = await fetch(httpUrl, fetchOptions);
+                } else {
+                    throw firstErr;
+                }
+            }
 
             clearTimeout(timeout);
 
@@ -121,13 +142,13 @@ export class MikroTikService {
             return text ? JSON.parse(text) : {};
         } catch (err: any) {
             if (err.name === "AbortError") {
-                throw new Error(`Connection to ${this.conn.host} timed out after 8 seconds. Ensure the router is reachable and REST API is enabled on the web port (80/443).`);
+                throw new Error(`Connection to ${this.conn.host} timed out after ${timeoutMs / 1000}s. Ensure the router is reachable, REST API service (www/www-ssl) is enabled, and firewall allows inbound traffic on port ${this.baseUrl.includes('https') ? '443' : '80'}.`);
             }
             if (err.cause?.code === "ECONNREFUSED") {
-                throw new Error(`Connection refused by ${this.conn.host}. Ensure the router is reachable and the REST API (www-ssl or www) service is enabled.`);
+                throw new Error(`Connection refused by ${this.conn.host}. Verify the REST API (www or www-ssl) service is enabled, firewall permits access, and correct port (${this.baseUrl.includes('https') ? '443' : '80'}) is used.`);
             }
             if (err.cause?.code === "EHOSTUNREACH" || err.cause?.code === "ENETUNREACH") {
-                throw new Error(`Router ${this.conn.host} is unreachable. Check the IP address and network connectivity.`);
+                throw new Error(`Router ${this.conn.host} appears unreachable. Check network routing, firewalls, and ensure the IP is public or accessible from this server.`);
             }
             throw new Error(`Failed to connect to ${this.conn.host}: ${err.message}`);
         }
