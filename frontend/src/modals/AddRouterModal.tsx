@@ -27,7 +27,7 @@ export default function AddRouterModal({ onClose, onSave, initialData }: AddRout
         (initialData?.vpnMode as 'hybrid' | 'wireguard' | 'openvpn') || 'hybrid'
     );
     const [description, setDescription] = useState(initialData?.description || '');
-    const [status, setStatus] = useState<'ONLINE' | 'OFFLINE'>(initialData?.status === 'Online' ? 'ONLINE' : 'OFFLINE');
+    const [status, setStatus] = useState<'Online' | 'Offline'>(initialData?.status === 'Online' ? 'Online' : 'Offline');
 
     const handleSave = () => {
         if (!routerName || !accessCode) {
@@ -275,28 +275,28 @@ export default function AddRouterModal({ onClose, onSave, initialData }: AddRout
                         </label>
                         <div style={{ display: 'flex', gap: 24 }}>
                             <div 
-                                onClick={() => setStatus('ONLINE')}
+                                onClick={() => setStatus('Online')}
                                 style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}
                             >
                                 <div style={{ 
                                     width: 18, height: 18, borderRadius: '50%', 
-                                    border: status === 'ONLINE' ? '6px solid #22c55e' : '2px solid #cbd5e1',
+                                    border: status === 'Online' ? '6px solid #22c55e' : '2px solid #cbd5e1',
                                     background: '#fff'
                                 }} />
-                                <span style={{ fontSize: '0.9rem', color: status === 'ONLINE' ? '#1e293b' : '#64748b', display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <span style={{ fontSize: '0.9rem', color: status === 'Online' ? '#1e293b' : '#64748b', display: 'flex', alignItems: 'center', gap: 4 }}>
                                     <CheckIcon style={{ fontSize: 16, color: '#22c55e' }} /> Enable
                                 </span>
                             </div>
                             <div 
-                                onClick={() => setStatus('OFFLINE')}
+                                onClick={() => setStatus('Offline')}
                                 style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}
                             >
                                 <div style={{ 
                                     width: 18, height: 18, borderRadius: '50%', 
-                                    border: status === 'OFFLINE' ? '6px solid #ef4444' : '2px solid #cbd5e1',
+                                    border: status === 'Offline' ? '6px solid #ef4444' : '2px solid #cbd5e1',
                                     background: '#fff'
                                 }} />
-                                <span style={{ fontSize: '0.9rem', color: status === 'OFFLINE' ? '#1e293b' : '#64748b', display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <span style={{ fontSize: '0.9rem', color: status === 'Offline' ? '#1e293b' : '#64748b', display: 'flex', alignItems: 'center', gap: 4 }}>
                                     <CloseIcon style={{ fontSize: 16, color: '#ef4444' }} /> Disable
                                 </span>
                             </div>
