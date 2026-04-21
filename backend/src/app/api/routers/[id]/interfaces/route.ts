@@ -5,10 +5,10 @@ import { getMikroTikService } from "@/lib/mikrotik";
 
 export async function GET(
     req: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const id = params.id;
+        const { id } = await params;
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
 
