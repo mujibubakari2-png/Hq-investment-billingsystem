@@ -82,6 +82,10 @@ const serverPublicKey = process.env.WG_SERVER_PUBLIC_KEY || derivePublicKeyPlace
                 wgPeerPublicKey,
                 wgPresharedKey,
             });
+        } else if (process.env.WG_SERVER_PUBLIC_KEY && wgPeerPublicKey !== process.env.WG_SERVER_PUBLIC_KEY) {
+            // Update the peer public key if the environment variable changes
+            wgPeerPublicKey = process.env.WG_SERVER_PUBLIC_KEY;
+            await updateRouterWgFields(id, { wgPeerPublicKey });
         }
 
         const tunnelIp = router.wgTunnelIp || "10.200.0.1";
@@ -199,7 +203,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                         "endpoint-address": serverEndpoint,
                         "endpoint-port": String(serverPort),
                         "persistent-keepalive": "25s",
-                        comment: "HQInvestment ISP Server",
+                        comment: "Kenge ISP Server",
                     });
                 } catch (e: any) {
                     if (!e.message?.includes("already")) console.warn("Peer note:", e.message);
@@ -209,7 +213,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 try {
                     await service.apiRequestPublic("/ip/firewall/filter", "PUT", {
                         chain: "input", protocol: "udp", "dst-port": String(listenPort),
-                        action: "accept", comment: "Allow WireGuard - HQInvestment",
+                        action: "accept", comment: "Allow WireGuard - Kenge",
                     });
                 } catch (e: any) { console.warn("FW note:", e.message); }
 
@@ -217,7 +221,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 try {
                     await service.apiRequestPublic("/ip/firewall/nat", "PUT", {
                         chain: "srcnat", "out-interface": "wg-kenge",
-                        action: "masquerade", comment: "NAT WireGuard - HQInvestment",
+                        action: "masquerade", comment: "NAT WireGuard - Kenge",
                     });
                 } catch (e: any) { console.warn("NAT note:", e.message); }
 
@@ -225,7 +229,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 try {
                     await service.apiRequestPublic("/ip/route", "PUT", {
                         "dst-address": "10.200.0.0/24", gateway: "wg-kenge",
-                        comment: "WireGuard subnet route - HQInvestment",
+                        comment: "WireGuard subnet route - Kenge",
                     });
                 } catch (e: any) { console.warn("Route note:", e.message); }
 
