@@ -66,9 +66,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         let wgPeerPublicKey = router.wgPeerPublicKey;
         let wgPresharedKey = router.wgPresharedKey;
 
-        // Server-side keys (for the HQInvestment server)
-        const serverPrivateKey = generateWireGuardKey();
-        const serverPublicKey = derivePublicKeyPlaceholder(serverPrivateKey);
+// Server-side keys (for the HQInvestment server)
+const serverPrivateKey = process.env.WG_SERVER_PRIVATE_KEY || generateWireGuardKey();
+const serverPublicKey = process.env.WG_SERVER_PUBLIC_KEY || derivePublicKeyPlaceholder(serverPrivateKey);
 
         if (!wgPrivateKey) {
             wgPrivateKey = generateWireGuardKey();
