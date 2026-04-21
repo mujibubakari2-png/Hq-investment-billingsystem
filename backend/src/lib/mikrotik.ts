@@ -162,6 +162,12 @@ export class MikroTikService {
 
     async testConnection(): Promise<{ success: boolean; message: string; info?: RouterSystemInfo }> {
         try {
+            // Check for simulation mode (e.g., if host is "simulation")
+            if (this.conn.host.toLowerCase() === "simulation") {
+                await this.log("connection_test", "Using simulation mode", "success");
+                return { success: true, message: "Simulation mode active" };
+            }
+
             const identity = await this.apiRequest("/system/identity");
             const resources = await this.apiRequest("/system/resource");
 
