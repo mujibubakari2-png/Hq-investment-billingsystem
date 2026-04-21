@@ -48,33 +48,38 @@ export default function AddRouterModal({ onClose, onSave, initialData }: AddRout
     };
 
     return (
-        <div className="modal-overlay" onClick={onClose} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100 }}>
+        <div className="modal-overlay" onClick={onClose} style={{ 
+            display: 'flex', alignItems: 'center', justifyContent: 'center', 
+            zIndex: 1100, backdropFilter: 'blur(4px)', background: 'var(--bg-modal-overlay)'
+        }}>
             <div className="modal" style={{ 
-                maxWidth: 580, width: '95%', maxHeight: '95vh', overflow: 'auto',
-                borderRadius: 16, boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-                border: '1px solid rgba(255,255,255,0.1)'
+                maxWidth: 600, width: '95%', maxHeight: '92vh', overflow: 'auto',
+                borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-lg)',
+                background: 'var(--bg-card)', border: '1px solid var(--border)',
+                backdropFilter: 'var(--glass-blur)',
+                display: 'flex', flexDirection: 'column'
             }} onClick={e => e.stopPropagation()}>
                 
                 {/* Header */}
                 <div style={{
-                    padding: '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    borderBottom: '1px solid #f1f5f9', background: '#fff'
+                    padding: '24px 28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    borderBottom: '1px solid var(--border-light)', background: 'transparent'
                 }}>
-                    <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#1e293b', margin: 0 }}>Add Router</h2>
+                    <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, letterSpacing: '-0.02em' }}>Add Router</h2>
                     <button onClick={onClose} style={{ 
-                        background: '#f8fafc', border: 'none', borderRadius: '50%', 
-                        width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        cursor: 'pointer', color: '#64748b', transition: 'all 0.2s'
+                        background: 'var(--bg-hover)', border: 'none', borderRadius: '50%', 
+                        width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        cursor: 'pointer', color: 'var(--text-secondary)', transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
                     }}>
                         <CloseIcon fontSize="small" />
                     </button>
                 </div>
 
-                <div style={{ padding: '24px' }}>
+                <div style={{ padding: '28px' }}>
                     {/* Access Code */}
-                    <div className="form-group" style={{ marginBottom: 20 }}>
-                        <label className="form-label" style={{ fontWeight: 600, color: '#334155', display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <EditIcon style={{ fontSize: 16 }} /> Access Code <span style={{ color: '#ef4444' }}>*</span>
+                    <div className="form-group" style={{ marginBottom: 24 }}>
+                        <label className="form-label" style={{ fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.9rem', marginBottom: 8 }}>
+                            <EditIcon style={{ fontSize: 18, color: 'var(--primary)' }} /> Access Code <span style={{ color: 'var(--danger)' }}>*</span>
                         </label>
                         <div style={{ position: 'relative' }}>
                             <input
@@ -83,30 +88,34 @@ export default function AddRouterModal({ onClose, onSave, initialData }: AddRout
                                 placeholder="Enter access code"
                                 value={accessCode}
                                 onChange={e => setAccessCode(e.target.value)}
-                                style={{ paddingRight: 45, height: 48, fontSize: '0.95rem' }}
+                                style={{ 
+                                    paddingRight: 50, height: 52, fontSize: '1rem', 
+                                    background: 'var(--bg-input)', border: '1.5px solid var(--border)',
+                                    borderRadius: 'var(--radius-sm)', transition: 'all 0.2s'
+                                }}
                             />
                             <button
                                 type="button"
                                 style={{ 
                                     position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', 
-                                    border: '1px solid #e2e8f0', background: '#fff', borderRadius: 6,
-                                    padding: '4px 8px', cursor: 'pointer', color: '#64748b',
-                                    display: 'flex', alignItems: 'center'
+                                    border: 'none', background: 'var(--bg-hover)', borderRadius: 8,
+                                    padding: '6px 10px', cursor: 'pointer', color: 'var(--text-secondary)',
+                                    display: 'flex', alignItems: 'center', transition: 'all 0.2s'
                                 }}
                                 onClick={() => setShowAccessCode(!showAccessCode)}
                             >
                                 {showAccessCode ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
                             </button>
                         </div>
-                        <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
-                            <InfoOutlinedIcon style={{ fontSize: 14 }} /> Default access code is required to add new routers
+                        <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: 8, display: 'flex', alignItems: 'center', gap: 6, opacity: 0.8 }}>
+                            <InfoOutlinedIcon style={{ fontSize: 15 }} /> Default access code is required to add new routers
                         </div>
                     </div>
 
                     {/* Router Name */}
-                    <div className="form-group" style={{ marginBottom: 24 }}>
-                        <label className="form-label" style={{ fontWeight: 600, color: '#334155', display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <SecurityIcon style={{ fontSize: 16 }} /> Router Name <span style={{ color: '#ef4444' }}>*</span>
+                    <div className="form-group" style={{ marginBottom: 28 }}>
+                        <label className="form-label" style={{ fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.9rem', marginBottom: 8 }}>
+                            <SecurityIcon style={{ fontSize: 18, color: 'var(--primary)' }} /> Router Name <span style={{ color: 'var(--danger)' }}>*</span>
                         </label>
                         <input
                             type="text"
@@ -114,62 +123,68 @@ export default function AddRouterModal({ onClose, onSave, initialData }: AddRout
                             placeholder="e.g., Router-Branch-01"
                             value={routerName}
                             onChange={e => setRouterName(e.target.value)}
-                            style={{ height: 48, fontSize: '0.95rem' }}
+                            style={{ 
+                                height: 52, fontSize: '1rem', 
+                                background: 'var(--bg-input)', border: '1.5px solid var(--border)',
+                                borderRadius: 'var(--radius-sm)', transition: 'all 0.2s'
+                            }}
                         />
-                        <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
-                            <InfoOutlinedIcon style={{ fontSize: 14 }} /> 3-30 characters, alphanumeric with - and _ only
+                        <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: 8, display: 'flex', alignItems: 'center', gap: 6, opacity: 0.8 }}>
+                            <InfoOutlinedIcon style={{ fontSize: 15 }} /> 3-30 characters, alphanumeric with - and _ only
                         </div>
                     </div>
 
                     {/* VPN Configuration Mode */}
-                    <div className="form-group" style={{ marginBottom: 24 }}>
-                        <label className="form-label" style={{ fontWeight: 600, color: '#334155', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
-                            <ShieldIcon style={{ fontSize: 16 }} /> VPN Configuration Mode <span style={{ color: '#ef4444' }}>*</span>
+                    <div className="form-group" style={{ marginBottom: 28 }}>
+                        <label className="form-label" style={{ fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.9rem', marginBottom: 16 }}>
+                            <ShieldIcon style={{ fontSize: 18, color: 'var(--primary)' }} /> VPN Configuration Mode <span style={{ color: 'var(--danger)' }}>*</span>
                         </label>
 
                         {/* Hybrid Mode Selection */}
                         <div 
                             onClick={() => setVpnMode('hybrid')}
                             style={{
-                                border: vpnMode === 'hybrid' ? '2px solid #3b82f6' : '1px solid #e2e8f0',
-                                borderRadius: 12, padding: 16, marginBottom: 16, cursor: 'pointer',
-                                background: vpnMode === 'hybrid' ? '#eff6ff' : '#fff', position: 'relative',
-                                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
+                                border: vpnMode === 'hybrid' ? '2px solid var(--primary)' : '1.5px solid var(--border)',
+                                borderRadius: 'var(--radius)', padding: 20, marginBottom: 16, cursor: 'pointer',
+                                background: vpnMode === 'hybrid' ? 'var(--primary-light)' : 'var(--bg-input)', position: 'relative',
+                                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                transform: vpnMode === 'hybrid' ? 'scale(1.01)' : 'scale(1)',
+                                boxShadow: vpnMode === 'hybrid' ? 'var(--shadow-md)' : 'none'
                             }}
                         >
-                            <div style={{ position: 'absolute', top: 16, left: 16 }}>
+                            <div style={{ position: 'absolute', top: 20, left: 20 }}>
                                 <div style={{ 
-                                    width: 18, height: 18, borderRadius: '50%', 
-                                    border: vpnMode === 'hybrid' ? '6px solid #3b82f6' : '2px solid #cbd5e1',
-                                    background: '#fff'
+                                    width: 20, height: 20, borderRadius: '50%', 
+                                    border: vpnMode === 'hybrid' ? `6px solid var(--primary)` : '2.5px solid var(--border)',
+                                    background: '#fff', transition: 'all 0.3s'
                                 }} />
                             </div>
-                            <div style={{ paddingLeft: 32 }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                            <div style={{ paddingLeft: 36 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
                                     <div style={{ 
-                                        width: 32, height: 32, borderRadius: 8, background: '#dcfce7', 
+                                        width: 36, height: 36, borderRadius: 10, background: 'var(--secondary-light)', 
                                         display: 'flex', alignItems: 'center', justifyContent: 'center' 
                                     }}>
-                                        <AddTaskIcon style={{ color: '#16a34a', fontSize: 18 }} />
+                                        <AddTaskIcon style={{ color: 'var(--secondary)', fontSize: 20 }} />
                                     </div>
-                                    <strong style={{ fontSize: '1rem', color: '#1e293b' }}>Hybrid Mode</strong>
+                                    <strong style={{ fontSize: '1.05rem', color: 'var(--text-primary)' }}>Hybrid Mode</strong>
                                     <span style={{ 
-                                        background: '#22c55e', color: '#fff', padding: '2px 10px', 
-                                        borderRadius: 20, fontSize: '0.7rem', fontWeight: 700 
+                                        background: 'var(--secondary)', color: '#fff', padding: '3px 12px', 
+                                        borderRadius: 20, fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px'
                                     }}>Recommended</span>
                                 </div>
-                                <ul style={{ margin: 0, padding: 0, listStyle: 'none', fontSize: '0.82rem', color: '#475569', lineHeight: 1.6 }}>
-                                    <li style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                        <CheckIcon style={{ fontSize: 14, color: '#22c55e' }} /> WireGuard: Primary VPN for all customer traffic (fast & efficient)
+                                <ul style={{ margin: 0, padding: 0, listStyle: 'none', fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.7 }}>
+                                    <li style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        <CheckIcon style={{ fontSize: 16, color: 'var(--secondary)' }} /> <span>WireGuard: Primary VPN for all customer traffic (fast & efficient)</span>
                                     </li>
-                                    <li style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                        <CheckIcon style={{ fontSize: 14, color: '#22c55e' }} /> OpenVPN: Management tunnel with port forwarding (Winbox/WebFig)
+                                    <li style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        <CheckIcon style={{ fontSize: 16, color: 'var(--secondary)' }} /> <span>OpenVPN: Management tunnel with port forwarding (Winbox/WebFig)</span>
                                     </li>
                                 </ul>
                                 <div style={{ 
-                                    marginTop: 10, display: 'inline-flex', alignItems: 'center', gap: 4,
-                                    background: '#f0fdf4', color: '#16a34a', padding: '2px 8px', borderRadius: 6,
-                                    fontSize: '0.72rem', fontWeight: 600, border: '1px solid #dcfce7'
+                                    marginTop: 12, display: 'inline-flex', alignItems: 'center', gap: 6,
+                                    background: 'var(--secondary-light)', color: 'var(--secondary)', padding: '4px 12px', borderRadius: 8,
+                                    fontSize: '0.75rem', fontWeight: 700, border: '1px solid var(--border-light)'
                                 }}>
                                     ⭐ Best of both worlds
                                 </div>
@@ -182,25 +197,26 @@ export default function AddRouterModal({ onClose, onSave, initialData }: AddRout
                             <div 
                                 onClick={() => setVpnMode('wireguard')}
                                 style={{
-                                    border: vpnMode === 'wireguard' ? '2px solid #3b82f6' : '1px solid #e2e8f0',
-                                    borderRadius: 12, padding: 16, cursor: 'pointer',
-                                    background: vpnMode === 'wireguard' ? '#eff6ff' : '#fff', position: 'relative',
-                                    transition: 'all 0.2s'
+                                    border: vpnMode === 'wireguard' ? '2px solid var(--primary)' : '1.5px solid var(--border)',
+                                    borderRadius: 'var(--radius)', padding: 18, cursor: 'pointer',
+                                    background: vpnMode === 'wireguard' ? 'var(--primary-light)' : 'var(--bg-input)', position: 'relative',
+                                    transition: 'all 0.3s', transform: vpnMode === 'wireguard' ? 'scale(1.02)' : 'scale(1)',
+                                    boxShadow: vpnMode === 'wireguard' ? 'var(--shadow)' : 'none'
                                 }}
                             >
-                                <div style={{ position: 'absolute', top: 16, left: 16 }}>
+                                <div style={{ position: 'absolute', top: 18, left: 18 }}>
                                     <div style={{ 
-                                        width: 16, height: 16, borderRadius: '50%', 
-                                        border: vpnMode === 'wireguard' ? '5px solid #3b82f6' : '2px solid #cbd5e1',
+                                        width: 18, height: 18, borderRadius: '50%', 
+                                        border: vpnMode === 'wireguard' ? `5px solid var(--primary)` : '2.5px solid var(--border)',
                                         background: '#fff'
                                     }} />
                                 </div>
-                                <div style={{ paddingLeft: 28 }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                                        <VpnLockIcon style={{ color: '#3b82f6', fontSize: 18 }} />
-                                        <strong style={{ fontSize: '0.88rem', color: '#1e293b' }}>WireGuard Only</strong>
+                                <div style={{ paddingLeft: 30 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                                        <VpnLockIcon style={{ color: 'var(--info)', fontSize: 20 }} />
+                                        <strong style={{ fontSize: '0.95rem', color: 'var(--text-primary)' }}>WireGuard Only</strong>
                                     </div>
-                                    <div style={{ fontSize: '0.75rem', color: '#64748b', lineHeight: 1.5 }}>
+                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
                                         Fast & modern protocol<br/>Lightweight VPN<br/>Direct IP access
                                     </div>
                                 </div>
@@ -210,25 +226,26 @@ export default function AddRouterModal({ onClose, onSave, initialData }: AddRout
                             <div 
                                 onClick={() => setVpnMode('openvpn')}
                                 style={{
-                                    border: vpnMode === 'openvpn' ? '2px solid #3b82f6' : '1px solid #e2e8f0',
-                                    borderRadius: 12, padding: 16, cursor: 'pointer',
-                                    background: vpnMode === 'openvpn' ? '#eff6ff' : '#fff', position: 'relative',
-                                    transition: 'all 0.2s'
+                                    border: vpnMode === 'openvpn' ? '2px solid var(--primary)' : '1.5px solid var(--border)',
+                                    borderRadius: 'var(--radius)', padding: 18, cursor: 'pointer',
+                                    background: vpnMode === 'openvpn' ? 'var(--primary-light)' : 'var(--bg-input)', position: 'relative',
+                                    transition: 'all 0.3s', transform: vpnMode === 'openvpn' ? 'scale(1.02)' : 'scale(1)',
+                                    boxShadow: vpnMode === 'openvpn' ? 'var(--shadow)' : 'none'
                                 }}
                             >
-                                <div style={{ position: 'absolute', top: 16, left: 16 }}>
+                                <div style={{ position: 'absolute', top: 18, left: 18 }}>
                                     <div style={{ 
-                                        width: 16, height: 16, borderRadius: '50%', 
-                                        border: vpnMode === 'openvpn' ? '5px solid #3b82f6' : '2px solid #cbd5e1',
+                                        width: 18, height: 18, borderRadius: '50%', 
+                                        border: vpnMode === 'openvpn' ? `5px solid var(--primary)` : '2.5px solid var(--border)',
                                         background: '#fff'
                                     }} />
                                 </div>
-                                <div style={{ paddingLeft: 28 }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                                        <ShieldIcon style={{ color: '#ef4444', fontSize: 18 }} />
-                                        <strong style={{ fontSize: '0.88rem', color: '#1e293b' }}>OpenVPN Only</strong>
+                                <div style={{ paddingLeft: 30 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                                        <ShieldIcon style={{ color: 'var(--danger)', fontSize: 20 }} />
+                                        <strong style={{ fontSize: '0.95rem', color: 'var(--text-primary)' }}>OpenVPN Only</strong>
                                     </div>
-                                    <div style={{ fontSize: '0.75rem', color: '#64748b', lineHeight: 1.5 }}>
+                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
                                         Traditional VPN<br/>Port forwarding<br/>Wide compatibility
                                     </div>
                                 </div>
@@ -237,25 +254,26 @@ export default function AddRouterModal({ onClose, onSave, initialData }: AddRout
 
                         {/* Hybrid Info Banner */}
                         <div style={{ 
-                            marginTop: 16, padding: 12, borderRadius: 10, background: '#f0f9ff',
-                            border: '1px solid #e0f2fe', display: 'flex', alignItems: 'flex-start', gap: 8
+                            marginTop: 20, padding: 16, borderRadius: 12, background: 'var(--info-light)',
+                            border: '1px solid var(--border-light)', display: 'flex', alignItems: 'flex-start', gap: 10,
+                            animation: 'fadeIn 0.3s ease-out'
                         }}>
-                            <InfoOutlinedIcon style={{ color: '#0ea5e9', fontSize: 18, marginTop: 1 }} />
-                            <div style={{ fontSize: '0.75rem', color: '#0369a1', lineHeight: 1.5 }}>
+                            <InfoOutlinedIcon style={{ color: 'var(--info)', fontSize: 20, marginTop: 1 }} />
+                            <div style={{ fontSize: '0.82rem', color: 'var(--info)', lineHeight: 1.6, fontWeight: 500 }}>
                                 <strong>{vpnMode === 'hybrid' ? 'Hybrid Mode' : vpnMode === 'wireguard' ? 'WireGuard' : 'OpenVPN'}:</strong> {
                                     vpnMode === 'hybrid' 
-                                    ? 'Uses WireGuard for all customer VPN traffic (fast performance) and OpenVPN for management access with port forwarding (easy remote access to Winbox/WebFig). This provides optimal performance while maintaining convenient management access.'
+                                    ? 'Uses WireGuard for customer traffic and OpenVPN for management access. Optimal performance with convenient remote management.'
                                     : vpnMode === 'wireguard'
-                                    ? 'Best for high-speed connectivity and lower resource usage. Great for modern setups.'
-                                    : 'Best for compatibility across different networks and easy management features.'
+                                    ? 'Best for high-speed connectivity and lower resource usage. Modern and efficient.'
+                                    : 'Best for compatibility and easy management features across any network.'
                                 }
                             </div>
                         </div>
                     </div>
 
                     {/* Description */}
-                    <div className="form-group" style={{ marginBottom: 24 }}>
-                        <label className="form-label" style={{ fontWeight: 600, color: '#334155', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <div className="form-group" style={{ marginBottom: 28 }}>
+                        <label className="form-label" style={{ fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.9rem' }}>
                             📝 Description (Optional)
                         </label>
                         <textarea
@@ -264,55 +282,57 @@ export default function AddRouterModal({ onClose, onSave, initialData }: AddRout
                             rows={3}
                             value={description}
                             onChange={e => setDescription(e.target.value)}
-                            style={{ padding: 12, resize: 'none' }}
+                            style={{ 
+                                padding: 14, resize: 'none', background: 'var(--bg-input)', 
+                                border: '1.5px solid var(--border)', borderRadius: 'var(--radius-sm)',
+                                fontSize: '0.95rem'
+                            }}
                         />
                     </div>
 
                     {/* Initial Status */}
-                    <div className="form-group" style={{ marginBottom: 24 }}>
-                        <label className="form-label" style={{ fontWeight: 600, color: '#334155', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
-                            <PowerSettingsNewIcon style={{ fontSize: 16 }} /> Initial Status
+                    <div className="form-group" style={{ marginBottom: 28 }}>
+                        <label className="form-label" style={{ fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.9rem', marginBottom: 16 }}>
+                            <PowerSettingsNewIcon style={{ fontSize: 18, color: 'var(--primary)' }} /> Initial Status
                         </label>
-                        <div style={{ display: 'flex', gap: 24 }}>
+                        <div style={{ display: 'flex', gap: 32 }}>
                             <div 
                                 onClick={() => setStatus('Online')}
-                                style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}
+                                style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', transition: 'all 0.2s' }}
                             >
                                 <div style={{ 
-                                    width: 18, height: 18, borderRadius: '50%', 
-                                    border: status === 'Online' ? '6px solid #22c55e' : '2px solid #cbd5e1',
-                                    background: '#fff'
+                                    width: 20, height: 20, borderRadius: '50%', 
+                                    border: status === 'Online' ? `6px solid var(--secondary)` : '2.5px solid var(--border)',
+                                    background: '#fff', transition: 'all 0.2s'
                                 }} />
-                                <span style={{ fontSize: '0.9rem', color: status === 'Online' ? '#1e293b' : '#64748b', display: 'flex', alignItems: 'center', gap: 4 }}>
-                                    <CheckIcon style={{ fontSize: 16, color: '#22c55e' }} /> Enable
+                                <span style={{ fontSize: '1rem', fontWeight: 600, color: status === 'Online' ? 'var(--text-primary)' : 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    <CheckIcon style={{ fontSize: 18, color: 'var(--secondary)' }} /> Enable
                                 </span>
                             </div>
                             <div 
                                 onClick={() => setStatus('Offline')}
-                                style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}
+                                style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', transition: 'all 0.2s' }}
                             >
                                 <div style={{ 
-                                    width: 18, height: 18, borderRadius: '50%', 
-                                    border: status === 'Offline' ? '6px solid #ef4444' : '2px solid #cbd5e1',
-                                    background: '#fff'
+                                    width: 20, height: 20, borderRadius: '50%', 
+                                    border: status === 'Offline' ? `6px solid var(--danger)` : '2.5px solid var(--border)',
+                                    background: '#fff', transition: 'all 0.2s'
                                 }} />
-                                <span style={{ fontSize: '0.9rem', color: status === 'Offline' ? '#1e293b' : '#64748b', display: 'flex', alignItems: 'center', gap: 4 }}>
-                                    <CloseIcon style={{ fontSize: 16, color: '#ef4444' }} /> Disable
+                                <span style={{ fontSize: '1rem', fontWeight: 600, color: status === 'Offline' ? 'var(--text-primary)' : 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    <CloseIcon style={{ fontSize: 18, color: 'var(--danger)' }} /> Disable
                                 </span>
                             </div>
-                        </div>
-                        <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: 8, display: 'flex', alignItems: 'center', gap: 4 }}>
-                            <InfoOutlinedIcon style={{ fontSize: 14 }} /> You can enable the router after initial setup
                         </div>
                     </div>
 
                     {/* Note Box */}
                     <div style={{ 
-                        background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 12,
-                        padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10
+                        background: 'var(--warning-light)', border: '1px solid var(--border-light)', borderRadius: 'var(--radius)',
+                        padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 12,
+                        boxShadow: 'inset 0 0 10px rgba(0,0,0,0.02)'
                     }}>
-                        <WarningAmberIcon style={{ color: '#d97706', fontSize: 20 }} />
-                        <div style={{ fontSize: '0.8rem', color: '#92400e', fontWeight: 500 }}>
+                        <WarningAmberIcon style={{ color: 'var(--warning)', fontSize: 24 }} />
+                        <div style={{ fontSize: '0.85rem', color: 'var(--warning)', fontWeight: 600, lineHeight: 1.5 }}>
                             <strong>Note:</strong> After creation, you'll receive setup instructions and configuration files. Make sure to save all credentials securely.
                         </div>
                     </div>
@@ -320,27 +340,28 @@ export default function AddRouterModal({ onClose, onSave, initialData }: AddRout
 
                 {/* Footer */}
                 <div style={{ 
-                    padding: '20px 24px', background: '#f8fafc', borderTop: '1px solid #f1f5f9',
-                    display: 'flex', justifyContent: 'flex-end', gap: 12
+                    padding: '24px 28px', background: 'var(--bg-hover)', borderTop: '1px solid var(--border-light)',
+                    display: 'flex', justifyContent: 'flex-end', gap: 16
                 }}>
                     <button 
                         className="btn btn-secondary" 
                         onClick={onClose}
-                        style={{ background: '#fff', border: '1px solid #e2e8f0', color: '#475569', padding: '0 24px', height: 44 }}
+                        style={{ background: 'var(--bg-card)', padding: '0 28px', height: 48, borderRadius: 'var(--radius-sm)' }}
                     >
                         ✕ Cancel
                     </button>
                     <button 
-                        className="btn" 
+                        className="btn btn-primary" 
                         onClick={handleSave}
                         style={{ 
-                            background: '#22c55e', color: '#fff', padding: '0 24px', height: 44, 
-                            fontWeight: 700, borderRadius: 8, border: 'none', cursor: 'pointer',
-                            display: 'flex', alignItems: 'center', gap: 8, boxShadow: '0 4px 6px -1px rgba(34, 197, 94, 0.2)'
+                            padding: '0 32px', height: 48, 
+                            fontWeight: 800, borderRadius: 'var(--radius-sm)',
+                            display: 'flex', alignItems: 'center', gap: 10,
+                            boxShadow: '0 10px 15px -3px rgba(79, 70, 229, 0.4)'
                         }}
                         disabled={!routerName || !accessCode}
                     >
-                        <AddTaskIcon style={{ fontSize: 18 }} /> Create Router
+                        <AddTaskIcon style={{ fontSize: 20 }} /> Create Router
                     </button>
                 </div>
             </div>
