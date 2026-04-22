@@ -1,0 +1,85 @@
+# DigitalOcean Droplet Deployment Guide
+
+This guide explains how to deploy the Kenge ISP Billing System to a **DigitalOcean Droplet** (VPS). This gives you full control and is often cheaper than App Platform for large databases.
+
+## Step 1: Create a Droplet
+1. Go to DigitalOcean and create a new **Droplet**.
+2. **OS**: Ubuntu 24.04 LTS (recommended).
+3. **Plan**: At least 2GB RAM (Shared CPU is fine for start).
+4. **Authentication**: SSH Key (highly recommended).
+
+## Step 2: Initial Server Setup
+Connect to your droplet via SSH:
+```bash
+ssh root@your_droplet_ip
+```
+
+Once inside, run the setup script I provided:
+```bash
+# Clone your repo first (you'll need to add your SSH key to GitHub/GitLab)
+git clone <your-repo-url> kenge
+cd kenge
+
+# Run the setup script
+chmod +x droplet-setup.sh
+./droplet-setup.sh
+```
+
+**Note**: After running the script, log out and log back in to apply group changes.
+
+## Step 3: Setup the Database
+We use Docker to run PostgreSQL on the same droplet.
+1. Edit `docker-compose.yml` and change the `POSTGRES_PASSWORD`.
+2. Start the database:
+```bash
+docker-compose up -d
+```
+
+## Step 4: Configure Environment Variables
+Create a `.env` file in the `backend` directory:
+```bash
+cd backend
+cp .env.example .env
+nano .env
+```
+Set the `DATABASE_URL` to:
+`postgresql://kenge_user:your_password@localhost:5432/kenge_isp`
+
+Also set `JWT_SECRET` and `GOOGLE_CLIENT_ID`.
+
+## Step 5: Build and Start Applications
+Go back to the root directory and install dependencies:
+```bash
+cd ..
+pnpm install
+pnpm build:all
+```
+
+Start everything with PM2:
+```bash
+pm2 start ecosystem.config.js
+pm2 save
+pm2 startup
+```
+
+## Step 6: Configure Nginx
+Copy the provided Nginx config to the system:
+```bash
+sudo cp nginx.conf /etc/nginx/sites-available/kenge
+sudo ln -s /etc/nginx/sites-available/kenge /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl restart nginx
+```
+
+## Step 7: SSL (HTTPS)
+Use Certbot to get a free SSL certificate:
+```bash
+sudo apt install certbot python3-certbot-nginx
+sudo certbot --nginx -d your-domain.com
+```
+
+## Summary of Ports
+- **Backend**: 3000
+- **Landing Page**: 3001
+- **Frontend Dashboard**: 5173 (Preview mode)
+- **Database**: 5432 (Internal to droplet)

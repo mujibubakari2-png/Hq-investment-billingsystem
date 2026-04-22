@@ -1,0 +1,14 @@
+# DigitalOcean Environment Variables Reference
+
+# BACKEND SERVICE
+DATABASE_URL=postgresql://db:password@host:port/dbname (Auto-set by DO)
+JWT_SECRET=generate-a-long-random-string
+GOOGLE_CLIENT_ID=96960694156-pg7m1cjdqas9nelo83nicrq4ig3kuq3l.apps.googleusercontent.com
+CORS_ORIGIN=${frontend.PUBLIC_URL} (Auto-set if using app.yaml)
+NODE_ENV=production
+
+# FRONTEND SERVICE
+VITE_API_URL=${backend.PUBLIC_URL}/api (Auto-set if using app.yaml)
+
+# LANDING PAGE SERVICE
+NODE_ENV=production

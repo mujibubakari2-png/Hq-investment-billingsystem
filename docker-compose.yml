@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: kenge-db
+    restart: always
+    environment:
+      POSTGRES_USER: kenge_user
+      POSTGRES_PASSWORD: kenge_password_replace_me
+      POSTGRES_DB: kenge_isp
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

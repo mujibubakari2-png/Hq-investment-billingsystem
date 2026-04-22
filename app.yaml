@@ -1,0 +1,61 @@
+name: kenge-isp-billing
+region: nyc
+services:
+- name: backend
+  instance_count: 1
+  instance_size_slug: basic-xxs
+  source_dir: .
+  build_command: pnpm install && pnpm --filter backend build
+  run_command: pnpm --filter backend start
+  envs:
+  - key: DATABASE_URL
+    scope: RUN_AND_BUILD_TIME
+    value: ${db.DATABASE_URL}
+  - key: NODE_ENV
+    scope: RUN_AND_BUILD_TIME
+    value: production
+  - key: JWT_SECRET
+    scope: RUN_TIME
+    type: SECRET
+  - key: GOOGLE_CLIENT_ID
+    scope: RUN_AND_BUILD_TIME
+    value: 96960694156-pg7m1cjdqas9nelo83nicrq4ig3kuq3l.apps.googleusercontent.com
+  - key: CORS_ORIGIN
+    scope: RUN_TIME
+    value: ${frontend.PUBLIC_URL}
+  http_port: 3000
+  routes:
+  - path: /api
+
+- name: landing-page
+  instance_count: 1
+  instance_size_slug: basic-xxs
+  source_dir: .
+  build_command: pnpm install && pnpm --filter landing-page build
+  run_command: pnpm --filter landing-page start
+  envs:
+  - key: NODE_ENV
+    scope: RUN_AND_BUILD_TIME
+    value: production
+  http_port: 3000
+  routes:
+  - path: /
+
+static_sites:
+- name: frontend
+  source_dir: .
+  build_command: pnpm install && pnpm --filter frontend build
+  output_dir: frontend/dist
+  envs:
+  - key: VITE_API_URL
+    scope: BUILD_TIME
+    value: ${backend.PUBLIC_URL}/api
+  routes:
+  - path: /dashboard
+
+databases:
+- engine: PG
+  name: db
+  num_nodes: 1
+  size_slug: db-s-dev-database
+  version: "16"
