@@ -72,21 +72,23 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         const serverPrivateKey = process.env.WG_SERVER_PRIVATE_KEY || generateWireGuardKey();
         const serverPublicKey = process.env.WG_SERVER_PUBLIC_KEY || derivePublicKeyPlaceholder(serverPrivateKey);
 
-        // Logic to assign a unique Tunnel IP if not set or if it's the old 10.200.x.x
-        if (!tunnelIp || tunnelIp === "10.200.0.1" || tunnelIp.startsWith("10.200.")) {
+        // Logic to assign a unique Tunnel IP if not set or if it's the default and already used
+        if (!tunnelIp || tunnelIp === "10.200.0.1") {
             const allWgRouters = await prisma.router.findMany({
                 where: { id: { not: id }, wgTunnelIp: { not: null } },
                 select: { wgTunnelIp: true }
             });
             const usedIps = allWgRouters.map(r => r.wgTunnelIp);
             
-            // Find first free IP from 10.0.0.200 to 10.0.0.250
-            let nextIp = 200;
-            while (usedIps.includes(`10.0.0.${nextIp}`) && nextIp < 250) {
-                nextIp++;
+            if (!tunnelIp || usedIps.includes("10.200.0.1")) {
+                // Find first free IP from 10.200.0.1 to 10.200.0.250
+                let nextIp = 1;
+                while (usedIps.includes(`10.200.0.${nextIp}`) && nextIp < 250) {
+                    nextIp++;
+                }
+                tunnelIp = `10.200.0.${nextIp}`;
+                await updateRouterWgFields(id, { wgTunnelIp: tunnelIp });
             }
-            tunnelIp = `10.0.0.${nextIp}`;
-            await updateRouterWgFields(id, { wgTunnelIp: tunnelIp });
         }
 
         if (!wgPrivateKey) {
@@ -108,7 +110,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
             await updateRouterWgFields(id, { wgPeerPublicKey });
         }
 
-        const serverTunnelIp = "10.0.0.1"; // Droplet server is always 10.0.0.1
+        const serverTunnelIp = tunnelIp!.replace(/\.\d+$/, ".254"); // Default server to .254 in same subnet
         const listenPort = router.wgListenPort || 13231;
         
         // Use request host as fallback if no endpoint is configured
@@ -186,10 +188,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             return errorResponse("WireGuard keys not generated. Open config first.", 400);
         }
 
-        let tunnelIp = router.wgTunnelIp;
-        if (!tunnelIp || tunnelIp === "10.200.0.1" || tunnelIp.startsWith("10.200.")) {
-            tunnelIp = "10.0.0.200"; // Fallback if somehow not generated
-        }
+        const tunnelIp = router.wgTunnelIp || "10.200.0.1";
         const listenPort = router.wgListenPort || 13231;
         
         // Use request host as fallback if no endpoint is configured (match GET logic)
@@ -246,7 +245,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                     await service.apiRequestPublic("/ip/address", "PUT", {
                         address: `${tunnelIp}/24`,
                         interface: "wg-kenge",
-                        network: "10.0.0.0",
+                        network: "10.200.0.0",
                         comment: "Kenge VPN Address"
                     });
                 } catch (e: any) {
@@ -259,7 +258,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                         interface: "wg-kenge",
                         "public-key": router.wgPeerPublicKey,
                         "preshared-key": router.wgPresharedKey,
-                        "allowed-address": "10.0.0.0/24",
+                        "allowed-address": "10.200.0.0/24",
                         "endpoint-address": serverEndpoint,
                         "endpoint-port": String(serverPort),
                         "persistent-keepalive": "25s",
@@ -306,7 +305,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 // Step 6: Route
                 try {
                     await service.apiRequestPublic("/ip/route", "PUT", {
-                        "dst-address": "10.0.0.0/24", gateway: "wg-kenge",
+                        "dst-address": "10.200.0.0/24", gateway: "wg-kenge",
                         comment: "WireGuard subnet route - Kenge",
                     });
                 } catch (e: any) { console.warn("Route note:", e.message); }

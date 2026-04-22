@@ -14,13 +14,15 @@ export const wireguardManager = {
                 throw new Error("Public key and Allowed IP are required");
             }
 
-            // Command to add peer
+            // Ensure the interface has the correct 10.200.0.254 IP address for routing (ignore if already exists)
+            const ensureIpCmd = `sudo ip addr add 10.200.0.254/24 dev wg0 || true`;
             // Use 'wg set' for runtime update and 'wg-quick save' for persistence
             const addCmd = `sudo wg set wg0 peer "${publicKey}" allowed-ips ${allowedIp}/32`;
             const saveCmd = `sudo wg-quick save wg0`;
 
             console.log(`[WireGuard] Adding peer: ${publicKey} with IP ${allowedIp}`);
             
+            await execAsync(ensureIpCmd);
             await execAsync(addCmd);
             await execAsync(saveCmd);
 
