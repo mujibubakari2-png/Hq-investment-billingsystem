@@ -7,8 +7,8 @@ echo "🚀 Starting VPN Setup..."
 sudo apt update
 sudo apt install -y wireguard iptables
 
-# 2. Generate Server Keys
-SERVER_PRIVATE_KEY=$(wg genkey)
+# 2. Set Server Keys
+SERVER_PRIVATE_KEY="mPsn44hz/0c/ZuAREVBTit//tuazXSw5+E9OeeAZS1Q="
 SERVER_PUBLIC_KEY=$(echo "$SERVER_PRIVATE_KEY" | wg pubkey)
 ETH_INTERFACE=$(ip route list default | awk '{print $5}')
 
