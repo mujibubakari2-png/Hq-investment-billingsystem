@@ -94,8 +94,7 @@ export async function POST(req: NextRequest) {
             const mt = await getMikroTikService(routerId, userPayload.tenantId);
 
             if (protocol === "WireGuard") {
-                // For WireGuard, the 'password' field is used as the Public Key
-                // 'remoteAddress' is used as the Allowed IP
+                // 1. Push to MikroTik
                 let allowedAddress = remoteAddress || "";
                 if (allowedAddress && !allowedAddress.includes("/")) {
                     allowedAddress += "/32";
@@ -106,6 +105,16 @@ export async function POST(req: NextRequest) {
                     allowedAddress: allowedAddress || "0.0.0.0/0",
                     comment: `VPN:${username}`,
                 });
+
+                // 2. Add Peer to Droplet (Local Server)
+                try {
+                    const { wireguardManager } = await import("@/lib/wireguard");
+                    // 'password' field is being used as the Peer's Public Key
+                    await wireguardManager.addPeer(password, remoteAddress || "10.0.0.2");
+                } catch (wgErr: any) {
+                    console.error("Failed to add peer to Droplet WireGuard:", wgErr);
+                    // Don't fail the whole request, but log it
+                }
             } else {
                 await mt.createVpnUser({
                     name: username,
