@@ -235,21 +235,26 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
             });
         }
         if (serviceType === 'pppoe' || serviceType === 'both') {
-            lines.push('', '# ===== PPPoE Server =====',
+            lines.push('', '# ===== PPPoE Server Configuration =====',
                 `/ip pool add name=pppoe-pool ranges=${pppoePoolStart}-${pppoePoolEnd}`,
-                `/ppp profile add name=radiax-pppoe local-address=${pppoeLocalAddress} remote-address=pppoe-pool dns-server=8.8.8.8,8.8.4.4`,
-                `/interface pppoe-server server add service-name=radiax-pppoe interface=${selectedInterfaces[0] || 'ether2-LAN'} default-profile=radiax-pppoe authentication=pap,chap,mschap1,mschap2 disabled=no`,
+                `/ppp profile add name=radiax-pppoe local-address=${pppoeLocalAddress} remote-address=pppoe-pool dns-server=8.8.8.8,1.1.1.1 use-encryption=yes change-tcp-mss=yes`,
+                `/interface pppoe-server server add service-name=pppoe-service interface=radiax_bridge default-profile=radiax-pppoe authentication=pap,chap,mschap1,mschap2 disabled=no`,
             );
         }
         if (serviceType === 'hotspot' || serviceType === 'both') {
             const hotspotNetwork = hotspotLocalAddress.split('.').slice(0, 3).join('.') + '.0/24';
-            lines.push('', '# ===== Hotspot Server =====',
-                `:if ([:len [/ip pool find name=hotspot-pool]] = 0) do={ /ip pool add name=hotspot-pool ranges=${hotspotPoolStart}-${hotspotPoolEnd} }`,
-                `:if ([:len [/ip address find address="${hotspotLocalAddress}/24"]] = 0) do={ /ip address add address=${hotspotLocalAddress}/24 interface=radiax_bridge }`,
-                `:if ([:len [/ip dhcp-server network find address="${hotspotNetwork}"]] = 0) do={ /ip dhcp-server network add address=${hotspotNetwork} gateway=${hotspotLocalAddress} dns-server=8.8.8.8,1.1.1.1 }`,
-                `:if ([:len [/ip dhcp-server find name=dhcp-hotspot]] = 0) do={ /ip dhcp-server add name=dhcp-hotspot interface=radiax_bridge address-pool=hotspot-pool disabled=no }`,
-                `:if ([:len [/ip hotspot profile find name=radiax-hotspot]] = 0) do={ /ip hotspot profile add name=radiax-hotspot hotspot-address=${hotspotLocalAddress} dns-name=login.spot login-by=http-chap,http-pap }`,
-                `:if ([:len [/ip hotspot find name=hotspot1]] = 0) do={ /ip hotspot add name=hotspot1 interface=radiax_bridge address-pool=hotspot-pool profile=radiax-hotspot disabled=no }`,
+            lines.push('', '# ===== Hotspot Server Configuration =====',
+                `/ip pool add name=hotspot-pool ranges=${hotspotPoolStart}-${hotspotPoolEnd}`,
+                `/ip address add address=${hotspotLocalAddress}/24 interface=radiax_bridge`,
+                `/ip dhcp-server network add address=${hotspotNetwork} gateway=${hotspotLocalAddress} dns-server=8.8.8.8,1.1.1.1`,
+                `/ip dhcp-server add name=dhcp-hotspot interface=radiax_bridge address-pool=hotspot-pool disabled=no`,
+                `/ip hotspot profile add name=hq-hotspot hotspot-address=${hotspotLocalAddress} dns-name=login.spot login-by=http-chap,http-pap`,
+                `/ip hotspot add name=hotspot1 interface=radiax_bridge address-pool=hotspot-pool profile=hq-hotspot disabled=no`,
+                '', '# --- Download Hotspot Login Page Files ---',
+                `/tool fetch url="http://${window.location.hostname}/hotspot-template.zip" mode=http dst-path=hotspot-template.zip`,
+                `:delay 5s`,
+                `/file unpack hotspot-template.zip`,
+                `/ip hotspot profile set [find name=hq-hotspot] html-directory=hotspot`,
             );
         }
         if (vpnEnabled) {
