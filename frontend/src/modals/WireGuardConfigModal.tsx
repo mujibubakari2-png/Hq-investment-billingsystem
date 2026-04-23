@@ -88,6 +88,9 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
         );
     }
 
+    const subnetPrefix = config.serverTunnelIp.split('.').slice(0, 3).join('.');
+    const subnetAddress = `${subnetPrefix}.0/24`;
+
     // Build MikroTik server script with CORRECT syntax (single backslash for line continuation)
     const serverConfig = `# ============================================
 # WireGuard VPN Configuration
@@ -126,7 +129,7 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
     preshared-key="${config.presharedKey}" \\
     endpoint-address=${config.serverEndpoint} \\
     endpoint-port=${config.serverPort} \\
-    allowed-address=10.200.0.0/24 \\
+    allowed-address=${subnetAddress} \\
     persistent-keepalive=25s \\
     comment="Kenge ISP Server"
 
@@ -138,7 +141,7 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
 # ============================================
 # STEP 6: Route
 # ============================================
-/ip route add dst-address=10.200.0.0/24 gateway=wg-kenge comment="VPN Route"
+/ip route add dst-address=${subnetAddress} gateway=wg-kenge comment="VPN Route"
 
 # ============================================
 # STEP 7: Firewall
@@ -185,7 +188,7 @@ DNS = 8.8.8.8, 1.1.1.1
 # Router: ${config.routerName}
 PublicKey = ${config.routerPublicKey}
 PresharedKey = ${config.presharedKey}
-AllowedIPs = 10.200.0.0/24, ${config.routerHost}/32
+AllowedIPs = ${subnetAddress}, ${config.routerHost}/32
 Endpoint = ${config.routerHost}:${config.listenPort}
 PersistentKeepalive = 25`;
 

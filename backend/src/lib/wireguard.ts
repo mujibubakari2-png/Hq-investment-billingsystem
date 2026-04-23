@@ -11,9 +11,9 @@ export const wireguardManager = {
             if (match && match[1]) {
                 return match[1];
             }
-            return "10.200.0.1";
+            return "10.0.0.1";
         } catch (error) {
-            return "10.200.0.1";
+            return "10.0.0.1";
         }
     },
 
