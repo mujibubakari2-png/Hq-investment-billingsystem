@@ -69,8 +69,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         let tunnelIp = router.wgTunnelIp;
 
         // Server-side keys (for the HQInvestment server)
-        const serverPrivateKey = process.env.WG_SERVER_PRIVATE_KEY || generateWireGuardKey();
-        const serverPublicKey = process.env.WG_SERVER_PUBLIC_KEY || derivePublicKeyPlaceholder(serverPrivateKey);
+        // Prevent random generation by using the hardcoded key from setup-vpn.sh as the ultimate fallback
+        const DEFAULT_SERVER_PRIVATE_KEY = "mPsn44hz/0c/ZuAREVBTit//tuazXSw5+E9OeeAZS1Q=";
+        const DEFAULT_SERVER_PUBLIC_KEY = "b7ADpdTy6UooXmb7Ve+PgGeXjGFLVFXqsuz32dYNaxA=";
+        
+        const serverPrivateKey = process.env.WG_SERVER_PRIVATE_KEY || DEFAULT_SERVER_PRIVATE_KEY;
+        const serverPublicKey = process.env.WG_SERVER_PUBLIC_KEY || DEFAULT_SERVER_PUBLIC_KEY;
 
         const wgServerIp = await wireguardManager.getServerIp();
         const subnetPrefix = wgServerIp.split('.').slice(0, 3).join('.'); // e.g. "10.0.0"
@@ -105,14 +109,15 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
                 wgPresharedKey,
                 wgTunnelIp: tunnelIp, // Save assigned IP
             });
-            // Update the peer public key if the actual server key doesn't match
-            const realServerPubKey = await wireguardManager.getServerPublicKey();
-            const currentServerPublicKey = realServerPubKey || serverPublicKey;
-            
-            if (wgPeerPublicKey !== currentServerPublicKey) {
-                wgPeerPublicKey = currentServerPublicKey;
-                await updateRouterWgFields(id, { wgPeerPublicKey });
-            }
+        }
+
+        // Always ensure the peer public key is correct, even if keys were already generated
+        const realServerPubKey = await wireguardManager.getServerPublicKey();
+        const currentServerPublicKey = realServerPubKey || serverPublicKey;
+        
+        if (wgPeerPublicKey !== currentServerPublicKey) {
+            wgPeerPublicKey = currentServerPublicKey;
+            await updateRouterWgFields(id, { wgPeerPublicKey });
         }
 
         const serverTunnelIp = wgServerIp; // Use actual interface IP
