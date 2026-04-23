@@ -4,6 +4,29 @@ import { promisify } from 'util';
 const execAsync = promisify(exec);
 
 export const wireguardManager = {
+    getServerIp: async (): Promise<string> => {
+        try {
+            const { stdout } = await execAsync("ip -4 addr show wg0");
+            const match = stdout.match(/inet\s+(\d+\.\d+\.\d+\.\d+)/);
+            if (match && match[1]) {
+                return match[1];
+            }
+            return "10.200.0.1";
+        } catch (error) {
+            return "10.200.0.1";
+        }
+    },
+
+    getServerPublicKey: async (): Promise<string | null> => {
+        try {
+            const { stdout } = await execAsync('sudo wg show wg0 public-key');
+            return stdout.trim();
+        } catch (error) {
+            console.error("[WireGuard Error] Failed to get server public key:", error);
+            return null;
+        }
+    },
+
     /**
      * Add a new peer to the WireGuard interface (wg0)
      */
@@ -14,15 +37,12 @@ export const wireguardManager = {
                 throw new Error("Public key and Allowed IP are required");
             }
 
-            // Ensure the interface has the correct 10.200.0.254 IP address for routing (ignore if already exists)
-            const ensureIpCmd = `sudo ip addr add 10.200.0.254/24 dev wg0 || true`;
             // Use 'wg set' for runtime update and 'wg-quick save' for persistence
             const addCmd = `sudo wg set wg0 peer "${publicKey}" allowed-ips ${allowedIp}/32`;
             const saveCmd = `sudo wg-quick save wg0`;
 
             console.log(`[WireGuard] Adding peer: ${publicKey} with IP ${allowedIp}`);
             
-            await execAsync(ensureIpCmd);
             await execAsync(addCmd);
             await execAsync(saveCmd);
 
