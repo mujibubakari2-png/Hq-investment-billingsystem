@@ -457,6 +457,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             pingResult = err.message || "Ping failed";
         }
 
+        try {
+            const { stdout } = await execAsync(`sudo wg show wg0 dump`);
+            pingResult += "\n\nWG Dump:\n" + stdout;
+        } catch (err: any) {
+            pingResult += "\n\nWG Dump failed: " + err.message;
+        }
+
         if (!peerConnected) {
             console.warn(`[WireGuard] Activate: peer ${tunnelIp} not yet connected (no handshake). Forcing host switch for testing. Ping: ${pingResult}`);
         }
