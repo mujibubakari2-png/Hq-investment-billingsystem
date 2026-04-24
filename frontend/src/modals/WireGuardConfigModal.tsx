@@ -129,6 +129,11 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
 /ip address add address=${config.routerTunnelIp}/24 interface=wg-kenge comment="VPN Address"
 
 # ============================================
+# STEP 6: Route
+# ============================================
+/ip route add dst-address=${subnetAddress} gateway=wg-kenge comment="VPN Route"
+
+# ============================================
 # STEP 7: Firewall
 # ============================================
 /ip firewall filter add chain=input action=accept protocol=udp dst-port=${config.listenPort} comment="Allow WireGuard VPN"
