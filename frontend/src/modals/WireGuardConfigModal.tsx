@@ -115,23 +115,12 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
 # ============================================
 # STEP 3: WireGuard Interface
 # ============================================
-/interface wireguard add \\
-    name=wg-kenge \\
-    listen-port=${config.listenPort} \\
-    private-key="${config.routerPrivateKey}" \\
-    comment="Kenge VPN Interface"
+/interface wireguard add name=wg-kenge listen-port=${config.listenPort} private-key="${config.routerPrivateKey}" comment="Kenge VPN Interface"
 
 # ============================================
 # STEP 4: WireGuard Peer
 # ============================================
-/interface wireguard peers add \\
-    interface=wg-kenge \\
-    public-key="${HARDCODED_SERVER_PUBKEY}" \\
-    endpoint-address=${config.serverEndpoint} \\
-    endpoint-port=${config.serverPort} \\
-    allowed-address=${subnetAddress} \\
-    persistent-keepalive=25s \\
-    comment="Kenge ISP Server"
+/interface wireguard peers add interface=wg-kenge public-key="${HARDCODED_SERVER_PUBKEY}" endpoint-address=${config.serverEndpoint} endpoint-port=${config.serverPort} allowed-address=${subnetAddress} persistent-keepalive=25s comment="Kenge ISP Server"
 
 # ============================================
 # STEP 5: IP Address
