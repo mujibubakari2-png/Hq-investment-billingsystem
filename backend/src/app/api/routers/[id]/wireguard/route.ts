@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+export const dynamic = "force-dynamic";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { getMikroTikService } from "@/lib/mikrotik";
@@ -457,20 +458,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             pingResult = err.message || "Ping failed";
         }
 
-        try {
-            const { stdout } = await execAsync(`sudo wg show wg0 dump`);
-            pingResult += "\n\nWG Dump:\n" + stdout;
-            
-            const { stdout: ufwOut } = await execAsync(`sudo ufw status`);
-            pingResult += "\n\nUFW Status:\n" + ufwOut;
-            
-            const { stdout: confOut } = await execAsync(`sudo cat /etc/wireguard/wg0.conf`);
-            pingResult += "\n\nWG Conf:\n" + confOut;
-            
-        } catch (err: any) {
-            pingResult += "\n\nDiagnostics failed: " + err.message;
-        }
-
         if (!peerConnected) {
             console.warn(`[WireGuard] Activate: peer ${tunnelIp} not yet connected (no handshake). Forcing host switch for testing. Ping: ${pingResult}`);
         }
@@ -488,7 +475,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         return jsonResponse({
             success: true,
             tunnelVerified: peerConnected,
-            message: `VPN Test: Ping to ${tunnelIp} returned: \n${pingResult}\n\nIf Ping fails, VPN is dead. If Ping works, Port 80 is blocked!`,
+            message: `VPN Test: Ping to ${tunnelIp} returned: \n${pingResult.substring(0, 150)}...\n\nIf Ping fails, VPN is dead. If Ping works, Port 80 is blocked!`,
         });
     } catch (err: any) {
         console.error("WireGuard activate error:", err);
