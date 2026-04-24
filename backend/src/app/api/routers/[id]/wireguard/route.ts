@@ -433,6 +433,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
         // Default: manual activate (user pasted the script on MikroTik)
         try {
+            // Clean up old dead peers before adding the new one
+            const allPeers = await wireguardManager.listPeers();
+            for (const peer of allPeers) {
+                if (peer.publicKey === wgPublicKey) continue;
+                if (peer.allowedIps === "(none)" || peer.allowedIps.includes(`${tunnelIp}/32`)) {
+                    await wireguardManager.removePeer(peer.publicKey);
+                }
+            }
+            
             await wireguardManager.addPeer(router.wgPublicKey, tunnelIp);
         } catch (err: any) {
             console.error("Failed to add peer:", err);
