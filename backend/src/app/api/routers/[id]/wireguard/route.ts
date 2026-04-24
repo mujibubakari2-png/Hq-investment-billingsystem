@@ -433,11 +433,20 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
         // Default: manual activate (user pasted the script on MikroTik)
         try {
-            // Clean up old dead peers before adding the new one
+            // Aggressive Cleanup: Remove any peer that is not actively registered in the DB
+            const allValidRouters = await prisma.router.findMany({
+                where: { wgPublicKey: { not: null } },
+                select: { wgPublicKey: true }
+            });
+            const validKeys = new Set(allValidRouters.map(r => r.wgPublicKey));
+            
             const allPeers = await wireguardManager.listPeers();
             for (const peer of allPeers) {
+                // Keep the current router being activated
                 if (peer.publicKey === wgPublicKey) continue;
-                if (peer.allowedIps === "(none)" || peer.allowedIps.includes(`${tunnelIp}/32`)) {
+                
+                // If peer is not in the database, OR it has lost its allowed IP, destroy it
+                if (!validKeys.has(peer.publicKey) || peer.allowedIps === "(none)") {
                     await wireguardManager.removePeer(peer.publicKey);
                 }
             }
