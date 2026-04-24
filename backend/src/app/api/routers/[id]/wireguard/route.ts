@@ -230,7 +230,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 data: {
                     routerId: id,
                     action: "wireguard_host_reset",
-                    details: `Router host reset to ${newHost} by Admin ID: ${userPayload.id}. WireGuard tunnel was unreachable.`,
+                    details: `Router host reset to ${newHost} by Admin ID: ${userPayload.userId}. WireGuard tunnel was unreachable.`,
                     status: "success",
                 },
             });
