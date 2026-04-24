@@ -481,7 +481,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         return jsonResponse({
             success: true,
             tunnelVerified: peerConnected,
-            message: `VPN Test: Ping to ${tunnelIp} returned: \n${pingResult.substring(0, 150)}...\n\nIf Ping fails, VPN is dead. If Ping works, Port 80 is blocked!`,
+            message: `VPN Test: Ping to ${tunnelIp} returned: \n${pingResult}\n\nIf Ping fails, VPN is dead. If Ping works, Port 80 is blocked!`,
         });
     } catch (err: any) {
         console.error("WireGuard activate error:", err);
