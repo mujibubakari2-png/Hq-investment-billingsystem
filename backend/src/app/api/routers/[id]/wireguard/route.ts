@@ -64,7 +64,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         // Prevent random generation by using the hardcoded key from setup-vpn.sh as the ultimate fallback
         const DEFAULT_SERVER_PRIVATE_KEY = "mPsn44hz/0c/ZuAREVBTit//tuazXSw5+E9OeeAZS1Q=";
         const DEFAULT_SERVER_PUBLIC_KEY = "b7ADpdTy6UooXmb7Ve+PgGeXjGFLVFXqsuz32dYNaxA=";
-        
+
         const serverPrivateKey = process.env.WG_SERVER_PRIVATE_KEY || DEFAULT_SERVER_PRIVATE_KEY;
         const serverPublicKey = process.env.WG_SERVER_PUBLIC_KEY || DEFAULT_SERVER_PUBLIC_KEY;
 
@@ -78,7 +78,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
                 select: { wgTunnelIp: true }
             });
             const usedIps = allWgRouters.map(r => r.wgTunnelIp);
-            
+
             // Find first free IP from 200 to 250
             let nextIp = 200;
             while (usedIps.includes(`${subnetPrefix}.${nextIp}`) && nextIp < 250) {
@@ -114,7 +114,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         // Always ensure the peer public key is correct, even if keys were already generated
         const realServerPubKey = await wireguardManager.getServerPublicKey();
         const currentServerPublicKey = realServerPubKey || serverPublicKey;
-        
+
         if (wgPeerPublicKey !== currentServerPublicKey) {
             wgPeerPublicKey = currentServerPublicKey;
             await updateRouterWgFields(id, { wgPeerPublicKey });
@@ -122,7 +122,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
         const serverTunnelIp = wgServerIp; // Use actual interface IP
         const listenPort = router.wgListenPort || 13231;
-        
+
         // Use request host as fallback if no endpoint is configured
         const requestHost = req.headers.get("host")?.split(":")[0];
         const serverEndpoint = router.wgServerEndpoint || process.env.WG_SERVER_ENDPOINT || requestHost || "vpn.billing-system.local";
@@ -254,7 +254,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             tunnelIp = `${subnetPrefix}.200`; // Fallback
         }
         const listenPort = router.wgListenPort || 13231;
-        
+
         // Use request host as fallback if no endpoint is configured (match GET logic)
         const requestHost = req.headers.get("host")?.split(":")[0];
         const serverEndpoint = router.wgServerEndpoint || process.env.WG_SERVER_ENDPOINT || requestHost || "vpn.billing-system.local";
@@ -448,7 +448,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         };
         // FOR DEBUGGING: Always switch router host to tunnel IP to test actual connectivity
         activateData.host = tunnelIp;
-        
+
         let pingResult = "Ping not attempted";
         try {
             const { stdout } = await execAsync(`ping -c 3 -W 3 ${tunnelIp}`);
@@ -460,8 +460,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         try {
             const { stdout } = await execAsync(`sudo wg show wg0 dump`);
             pingResult += "\n\nWG Dump:\n" + stdout;
+            
+            const { stdout: ufwOut } = await execAsync(`sudo ufw status`);
+            pingResult += "\n\nUFW Status:\n" + ufwOut;
+            
+            const { stdout: confOut } = await execAsync(`sudo cat /etc/wireguard/wg0.conf`);
+            pingResult += "\n\nWG Conf:\n" + confOut;
+            
         } catch (err: any) {
-            pingResult += "\n\nWG Dump failed: " + err.message;
+            pingResult += "\n\nDiagnostics failed: " + err.message;
         }
 
         if (!peerConnected) {
@@ -481,7 +488,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         return jsonResponse({
             success: true,
             tunnelVerified: peerConnected,
-            message: `VPN Test: Ping to ${tunnelIp} returned: \n${pingResult}\n\nIf Ping fails, VPN is dead. If Ping works, Port 80 is blocked!`,
+            message: `VPN Test: Ping to ${tunnelIp} returned: \n${pingResult.substring(0, 150)}...\n\nIf Ping fails, VPN is dead. If Ping works, Port 80 is blocked!`,
         });
     } catch (err: any) {
         console.error("WireGuard activate error:", err);
