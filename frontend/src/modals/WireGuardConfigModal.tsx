@@ -147,9 +147,9 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
 # ============================================
 # STEP 7: Firewall
 # ============================================
-/ip firewall filter add chain=input action=accept protocol=udp dst-port=${config.listenPort} comment="Allow WireGuard VPN" place-before=0
-/ip firewall filter add chain=forward action=accept in-interface=wg-kenge comment="Allow VPN Traffic" place-before=0
-/ip firewall filter add chain=forward action=accept out-interface=wg-kenge comment="Allow VPN Return Traffic" place-before=0
+/ip firewall filter add chain=input action=accept protocol=udp dst-port=${config.listenPort} comment="Allow WireGuard VPN"
+/ip firewall filter add chain=forward action=accept in-interface=wg-kenge comment="Allow VPN Traffic"
+/ip firewall filter add chain=forward action=accept out-interface=wg-kenge comment="Allow VPN Return Traffic"
 
 # ============================================
 # STEP 8: DNS

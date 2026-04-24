@@ -337,15 +337,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 const firewallRules = [
                     {
                         chain: "input", protocol: "udp", "dst-port": String(listenPort),
-                        action: "accept", comment: "Allow WireGuard - Kenge", "place-before": "0"
+                        action: "accept", comment: "Allow WireGuard - Kenge"
                     },
                     {
                         chain: "forward", "in-interface": "wg-kenge",
-                        action: "accept", comment: "Allow WG traffic", "place-before": "0"
+                        action: "accept", comment: "Allow WG traffic"
                     },
                     {
                         chain: "forward", "out-interface": "wg-kenge",
-                        action: "accept", comment: "Allow WG return traffic", "place-before": "0"
+                        action: "accept", comment: "Allow WG return traffic"
                     }
                 ];
 
