@@ -443,7 +443,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             const allPeers = await wireguardManager.listPeers();
             for (const peer of allPeers) {
                 // Keep the current router being activated
-                if (peer.publicKey === wgPublicKey) continue;
+                if (peer.publicKey === router.wgPublicKey) continue;
                 
                 // If peer is not in the database, OR it has lost its allowed IP, destroy it
                 if (!validKeys.has(peer.publicKey) || peer.allowedIps === "(none)") {
