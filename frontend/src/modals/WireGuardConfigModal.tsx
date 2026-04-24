@@ -127,7 +127,6 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
 /interface wireguard peers add \\
     interface=wg-kenge \\
     public-key="${HARDCODED_SERVER_PUBKEY}" \\
-    preshared-key="${config.presharedKey}" \\
     endpoint-address=${config.serverEndpoint} \\
     endpoint-port=${config.serverPort} \\
     allowed-address=${subnetAddress} \\
