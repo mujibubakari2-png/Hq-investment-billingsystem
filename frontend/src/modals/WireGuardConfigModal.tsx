@@ -88,8 +88,9 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
         );
     }
 
-    const subnetPrefix = config.serverTunnelIp.split('.').slice(0, 3).join('.');
-    const subnetAddress = `${subnetPrefix}.0/24`;
+    // Hardcode the known good subnet to bypass Droplet misconfiguration
+    const subnetAddress = "10.0.0.0/24";
+    const HARDCODED_SERVER_PUBKEY = "b7ADpdTy6UooXmb7Ve+PgGeXjGFLVFXqsuz32dYNaxA=";
 
     // Build MikroTik server script with CORRECT syntax (single backslash for line continuation)
     const serverConfig = `# ============================================
@@ -125,7 +126,7 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
 # ============================================
 /interface wireguard peers add \\
     interface=wg-kenge \\
-    public-key="${config.serverPublicKey}" \\
+    public-key="${HARDCODED_SERVER_PUBKEY}" \\
     preshared-key="${config.presharedKey}" \\
     endpoint-address=${config.serverEndpoint} \\
     endpoint-port=${config.serverPort} \\
@@ -136,7 +137,7 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
 # ============================================
 # STEP 5: IP Address
 # ============================================
-/ip address add address=${config.routerTunnelIp}/24 interface=wg-kenge comment="VPN Address"
+/ip address add address=${config.routerTunnelIp.replace("10.200", "10.0")}/24 interface=wg-kenge comment="VPN Address"
 
 # ============================================
 # STEP 6: Route
@@ -163,7 +164,7 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
 # - Password: ${router.password || 'admin'}
 #
 # VPN Configuration:
-# - VPN IP: ${config.routerTunnelIp}
+# - VPN IP: ${config.routerTunnelIp.replace("10.200", "10.0")}
 # - Endpoint: ${config.serverEndpoint}:${config.serverPort}
 # - Interface: wg-kenge
 # - Listen Port: ${config.listenPort}
@@ -181,7 +182,7 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
 [Interface]
 # Kenge ISP Server side
 PrivateKey = <SERVER_PRIVATE_KEY>
-Address = ${config.serverTunnelIp}/24
+Address = 10.0.0.1/24
 DNS = 8.8.8.8, 1.1.1.1
 
 [Peer]
@@ -382,7 +383,7 @@ PersistentKeepalive = 25`;
                 }}>
                     <div>
                         <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 2 }}>Tunnel Address</div>
-                        <div style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '0.85rem' }}>{activeTab === 'server' ? config.routerTunnelIp : config.serverTunnelIp}/24</div>
+                        <div style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '0.85rem' }}>{activeTab === 'server' ? config.routerTunnelIp.replace("10.200", "10.0") : "10.0.0.1"}/24</div>
                     </div>
                     <div>
                         <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 2 }}>Listen Port</div>
@@ -418,7 +419,7 @@ PersistentKeepalive = 25`;
                             ? <>
                                 <strong>Option 1:</strong> Click "Auto-Push to Router" to configure automatically via API.<br />
                                 <strong>Option 2:</strong> Copy and paste this script into MikroTik Terminal, then click "I Pasted It — Activate".<br />
-                                The system will switch to the WireGuard tunnel IP ({config.routerTunnelIp}) for all future API connections.
+                                The system will switch to the WireGuard tunnel IP ({config.routerTunnelIp.replace("10.200", "10.0")}) for all future API connections.
                             </>
                             : 'Install this config on your Kenge VPN server to complete the tunnel. Replace <SERVER_PRIVATE_KEY> with your actual server private key.'
                         }

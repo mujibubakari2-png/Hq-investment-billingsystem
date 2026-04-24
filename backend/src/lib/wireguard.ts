@@ -94,5 +94,30 @@ export const wireguardManager = {
             console.error("[WireGuard Error] Failed to list peers:", error);
             return [];
         }
-    }
+    },
+
+    /**
+     * Check if a WireGuard peer has completed a handshake within the last 3 minutes.
+     * Returns true only if the tunnel is actually established.
+     */
+    checkPeerHandshake: async (publicKey: string): Promise<boolean> => {
+        try {
+            const { stdout } = await execAsync('sudo wg show wg0 latest-handshakes');
+            const lines = stdout.trim().split('\n').filter(Boolean);
+            for (const line of lines) {
+                const parts = line.trim().split(/\s+/);
+                if (parts[0] === publicKey) {
+                    const handshakeTimestamp = parseInt(parts[1] || '0');
+                    if (handshakeTimestamp === 0) return false;
+                    const ageSeconds = Math.floor(Date.now() / 1000) - handshakeTimestamp;
+                    // Consider connected if handshake was within last 3 minutes (180s)
+                    return ageSeconds < 180;
+                }
+            }
+            return false;
+        } catch (error) {
+            console.error('[WireGuard Error] Failed to check peer handshake:', error);
+            return false;
+        }
+    },
 };

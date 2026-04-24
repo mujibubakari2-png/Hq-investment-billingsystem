@@ -166,6 +166,16 @@ export class MikroTikService {
                 throw new Error(`Connection refused by ${this.conn.host}. Verify the REST API (www or www-ssl) service is enabled, firewall permits access, and correct port (${this.baseUrl.includes('https') ? '443' : '80'}) is used.`);
             }
             if (err.cause?.code === "EHOSTUNREACH" || err.cause?.code === "ENETUNREACH") {
+                const isPrivateIp = /^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/.test(this.conn.host);
+                if (isPrivateIp) {
+                    throw new Error(
+                        `Router ${this.conn.host} appears unreachable. This is a WireGuard tunnel IP — ` +
+                        `the tunnel must be established before you can manage this router. ` +
+                        `On the Droplet, run: sudo wg show wg0 — check that the MikroTik peer appears ` +
+                        `and has a recent handshake. If not, re-apply the WireGuard config on your MikroTik ` +
+                        `or re-run setup-vpn.sh on the Droplet.`
+                    );
+                }
                 throw new Error(`Router ${this.conn.host} appears unreachable. Check network routing, firewalls, and ensure the IP is public or accessible from this server.`);
             }
             const causeMsg = err.cause ? ` (${err.cause.message || err.cause.code})` : '';
