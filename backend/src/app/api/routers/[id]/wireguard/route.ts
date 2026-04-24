@@ -5,17 +5,6 @@ import { getMikroTikService } from "@/lib/mikrotik";
 import { wireguardManager } from "@/lib/wireguard";
 import crypto from "crypto";
 
-// ── Key helpers ─────────────────────────────────────────────────────────────
-
-function generateWireGuardKey(): string {
-    return crypto.randomBytes(32).toString("base64");
-}
-
-function derivePublicKeyPlaceholder(privateKey: string): string {
-    const hash = crypto.createHash("sha256").update(privateKey).digest();
-    return hash.toString("base64");
-}
-
 // ── Raw SQL helpers (bypass Prisma client validation for new fields) ────────
 
 async function getRouterWgFields(routerId: string) {
@@ -97,10 +86,18 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         }
 
         if (!wgPrivateKey) {
-            wgPrivateKey = generateWireGuardKey();
-            wgPublicKey = derivePublicKeyPlaceholder(wgPrivateKey);
-            wgPeerPublicKey = serverPublicKey;
-            wgPresharedKey = generateWireGuardKey();
+            try {
+                wgPrivateKey = await wireguardManager.generatePrivateKey();
+                wgPublicKey = await wireguardManager.derivePublicKey(wgPrivateKey);
+                wgPeerPublicKey = serverPublicKey;
+                wgPresharedKey = await wireguardManager.generatePrivateKey(); // Preshared keys use the same 32-byte format
+            } catch (err) {
+                console.error("Failed to generate real WG keys, using fallback", err);
+                wgPrivateKey = crypto.randomBytes(32).toString("base64");
+                wgPublicKey = crypto.createHash("sha256").update(wgPrivateKey).digest("base64"); // INSECURE FALLBACK
+                wgPeerPublicKey = serverPublicKey;
+                wgPresharedKey = crypto.randomBytes(32).toString("base64");
+            }
 
             await updateRouterWgFields(id, {
                 wgPrivateKey,

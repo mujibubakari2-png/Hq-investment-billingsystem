@@ -27,6 +27,16 @@ export const wireguardManager = {
         }
     },
 
+    generatePrivateKey: async (): Promise<string> => {
+        const { stdout } = await execAsync('wg genkey');
+        return stdout.trim();
+    },
+
+    derivePublicKey: async (privateKey: string): Promise<string> => {
+        const { stdout } = await execAsync(`echo "${privateKey}" | wg pubkey`);
+        return stdout.trim();
+    },
+
     /**
      * Add a new peer to the WireGuard interface (wg0)
      */
