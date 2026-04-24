@@ -4,6 +4,9 @@ import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { getMikroTikService } from "@/lib/mikrotik";
 import { wireguardManager } from "@/lib/wireguard";
 import crypto from "crypto";
+import { exec } from "child_process";
+import { promisify } from "util";
+const execAsync = promisify(exec);
 
 // ── Raw SQL helpers (bypass Prisma client validation for new fields) ────────
 
@@ -445,8 +448,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         };
         // FOR DEBUGGING: Always switch router host to tunnel IP to test actual connectivity
         activateData.host = tunnelIp;
+        
+        let pingResult = "Ping not attempted";
+        try {
+            const { stdout } = await execAsync(`ping -c 3 -W 3 ${tunnelIp}`);
+            pingResult = stdout;
+        } catch (err: any) {
+            pingResult = err.message || "Ping failed";
+        }
+
         if (!peerConnected) {
-            console.warn(`[WireGuard] Activate: peer ${tunnelIp} not yet connected (no handshake). Forcing host switch for testing.`);
+            console.warn(`[WireGuard] Activate: peer ${tunnelIp} not yet connected (no handshake). Forcing host switch for testing. Ping: ${pingResult}`);
         }
         await updateRouterWgFields(id, activateData);
 
@@ -454,9 +466,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             data: {
                 routerId: id,
                 action: "wireguard_activated",
-                details: peerConnected
-                    ? `WireGuard activated for ${router.name}. Host switched to tunnel IP ${tunnelIp}.`
-                    : `WireGuard peer registered for ${router.name} but MikroTik has not connected yet. Host kept at current IP — apply the config on MikroTik first.`,
+                details: `Forced WireGuard activation for ${router.name}. Host switched to ${tunnelIp}. Ping Test: ${pingResult.substring(0, 100)}`,
                 status: "success",
             },
         });
@@ -464,10 +474,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         return jsonResponse({
             success: true,
             tunnelVerified: peerConnected,
-            message: peerConnected
-                ? `WireGuard activated. Router host updated to tunnel IP ${tunnelIp}.`
-                : `WireGuard peer registered on server. The MikroTik has not connected yet — ` +
-                  `apply the WireGuard config on your MikroTik, then click Activate again to switch the host to ${tunnelIp}.`,
+            message: `VPN Test: Ping to ${tunnelIp} returned: \n${pingResult.substring(0, 150)}...\n\nIf Ping fails, VPN is dead. If Ping works, Port 80 is blocked!`,
         });
     } catch (err: any) {
         console.error("WireGuard activate error:", err);
