@@ -446,11 +446,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             wgEnabled: true,
             wgConfiguredAt: new Date(),
         };
-        // Only switch router host to tunnel IP if MikroTik has actually connected
-        if (peerConnected) {
-            activateData.host = tunnelIp;
-        } else {
-            console.warn(`[WireGuard] Activate: peer ${tunnelIp} not yet connected (no handshake). Host NOT switched.`);
+        // FOR DEBUGGING: Always switch router host to tunnel IP to test actual connectivity
+        activateData.host = tunnelIp;
+        if (!peerConnected) {
+            console.warn(`[WireGuard] Activate: peer ${tunnelIp} not yet connected (no handshake). Forcing host switch for testing.`);
         }
         await updateRouterWgFields(id, activateData);
 
