@@ -337,7 +337,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 const firewallRules = [
                     {
                         chain: "input", protocol: "udp", "dst-port": String(listenPort),
-                        action: "accept", comment: "Allow WireGuard - Kenge"
+                        action: "accept", comment: "Allow WireGuard - Kenge", "place-before": "0"
+                    },
+                    {
+                        // Allow the Droplet to reach MikroTik REST API (port 80) over the VPN tunnel
+                        chain: "input", protocol: "tcp", "dst-port": "80",
+                        "src-address": `${subnetPrefix}.0/24`,
+                        action: "accept", comment: "Allow REST API from VPN - Kenge", "place-before": "0"
                     },
                     {
                         chain: "forward", "in-interface": "wg-kenge",
@@ -458,42 +464,49 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         }
 
         // Wait a few seconds for MikroTik to complete the WireGuard handshake
-        await new Promise(resolve => setTimeout(resolve, 5000));
+        await new Promise(resolve => setTimeout(resolve, 8000));
         const peerConnected = await wireguardManager.checkPeerHandshake(router.wgPublicKey);
 
         const activateData: Record<string, any> = {
             wgEnabled: true,
             wgConfiguredAt: new Date(),
         };
-        // FOR DEBUGGING: Always switch router host to tunnel IP to test actual connectivity
-        activateData.host = tunnelIp;
 
         let pingResult = "Ping not attempted";
-        try {
-            const { stdout } = await execAsync(`ping -c 3 -W 3 ${tunnelIp}`);
-            pingResult = stdout;
-        } catch (err: any) {
-            pingResult = err.message || "Ping failed";
+        let responseMessage: string;
+
+        if (peerConnected) {
+            // Only switch host to tunnel IP once tunnel is actually confirmed
+            activateData.host = tunnelIp;
+            try {
+                const { stdout } = await execAsync(`ping -c 3 -W 3 ${tunnelIp}`);
+                pingResult = stdout;
+            } catch (err: any) {
+                pingResult = err.message || "Ping failed";
+            }
+            responseMessage = `WireGuard tunnel established! Router is now accessible via tunnel IP ${tunnelIp}. Ping result:\n${pingResult.substring(0, 150)}`;
+            console.log(`[WireGuard] Activate: peer ${tunnelIp} connected. Switching host to tunnel IP.`);
+        } else {
+            // Handshake not confirmed — keep original host to preserve connectivity
+            console.warn(`[WireGuard] Activate: peer ${tunnelIp} has NOT completed a WireGuard handshake. Keeping original host IP to preserve connectivity.`);
+            responseMessage = `WireGuard peer registered on server, but MikroTik has NOT connected yet (no handshake).\n\nTo fix:\n1. Verify the config was pasted correctly on MikroTik.\n2. Check UDP port ${listenPort} is open on MikroTik (firewall rule must be above any DROP rule).\n3. Run on Droplet: sudo wg show wg0\n4. Once the MikroTik peer appears with a handshake, click Activate again.`;
         }
 
-        if (!peerConnected) {
-            console.warn(`[WireGuard] Activate: peer ${tunnelIp} not yet connected (no handshake). Forcing host switch for testing. Ping: ${pingResult}`);
-        }
         await updateRouterWgFields(id, activateData);
 
         await prisma.routerLog.create({
             data: {
                 routerId: id,
                 action: "wireguard_activated",
-                details: `Forced WireGuard activation for ${router.name}. Host switched to ${tunnelIp}. Ping Test: ${pingResult.substring(0, 100)}`,
+                details: `WireGuard activation for ${router.name}. Tunnel ${peerConnected ? 'verified — host switched to ' + tunnelIp : 'NOT yet connected — original host preserved'}.`,
                 status: "success",
             },
         });
 
         return jsonResponse({
-            success: true,
+            success: peerConnected,
             tunnelVerified: peerConnected,
-            message: `VPN Test: Ping to ${tunnelIp} returned: \n${pingResult.substring(0, 150)}...\n\nIf Ping fails, VPN is dead. If Ping works, Port 80 is blocked!`,
+            message: responseMessage,
         });
     } catch (err: any) {
         console.error("WireGuard activate error:", err);

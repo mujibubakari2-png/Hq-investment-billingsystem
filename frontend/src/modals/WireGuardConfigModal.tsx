@@ -33,6 +33,9 @@ interface WgConfig {
     listenPort: number;
     serverEndpoint: string;
     serverPort: number;
+    tunnelActive: boolean;
+    lastHandshakeSeconds: number | null;
+    tunnelStatusMessage: string;
 }
 
 export default function WireGuardConfigModal({ router, onClose }: WireGuardConfigModalProps) {
@@ -91,7 +94,8 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
     // Compute subnet from tunnel IP dynamically
     const subnetPrefix = config.routerTunnelIp.split('.').slice(0, 3).join('.');
     const subnetAddress = `${subnetPrefix}.0/24`;
-    const HARDCODED_SERVER_PUBKEY = "b7ADpdTy6UooXmb7Ve+PgGeXjGFLVFXqsuz32dYNaxA=";
+    // Always use the server public key returned from the backend (dynamically fetched via wg show)
+    const serverPubKey = config.serverPublicKey;
 
     // Build MikroTik server script with CORRECT syntax (single backslash for line continuation)
     const serverConfig = `# ============================================
@@ -121,7 +125,7 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
 # ============================================
 # STEP 4: WireGuard Peer
 # ============================================
-/interface wireguard peers add interface=wg-kenge public-key="${HARDCODED_SERVER_PUBKEY}" endpoint-address=${config.serverEndpoint} endpoint-port=${config.serverPort} allowed-address=${subnetAddress} persistent-keepalive=25s comment="Kenge ISP Server"
+/interface wireguard peers add interface=wg-kenge public-key="${serverPubKey}" endpoint-address=${config.serverEndpoint} endpoint-port=${config.serverPort} allowed-address=${subnetAddress} persistent-keepalive=25s comment="Kenge ISP Server"
 
 # ============================================
 # STEP 5: IP Address
@@ -136,7 +140,11 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
 # ============================================
 # STEP 7: Firewall
 # ============================================
-/ip firewall filter add chain=input action=accept protocol=udp dst-port=${config.listenPort} comment="Allow WireGuard VPN"
+# Allow WireGuard UDP handshake port
+/ip firewall filter add chain=input action=accept protocol=udp dst-port=${config.listenPort} comment="Allow WireGuard VPN" place-before=0
+# Allow Droplet to reach MikroTik REST API over the VPN tunnel (port 80)
+/ip firewall filter add chain=input action=accept src-address=${subnetAddress} dst-port=80 protocol=tcp comment="Allow REST API from VPN" place-before=0
+# Allow forwarding through the VPN interface
 /ip firewall filter add chain=forward action=accept in-interface=wg-kenge comment="Allow VPN Traffic"
 /ip firewall filter add chain=forward action=accept out-interface=wg-kenge comment="Allow VPN Return Traffic"
 
@@ -153,10 +161,11 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
 # - Password: ${router.password || 'admin'}
 #
 # VPN Configuration:
-# - VPN IP: ${config.routerTunnelIp.replace("10.200", "10.0")}
-# - Endpoint: ${config.serverEndpoint}:${config.serverPort}
-# - Interface: wg-kenge
-# - Listen Port: ${config.listenPort}
+# - Router VPN IP : ${config.routerTunnelIp}
+# - Server VPN IP : ${config.serverTunnelIp}
+# - Server Endpoint: ${config.serverEndpoint}:${config.serverPort}
+# - Interface      : wg-kenge
+# - Listen Port    : ${config.listenPort}
 #
 # IMPORTANT: Save these credentials securely!
 # ============================================`;
@@ -272,21 +281,22 @@ PersistentKeepalive = 25`;
                 {/* Status + Action Buttons */}
                 <div style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    padding: '10px 24px', background: config.enabled ? '#f0fdf4' : '#fef3c7',
+                    padding: '10px 24px', background: config.tunnelActive ? '#f0fdf4' : config.enabled ? '#fff7ed' : '#fef3c7',
                     borderBottom: '1px solid var(--border-light)', gap: 8, flexWrap: 'wrap',
                 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <div style={{
                             width: 10, height: 10, borderRadius: '50%',
-                            background: config.enabled ? '#16a34a' : '#d97706',
-                            boxShadow: config.enabled ? '0 0 6px #16a34a' : 'none',
+                            background: config.tunnelActive ? '#16a34a' : config.enabled ? '#ea580c' : '#d97706',
+                            boxShadow: config.tunnelActive ? '0 0 6px #16a34a' : 'none',
                         }} />
-                        <span style={{ fontSize: '0.82rem', fontWeight: 600, color: config.enabled ? '#15803d' : '#92400e' }}>
-                            {config.enabled
+                        <span style={{ fontSize: '0.82rem', fontWeight: 600, color: config.tunnelActive ? '#15803d' : config.enabled ? '#c2410c' : '#92400e' }}>
+                            {config.tunnelStatusMessage || (config.enabled
                                 ? `WireGuard Active — Connected via tunnel ${config.routerTunnelIp}`
-                                : 'WireGuard Not Configured — Paste script or auto-push'}
+                                : 'WireGuard Not Configured — Paste script or auto-push')}
                         </span>
                     </div>
+
                     <div style={{ display: 'flex', gap: 6 }}>
                         {!config.enabled ? (
                             <>
