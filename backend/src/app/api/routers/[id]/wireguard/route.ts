@@ -1,5 +1,4 @@
 import { NextRequest } from "next/server";
-export const dynamic = "force-dynamic";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { getMikroTikService } from "@/lib/mikrotik";

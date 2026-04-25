@@ -2,7 +2,6 @@ import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 
-export const dynamic = "force-dynamic";
 
 // GET /api/admin/tenants - list all tenants (Super Admin only)
 export async function GET(req: NextRequest) {

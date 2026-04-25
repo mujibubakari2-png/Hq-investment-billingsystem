@@ -3,7 +3,6 @@ import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { toISOSafe } from "@/lib/dateUtils";
 
-export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
     try {

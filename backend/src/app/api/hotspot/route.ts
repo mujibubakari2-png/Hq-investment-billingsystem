@@ -2,7 +2,6 @@ import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 
-export const dynamic = "force-dynamic";
 
 // GET /api/hotspot - list all hotspot subscribers for the tenant
 export async function GET(req: NextRequest) {

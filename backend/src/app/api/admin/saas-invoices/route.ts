@@ -3,7 +3,6 @@ import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { toISOSafe } from "@/lib/dateUtils";
 
-export const dynamic = "force-dynamic";
 
 // GET /api/admin/saas-invoices - list all SaaS (Tenant) invoices (Super Admin only)
 export async function GET(req: NextRequest) {

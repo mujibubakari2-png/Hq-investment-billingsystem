@@ -3,7 +3,6 @@ import prisma from "@/lib/prisma";
 import { hashPassword, jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { toISOSafe } from "@/lib/dateUtils";
 
-export const dynamic = "force-dynamic";
 
 // GET /api/users - list system users (Admin only)
 export async function GET(req: NextRequest) {
