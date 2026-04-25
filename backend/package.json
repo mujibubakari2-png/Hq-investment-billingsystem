@@ -8,6 +8,7 @@
     "build": "prisma generate && next build",
     "build:full": "prisma generate && next build",
     "start": "bash scripts/railway-start.sh",
+    "start:droplet": "bash scripts/droplet-start.sh",
     "next:start": "next start --hostname 0.0.0.0 --port ${PORT:-3000}",
     "test": "vitest",
     "db:seed": "pnpm exec tsx scripts/seed.ts",
