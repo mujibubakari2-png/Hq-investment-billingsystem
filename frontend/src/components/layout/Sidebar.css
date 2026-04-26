@@ -4,6 +4,7 @@
     left: 0;
     width: var(--sidebar-width);
     height: 100vh;
+    height: 100dvh;
     background: var(--bg-sidebar);
     border-right: 1px solid var(--border-light);
     display: flex;
