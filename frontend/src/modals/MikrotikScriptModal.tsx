@@ -101,7 +101,7 @@ add dst-address="${window.location.hostname}" action=accept comment="Billing Por
 
 # ── 10. System Scheduler (Auto-sync with HQInvestment) ───────────────────
 /system scheduler
-add name="billing-sync" interval=5m on-event="/tool fetch url=\\"${(import.meta.env.VITE_API_URL || window.location.origin).replace(/\/$/, '')}/api/sync/${routerIdCode}\\" mode=https" \\
+add name="billing-sync" interval=5m on-event="/tool fetch url=\\"${(import.meta.env.VITE_API_URL || window.location.origin).replace(/\/$/, '')}/api/sync/${routerIdCode}\\"" \\
     start-time=startup
 
 # ── 11. Logging ──────────────────────────────────────────────
