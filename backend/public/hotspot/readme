@@ -1,0 +1,66 @@
+HQINVESTMENT ISP Billing — MikroTik Hotspot Login Portal
+==========================================================
+
+Version : 2.0
+Date    : 2025
+Author  : HQINVESTMENT ISP Billing System
+
+FILES INCLUDED
+--------------
+  login.html    - Main login page (M-Pesa payment + CHAP login)
+  logout.html   - Logout confirmation page
+  status.html   - Connection status page (auto-refreshes)
+  error.html    - Single error display page
+  errors.html   - Multiple errors display page
+  redirect.html - Post-login redirect page
+  rlogin.html   - RADIUS/account-based login page
+  radvert.html  - Post-login advertisement page
+  tandc.html    - Terms and conditions
+  faqs.html     - Frequently asked questions
+  md5.js        - MD5 library for CHAP authentication (REQUIRED)
+  readme        - This file
+  favicon.ico   - Site favicon
+
+  assets/
+    css/
+      style.css - Main stylesheet
+    img/
+      (place logo and background images here)
+    xml/
+      hotspot.xml - Hotspot configuration metadata
+
+HOW TO INSTALL ON MIKROTIK
+---------------------------
+1. Open Winbox → Files
+2. Upload the entire "hotspot" folder to your MikroTik flash memory
+3. Verify via Terminal:
+     /file print where name~"hotspot"
+4. Set your hotspot profile to use this directory:
+     /ip hotspot profile set [find] html-directory=hotspot
+5. Test by connecting a device to the hotspot WiFi
+
+AUTHENTICATION METHODS SUPPORTED
+----------------------------------
+  - HTTP-CHAP  (secure, uses md5.js — RECOMMENDED)
+  - HTTP-PAP   (plain text, less secure)
+  - Cookie     (auto-login on return visits)
+  - MAC-Cookie (auto-login by MAC address)
+
+BILLING API ENDPOINTS USED
+----------------------------
+  POST /api/hotspot/purchase    - Initiate M-Pesa payment
+  GET  /api/hotspot/status      - Poll payment status
+  GET  /api/packages            - Fetch available packages
+
+WALLED GARDEN (must be configured on MikroTik)
+------------------------------------------------
+  Add your billing server domain/IP to walled garden so
+  unauthenticated users can reach the API:
+    /ip hotspot walled-garden add dst-host="your-droplet-ip" action=allow
+    /ip hotspot walled-garden ip add dst-address="your-droplet-ip" action=accept
+
+SUPPORT
+-------
+  Phone : +255 000 000 000
+  Email : support@hqinvestment.co.tz
+  Web   : https://hqinvestment.co.tz

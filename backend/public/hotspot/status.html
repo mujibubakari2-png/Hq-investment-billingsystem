@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="sw">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HQINVESTMENT WiFi – Hali ya Muunganiko</title>
+<link rel="icon" href="favicon.ico">
+<link rel="stylesheet" href="assets/css/style.css">
+<meta http-equiv="refresh" content="120">
+</head>
+<body>
+<div class="card">
+  <div class="card-header">
+    <div class="logo-wrap">
+      <svg viewBox="0 0 24 24"><path d="M1 6l11 8 11-8V5L12 13 1 5v1zm0 3v9a1 1 0 001 1h20a1 1 0 001-1V9l-11 8L1 9z"/></svg>
+    </div>
+    <h1>HQINVESTMENT WiFi</h1>
+    <p>Hali ya Muunganiko Wako</p>
+  </div>
+  <div class="card-body">
+    <div class="status-box">
+      <div class="status-icon">✅</div>
+      <h2>Umeunganishwa</h2>
+      <p>Unafurahia huduma ya HQINVESTMENT WiFi</p>
+    </div>
+    <div class="info-row">
+      <span class="info-label">Mtumiaji</span>
+      <span class="info-value">$(username)</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">IP Address</span>
+      <span class="info-value">$(ip)</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">MAC Address</span>
+      <span class="info-value">$(mac)</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">Muda Uliobaki</span>
+      <span class="info-value" style="color:var(--primary);">$(session-time-left)</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">Data Iliyotumika</span>
+      <span class="info-value">$(bytes-in) / $(bytes-out)</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">Muda wa Muunganiko</span>
+      <span class="info-value">$(uptime)</span>
+    </div>
+    <a href="$(link-logout)" class="btn btn-danger" style="display:block;margin-top:18px;text-decoration:none;">
+      Toka (Logout)
+    </a>
+    <button class="btn btn-secondary" onclick="window.location.reload()">
+      🔄 Onyesha Upya
+    </button>
+  </div>
+  <div class="card-footer">
+    <p>Ukurasa huu unasasishwa kila dakika 2</p>
+    <p style="margin-top:4px;">&copy; 2025 HQINVESTMENT ISP Billing</p>
+  </div>
+</div>
+</body>
+</html>

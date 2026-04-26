@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="sw">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HQINVESTMENT WiFi – Ingia (RADIUS)</title>
+<link rel="icon" href="favicon.ico">
+<link rel="stylesheet" href="assets/css/style.css">
+<script src="md5.js"></script>
+</head>
+<body>
+<div class="card">
+  <div class="card-header">
+    <div class="logo-wrap">
+      <svg viewBox="0 0 24 24"><path d="M1 6l11 8 11-8V5L12 13 1 5v1zm0 3v9a1 1 0 001 1h20a1 1 0 001-1V9l-11 8L1 9z"/></svg>
+    </div>
+    <h1>HQINVESTMENT WiFi</h1>
+    <p>Ingia kwa akaunti yako</p>
+  </div>
+  <div class="card-body">
+    $(if error)
+    <div class="alert alert-error"><span>⚠</span><span>$(error)</span></div>
+    $(endif)
+
+    <form method="POST" action="$(link-login-only)" onsubmit="return doLogin(this)">
+      <input type="hidden" name="dst"           value="$(link-orig)">
+      <input type="hidden" name="popup"          value="true">
+      <input type="hidden" name="chap-id"        value="$(chap-id)">
+      <input type="hidden" name="chap-challenge" value="$(chap-challenge)">
+      <input type="hidden" name="chap-password"  id="chap-password" value="">
+
+      <div class="field">
+        <label for="username">Jina la Mtumiaji</label>
+        <input type="text" id="username" name="username" value="$(username)"
+               placeholder="HS-0712345678" autocomplete="username" autofocus>
+      </div>
+
+      <div class="field">
+        <label for="password">Nywila</label>
+        <input type="password" id="password" name="password"
+               placeholder="••••••••" autocomplete="current-password">
+      </div>
+
+      <button type="submit" class="btn btn-primary">Ingia</button>
+    </form>
+
+    <div class="divider"><span>au</span></div>
+    <a href="login.html" class="btn btn-secondary" style="display:block;text-decoration:none;text-align:center;">
+      Lipa kwa M-Pesa
+    </a>
+  </div>
+  <div class="card-footer">
+    <p><a href="faqs.html">Msaada</a> &nbsp;|&nbsp; <a href="tandc.html">Masharti</a></p>
+  </div>
+</div>
+<script>
+function doLogin(form) {
+  var id = form['chap-id'].value;
+  var pw = form['password'].value;
+  var ch = form['chap-challenge'].value;
+  if (id && ch) {
+    form['chap-password'].value = chapPassword(id, pw, ch);
+    form['password'].value = '';
+  }
+  return true;
+}
+</script>
+</body>
+</html>

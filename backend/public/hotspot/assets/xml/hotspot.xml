@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  HQINVESTMENT ISP Billing - Hotspot Configuration Metadata
+  This file is read by MikroTik to configure hotspot behaviour.
+-->
+<hotspot>
+  <name>HQINVESTMENT WiFi</name>
+  <version>2.0</version>
+  <login-page>login.html</login-page>
+  <logout-page>logout.html</logout-page>
+  <status-page>status.html</status-page>
+  <error-page>error.html</error-page>
+  <redirect-page>redirect.html</redirect-page>
+  <advertisement-page>radvert.html</advertisement-page>
+  <terms-page>tandc.html</terms-page>
+  <faq-page>faqs.html</faq-page>
+  <md5-script>md5.js</md5-script>
+  <styles>assets/css/style.css</styles>
+  <login-methods>
+    <method>http-chap</method>
+    <method>http-pap</method>
+    <method>cookie</method>
+    <method>mac-cookie</method>
+  </login-methods>
+  <payment>
+    <provider>M-Pesa</provider>
+    <currency>TZS</currency>
+    <country>Tanzania</country>
+  </payment>
+  <support>
+    <phone>+255000000000</phone>
+    <email>support@hqinvestment.co.tz</email>
+  </support>
+</hotspot>

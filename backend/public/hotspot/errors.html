@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="sw">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HQINVESTMENT WiFi – Makosa</title>
+<link rel="icon" href="favicon.ico">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<div class="card">
+  <div class="card-header">
+    <div class="logo-wrap">
+      <svg viewBox="0 0 24 24"><path d="M1 6l11 8 11-8V5L12 13 1 5v1zm0 3v9a1 1 0 001 1h20a1 1 0 001-1V9l-11 8L1 9z"/></svg>
+    </div>
+    <h1>HQINVESTMENT WiFi</h1>
+    <p>Makosa ya Muunganiko</p>
+  </div>
+  <div class="card-body">
+    <!-- MikroTik renders multiple errors inside this block -->
+    $(if error1)
+    <div class="alert alert-error"><span>⚠</span><span>$(error1)</span></div>
+    $(endif)
+    $(if error2)
+    <div class="alert alert-error"><span>⚠</span><span>$(error2)</span></div>
+    $(endif)
+    $(if error3)
+    <div class="alert alert-error"><span>⚠</span><span>$(error3)</span></div>
+    $(endif)
+    $(if error)
+    <div class="alert alert-error"><span>⚠</span><span>$(error)</span></div>
+    $(endif)
+    <a href="$(link-login)" class="btn btn-primary" style="display:block;margin-top:18px;text-decoration:none;">
+      ← Jaribu Tena
+    </a>
+  </div>
+  <div class="card-footer">
+    <p>Msaada: <a href="faqs.html">Maswali ya Kawaida</a></p>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="sw">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HQINVESTMENT WiFi – Inakuelekeza…</title>
+<link rel="icon" href="favicon.ico">
+<link rel="stylesheet" href="assets/css/style.css">
+<script>
+  // MikroTik redirect page: automatically forward to original destination
+  window.onload = function() {
+    var dst = '$(link-orig)';
+    if (!dst || dst === '$(link-orig)') dst = 'http://www.google.com';
+    setTimeout(function(){ window.location.replace(dst); }, 2000);
+  };
+</script>
+</head>
+<body>
+<div class="card">
+  <div class="card-header">
+    <div class="logo-wrap">
+      <svg viewBox="0 0 24 24"><path d="M1 6l11 8 11-8V5L12 13 1 5v1zm0 3v9a1 1 0 001 1h20a1 1 0 001-1V9l-11 8L1 9z"/></svg>
+    </div>
+    <h1>HQINVESTMENT WiFi</h1>
+    <p>Umeunganishwa kwa mafanikio!</p>
+  </div>
+  <div class="card-body">
+    <div class="status-box">
+      <div class="status-icon">🚀</div>
+      <h2>Karibu mtandaoni!</h2>
+      <p>Unakuelekeza kwenye tovuti yako…</p>
+    </div>
+    <div class="progress-wrap">
+      <div class="progress-bar">
+        <div class="progress-fill" id="prog" style="width:0%"></div>
+      </div>
+      <div class="progress-label">Inaendelea…</div>
+    </div>
+    <a href="$(link-orig)" class="btn btn-primary" style="display:block;margin-top:12px;text-decoration:none;">
+      Endelea Sasa →
+    </a>
+  </div>
+</div>
+<script>
+  var p = 0;
+  var iv = setInterval(function(){
+    p += 50; document.getElementById('prog').style.width = Math.min(p,100) + '%';
+    if (p >= 100) clearInterval(iv);
+  }, 100);
+</script>
+</body>
+</html>

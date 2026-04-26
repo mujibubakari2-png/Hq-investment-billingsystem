@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="sw">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HQINVESTMENT WiFi – Ingia</title>
+<meta name="description" content="Karibu kwenye mtandao wa HQINVESTMENT. Lipa na M-Pesa au ingia kwa akaunti yako.">
+<link rel="icon" href="favicon.ico" type="image/x-icon">
+<link rel="stylesheet" href="assets/css/style.css">
+<script src="md5.js"></script>
+</head>
+<body>
+
+<div class="card">
+  <!-- Header -->
+  <div class="card-header">
+    <div class="logo-wrap">
+      <svg viewBox="0 0 24 24"><path d="M1 6l11 8 11-8V5L12 13 1 5v1zm0 3v9a1 1 0 001 1h20a1 1 0 001-1V9l-11 8L1 9z"/></svg>
+    </div>
+    <h1>HQINVESTMENT WiFi</h1>
+    <p>Karibu! Lipa kwa M-Pesa au ingia kwa akaunti</p>
+  </div>
+
+  <!-- Body -->
+  <div class="card-body">
+
+    <!-- Error message from MikroTik -->
+    $(if error)
+    <div class="alert alert-error" id="error-alert">
+      <span>⚠</span>
+      <span>$(error)</span>
+    </div>
+    $(endif)
+
+    <!-- Tab switcher -->
+    <div style="display:flex;gap:8px;margin-bottom:20px;">
+      <button id="tab-login" class="btn btn-primary" style="flex:1;padding:9px;"
+        onclick="showTab('login')">Lipa / Jiunge</button>
+      <button id="tab-account" class="btn btn-secondary" style="flex:1;padding:9px;"
+        onclick="showTab('account')">Nina Akaunti</button>
+    </div>
+
+    <!-- ══ TAB 1: PAY / REGISTER ══════════════════════ -->
+    <div id="panel-login">
+
+      <!-- Package selection (loaded from API) -->
+      <div class="packages">
+        <div class="packages-title">Chagua Kifurushi</div>
+        <div class="pkg-grid" id="pkg-grid">
+          <div style="grid-column:1/-1;text-align:center;padding:18px;color:var(--text-muted);font-size:.84rem;">
+            <span class="spinner" style="border-color:rgba(22,163,74,.3);border-top-color:var(--primary);width:18px;height:18px;"></span>
+            Inapakia vifurushi…
+          </div>
+        </div>
+      </div>
+
+      <!-- Phone number -->
+      <div class="field">
+        <label for="phone">Namba ya Simu (M-Pesa)</label>
+        <input type="tel" id="phone" name="phone" placeholder="0712345678"
+               autocomplete="tel" inputmode="numeric" maxlength="13">
+      </div>
+
+      <!-- MAC (hidden, auto-filled) -->
+      <input type="hidden" id="mac" value="$(mac)">
+      <input type="hidden" id="selected-pkg-id" value="">
+      <input type="hidden" id="router-id" value="$(link-login)">
+
+      <!-- Pay button -->
+      <button class="btn btn-primary" id="pay-btn" onclick="startPayment()">
+        Lipa Sasa
+      </button>
+
+      <!-- Payment status polling -->
+      <div id="payment-status" style="display:none;margin-top:16px;">
+        <div class="alert alert-info" id="pay-msg">
+          <span class="spinner"></span>
+          <span id="pay-msg-text">Subiri kukamilisha malipo…</span>
+        </div>
+        <div class="progress-wrap">
+          <div class="progress-bar"><div class="progress-fill" id="prog" style="width:0%"></div></div>
+          <div class="progress-label" id="prog-label">0 / 60 sekunde</div>
+        </div>
+      </div>
+
+    </div><!-- end panel-login -->
+
+    <!-- ══ TAB 2: EXISTING ACCOUNT ════════════════════ -->
+    <div id="panel-account" style="display:none;">
+      <form method="POST" action="$(link-login-only)" onsubmit="return doLogin(this)">
+        <input type="hidden" name="dst"  value="$(link-orig)">
+        <input type="hidden" name="popup" value="true">
+
+        <div class="field">
+          <label for="username">Jina la Mtumiaji</label>
+          <input type="text" id="username" name="username"
+                 value="$(username)" placeholder="HS-0712345678"
+                 autocomplete="username" autofocus>
+        </div>
+
+        <div class="field">
+          <label for="password">Nywila</label>
+          <input type="password" id="password" name="password"
+                 placeholder="••••••••" autocomplete="current-password">
+        </div>
+
+        <!-- CHAP hidden fields -->
+        <input type="hidden" name="chap-id"        value="$(chap-id)">
+        <input type="hidden" name="chap-challenge"  value="$(chap-challenge)">
+        <input type="hidden" name="chap-password"   id="chap-password" value="">
+
+        <button type="submit" class="btn btn-primary">Ingia</button>
+      </form>
+
+      <div class="divider"><span>au</span></div>
+      <button class="btn btn-secondary" onclick="showTab('login')">Lipa kwa M-Pesa</button>
+    </div>
+
+  </div><!-- end card-body -->
+
+  <!-- Footer -->
+  <div class="card-footer">
+    <p>
+      Kwa msaada: <a href="tel:+255000000000">+255 000 000 000</a> &nbsp;|&nbsp;
+      <a href="tandc.html">Masharti</a> &nbsp;|&nbsp;
+      <a href="faqs.html">Maswali</a>
+    </p>
+    <p style="margin-top:6px;">&copy; 2025 HQINVESTMENT ISP Billing</p>
+  </div>
+</div><!-- end card -->
+
+<script>
+/* ── CONFIG ───────────────────────────────────────── */
+// API base: detect dynamically from redirect URL embedded by MikroTik
+// MikroTik injects $(link-login) which contains the droplet URL pattern
+var API_BASE = (function(){
+  // Try to pull from the MikroTik login link if it contains our domain
+  var loginLink = document.getElementById('router-id').value || '';
+  var m = loginLink.match(/https?:\/\/[^\/]*/);
+  if (m && m[0] && !m[0].includes('192.168')) return m[0];
+  // Fallback: use hardcoded droplet API (replaced by download script)
+  return 'BILLING_API_URL';
+})();
+
+var ROUTER_ID = ''; // extracted from walled garden or URL param
+var selectedPkg = null;
+var paymentRef  = null;
+var pollTimer   = null;
+var pollCount   = 0;
+var MAX_POLL    = 60;
+
+/* ── URL PARAMS ───────────────────────────────────── */
+(function(){
+  var params = new URLSearchParams(window.location.search);
+  ROUTER_ID = params.get('routerId') || params.get('router_id') || '';
+})();
+
+/* ── CHAP LOGIN ────────────────────────────────────── */
+function doLogin(form) {
+  var id  = form['chap-id'].value;
+  var pw  = form['password'].value;
+  var ch  = form['chap-challenge'].value;
+  if (id && ch) {
+    form['chap-password'].value = chapPassword(id, pw, ch);
+    form['password'].value = '';
+  }
+  return true;
+}
+
+/* ── TAB SWITCHER ──────────────────────────────────── */
+function showTab(tab) {
+  document.getElementById('panel-login').style.display    = tab === 'login'   ? '' : 'none';
+  document.getElementById('panel-account').style.display  = tab === 'account' ? '' : 'none';
+  document.getElementById('tab-login').className   = 'btn ' + (tab === 'login'   ? 'btn-primary' : 'btn-secondary');
+  document.getElementById('tab-account').className = 'btn ' + (tab === 'account' ? 'btn-primary' : 'btn-secondary');
+}
+
+/* ── LOAD PACKAGES ─────────────────────────────────── */
+function loadPackages() {
+  var url = API_BASE + '/api/packages?type=HOTSPOT&status=ACTIVE' + (ROUTER_ID ? '&routerId=' + ROUTER_ID : '');
+  fetch(url)
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      var packages = data.data || data || [];
+      renderPackages(packages);
+    })
+    .catch(function(){
+      document.getElementById('pkg-grid').innerHTML =
+        '<div style="grid-column:1/-1;text-align:center;padding:12px;color:var(--error);font-size:.82rem;">Hitilafu ya kupakia vifurushi. Jaribu tena.</div>';
+    });
+}
+
+function renderPackages(list) {
+  if (!list || list.length === 0) {
+    document.getElementById('pkg-grid').innerHTML =
+      '<div style="grid-column:1/-1;text-align:center;padding:12px;color:var(--text-muted);font-size:.82rem;">Hakuna vifurushi vilivyopatikana.</div>';
+    return;
+  }
+  var html = '';
+  list.forEach(function(p, i) {
+    var speed = '';
+    if (p.downloadSpeed) speed = p.downloadSpeed + (p.downloadUnit||'Mbps');
+    var dur = p.duration + ' ' + ({MINUTES:'Min',HOURS:'Saa',DAYS:'Siku',MONTHS:'Miezi'}[p.durationUnit] || p.durationUnit);
+    html += '<label class="pkg-card" id="pkg-' + p.id + '" onclick="selectPkg(\'' + p.id + '\')">' +
+              '<input type="radio" name="pkg" value="' + p.id + '"' + (i===0?' checked':'') + '>' +
+              '<div class="pkg-name">' + escHtml(p.name) + '</div>' +
+              (speed ? '<div class="pkg-speed">' + escHtml(speed) + '</div>' : '') +
+              '<div class="pkg-price">TSH ' + Number(p.price).toLocaleString() + '</div>' +
+              '<div class="pkg-dur">' + escHtml(dur) + '</div>' +
+            '</label>';
+    if (i === 0) { selectedPkg = p; document.getElementById('selected-pkg-id').value = p.id; }
+  });
+  document.getElementById('pkg-grid').innerHTML = html;
+}
+
+function selectPkg(id) {
+  document.querySelectorAll('.pkg-card').forEach(function(el){ el.classList.remove('selected'); });
+  var el = document.getElementById('pkg-' + id);
+  if (el) el.classList.add('selected');
+  document.getElementById('selected-pkg-id').value = id;
+}
+
+/* ── PAYMENT ───────────────────────────────────────── */
+function startPayment() {
+  var phone   = document.getElementById('phone').value.trim();
+  var pkgId   = document.getElementById('selected-pkg-id').value;
+  var mac     = document.getElementById('mac').value;
+
+  clearAlert();
+
+  if (!phone) { showAlert('Tafadhali ingiza namba ya simu.'); return; }
+  if (!pkgId) { showAlert('Tafadhali chagua kifurushi.'); return; }
+
+  var btn = document.getElementById('pay-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Inawasiliana…';
+
+  fetch(API_BASE + '/api/hotspot/purchase', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ packageId: pkgId, phone: phone, macAddress: mac, routerId: ROUTER_ID })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    if (d.reference || d.success) {
+      paymentRef = d.reference;
+      document.getElementById('payment-status').style.display = '';
+      btn.style.display = 'none';
+      startPolling();
+    } else {
+      showAlert(d.message || d.error || 'Imeshindwa kuanzisha malipo.');
+      btn.disabled = false;
+      btn.innerHTML = 'Lipa Sasa';
+    }
+  })
+  .catch(function(){
+    showAlert('Hitilafu ya mtandao. Hakikisha uko kwenye WiFi kisha jaribu tena.');
+    btn.disabled = false;
+    btn.innerHTML = 'Lipa Sasa';
+  });
+}
+
+/* ── POLL PAYMENT STATUS ────────────────────────────── */
+function startPolling() {
+  pollCount = 0;
+  pollTimer = setInterval(function(){
+    pollCount++;
+    var pct = Math.min(pollCount / MAX_POLL * 100, 99);
+    document.getElementById('prog').style.width = pct + '%';
+    document.getElementById('prog-label').textContent = pollCount + ' / ' + MAX_POLL + ' sekunde';
+
+    fetch(API_BASE + '/api/hotspot/status?reference=' + encodeURIComponent(paymentRef))
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (d.status === 'COMPLETED') {
+          clearInterval(pollTimer);
+          document.getElementById('prog').style.width = '100%';
+          document.getElementById('pay-msg').className = 'alert alert-success';
+          document.getElementById('pay-msg-text').textContent = '✅ Malipo yamekamilika! Inakuunganisha…';
+          // Auto-login via MikroTik login link
+          if (d.username) {
+            setTimeout(function(){
+              var chapId = '$(chap-id)';
+              var chapCh = '$(chap-challenge)';
+              var pwd    = d.password || d.username;
+              var url    = '$(link-login-only)?username=' + encodeURIComponent(d.username) +
+                           '&password=' + encodeURIComponent(pwd) +
+                           '&dst=$(link-orig)';
+              if (chapId && chapCh) {
+                url = '$(link-login-only)?username=' + encodeURIComponent(d.username) +
+                      '&chap-id=' + encodeURIComponent(chapId) +
+                      '&chap-challenge=' + encodeURIComponent(chapCh) +
+                      '&chap-password=' + encodeURIComponent(chapPassword(chapId, pwd, chapCh)) +
+                      '&dst=$(link-orig)';
+              }
+              window.location.href = url;
+            }, 1500);
+          }
+        } else if (d.status === 'FAILED') {
+          clearInterval(pollTimer);
+          document.getElementById('payment-status').style.display = 'none';
+          var btn = document.getElementById('pay-btn');
+          btn.style.display = '';
+          btn.disabled = false;
+          btn.innerHTML = 'Lipa Sasa';
+          showAlert('Malipo yameshindwa. Tafadhali jaribu tena.');
+        }
+      })
+      .catch(function(){});
+
+    if (pollCount >= MAX_POLL) {
+      clearInterval(pollTimer);
+      document.getElementById('pay-msg').className = 'alert alert-error';
+      document.getElementById('pay-msg-text').textContent = '⏰ Muda umekwisha. Jaribu tena.';
+      var btn = document.getElementById('pay-btn');
+      btn.style.display = '';
+      btn.disabled = false;
+      btn.innerHTML = 'Lipa Sasa';
+    }
+  }, 1000);
+}
+
+/* ── UTILS ──────────────────────────────────────────── */
+function showAlert(msg) {
+  var el = document.getElementById('error-alert');
+  if (!el) {
+    el = document.createElement('div');
+    el.className = 'alert alert-error';
+    el.id = 'error-alert';
+    document.querySelector('.card-body').prepend(el);
+  }
+  el.innerHTML = '<span>⚠</span><span>' + escHtml(msg) + '</span>';
+  el.style.display = '';
+}
+
+function clearAlert() {
+  var el = document.getElementById('error-alert');
+  if (el) el.style.display = 'none';
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/* ── INIT ───────────────────────────────────────────── */
+loadPackages();
+</script>
+</body>
+</html>
