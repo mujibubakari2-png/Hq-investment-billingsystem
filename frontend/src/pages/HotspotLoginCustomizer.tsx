@@ -54,6 +54,8 @@ export default function HotspotLoginCustomizer() {
     const [customerCareNumber, setCustomerCareNumber] = useState('');
     const [backendUrl, setBackendUrl] = useState(CLEAN_API_URL || '');
     const [saving, setSaving] = useState(false);
+    const [saveSuccess, setSaveSuccess] = useState(false);
+    const [saveError, setSaveError] = useState<string | null>(null);
 
     // Live preview
     const [showPreview, setShowPreview] = useState(true);
@@ -643,8 +645,13 @@ export default function HotspotLoginCustomizer() {
     };
 
     const handleSaveSettings = async () => {
-        if (!selectedRouterId) return;
+        if (!selectedRouterId) {
+            setSaveError('Please select a router first.');
+            return;
+        }
         setSaving(true);
+        setSaveSuccess(false);
+        setSaveError(null);
         try {
             await hotspotSettingsApi.update({
                 routerId: selectedRouterId,
@@ -659,10 +666,12 @@ export default function HotspotLoginCustomizer() {
                 customerCareNumber,
                 backendUrl
             });
-            alert('Customization settings saved successfully!');
-        } catch (err) {
+            setSaveSuccess(true);
+            setTimeout(() => setSaveSuccess(false), 3000);
+        } catch (err: any) {
             console.error('Failed to save settings:', err);
-            alert('Failed to save settings. Please try again.');
+            setSaveError(err.message || 'Failed to save settings. Please try again.');
+            setTimeout(() => setSaveError(null), 5000);
         } finally {
             setSaving(false);
         }
@@ -1161,8 +1170,8 @@ TROUBLESHOOTING:
 
                         {/* Action buttons */}
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 24 }}>
-                            <button className="btn" onClick={handleSaveSettings} disabled={saving} style={{ background: '#4f46e5', color: '#fff', fontWeight: 600, padding: '10px 20px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                                {saving ? 'Saving...' : 'Save Customization'}
+                            <button className="btn" onClick={handleSaveSettings} disabled={saving} style={{ background: saving ? '#818cf8' : '#4f46e5', color: '#fff', fontWeight: 600, padding: '10px 20px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                                {saving ? '⏳ Saving...' : '💾 Save Customization'}
                             </button>
                             <button className="btn" onClick={handlePreview} style={{ background: '#2563eb', color: '#fff', fontWeight: 600, padding: '10px 20px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
                                 <PreviewIcon fontSize="small" /> Preview Changes
@@ -1171,6 +1180,18 @@ TROUBLESHOOTING:
                                 <DownloadIcon fontSize="small" /> Download ZIP File
                             </button>
                         </div>
+                        {/* Save feedback */}
+                        {saveSuccess && (
+                            <div style={{ marginTop: 10, padding: '10px 14px', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 8, color: '#15803d', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                ✅ Settings saved successfully!
+                            </div>
+                        )}
+                        {saveError && (
+                            <div style={{ marginTop: 10, padding: '10px 14px', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, color: '#dc2626', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                ❌ {saveError}
+                            </div>
+                        )}
+
                     </div>
                 </div>
 

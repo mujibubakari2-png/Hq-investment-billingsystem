@@ -438,11 +438,12 @@ export interface HotspotSettings {
     companyName?: string;
     customerCareNumber?: string;
     adMessage?: string;
+    backendUrl?: string;
 }
 
 export const hotspotSettingsApi = {
     get: (routerId: string) => get<HotspotSettings>(`/hotspot-settings?routerId=${routerId}`),
-    update: (data: Partial<HotspotSettings>) => post<HotspotSettings>('/hotspot-settings', data),
+    update: (data: Partial<HotspotSettings> & { routerId: string }) => post<HotspotSettings>('/hotspot-settings', data),
 };
 
 // ── Reports ─────────────────────────────────────────────────────────────────

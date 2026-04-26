@@ -220,6 +220,7 @@ model HotspotSettings {
   updatedAt          DateTime @updatedAt
   tenantId           String?
   adMessage          String?  @default("🎉 Special offer! Get extra data on all packages today!")
+  backendUrl         String?
   router             Router   @relation(fields: [routerId], references: [id], onDelete: Cascade)
   tenant             Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
