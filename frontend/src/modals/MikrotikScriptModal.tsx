@@ -61,7 +61,7 @@ export default function MikrotikScriptModal({ router, onClose }: MikrotikScriptM
 }
 
 :if ([:len [/ip dhcp-server network find address="192.168.88.0/24"]] = 0) do={
-    /ip dhcp-server network add address=192.168.88.0/24 gateway=192.168.88.1 dns-server=8.8.8.8,1.1.1.1
+    /ip dhcp-server network add address=192.168.88.0/24 gateway=192.168.88.1 dns-server=192.168.88.1
 }
 
 :if ([:len [/ip dhcp-server find name="dhcp-${router.name}"]] = 0) do={
