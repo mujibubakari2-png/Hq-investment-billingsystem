@@ -153,7 +153,9 @@ add service=hotspot,ppp address=${window.location.hostname} secret=hqinvestment-
 
 # ── 9. Walled Garden (Allow billing portal) ──────────────────
 /ip hotspot walled-garden
-add dst-host="*.${window.location.hostname}" action=allow comment="Billing Portal"
+add dst-host="${window.location.hostname}" action=allow comment="Billing Portal"
+/ip hotspot walled-garden ip
+add dst-address="${window.location.hostname}" action=accept comment="Billing Portal IP"
 
 # ── 10. Logging ──────────────────────────────────────────────
 /system logging
