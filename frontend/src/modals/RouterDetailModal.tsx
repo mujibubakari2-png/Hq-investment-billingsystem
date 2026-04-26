@@ -110,6 +110,7 @@ add dst-address="${window.location.hostname}" action=accept comment="Billing Por
 
 # ── 10. System Scheduler (Auto-sync with HQInvestment) ───────────────────
 /system scheduler
+:if ([:len [find name="billing-sync"]] > 0) do={ remove [find name="billing-sync"] }
 add name="billing-sync" interval=5m on-event="/tool fetch url=\\"${(import.meta.env.VITE_API_URL || window.location.origin).replace(/\/$/, '')}/api/sync/${routerIdCode}\\"" \\
     start-time=startup
 
