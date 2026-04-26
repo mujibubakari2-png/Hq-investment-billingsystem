@@ -711,7 +711,8 @@ export default function HotspotLoginCustomizer() {
         
         try {
             // Fetch the base template files from backend
-            const backendApi = backendUrl || '/api';
+            const cleanUrl = backendUrl ? (backendUrl.endsWith('/') ? backendUrl.slice(0, -1) : backendUrl) : '';
+            const backendApi = cleanUrl ? (cleanUrl.endsWith('/api') ? cleanUrl : `${cleanUrl}/api`) : '/api';
             const res = await fetch(`${backendApi}/hotspot/download?routerId=${selectedRouterId}`);
             if (!res.ok) throw new Error('Failed to fetch hotspot files from backend');
             
