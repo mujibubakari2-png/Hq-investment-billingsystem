@@ -719,6 +719,9 @@ export default function HotspotLoginCustomizer() {
             const data = await res.json();
             const zip = new JSZip();
             
+            // Debugging alert to help user
+            alert(`Debug Info:\nAPI: ${backendApi}\nFound Files: ${data.files ? data.files.length : 0}\nStatus: ${res.status}`);
+
             // Add all base files to JSZip (md5.js, assets/css, images, etc.)
             if (data.files && Array.isArray(data.files)) {
                 for (const file of data.files) {
