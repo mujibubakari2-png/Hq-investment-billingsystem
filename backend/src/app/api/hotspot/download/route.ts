@@ -19,7 +19,11 @@ export async function GET(req: NextRequest) {
         const apiUrl = searchParams.get("apiUrl") || process.env.APP_URL || "https://your-droplet.digitalocean.com";
         const routerId = searchParams.get("routerId") || "";
 
-        const hotspotDir = join(process.cwd(), "public", "hotspot");
+        let hotspotDir = join(process.cwd(), "public", "hotspot");
+        // Fallback for monorepo root process.cwd()
+        if (!require("fs").existsSync(hotspotDir)) {
+            hotspotDir = join(process.cwd(), "backend", "public", "hotspot");
+        }
 
         // Collect all files recursively
         const files: { path: string; content: string; encoding: "utf8" | "base64" }[] = [];
