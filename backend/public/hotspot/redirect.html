@@ -2,16 +2,16 @@
 <html lang="sw">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>HQINVESTMENT WiFi – Inakuelekeza…</title>
-<link rel="icon" href="favicon.ico">
+<link rel="icon" href="assets/img/favicon.ico" type="image/x-icon">
+<link rel="shortcut icon" href="assets/img/favicon.ico">
 <link rel="stylesheet" href="assets/css/style.css">
 <script>
-  // MikroTik redirect page: automatically forward to original destination
   window.onload = function() {
     var dst = '$(link-orig)';
-    if (!dst || dst === '$(link-orig)') dst = 'http://www.google.com';
-    setTimeout(function(){ window.location.replace(dst); }, 2000);
+    if (!dst || dst === '$(link-orig)' || dst === '') dst = 'http://www.google.com';
+    setTimeout(function(){ window.location.replace(dst); }, 2500);
   };
 </script>
 </head>
@@ -36,7 +36,7 @@
       </div>
       <div class="progress-label">Inaendelea…</div>
     </div>
-    <a href="$(link-orig)" class="btn btn-primary" style="display:block;margin-top:12px;text-decoration:none;">
+    <a href="$(link-orig)" class="btn btn-primary mt-12 d-block" style="text-decoration:none;">
       Endelea Sasa →
     </a>
   </div>
@@ -44,7 +44,8 @@
 <script>
   var p = 0;
   var iv = setInterval(function(){
-    p += 50; document.getElementById('prog').style.width = Math.min(p,100) + '%';
+    p += 4;
+    document.getElementById('prog').style.width = Math.min(p, 100) + '%';
     if (p >= 100) clearInterval(iv);
   }, 100);
 </script>

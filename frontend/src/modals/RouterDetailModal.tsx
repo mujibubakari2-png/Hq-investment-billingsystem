@@ -22,62 +22,6 @@ interface RouterDetailModalProps {
 export default function RouterDetailModal({ router, onClose, onDelete }: RouterDetailModalProps) {
     const navigate = useNavigate();
     const [showWireGuard, setShowWireGuard] = useState(false);
-    const [isDownloadingPortal, setIsDownloadingPortal] = useState(false);
-
-    const downloadHotspotPortal = async () => {
-        try {
-            setIsDownloadingPortal(true);
-            
-            // Dynamically load JSZip from CDN if not present
-            if (!(window as any).JSZip) {
-                await new Promise((resolve, reject) => {
-                    const script = document.createElement('script');
-                    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
-                    script.onload = resolve;
-                    script.onerror = reject;
-                    document.head.appendChild(script);
-                });
-            }
-            
-            const JSZip = (window as any).JSZip;
-            const zip = new JSZip();
-            
-            // Fetch files from backend API
-            const apiUrl = (import.meta.env.VITE_API_URL || window.location.origin).replace(/\/$/, '');
-            const response = await fetch(`${apiUrl}/api/hotspot/download?routerId=${router.id}&apiUrl=${encodeURIComponent(apiUrl)}`);
-            
-            if (!response.ok) throw new Error('Failed to fetch hotspot files');
-            const data = await response.json();
-            
-            if (!data.files || data.files.length === 0) throw new Error('No files returned from server');
-
-            // Add files to zip
-            data.files.forEach((file: any) => {
-                zip.file(file.path, file.content, { base64: file.encoding === 'base64' });
-            });
-
-            // Add an instruction text file
-            zip.file('INSTALLATION_GUIDE.txt', data.instructions.join('\n'));
-
-            // Generate and download zip
-            const blob = await zip.generateAsync({ type: 'blob' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `hotspot-portal-${router.name.toLowerCase().replace(/\s+/g, '-')}.zip`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            
-            alert('Hotspot portal files downloaded successfully. Extract and upload the "hotspot" folder to your MikroTik flash.');
-        } catch (error) {
-            console.error('Download error:', error);
-            alert('Failed to download hotspot files. Please try again.');
-        } finally {
-            setIsDownloadingPortal(false);
-        }
-    };
 
     const downloadScript = () => {
         const routerIdCode = `MYR-${router.id.padStart(3, '0')}VBHBC`;
@@ -280,23 +224,6 @@ add topics=pppoe action=memory
                             }} onClick={downloadScript}>
                                 <DownloadIcon fontSize="small" /> Download Script
                             </button>
-                        </div>
-                        <div style={{ marginTop: 8 }}>
-                            <button className="btn" style={{
-                                background: '#f0fdf4', color: '#16a34a', fontWeight: 600, border: '1px solid #bbf7d0',
-                                padding: '10px 16px', borderRadius: 'var(--radius-sm)', width: '100%',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                            }} onClick={downloadHotspotPortal} disabled={isDownloadingPortal}>
-                                {isDownloadingPortal ? (
-                                    <span style={{ display: 'inline-block', width: 16, height: 16, border: '2px solid #16a34a', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-                                ) : (
-                                    <DownloadIcon fontSize="small" />
-                                )}
-                                {isDownloadingPortal ? 'Packaging Files...' : 'Download Hotspot Portal (ZIP)'}
-                            </button>
-                            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'center', marginTop: 4 }}>
-                                Contains login, M-Pesa payment, status, and MD5 authentication files
-                            </p>
                         </div>
                     </div>
 

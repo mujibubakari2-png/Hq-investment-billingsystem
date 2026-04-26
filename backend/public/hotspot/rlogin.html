@@ -2,9 +2,10 @@
 <html lang="sw">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>HQINVESTMENT WiFi – Ingia (RADIUS)</title>
-<link rel="icon" href="favicon.ico">
+<link rel="icon" href="assets/img/favicon.ico" type="image/x-icon">
+<link rel="shortcut icon" href="assets/img/favicon.ico">
 <link rel="stylesheet" href="assets/css/style.css">
 <script src="md5.js"></script>
 </head>
@@ -23,7 +24,7 @@
     $(endif)
 
     <form method="POST" action="$(link-login-only)" onsubmit="return doLogin(this)">
-      <input type="hidden" name="dst"           value="$(link-orig)">
+      <input type="hidden" name="dst"            value="$(link-orig)">
       <input type="hidden" name="popup"          value="true">
       <input type="hidden" name="chap-id"        value="$(chap-id)">
       <input type="hidden" name="chap-challenge" value="$(chap-challenge)">
@@ -31,8 +32,9 @@
 
       <div class="field">
         <label for="username">Jina la Mtumiaji</label>
-        <input type="text" id="username" name="username" value="$(username)"
-               placeholder="HS-0712345678" autocomplete="username" autofocus>
+        <input type="text" id="username" name="username"
+               value="$(username)" placeholder="HS-0712345678"
+               autocomplete="username" autofocus>
       </div>
 
       <div class="field">
@@ -41,12 +43,12 @@
                placeholder="••••••••" autocomplete="current-password">
       </div>
 
-      <button type="submit" class="btn btn-primary">Ingia</button>
+      <button type="submit" class="btn btn-primary">🔒 Ingia</button>
     </form>
 
     <div class="divider"><span>au</span></div>
-    <a href="login.html" class="btn btn-secondary" style="display:block;text-decoration:none;text-align:center;">
-      Lipa kwa M-Pesa
+    <a href="login.html" class="btn btn-secondary d-block" style="text-decoration:none;text-align:center;">
+      💳 Lipa kwa M-Pesa
     </a>
   </div>
   <div class="card-footer">
@@ -58,7 +60,7 @@ function doLogin(form) {
   var id = form['chap-id'].value;
   var pw = form['password'].value;
   var ch = form['chap-challenge'].value;
-  if (id && ch) {
+  if (id && ch && typeof chapPassword === 'function') {
     form['chap-password'].value = chapPassword(id, pw, ch);
     form['password'].value = '';
   }

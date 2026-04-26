@@ -2,9 +2,10 @@
 <html lang="sw">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>HQINVESTMENT WiFi – Makosa</title>
-<link rel="icon" href="favicon.ico">
+<link rel="icon" href="assets/img/favicon.ico" type="image/x-icon">
+<link rel="shortcut icon" href="assets/img/favicon.ico">
 <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
@@ -17,7 +18,6 @@
     <p>Makosa ya Muunganiko</p>
   </div>
   <div class="card-body">
-    <!-- MikroTik renders multiple errors inside this block -->
     $(if error1)
     <div class="alert alert-error"><span>⚠</span><span>$(error1)</span></div>
     $(endif)
@@ -30,7 +30,7 @@
     $(if error)
     <div class="alert alert-error"><span>⚠</span><span>$(error)</span></div>
     $(endif)
-    <a href="$(link-login)" class="btn btn-primary" style="display:block;margin-top:18px;text-decoration:none;">
+    <a href="$(link-login)" class="btn btn-primary mt-18 d-block" style="text-decoration:none;">
       ← Jaribu Tena
     </a>
   </div>

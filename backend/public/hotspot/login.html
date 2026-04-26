@@ -2,10 +2,11 @@
 <html lang="sw">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>HQINVESTMENT WiFi – Ingia</title>
 <meta name="description" content="Karibu kwenye mtandao wa HQINVESTMENT. Lipa na M-Pesa au ingia kwa akaunti yako.">
-<link rel="icon" href="favicon.ico" type="image/x-icon">
+<link rel="icon" href="assets/img/favicon.ico" type="image/x-icon">
+<link rel="shortcut icon" href="assets/img/favicon.ico">
 <link rel="stylesheet" href="assets/css/style.css">
 <script src="md5.js"></script>
 </head>
@@ -18,37 +19,34 @@
       <svg viewBox="0 0 24 24"><path d="M1 6l11 8 11-8V5L12 13 1 5v1zm0 3v9a1 1 0 001 1h20a1 1 0 001-1V9l-11 8L1 9z"/></svg>
     </div>
     <h1>HQINVESTMENT WiFi</h1>
-    <p>Karibu! Lipa kwa M-Pesa au ingia kwa akaunti</p>
+    <p>Lipa kwa M-Pesa au ingia kwa akaunti</p>
   </div>
 
   <!-- Body -->
   <div class="card-body">
 
-    <!-- Error message from MikroTik -->
+    <!-- Error from MikroTik -->
     $(if error)
     <div class="alert alert-error" id="error-alert">
-      <span>⚠</span>
-      <span>$(error)</span>
+      <span>⚠</span><span>$(error)</span>
     </div>
     $(endif)
 
     <!-- Tab switcher -->
-    <div style="display:flex;gap:8px;margin-bottom:20px;">
-      <button id="tab-login" class="btn btn-primary" style="flex:1;padding:9px;"
-        onclick="showTab('login')">Lipa / Jiunge</button>
-      <button id="tab-account" class="btn btn-secondary" style="flex:1;padding:9px;"
-        onclick="showTab('account')">Nina Akaunti</button>
+    <div class="tab-wrap">
+      <button id="tab-login" class="btn btn-primary" onclick="showTab('login')">💳 Lipa / Jiunge</button>
+      <button id="tab-account" class="btn btn-secondary" onclick="showTab('account')">🔑 Nina Akaunti</button>
     </div>
 
-    <!-- ══ TAB 1: PAY / REGISTER ══════════════════════ -->
+    <!-- ══ TAB 1: PAY / REGISTER ══ -->
     <div id="panel-login">
 
-      <!-- Package selection (loaded from API) -->
+      <!-- Package grid -->
       <div class="packages">
         <div class="packages-title">Chagua Kifurushi</div>
         <div class="pkg-grid" id="pkg-grid">
-          <div style="grid-column:1/-1;text-align:center;padding:18px;color:var(--text-muted);font-size:.84rem;">
-            <span class="spinner" style="border-color:rgba(22,163,74,.3);border-top-color:var(--primary);width:18px;height:18px;"></span>
+          <div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--text-muted);font-size:.84rem;">
+            <span class="spinner spinner-green"></span>
             Inapakia vifurushi…
           </div>
         </div>
@@ -61,35 +59,41 @@
                autocomplete="tel" inputmode="numeric" maxlength="13">
       </div>
 
-      <!-- MAC (hidden, auto-filled) -->
-      <input type="hidden" id="mac" value="$(mac)">
+      <!-- Hidden fields -->
+      <input type="hidden" id="mac"             value="$(mac)">
       <input type="hidden" id="selected-pkg-id" value="">
-      <input type="hidden" id="router-id" value="$(link-login)">
+      <input type="hidden" id="chap-id-val"     value="$(chap-id)">
+      <input type="hidden" id="chap-ch-val"     value="$(chap-challenge)">
 
       <!-- Pay button -->
       <button class="btn btn-primary" id="pay-btn" onclick="startPayment()">
-        Lipa Sasa
+        💳 Lipa Sasa
       </button>
 
-      <!-- Payment status polling -->
+      <!-- Payment status -->
       <div id="payment-status" style="display:none;margin-top:16px;">
         <div class="alert alert-info" id="pay-msg">
           <span class="spinner"></span>
           <span id="pay-msg-text">Subiri kukamilisha malipo…</span>
         </div>
         <div class="progress-wrap">
-          <div class="progress-bar"><div class="progress-fill" id="prog" style="width:0%"></div></div>
+          <div class="progress-bar">
+            <div class="progress-fill" id="prog" style="width:0%"></div>
+          </div>
           <div class="progress-label" id="prog-label">0 / 60 sekunde</div>
         </div>
       </div>
 
     </div><!-- end panel-login -->
 
-    <!-- ══ TAB 2: EXISTING ACCOUNT ════════════════════ -->
+    <!-- ══ TAB 2: EXISTING ACCOUNT ══ -->
     <div id="panel-account" style="display:none;">
       <form method="POST" action="$(link-login-only)" onsubmit="return doLogin(this)">
-        <input type="hidden" name="dst"  value="$(link-orig)">
-        <input type="hidden" name="popup" value="true">
+        <input type="hidden" name="dst"            value="$(link-orig)">
+        <input type="hidden" name="popup"          value="true">
+        <input type="hidden" name="chap-id"        value="$(chap-id)">
+        <input type="hidden" name="chap-challenge" value="$(chap-challenge)">
+        <input type="hidden" name="chap-password"  id="chap-password" value="">
 
         <div class="field">
           <label for="username">Jina la Mtumiaji</label>
@@ -104,16 +108,11 @@
                  placeholder="••••••••" autocomplete="current-password">
         </div>
 
-        <!-- CHAP hidden fields -->
-        <input type="hidden" name="chap-id"        value="$(chap-id)">
-        <input type="hidden" name="chap-challenge"  value="$(chap-challenge)">
-        <input type="hidden" name="chap-password"   id="chap-password" value="">
-
-        <button type="submit" class="btn btn-primary">Ingia</button>
+        <button type="submit" class="btn btn-primary">🔒 Ingia</button>
       </form>
 
       <div class="divider"><span>au</span></div>
-      <button class="btn btn-secondary" onclick="showTab('login')">Lipa kwa M-Pesa</button>
+      <button class="btn btn-secondary" onclick="showTab('login')">💳 Lipa kwa M-Pesa</button>
     </div>
 
   </div><!-- end card-body -->
@@ -121,111 +120,133 @@
   <!-- Footer -->
   <div class="card-footer">
     <p>
-      Kwa msaada: <a href="tel:+255000000000">+255 000 000 000</a> &nbsp;|&nbsp;
-      <a href="tandc.html">Masharti</a> &nbsp;|&nbsp;
+      Msaada: <a href="tel:+255000000000">+255 000 000 000</a>
+      &nbsp;|&nbsp;
+      <a href="tandc.html">Masharti</a>
+      &nbsp;|&nbsp;
       <a href="faqs.html">Maswali</a>
     </p>
-    <p style="margin-top:6px;">&copy; 2025 HQINVESTMENT ISP Billing</p>
+    <p class="mt-4">&copy; 2025 HQINVESTMENT ISP</p>
   </div>
 </div><!-- end card -->
 
 <script>
-/* ── CONFIG ───────────────────────────────────────── */
-// API base: detect dynamically from redirect URL embedded by MikroTik
-// MikroTik injects $(link-login) which contains the droplet URL pattern
+/* ── API BASE DETECTION ─────────────────────────────────────────────────
+   Priority:
+   1. URL param  ?server=https://...  (overrides all)
+   2. URL param  ?api=https://...
+   3. Auto-detect from window.location if served from billing server
+   4. Hardcoded placeholder (replaced when zip is downloaded)
+   ─────────────────────────────────────────────────────────────────────── */
 var API_BASE = (function(){
-  // Try to pull from the MikroTik login link if it contains our domain
-  var loginLink = document.getElementById('router-id').value || '';
-  var m = loginLink.match(/https?:\/\/[^\/]*/);
-  if (m && m[0] && !m[0].includes('192.168')) return m[0];
-  // Fallback: use hardcoded droplet API (replaced by download script)
+  var params = new URLSearchParams(window.location.search);
+
+  // 1-2: URL params
+  var fromParam = params.get('server') || params.get('api');
+  if (fromParam && fromParam.startsWith('http')) return fromParam.replace(/\/$/, '');
+
+  // 3: If this page is served from the billing server itself (not MikroTik)
+  var h = window.location.hostname;
+  var isPublicHost = h && h !== 'localhost' && !h.match(/^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/);
+  if (isPublicHost) return window.location.protocol + '//' + window.location.host;
+
+  // 4: Hardcoded (replaced by download script / RouterDetailModal)
   return 'BILLING_API_URL';
 })();
 
-var ROUTER_ID = ''; // extracted from walled garden or URL param
+var ROUTER_ID   = '';
 var selectedPkg = null;
 var paymentRef  = null;
 var pollTimer   = null;
 var pollCount   = 0;
 var MAX_POLL    = 60;
 
-/* ── URL PARAMS ───────────────────────────────────── */
+/* ── URL PARAMS ──────────────────────────────────────── */
 (function(){
-  var params = new URLSearchParams(window.location.search);
-  ROUTER_ID = params.get('routerId') || params.get('router_id') || '';
+  var p = new URLSearchParams(window.location.search);
+  ROUTER_ID = p.get('routerId') || p.get('router_id') || '';
 })();
 
-/* ── CHAP LOGIN ────────────────────────────────────── */
+/* ── CHAP LOGIN ──────────────────────────────────────── */
 function doLogin(form) {
-  var id  = form['chap-id'].value;
-  var pw  = form['password'].value;
-  var ch  = form['chap-challenge'].value;
-  if (id && ch) {
+  var id = form['chap-id'].value;
+  var pw = form['password'].value;
+  var ch = form['chap-challenge'].value;
+  if (id && ch && typeof chapPassword === 'function') {
     form['chap-password'].value = chapPassword(id, pw, ch);
     form['password'].value = '';
   }
   return true;
 }
 
-/* ── TAB SWITCHER ──────────────────────────────────── */
+/* ── TAB SWITCHER ────────────────────────────────────── */
 function showTab(tab) {
-  document.getElementById('panel-login').style.display    = tab === 'login'   ? '' : 'none';
-  document.getElementById('panel-account').style.display  = tab === 'account' ? '' : 'none';
-  document.getElementById('tab-login').className   = 'btn ' + (tab === 'login'   ? 'btn-primary' : 'btn-secondary');
-  document.getElementById('tab-account').className = 'btn ' + (tab === 'account' ? 'btn-primary' : 'btn-secondary');
+  var isLogin = tab === 'login';
+  document.getElementById('panel-login').style.display   = isLogin ? '' : 'none';
+  document.getElementById('panel-account').style.display = isLogin ? 'none' : '';
+  document.getElementById('tab-login').className   = 'btn ' + (isLogin ? 'btn-primary' : 'btn-secondary');
+  document.getElementById('tab-account').className = 'btn ' + (isLogin ? 'btn-secondary' : 'btn-primary');
 }
 
-/* ── LOAD PACKAGES ─────────────────────────────────── */
+/* ── LOAD PACKAGES ───────────────────────────────────── */
 function loadPackages() {
-  var url = API_BASE + '/api/packages?type=HOTSPOT&status=ACTIVE' + (ROUTER_ID ? '&routerId=' + ROUTER_ID : '');
+  var url = API_BASE + '/api/packages?type=HOTSPOT&status=ACTIVE' +
+            (ROUTER_ID ? '&routerId=' + ROUTER_ID : '');
   fetch(url)
     .then(function(r){ return r.json(); })
     .then(function(data){
-      var packages = data.data || data || [];
-      renderPackages(packages);
+      var list = data.data || data || [];
+      renderPackages(Array.isArray(list) ? list : []);
     })
     .catch(function(){
       document.getElementById('pkg-grid').innerHTML =
-        '<div style="grid-column:1/-1;text-align:center;padding:12px;color:var(--error);font-size:.82rem;">Hitilafu ya kupakia vifurushi. Jaribu tena.</div>';
+        '<div style="grid-column:1/-1;text-align:center;padding:14px;color:var(--error);font-size:.82rem;">' +
+        '⚠ Hitilafu ya kupakia vifurushi. Jaribu tena.</div>';
     });
 }
 
 function renderPackages(list) {
   if (!list || list.length === 0) {
     document.getElementById('pkg-grid').innerHTML =
-      '<div style="grid-column:1/-1;text-align:center;padding:12px;color:var(--text-muted);font-size:.82rem;">Hakuna vifurushi vilivyopatikana.</div>';
+      '<div style="grid-column:1/-1;text-align:center;padding:14px;color:var(--text-muted);font-size:.82rem;">' +
+      'Hakuna vifurushi vilivyopatikana.</div>';
     return;
   }
+  var units = { MINUTES:'Min', HOURS:'Saa', DAYS:'Siku', MONTHS:'Miezi' };
   var html = '';
   list.forEach(function(p, i) {
-    var speed = '';
-    if (p.downloadSpeed) speed = p.downloadSpeed + (p.downloadUnit||'Mbps');
-    var dur = p.duration + ' ' + ({MINUTES:'Min',HOURS:'Saa',DAYS:'Siku',MONTHS:'Miezi'}[p.durationUnit] || p.durationUnit);
-    html += '<label class="pkg-card" id="pkg-' + p.id + '" onclick="selectPkg(\'' + p.id + '\')">' +
-              '<input type="radio" name="pkg" value="' + p.id + '"' + (i===0?' checked':'') + '>' +
-              '<div class="pkg-name">' + escHtml(p.name) + '</div>' +
-              (speed ? '<div class="pkg-speed">' + escHtml(speed) + '</div>' : '') +
-              '<div class="pkg-price">TSH ' + Number(p.price).toLocaleString() + '</div>' +
-              '<div class="pkg-dur">' + escHtml(dur) + '</div>' +
+    var speed = p.downloadSpeed ? (p.downloadSpeed + (p.downloadUnit||'Mbps')) : '';
+    var dur = p.duration + ' ' + (units[p.durationUnit] || p.durationUnit);
+    html += '<label class="pkg-card' + (i===0?' selected':'') + '" id="pkg-' + p.id +
+            '" onclick="selectPkg(\'' + p.id + '\')">' +
+            '<input type="radio" name="pkg" value="' + p.id + '"' + (i===0?' checked':'') + '>' +
+            '<div class="pkg-name">' + escHtml(p.name) + '</div>' +
+            (speed ? '<div class="pkg-speed">' + escHtml(speed) + '</div>' : '') +
+            '<div class="pkg-price">TSH ' + Number(p.price).toLocaleString() + '</div>' +
+            '<div class="pkg-dur">' + escHtml(dur) + '</div>' +
             '</label>';
-    if (i === 0) { selectedPkg = p; document.getElementById('selected-pkg-id').value = p.id; }
+    if (i === 0) {
+      selectedPkg = p;
+      document.getElementById('selected-pkg-id').value = p.id;
+    }
   });
   document.getElementById('pkg-grid').innerHTML = html;
 }
 
 function selectPkg(id) {
-  document.querySelectorAll('.pkg-card').forEach(function(el){ el.classList.remove('selected'); });
+  document.querySelectorAll('.pkg-card').forEach(function(el){
+    el.classList.remove('selected');
+  });
   var el = document.getElementById('pkg-' + id);
   if (el) el.classList.add('selected');
   document.getElementById('selected-pkg-id').value = id;
 }
 
-/* ── PAYMENT ───────────────────────────────────────── */
+/* ── PAYMENT ─────────────────────────────────────────── */
 function startPayment() {
-  var phone   = document.getElementById('phone').value.trim();
-  var pkgId   = document.getElementById('selected-pkg-id').value;
-  var mac     = document.getElementById('mac').value;
-
+  var phone = document.getElementById('phone').value.trim();
+  var pkgId = document.getElementById('selected-pkg-id').value;
+  var mac   = document.getElementById('mac').value;
   clearAlert();
 
   if (!phone) { showAlert('Tafadhali ingiza namba ya simu.'); return; }
@@ -250,17 +271,17 @@ function startPayment() {
     } else {
       showAlert(d.message || d.error || 'Imeshindwa kuanzisha malipo.');
       btn.disabled = false;
-      btn.innerHTML = 'Lipa Sasa';
+      btn.innerHTML = '💳 Lipa Sasa';
     }
   })
   .catch(function(){
     showAlert('Hitilafu ya mtandao. Hakikisha uko kwenye WiFi kisha jaribu tena.');
     btn.disabled = false;
-    btn.innerHTML = 'Lipa Sasa';
+    btn.innerHTML = '💳 Lipa Sasa';
   });
 }
 
-/* ── POLL PAYMENT STATUS ────────────────────────────── */
+/* ── POLL PAYMENT STATUS ─────────────────────────────── */
 function startPolling() {
   pollCount = 0;
   pollTimer = setInterval(function(){
@@ -277,24 +298,27 @@ function startPolling() {
           document.getElementById('prog').style.width = '100%';
           document.getElementById('pay-msg').className = 'alert alert-success';
           document.getElementById('pay-msg-text').textContent = '✅ Malipo yamekamilika! Inakuunganisha…';
-          // Auto-login via MikroTik login link
           if (d.username) {
             setTimeout(function(){
-              var chapId = '$(chap-id)';
-              var chapCh = '$(chap-challenge)';
+              var chapId = document.getElementById('chap-id-val').value;
+              var chapCh = document.getElementById('chap-ch-val').value;
               var pwd    = d.password || d.username;
-              var url    = '$(link-login-only)?username=' + encodeURIComponent(d.username) +
-                           '&password=' + encodeURIComponent(pwd) +
-                           '&dst=$(link-orig)';
-              if (chapId && chapCh) {
-                url = '$(link-login-only)?username=' + encodeURIComponent(d.username) +
+              var base   = '$(link-login-only)';
+              var dst    = '$(link-orig)';
+              var url;
+              if (chapId && chapCh && !chapId.includes('$(')) {
+                url = base + '?username=' + encodeURIComponent(d.username) +
                       '&chap-id=' + encodeURIComponent(chapId) +
                       '&chap-challenge=' + encodeURIComponent(chapCh) +
                       '&chap-password=' + encodeURIComponent(chapPassword(chapId, pwd, chapCh)) +
-                      '&dst=$(link-orig)';
+                      '&dst=' + encodeURIComponent(dst);
+              } else {
+                url = base + '?username=' + encodeURIComponent(d.username) +
+                      '&password=' + encodeURIComponent(pwd) +
+                      '&dst=' + encodeURIComponent(dst);
               }
               window.location.href = url;
-            }, 1500);
+            }, 1800);
           }
         } else if (d.status === 'FAILED') {
           clearInterval(pollTimer);
@@ -302,7 +326,7 @@ function startPolling() {
           var btn = document.getElementById('pay-btn');
           btn.style.display = '';
           btn.disabled = false;
-          btn.innerHTML = 'Lipa Sasa';
+          btn.innerHTML = '💳 Lipa Sasa';
           showAlert('Malipo yameshindwa. Tafadhali jaribu tena.');
         }
       })
@@ -315,12 +339,12 @@ function startPolling() {
       var btn = document.getElementById('pay-btn');
       btn.style.display = '';
       btn.disabled = false;
-      btn.innerHTML = 'Lipa Sasa';
+      btn.innerHTML = '💳 Lipa Sasa';
     }
   }, 1000);
 }
 
-/* ── UTILS ──────────────────────────────────────────── */
+/* ── UTILS ───────────────────────────────────────────── */
 function showAlert(msg) {
   var el = document.getElementById('error-alert');
   if (!el) {
@@ -331,6 +355,7 @@ function showAlert(msg) {
   }
   el.innerHTML = '<span>⚠</span><span>' + escHtml(msg) + '</span>';
   el.style.display = '';
+  el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 function clearAlert() {
@@ -339,10 +364,12 @@ function clearAlert() {
 }
 
 function escHtml(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-/* ── INIT ───────────────────────────────────────────── */
+/* ── INIT ────────────────────────────────────────────── */
 loadPackages();
 </script>
 </body>
