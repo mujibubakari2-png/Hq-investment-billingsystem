@@ -42,7 +42,20 @@ export default function MikrotikScriptModal({ router, onClose }: MikrotikScriptM
         profile="hsprof-${router.name}" disabled=no
 }
 
-# ── 3. DHCP Server ───────────────────────────────────────────
+# ── 3. PPPoE Server Setup ─────────────────────────────────────
+:if ([:len [/ip pool find name="pppoe-pool-${router.name}"]] = 0) do={
+    /ip pool add name="pppoe-pool-${router.name}" ranges=10.10.10.2-10.10.10.254
+}
+
+:if ([:len [/ppp profile find name="pppoe-profile-${router.name}"]] = 0) do={
+    /ppp profile add name="pppoe-profile-${router.name}" local-address=10.10.10.1 remote-address="pppoe-pool-${router.name}" dns-server=8.8.8.8,1.1.1.1 use-encryption=yes
+}
+
+:if ([:len [/interface pppoe-server server find service-name="pppoe-svc-${router.name}"]] = 0) do={
+    /interface pppoe-server server add service-name="pppoe-svc-${router.name}" interface=ether1 default-profile="pppoe-profile-${router.name}" disabled=no
+}
+
+# ── 4. DHCP Server ───────────────────────────────────────────
 :if ([:len [/ip address find address="192.168.88.1/24"]] = 0) do={
     /ip address add address=192.168.88.1/24 interface=ether2
 }
@@ -72,31 +85,34 @@ add chain=input protocol=icmp action=accept comment="Allow Ping"
 add chain=input connection-state=established,related action=accept
 add chain=input action=drop comment="Drop all other input"
 
-# ── 7. RADIUS Client (HQInvestment ISP Billing) ───────────────────────
+# ── 8. RADIUS Client (HQInvestment ISP Billing) ───────────────────────
 /radius
-add service=hotspot address=${window.location.hostname} secret=hqinvestment-radius-secret \\
+add service=hotspot,ppp address=${window.location.hostname} secret=hqinvestment-radius-secret \\
     authentication-port=1812 accounting-port=1813
 
 /ip hotspot profile set "hsprof-${router.name}" use-radius=yes radius-accounting=yes
+/ppp profile set "pppoe-profile-${router.name}" use-radius=yes
 
-# ── 8. Walled Garden (Allow billing portal) ──────────────────
+# ── 9. Walled Garden (Allow billing portal) ──────────────────
 /ip hotspot walled-garden
 add dst-host="${window.location.hostname}" action=allow comment="Billing Portal"
 /ip hotspot walled-garden ip
 add dst-address="${window.location.hostname}" action=accept comment="Billing Portal IP"
 
-# ── 9. System Scheduler (Auto-sync with HQInvestment) ───────────────────
+# ── 10. System Scheduler (Auto-sync with HQInvestment) ───────────────────
 /system scheduler
 add name="billing-sync" interval=5m on-event="/tool fetch url=\\"${(import.meta.env.VITE_API_URL || window.location.origin).replace(/\/$/, '')}/api/sync/${routerIdCode}\\" mode=https" \\
     start-time=startup
 
-# ── 10. Logging ──────────────────────────────────────────────
+# ── 11. Logging ──────────────────────────────────────────────
 /system logging
 add topics=hotspot action=memory
 add topics=radius action=memory
+add topics=pppoe action=memory
 
 # ═══════════════════════════════════════════════════════════════
 # ✅ Script Complete! Router "${router.name}" is configured.
+# Both Hotspot & PPPoE servers are set up.
 # ═══════════════════════════════════════════════════════════════`;
 
     const handleCopy = () => {

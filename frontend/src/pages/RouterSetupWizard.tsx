@@ -248,13 +248,12 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                 `/ip address add address=${hotspotLocalAddress}/24 interface=radiax_bridge`,
                 `/ip dhcp-server network add address=${hotspotNetwork} gateway=${hotspotLocalAddress} dns-server=8.8.8.8,1.1.1.1`,
                 `/ip dhcp-server add name=dhcp-hotspot interface=radiax_bridge address-pool=hotspot-pool disabled=no`,
-                `/ip hotspot profile add name=hq-hotspot hotspot-address=${hotspotLocalAddress} dns-name=login.spot login-by=http-chap,http-pap`,
+                `/ip hotspot profile add name=hq-hotspot hotspot-address=${hotspotLocalAddress} dns-name=login.spot login-by=http-chap,http-pap,cookie,mac-cookie html-directory=hotspot http-cookie-lifetime=3d`,
                 `/ip hotspot add name=hotspot1 interface=radiax_bridge address-pool=hotspot-pool profile=hq-hotspot disabled=no`,
                 '', '# --- Hotspot Login Page (HTML Template) ---',
                 `# NOTE: Upload your custom hotspot HTML files separately.`,
                 `# 1. Go to Hotspot Customizer in the billing system and download the ZIP`,
-                `# 2. Extract the ZIP and upload all files to the MikroTik Files section`,
-                `# 3. Then run: /ip hotspot profile set [find name=hq-hotspot] html-directory=hotspot`,
+                `# 2. Extract the ZIP and upload all files to the MikroTik Files section (in the 'hotspot' folder)`
             );
         }
         if (vpnEnabled) {
@@ -282,7 +281,11 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
         }
         lines.push('', '# ===== RADIUS Client =====',
             `/radius add service=hotspot,ppp address=${radiusAddress} secret=${radiusSecret} authentication-port=1812 accounting-port=1813`,
-            '/ip hotspot profile set radiax-hotspot use-radius=yes',
+            '/ip hotspot profile set hq-hotspot use-radius=yes radius-accounting=yes',
+            '/ppp profile set radiax-pppoe use-radius=yes',
+            '', '# ===== Walled Garden =====',
+            `/ip hotspot walled-garden add dst-host="${window.location.hostname}" action=allow comment="Billing Portal"`,
+            `/ip hotspot walled-garden ip add dst-address="${window.location.hostname}" action=accept comment="Billing Portal IP"`,
             '', '# Configuration complete', '');
 
         return lines.join('\n');
