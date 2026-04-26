@@ -250,11 +250,11 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                 `/ip dhcp-server add name=dhcp-hotspot interface=radiax_bridge address-pool=hotspot-pool disabled=no`,
                 `/ip hotspot profile add name=hq-hotspot hotspot-address=${hotspotLocalAddress} dns-name=login.spot login-by=http-chap,http-pap`,
                 `/ip hotspot add name=hotspot1 interface=radiax_bridge address-pool=hotspot-pool profile=hq-hotspot disabled=no`,
-                '', '# --- Download Hotspot Login Page Files ---',
-                `/tool fetch url="http://${window.location.hostname}/hotspot-template.zip" mode=http dst-path=hotspot-template.zip`,
-                `:delay 5s`,
-                `/file unpack hotspot-template.zip`,
-                `/ip hotspot profile set [find name=hq-hotspot] html-directory=hotspot`,
+                '', '# --- Hotspot Login Page (HTML Template) ---',
+                `# NOTE: Upload your custom hotspot HTML files separately.`,
+                `# 1. Go to Hotspot Customizer in the billing system and download the ZIP`,
+                `# 2. Extract the ZIP and upload all files to the MikroTik Files section`,
+                `# 3. Then run: /ip hotspot profile set [find name=hq-hotspot] html-directory=hotspot`,
             );
         }
         if (vpnEnabled) {
