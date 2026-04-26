@@ -89,7 +89,7 @@ export default function RouterDetailModal({ router, onClose, onDelete }: RouterD
 /ip firewall filter
 add chain=input protocol=tcp dst-port=8291 action=accept comment="Allow Winbox"
 add chain=input protocol=tcp dst-port=80,443 action=accept comment="Allow Web"
-add chain=input protocol=udp dst-port=53,67 action=accept comment="Allow DNS & DHCP"
+add chain=input protocol=udp dst-port=53,67,20561 action=accept comment="Allow DNS, DHCP & MAC Winbox"
 add chain=input protocol=icmp action=accept comment="Allow Ping"
 add chain=input connection-state=established,related action=accept
 add chain=input action=drop comment="Drop all other input"
