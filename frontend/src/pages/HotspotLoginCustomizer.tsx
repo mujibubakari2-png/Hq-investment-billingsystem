@@ -166,15 +166,31 @@ export default function HotspotLoginCustomizer() {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>${companyName} Hotspot</title>
-    <link href="https://fonts.googleapis.com/css2?family=${selectedFont.replace(/ /g, '+')}:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=${selectedFont.replace(/ /g, '+')}:wght@400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+    <noscript><link href="https://fonts.googleapis.com/css2?family=${selectedFont.replace(/ /g, '+')}:wght@400;500;600;700&display=swap" rel="stylesheet"></noscript>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: '${selectedFont}', sans-serif;
             background: linear-gradient(175deg, ${accentColor}18 0%, #f0f4f8 40%, #ffffff 100%);
             min-height: 100vh; padding: 0;
+            display: flex; align-items: center; justify-content: center;
         }
-        .page { max-width: 480px; margin: 0 auto; min-height: 100vh; background: #fff; }
+        .page { 
+            width: 100%; max-width: 480px; background: #fff; 
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            position: relative; overflow: hidden;
+        }
+        @media (min-width: 481px) {
+            .page { border-radius: 24px; min-height: auto; margin: 20px; }
+            body { background: linear-gradient(135deg, ${primaryColor}22, ${accentColor}22); }
+        }
+        @media (max-width: 480px) {
+            .page { min-height: 100vh; border-radius: 0; }
+            body { align-items: flex-start; }
+        }
 
         /* ── Header ── */
         .header {
@@ -734,6 +750,7 @@ export default function HotspotLoginCustomizer() {
             }
 
             // Override specific files with customized ones
+            zip.file("favicon.ico", "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAIElEQVQ4T2NkYGD4z8DAwMgAQUZUg9gwGkRDCXgEaQAAa/EIA1x7s7EAAAAASUVORK5CYII=", { base64: true });
             zip.file("login.html", generateHtml());
             zip.file("alogin.html", `<html><body><script>window.location='login.html';</script></body></html>`);
             zip.file("redirect.html", `<html><body><script>window.location='login.html';</script></body></html>`);
