@@ -421,8 +421,14 @@ export default function HotspotLoginCustomizer() {
         <div class="section">
             <div class="section-title">📶 Manual Login</div>
             <div class="section-card">
-                <form name="login" action="$(link-login-only)" method="post">
+                $(if error)
+                <div style="background: #fee2e2; color: #ef4444; padding: 10px; border-radius: 6px; margin-bottom: 15px; font-size: 0.85rem; text-align: center; border: 1px solid #fca5a5;">
+                    $(error)
+                </div>
+                $(endif)
+                <form name="login" action="$(link-login-only)" method="post" onsubmit="return doLogin()">
                     <input type="hidden" name="dst" value="$(link-orig)" />
+                    <input type="hidden" name="popup" value="true" />
                     <div class="login-row">
                         <input type="text" class="field-input" name="username" value="$(username)" placeholder="Username" />
                         <input type="password" class="field-input" name="password" placeholder="••••" />
@@ -446,6 +452,7 @@ export default function HotspotLoginCustomizer() {
         </div>
     </div>
 
+    <script src="/md5.js"></script>
     <script>
         // ── Configuration ──
         var API_BASE = '${backendUrl || CLEAN_API_URL || window.location.origin}';
@@ -559,7 +566,26 @@ export default function HotspotLoginCustomizer() {
             var f = document.forms['login'];
             f.username.value = user;
             f.password.value = pass;
+            doLogin();
+        }
+
+        function doLogin() {
+            var f = document.forms['login'];
+            if (typeof hexMD5 !== 'undefined' && '$(chap-id)' !== '') {
+                var newpass = hexMD5('$(chap-id)' + f.password.value + '$(chap-challenge)');
+                // We must send the hashed password instead
+                var sendForm = document.createElement('form');
+                sendForm.method = 'post';
+                sendForm.action = '$(link-login-only)';
+                sendForm.innerHTML = '<input type="hidden" name="username" value="' + f.username.value + '" />' +
+                                     '<input type="hidden" name="password" value="' + newpass + '" />' +
+                                     '<input type="hidden" name="dst" value="' + f.dst.value + '" />';
+                document.body.appendChild(sendForm);
+                sendForm.submit();
+                return false;
+            }
             f.submit();
+            return false;
         }
 
         function doVoucher() {
@@ -686,6 +712,8 @@ export default function HotspotLoginCustomizer() {
         zip.file("login.html", generateHtml());
         zip.file("alogin.html", `<html><body><script>window.location='login.html';</script></body></html>`);
         zip.file("redirect.html", `<html><body><script>window.location='login.html';</script></body></html>`);
+        zip.file("status.html", `<html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Status</title><style>body{font-family:sans-serif;background:#f3f4f6;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;} .card{background:#fff;padding:30px;border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,0.1);text-align:center;width:90%;max-width:350px;} h2{color:#1a1a2e;margin-top:0;} p{color:#666;font-size:0.9rem;} .btn{display:inline-block;background:#ef4444;color:#fff;padding:10px 20px;text-decoration:none;border-radius:6px;margin-top:20px;font-weight:bold;}</style></head><body><div class="card"><h2>You are connected!</h2><p><strong>Username:</strong> $(username)</p><p><strong>IP:</strong> $(ip)</p>$(if session-time-left)<p><strong>Time left:</strong> $(session-time-left)</p>$(endif)<a href="$(link-logout)" class="btn">Log Out</a></div></body></html>`);
+        zip.file("logout.html", `<html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Logged Out</title><style>body{font-family:sans-serif;background:#f3f4f6;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;} .card{background:#fff;padding:30px;border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,0.1);text-align:center;width:90%;max-width:350px;} h2{color:#1a1a2e;margin-top:0;} p{color:#666;font-size:0.9rem;} .btn{display:inline-block;background:#6366f1;color:#fff;padding:10px 20px;text-decoration:none;border-radius:6px;margin-top:20px;font-weight:bold;}</style></head><body><div class="card"><h2>Logged Out</h2><p>You have successfully logged out.</p><p><strong>Session time:</strong> $(uptime)</p><a href="$(link-login)" class="btn">Log In Again</a></div></body></html>`);
         zip.file("api.json", `{
    "captive": $(if logged-in == 'yes')false$(else)true$(endif),
    "user-portal-url": "$(link-login-only)",
