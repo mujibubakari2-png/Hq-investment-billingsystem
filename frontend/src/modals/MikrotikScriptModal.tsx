@@ -42,6 +42,9 @@ export default function MikrotikScriptModal({ router, onClose }: MikrotikScriptM
         profile="hsprof-${router.name}" disabled=no
 }
 
+# Ensure ALL existing hotspots use this new profile so the login page works everywhere
+/ip hotspot set [find] profile="hsprof-${router.name}"
+
 # ── 3. PPPoE Server Setup ─────────────────────────────────────
 :if ([:len [/ip pool find name="pppoe-pool-${router.name}"]] = 0) do={
     /ip pool add name="pppoe-pool-${router.name}" ranges=10.10.10.2-10.10.10.254
