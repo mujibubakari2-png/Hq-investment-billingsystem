@@ -83,20 +83,20 @@ export default function EditPackage() {
         try {
             await packagesApi.update(id, {
                 name,
-                type: packageType,
-                category: accountType,
+                type: packageType.toUpperCase(),
+                category: accountType.toUpperCase(),
                 price: Number(price),
                 duration: Number(duration),
-                durationUnit,
-                router,
+                durationUnit: durationUnit.toUpperCase(),
+                routerId: router,
                 uploadSpeed: Number(uploadSpeed),
                 uploadUnit,
                 downloadSpeed: Number(downloadSpeed),
                 downloadUnit,
                 burstEnabled,
-                hotspotType,
+                hotspotType: hotspotType.toUpperCase().replace('-', '_'),
                 devices: Number(devices),
-                paymentType,
+                paymentType: paymentType.toUpperCase(),
                 payStatus
             });
             navigate('/packages');

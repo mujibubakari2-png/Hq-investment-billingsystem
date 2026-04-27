@@ -121,7 +121,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         }
 
         const serverTunnelIp = wgServerIp; // Use actual interface IP
-        const listenPort = router.wgListenPort || 13231;
+        const listenPort = router.wgListenPort || 51820;
 
         // Use request host as fallback if no endpoint is configured
         const requestHost = req.headers.get("host")?.split(":")[0];
@@ -253,7 +253,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         if (!tunnelIp || !tunnelIp.startsWith(`${subnetPrefix}.`)) {
             tunnelIp = `${subnetPrefix}.200`; // Fallback
         }
-        const listenPort = router.wgListenPort || 13231;
+        const listenPort = router.wgListenPort || 51820;
 
         // Use request host as fallback if no endpoint is configured (match GET logic)
         const requestHost = req.headers.get("host")?.split(":")[0];

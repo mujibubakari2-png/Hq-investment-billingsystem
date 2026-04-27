@@ -5,6 +5,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model User {
@@ -168,7 +169,7 @@ model Router {
   vpnMode          String?          @default("hybrid")
   wgConfiguredAt   DateTime?
   wgEnabled        Boolean          @default(false)
-  wgListenPort     Int?             @default(13231)
+  wgListenPort     Int?             @default(51820)
   wgPeerPublicKey  String?
   wgPresharedKey   String?
   wgPrivateKey     String?

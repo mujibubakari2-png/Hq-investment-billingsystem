@@ -40,20 +40,20 @@ export default function AddPackage() {
         try {
             await packagesApi.create({
                 name,
-                type: packageType,
-                category: accountType,
+                type: packageType.toUpperCase(),
+                category: accountType.toUpperCase(),
                 price: Number(price),
                 duration: Number(duration),
-                durationUnit,
-                router,
+                durationUnit: durationUnit.toUpperCase(),
+                routerId: router, // the API expects routerId or router name, but key is usually routerId
                 uploadSpeed: Number(uploadSpeed),
                 uploadUnit,
                 downloadSpeed: Number(downloadSpeed),
                 downloadUnit,
                 burstEnabled,
-                hotspotType,
+                hotspotType: hotspotType.toUpperCase().replace('-', '_'),
                 devices: Number(devices),
-                paymentType,
+                paymentType: paymentType.toUpperCase(),
                 payStatus
             });
             navigate('/packages');

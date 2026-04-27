@@ -721,7 +721,7 @@ export class MikroTikService {
                     await this.apiRequest("/interface/wireguard", "PUT", {
                         name: iface,
                         comment: "Auto-created by HQInvestment",
-                        "listen-port": "13231"
+                        "listen-port": "51820"
                     });
                 }
             }

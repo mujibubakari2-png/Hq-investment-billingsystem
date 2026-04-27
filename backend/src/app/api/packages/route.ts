@@ -88,15 +88,31 @@ export async function POST(req: NextRequest) {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
 
-        const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
         const tenantFilter = { tenantId: userPayload.tenantId };
 
         const body = await req.json();
 
+        // Normalize frontend display values → schema enum values before validation
+        const normalized = {
+            ...body,
+            type: body.type === "PPPoE" ? "PPPOE" : body.type === "Hotspot" ? "HOTSPOT" : (body.type || "").toUpperCase(),
+            category: body.category === "Business" ? "BUSINESS" : body.category === "Personal" ? "PERSONAL" : (body.category || "").toUpperCase(),
+            paymentType: body.paymentType === "Postpaid" ? "POSTPAID" : body.paymentType === "Prepaid" ? "PREPAID" : (body.paymentType || "").toUpperCase(),
+            durationUnit: (body.durationUnit || "").toUpperCase(),
+            hotspotType: body.hotspotType === "Data-capped" ? "DATA_CAPPED" : body.hotspotType === "Unlimited" ? "UNLIMITED" : body.hotspotType,
+            // Ensure numeric fields are numbers (frontend may send strings)
+            uploadSpeed: body.uploadSpeed !== undefined ? Number(body.uploadSpeed) : undefined,
+            downloadSpeed: body.downloadSpeed !== undefined ? Number(body.downloadSpeed) : undefined,
+            price: body.price !== undefined ? Number(body.price) : undefined,
+            duration: body.duration !== undefined ? parseInt(String(body.duration)) : undefined,
+            devices: body.devices !== undefined ? parseInt(String(body.devices)) : undefined,
+        };
+
         // Validate input
-        const validation = validateData(createPackageSchema, body);
+        const validation = validateData(createPackageSchema, normalized);
         if (!validation.success) {
-            return errorResponse(`Validation errors: ${validation.errors.join(', ')}`, 400);
+            console.error("[PACKAGE VALIDATION FAILED]:", validation.errors, "| Input:", JSON.stringify(normalized));
+            return errorResponse(`Validation failed: ${validation.errors.join(', ')}`, 400);
         }
         const validatedData = validation.data;
 
@@ -125,8 +141,12 @@ export async function POST(req: NextRequest) {
         });
 
         return jsonResponse(pkg, 201);
-    } catch (e) {
-        console.error("PACKAGE POST ERROR:", e);
-        return errorResponse("Internal server error", 500);
+    } catch (e: any) {
+        console.error("[PACKAGE CREATE ERROR]:", e?.message || e);
+        // Expose meaningful error to client (never expose raw stack in prod but give useful message)
+        const msg = e?.message?.includes('Unique constraint') ? 'A package with that name already exists.'
+            : e?.message?.includes('Foreign key') ? 'Invalid router reference.'
+            : e?.message || 'Internal server error';
+        return errorResponse(msg, 500);
     }
 }

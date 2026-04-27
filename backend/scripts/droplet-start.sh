@@ -61,7 +61,28 @@ else
     echo "   Check: sudo systemctl status postgresql"
 fi
 
-# ── 4. Run Prisma DB sync ────────────────────────────────────────────────────
+# ── 4. Ensure WireGuard VPN is running (needed for MikroTik connectivity) ────
+echo "🔒 Checking WireGuard VPN status..."
+if command -v wg &> /dev/null; then
+    if systemctl is-active --quiet wg-quick@wg0; then
+        echo "✅ WireGuard wg0 is already running"
+        echo "   Peers connected: $(sudo wg show wg0 peers 2>/dev/null | wc -l)"
+    else
+        echo "⚠️  WireGuard wg0 is NOT running — restarting..."
+        sudo systemctl restart wg-quick@wg0
+        sleep 2
+        if systemctl is-active --quiet wg-quick@wg0; then
+            echo "✅ WireGuard wg0 restarted successfully (UDP port 51820)"
+        else
+            echo "❌ WARNING: WireGuard failed to start — MikroTik routers using VPN tunnel will be UNREACHABLE"
+            echo "   Run: sudo systemctl status wg-quick@wg0 to diagnose"
+        fi
+    fi
+else
+    echo "ℹ️  WireGuard not installed — skipping VPN check (direct-connect routers will still work)"
+fi
+
+# ── 5. Run Prisma DB sync ────────────────────────────────────────────────────
 echo "🔧 Syncing database schema (prisma db push)..."
 if pnpm exec prisma db push --accept-data-loss; then
     echo "✅ Schema sync successful"

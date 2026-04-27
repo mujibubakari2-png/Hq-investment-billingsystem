@@ -248,12 +248,12 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                 `/ip address add address=${hotspotLocalAddress}/24 interface=radiax_bridge`,
                 `/ip dhcp-server network add address=${hotspotNetwork} gateway=${hotspotLocalAddress} dns-server=${hotspotLocalAddress}`,
                 `/ip dhcp-server add name=dhcp-hotspot interface=radiax_bridge address-pool=hotspot-pool disabled=no`,
-                `/ip hotspot profile add name=hq-hotspot hotspot-address=${hotspotLocalAddress} dns-name=login.spot login-by=http-chap,http-pap,cookie,mac-cookie html-directory=hotspot http-cookie-lifetime=3d`,
+                `/ip hotspot profile add name=hq-hotspot hotspot-address=${hotspotLocalAddress} dns-name=login.spot login-by=http-chap,http-pap,cookie,mac-cookie html-directory=flash/hotspot http-cookie-lifetime=3d`,
                 `/ip hotspot add name=hotspot1 interface=radiax_bridge address-pool=hotspot-pool profile=hq-hotspot disabled=no`,
                 '', '# --- Hotspot Login Page (HTML Template) ---',
                 `# NOTE: Upload your custom hotspot HTML files separately.`,
                 `# 1. Go to Hotspot Customizer in the billing system and download the ZIP`,
-                `# 2. Extract the ZIP and upload all files to the MikroTik Files section (in the 'hotspot' folder)`
+                `# 2. Extract the ZIP and upload all files to the MikroTik Files section (in the 'flash/hotspot' folder to survive reboots)`
             );
         }
         if (vpnEnabled) {

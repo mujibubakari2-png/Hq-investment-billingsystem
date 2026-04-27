@@ -144,56 +144,69 @@ export async function POST(req: NextRequest) {
         });
 
         // ── Initiate Mobile Money STK Push ──
-        // Use the specified payment channel or the first active one
-        const paymentChannel = await prisma.paymentChannel.findFirst({
-            where: {
-                OR: [
-                    { name: { contains: method, mode: "insensitive" } },
-                    { provider: { contains: method, mode: "insensitive" } },
-                ],
-                status: "ACTIVE"
-            },
-        }) || await prisma.paymentChannel.findFirst({
-            where: { status: "ACTIVE" },
+        // Load the tenant's payment settings
+        const tenantSettings = await prisma.systemSetting.findMany({
+            where: { tenantId: pkg.tenantId || pkg.router?.tenantId || null }
         });
 
-        const apiKey = paymentChannel?.apiKey || process.env.PAYMENT_API_KEY || "";
-        const apiSecret = paymentChannel?.apiSecret || process.env.PAYMENT_API_SECRET || "";
+        const gwSetting = tenantSettings.find(s => s.key === "paymentGateways");
+        let gateways: any[] = [];
+        if (gwSetting) {
+            try { gateways = JSON.parse(gwSetting.value); } catch(e){}
+        }
+        
+        const defaultGw = gateways.find(g => g.isDefault && g.enabled) || gateways.find(g => g.enabled);
+        let provider = defaultGw ? defaultGw.name.toUpperCase() : "M-PESA";
+        let gatewayId = defaultGw ? defaultGw.id : null;
+
         const callbackUrl = `${process.env.APP_URL || "http://localhost:3001"}/api/hotspot/callback`;
-
         let checkoutRequestId: string | null = null;
+        let isRealPayment = false;
 
-        if (apiKey && apiKey !== "demo_key") {
-            // Real payment provider integration
-            try {
-                const paymentResponse = await fetch(
-                    process.env.PAYMENT_API_URL || "https://api.paymentprovider.com/v1/stk-push",
-                    {
-                        method: "POST",
-                        headers: {
-                            "Content-Type": "application/json",
-                            Authorization: `Bearer ${apiKey}`,
-                        },
-                        body: JSON.stringify({
-                            PhoneNumber: cleanPhone,
-                            Amount: pkg.price,
-                            AccountReference: reference,
-                            TransactionDesc: `${pkg.name} - WiFi Package`,
-                            CallbackUrl: callbackUrl,
-                        }),
+        if (gatewayId === "6" || provider.includes("ZENOPAY")) {
+            const zenoSetting = tenantSettings.find(s => s.key === "payment_config_zenopay");
+            if (zenoSetting) {
+                try {
+                    const config = JSON.parse(zenoSetting.value);
+                    if (config.apiKey && config.apiKey.length > 5) {
+                        isRealPayment = true;
+                        // Example Zenopay implementation
+                        const zenoData = new URLSearchParams();
+                        zenoData.append('create_order', '1');
+                        zenoData.append('buyer_name', existingClient?.fullName || 'Hotspot User');
+                        zenoData.append('buyer_phone', cleanPhone);
+                        zenoData.append('amount', String(pkg.price));
+                        zenoData.append('secret_key', config.apiKey);
+                        zenoData.append('webhook_url', config.webhookUrl || callbackUrl);
+                        
+                        const paymentResponse = await fetch("https://zenoapi.com/api/payments/mobile_money_tanzania", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                            body: zenoData
+                        });
+                        const payResult = await paymentResponse.json();
+                        checkoutRequestId = payResult.order_id || payResult.transaction_id || `ZENO-${Date.now()}`;
                     }
-                );
-                const payResult = await paymentResponse.json();
-                checkoutRequestId = payResult.CheckoutRequestID || payResult.checkoutRequestId || null;
-            } catch (payError) {
-                console.error("Payment provider error:", payError);
-                // Don't fail the whole request — let client poll for manual completion
+                } catch(e) { console.error("Zenopay err:", e); }
             }
-        } else {
-            // Demo mode: Auto-complete the transaction after 5 seconds
-            checkoutRequestId = `DEMO-${Date.now()}`;
+        } else if (gatewayId === "2" || provider.includes("TILL")) {
+            const tillSetting = tenantSettings.find(s => s.key === "payment_config_mpesa_till");
+            if (tillSetting) {
+                try {
+                    const config = JSON.parse(tillSetting.value);
+                    if (config.consumerKey && config.consumerSecret) {
+                        isRealPayment = true;
+                        // Example M-Pesa STK Push
+                        // Authentication and STK push logic goes here...
+                        checkoutRequestId = `MPESA-${Date.now()}`;
+                    }
+                } catch(e) {}
+            }
+        }
 
-            // Simulate delayed payment completion
+        if (!isRealPayment) {
+            // Demo mode: Auto-complete the transaction after 5 seconds if no real API key configured
+            checkoutRequestId = `DEMO-${Date.now()}`;
             setTimeout(async () => {
                 try {
                     await completeHotspotPurchase(transaction.id, reference, clientId, pkg, routerId || pkg.routerId);
@@ -208,12 +221,13 @@ export async function POST(req: NextRequest) {
             message: "Payment initiated. Check your phone for the payment prompt.",
             reference,
             transactionId: transaction.id,
-            purchase_id: transaction.id, // Alias for tests
+            purchase_id: transaction.id,
             checkoutRequestId,
-            payment_url: "https://demo-payment-url.com", // Alias for tests
-            status: "pending", // Alias for tests
+            payment_url: "", 
+            status: "pending",
             packageName: pkg.name,
             amount: pkg.price,
+            provider
         });
 
     } catch (e) {
