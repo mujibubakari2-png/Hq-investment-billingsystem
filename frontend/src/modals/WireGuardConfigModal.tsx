@@ -97,6 +97,8 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
     // Always use the server public key returned from the backend (dynamically fetched via wg show)
     const serverPubKey = config.serverPublicKey;
 
+    const restPort = router.apiPort || (router.port === 8728 || router.port === 8729 ? 80 : router.port) || 80;
+
     // Build MikroTik server script with CORRECT syntax (single backslash for line continuation)
     const serverConfig = `# ============================================
 # WireGuard VPN Configuration
@@ -108,66 +110,59 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
 # ============================================
 
 # ============================================
-# STEP 1: Create Management User
-# ============================================
-/user add name=admin_kenge password="${router.password || 'admin'}" group=full comment="Management User - DO NOT DELETE"
-
-# ============================================
-# STEP 2: Set Router Identity
+# STEP 1: Set Router Identity
 # ============================================
 /system identity set name="${config.routerName}"
 
 # ============================================
-# STEP 3: WireGuard Interface
+# STEP 2: WireGuard Interface
 # ============================================
 /interface wireguard add name=wg-kenge listen-port=${config.listenPort} private-key="${config.routerPrivateKey}" comment="Kenge VPN Interface"
 
 # ============================================
-# STEP 4: WireGuard Peer
+# STEP 3: WireGuard Peer
 # ============================================
 /interface wireguard peers add interface=wg-kenge public-key="${serverPubKey}" endpoint-address=${config.serverEndpoint} endpoint-port=${config.serverPort} allowed-address=${subnetAddress} persistent-keepalive=25s comment="Kenge ISP Server"
 
 # ============================================
-# STEP 5: IP Address
+# STEP 4: IP Address
 # ============================================
 /ip address add address=${config.routerTunnelIp}/24 interface=wg-kenge comment="VPN Address"
 
 # ============================================
-# STEP 6: Route
+# STEP 5: Route
 # ============================================
 /ip route add dst-address=${subnetAddress} gateway=wg-kenge comment="VPN Route"
 
 # ============================================
-# STEP 7: Firewall
+# STEP 6: Firewall
 # ============================================
 # Allow WireGuard UDP handshake port
-/ip firewall filter add chain=input action=accept protocol=udp dst-port=${config.listenPort} comment="Allow WireGuard VPN" place-before=0
-# Allow Droplet to reach MikroTik REST API over the VPN tunnel (port 80)
-/ip firewall filter add chain=input action=accept src-address=${subnetAddress} dst-port=80 protocol=tcp comment="Allow REST API from VPN" place-before=0
+/ip firewall filter add chain=input action=accept protocol=udp dst-port=${config.listenPort} comment="Allow WireGuard - Kenge"
+# Allow ICMP from VPN
+/ip firewall filter add chain=input action=accept protocol=icmp src-address=${subnetAddress} comment="Allow ICMP from VPN - Kenge"
+# Allow Droplet to reach MikroTik REST API over the VPN tunnel
+/ip firewall filter add chain=input action=accept protocol=tcp dst-port=${restPort} src-address=${subnetAddress} comment="Allow REST API from VPN - Kenge"
+# Allow Winbox access over VPN
+/ip firewall filter add chain=input action=accept protocol=tcp dst-port=8291 src-address=${subnetAddress} comment="Allow Winbox from VPN - Kenge"
 # Allow forwarding through the VPN interface
-/ip firewall filter add chain=forward action=accept in-interface=wg-kenge comment="Allow VPN Traffic"
-/ip firewall filter add chain=forward action=accept out-interface=wg-kenge comment="Allow VPN Return Traffic"
+/ip firewall filter add chain=forward action=accept in-interface=wg-kenge comment="Allow WG traffic - Kenge"
+/ip firewall filter add chain=forward action=accept out-interface=wg-kenge comment="Allow WG return traffic - Kenge"
 
 # ============================================
-# STEP 8: DNS
+# STEP 7: DNS
 # ============================================
 /ip dns set servers=8.8.8.8,8.8.4.4 allow-remote-requests=yes
 
 # ============================================
 # Configuration Complete!
 # ============================================
-# Management Credentials:
-# - Username: admin_kenge
-# - Password: ${router.password || 'admin'}
-#
 # VPN Configuration:
 # - Router VPN IP : ${config.routerTunnelIp}
 # - Server VPN IP : ${config.serverTunnelIp}
 # - Server Endpoint: ${config.serverEndpoint}:${config.serverPort}
 # - Interface      : wg-kenge
 # - Listen Port    : ${config.listenPort}
-#
-# IMPORTANT: Save these credentials securely!
 # ============================================`;
 
     // Client config for the HQInvestment ISP server
