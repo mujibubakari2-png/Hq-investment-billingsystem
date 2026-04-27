@@ -290,6 +290,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                     });
                 } catch (e: any) { console.warn("DNS note:", e.message); }
 
+                try {
+                    // Set NTP Client (Critical for WireGuard handshake timestamps after reboot)
+                    await service.apiRequestPublic("/system/ntp/client", "PATCH", {
+                        enabled: "yes",
+                        servers: "pool.ntp.org"
+                    });
+                } catch (e: any) { console.warn("NTP note:", e.message); }
+
                 // Step 1: Create WireGuard interface
                 try {
                     await service.apiRequestPublic("/interface/wireguard", "PUT", {
@@ -333,24 +341,38 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
                 // Step 4: Firewall Rules (Input and Forward)
                 // Use place-before="0" to ensure rules are at the top of the chain
+                const restPort = router.apiPort || (router.port === 8728 || router.port === 8729 ? 80 : router.port) || 80;
+                
                 const firewallRules = [
                     {
                         chain: "input", protocol: "udp", "dst-port": String(listenPort),
                         action: "accept", comment: "Allow WireGuard - Kenge", "place-before": "0"
                     },
                     {
-                        // Allow the Droplet to reach MikroTik REST API (port 80) over the VPN tunnel
-                        chain: "input", protocol: "tcp", "dst-port": "80",
+                        // Allow ICMP from VPN
+                        chain: "input", protocol: "icmp",
+                        "src-address": `${subnetPrefix}.0/24`,
+                        action: "accept", comment: "Allow ICMP from VPN - Kenge", "place-before": "0"
+                    },
+                    {
+                        // Allow the Droplet to reach MikroTik REST API over the VPN tunnel
+                        chain: "input", protocol: "tcp", "dst-port": String(restPort),
                         "src-address": `${subnetPrefix}.0/24`,
                         action: "accept", comment: "Allow REST API from VPN - Kenge", "place-before": "0"
                     },
                     {
+                        // Allow Winbox access over VPN
+                        chain: "input", protocol: "tcp", "dst-port": "8291",
+                        "src-address": `${subnetPrefix}.0/24`,
+                        action: "accept", comment: "Allow Winbox from VPN - Kenge", "place-before": "0"
+                    },
+                    {
                         chain: "forward", "in-interface": "wg-kenge",
-                        action: "accept", comment: "Allow WG traffic"
+                        action: "accept", comment: "Allow WG traffic - Kenge", "place-before": "0"
                     },
                     {
                         chain: "forward", "out-interface": "wg-kenge",
-                        action: "accept", comment: "Allow WG return traffic"
+                        action: "accept", comment: "Allow WG return traffic - Kenge", "place-before": "0"
                     }
                 ];
 

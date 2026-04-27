@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
         if (!userPayload) return errorResponse("Unauthorized", 401);
 
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
-        const tenantFilter = { tenantId: userPayload.tenantId };
+        const tenantFilter = isSuperAdmin ? {} : { tenantId: userPayload.tenantId };
 
         const { searchParams } = new URL(req.url);
         const type = searchParams.get("type") || "";
@@ -88,7 +88,8 @@ export async function POST(req: NextRequest) {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
 
-        const tenantFilter = { tenantId: userPayload.tenantId };
+        const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
+        const tenantFilter = isSuperAdmin ? {} : { tenantId: userPayload.tenantId };
 
         const body = await req.json();
 
@@ -117,6 +118,8 @@ export async function POST(req: NextRequest) {
         const validatedData = validation.data;
 
         let routerId = validatedData.routerId;
+        let routerTenantId: string | null | undefined = userPayload.tenantId;
+
         if (routerId) {
             const router = await prisma.router.findFirst({
                 where: {
@@ -129,6 +132,7 @@ export async function POST(req: NextRequest) {
             });
             if (!router) return errorResponse("Router not found or you don't have permission to use it", 404);
             routerId = router.id;
+            routerTenantId = router.tenantId;
         }
 
         const pkg = await prisma.package.create({
@@ -136,7 +140,7 @@ export async function POST(req: NextRequest) {
                 ...validatedData,
                 routerId: routerId || null,
                 status: "ACTIVE",
-                tenantId: userPayload.tenantId
+                tenantId: isSuperAdmin ? routerTenantId : userPayload.tenantId
             },
         });
 
