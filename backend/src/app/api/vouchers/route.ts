@@ -89,8 +89,11 @@ export async function POST(req: NextRequest) {
             return errorResponse("Forbidden: Package belongs to another tenant", 403);
         }
 
-        if (routerId) {
-            const router = await prisma.router.findUnique({ where: { id: routerId } });
+        const normalizedRouterId = routerId ? String(routerId).trim() : "";
+        const routerIdValue = normalizedRouterId ? normalizedRouterId : null;
+
+        if (routerIdValue) {
+            const router = await prisma.router.findUnique({ where: { id: routerIdValue } });
             if (!router) return errorResponse("Router not found", 404);
             if (!isSuperAdmin && router.tenantId !== currentUser.tenantId) {
                 return errorResponse("Forbidden: Router belongs to another tenant", 403);
@@ -109,11 +112,15 @@ export async function POST(req: NextRequest) {
         const finalCode = code || Math.floor(100000 + Math.random() * 900000).toString();
         const tenantIdValue = isSuperAdmin ? pkg.tenantId : currentUser.tenantId;
 
+        // Ensure code is unique for friendly error message
+        const exists = await prisma.voucher.findUnique({ where: { code: finalCode } });
+        if (exists) return errorResponse("Voucher code already exists", 409);
+
         const voucher = await prisma.voucher.create({
             data: {
                 code: finalCode,
                 packageId: pkg.id,
-                routerId,
+                routerId: routerIdValue,
                 createdById: finalCreatedById,
                 tenantId: tenantIdValue
             },

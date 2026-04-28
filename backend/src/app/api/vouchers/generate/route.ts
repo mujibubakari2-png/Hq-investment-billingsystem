@@ -6,13 +6,25 @@ import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
-        const { packageId, routerId, createdById, count = 10, prefix = "", codeLength = 8, codeFormat = "alphanumeric-upper" } = body;
+        const {
+            packageId,
+            routerId,
+            createdById,
+            count = 10,
+            prefix = "",
+            codeLength = 8,
+            codeFormat = "alphanumeric-upper"
+        } = body;
 
         // Prefer logged-in user from JWT token, then body, then admin fallback
         const currentUser = getUserFromRequest(req);
         if (!currentUser) return errorResponse("Unauthorized", 401);
-        
-        const tenantIdValue = currentUser.role === "SUPER_ADMIN" ? null : (currentUser.tenantId || null);
+
+        const normalizedCount = Math.max(1, Math.min(500, Number(count) || 10));
+        const normalizedCodeLength = Math.max(4, Math.min(32, Number(codeLength) || 8));
+        const normalizedPrefix = String(prefix || "");
+        const normalizedRouterId = routerId ? String(routerId).trim() : "";
+        const routerIdValue = normalizedRouterId ? normalizedRouterId : null;
 
         let finalCreatedById = currentUser.userId || createdById;
         if (!finalCreatedById) {
@@ -38,12 +50,16 @@ export async function POST(req: NextRequest) {
             return errorResponse("Package not found", 404);
         }
 
+        const tenantIdValue = currentUser.role === "SUPER_ADMIN"
+            ? (pkg.tenantId || null)
+            : (currentUser.tenantId || null);
+
         if (tenantIdValue && pkg.tenantId && pkg.tenantId !== tenantIdValue) {
             return errorResponse("Forbidden: Package belongs to another tenant", 403);
         }
 
-        if (routerId) {
-            const router = await prisma.router.findUnique({ where: { id: routerId } });
+        if (routerIdValue) {
+            const router = await prisma.router.findUnique({ where: { id: routerIdValue } });
             if (!router) return errorResponse("Router not found", 404);
             if (tenantIdValue && router.tenantId && router.tenantId !== tenantIdValue) {
                 return errorResponse("Forbidden: Router belongs to another tenant", 403);
@@ -65,28 +81,37 @@ export async function POST(req: NextRequest) {
             return result;
         };
 
-        const vouchers = [];
-        for (let i = 0; i < count; i++) {
-            const code = prefix + generateCode(codeLength, codeFormat);
-
-            // Check uniqueness
-            const exists = await prisma.voucher.findUnique({ where: { code } });
-            if (exists) {
-                i--; // retry
-                continue;
-            }
-
-            const voucher = await prisma.voucher.create({
-                data: {
-                    code,
-                    packageId: actualPackageId,
-                    routerId,
-                    createdById: finalCreatedById,
-                    tenantId: tenantIdValue
-                },
-            });
-            vouchers.push(voucher);
+        // Generate codes in-memory then insert efficiently
+        const target = normalizedCount;
+        const codes = new Set<string>();
+        const maxAttempts = target * 10;
+        let attempts = 0;
+        while (codes.size < target && attempts < maxAttempts) {
+            attempts++;
+            codes.add(normalizedPrefix + generateCode(normalizedCodeLength, codeFormat));
         }
+
+        if (codes.size === 0) {
+            return errorResponse("Failed to generate voucher codes", 500);
+        }
+
+        const codeList = Array.from(codes);
+
+        await prisma.voucher.createMany({
+            data: codeList.map((code) => ({
+                code,
+                packageId: actualPackageId,
+                routerId: routerIdValue,
+                createdById: finalCreatedById,
+                tenantId: tenantIdValue
+            })),
+            skipDuplicates: true
+        });
+
+        const vouchers = await prisma.voucher.findMany({
+            where: { code: { in: codeList } },
+            orderBy: { createdAt: "desc" },
+        });
 
         return jsonResponse({
             message: "Vouchers generated successfully",

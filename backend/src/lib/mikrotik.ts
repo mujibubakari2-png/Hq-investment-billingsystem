@@ -632,6 +632,35 @@ export class MikroTikService {
         }
     }
 
+    async upsertPPPoEProfile(profile: Omit<BandwidthProfile, "id">): Promise<BandwidthProfile> {
+        const existing = (await this.listPPPoEProfiles()).find(p => p.name === profile.name);
+        if (!existing?.id) {
+            return this.createPPPoEProfile(profile);
+        }
+        await this.apiRequest("/ppp/profile", "PATCH", {
+            ".id": existing.id,
+            "rate-limit": profile.rateLimit,
+            comment: profile.comment || existing.comment || `HQInvestment ISP - ${profile.name}`,
+        });
+        await this.log("update_pppoe_profile", `Updated PPPoE profile: ${profile.name} (${profile.rateLimit})`, "success");
+        return { ...profile, id: existing.id };
+    }
+
+    async upsertHotspotProfile(profile: Omit<BandwidthProfile, "id">): Promise<BandwidthProfile> {
+        const existing = (await this.listHotspotProfiles()).find(p => p.name === profile.name);
+        if (!existing?.id) {
+            return this.createHotspotProfile(profile);
+        }
+        await this.apiRequest("/ip/hotspot/user/profile", "PATCH", {
+            ".id": existing.id,
+            "rate-limit": profile.rateLimit,
+            "shared-users": String(profile.sharedUsers || 1),
+            comment: profile.comment || existing.comment || `HQInvestment ISP - ${profile.name}`,
+        });
+        await this.log("update_hotspot_profile", `Updated Hotspot profile: ${profile.name} (${profile.rateLimit})`, "success");
+        return { ...profile, id: existing.id };
+    }
+
     // ══════════════════════════════════════════════════════════════════════════
     // AUTOMATION HELPERS
     // ══════════════════════════════════════════════════════════════════════════
@@ -816,9 +845,9 @@ export class MikroTikService {
         const rateLimit = `${uploadStr}/${downloadStr}`;
 
         if (serviceType === "pppoe") {
-            return this.createPPPoEProfile({ name: packageName, rateLimit, comment: `Auto-created from package` });
+            return this.upsertPPPoEProfile({ name: packageName, rateLimit, comment: `Auto-synced from package` });
         } else {
-            return this.createHotspotProfile({ name: packageName, rateLimit, sharedUsers, comment: `Auto-created from package` });
+            return this.upsertHotspotProfile({ name: packageName, rateLimit, sharedUsers, comment: `Auto-synced from package` });
         }
     }
 }

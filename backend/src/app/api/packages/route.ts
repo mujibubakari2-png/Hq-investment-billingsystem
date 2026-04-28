@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { createPackageSchema, validateData } from "@/lib/validation";
+import { getMikroTikService } from "@/lib/mikrotik";
 
 // GET /api/packages
 export async function GET(req: NextRequest) {
@@ -143,6 +144,41 @@ export async function POST(req: NextRequest) {
                 tenantId: isSuperAdmin ? routerTenantId : userPayload.tenantId
             },
         });
+
+        // Best-effort: sync MikroTik bandwidth profile to match this package
+        if (pkg.routerId) {
+            try {
+                const mikrotik = await getMikroTikService(pkg.routerId, isSuperAdmin ? null : userPayload.tenantId);
+                await mikrotik.createProfileFromPackage(
+                    pkg.name,
+                    pkg.uploadSpeed,
+                    pkg.uploadUnit,
+                    pkg.downloadSpeed,
+                    pkg.downloadUnit,
+                    pkg.type === "PPPOE" ? "pppoe" : "hotspot",
+                    pkg.devices || 1,
+                );
+                await prisma.routerLog.create({
+                    data: {
+                        routerId: pkg.routerId,
+                        tenantId: pkg.tenantId,
+                        action: "package_profile_synced",
+                        details: `Synced profile for package "${pkg.name}" (${pkg.type})`,
+                        status: "success",
+                    }
+                });
+            } catch (err: any) {
+                await prisma.routerLog.create({
+                    data: {
+                        routerId: pkg.routerId,
+                        tenantId: pkg.tenantId,
+                        action: "package_profile_sync_failed",
+                        details: `Failed to sync profile for "${pkg.name}": ${err?.message || "Unknown error"}`,
+                        status: "error",
+                    }
+                });
+            }
+        }
 
         return jsonResponse(pkg, 201);
     } catch (e: any) {

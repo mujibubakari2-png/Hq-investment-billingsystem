@@ -190,8 +190,8 @@ function showTab(tab) {
 
 /* ── LOAD PACKAGES ───────────────────────────────────── */
 function loadPackages() {
-  var url = API_BASE + '/api/packages?type=HOTSPOT&status=ACTIVE' +
-            (ROUTER_ID ? '&routerId=' + ROUTER_ID : '');
+  var url = API_BASE + '/api/hotspot/packages' +
+            (ROUTER_ID ? '?routerId=' + encodeURIComponent(ROUTER_ID) : '');
   fetch(url)
     .then(function(r){ return r.json(); })
     .then(function(data){

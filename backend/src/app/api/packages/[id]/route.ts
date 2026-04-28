@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
+import { getMikroTikService } from "@/lib/mikrotik";
 
 // GET /api/packages/[id]
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -48,6 +49,41 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
                 routerId: router?.id,
             },
         });
+
+        // Best-effort: sync MikroTik bandwidth profile when package changes
+        if (pkg.routerId) {
+            try {
+                const mikrotik = await getMikroTikService(pkg.routerId);
+                await mikrotik.createProfileFromPackage(
+                    pkg.name,
+                    pkg.uploadSpeed,
+                    pkg.uploadUnit,
+                    pkg.downloadSpeed,
+                    pkg.downloadUnit,
+                    pkg.type === "PPPOE" ? "pppoe" : "hotspot",
+                    pkg.devices || 1,
+                );
+                await prisma.routerLog.create({
+                    data: {
+                        routerId: pkg.routerId,
+                        tenantId: pkg.tenantId,
+                        action: "package_profile_synced",
+                        details: `Synced profile after updating package "${pkg.name}" (${pkg.type})`,
+                        status: "success",
+                    }
+                });
+            } catch (err: any) {
+                await prisma.routerLog.create({
+                    data: {
+                        routerId: pkg.routerId,
+                        tenantId: pkg.tenantId,
+                        action: "package_profile_sync_failed",
+                        details: `Failed to sync profile after updating "${pkg.name}": ${err?.message || "Unknown error"}`,
+                        status: "error",
+                    }
+                });
+            }
+        }
 
         return jsonResponse(pkg);
     } catch {
