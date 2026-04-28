@@ -21,7 +21,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
             return errorResponse("Unauthorized", 403);
         }
 
-        const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://your-server-ip:3000";
         const apiPort = router.apiPort || 80;
 
         const script = `# HQInvestment ISP Billing System - Router Setup Script
@@ -45,17 +44,27 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     /user set [find name="admin"] password="${router.password || ''}" group=full
 }
 
-# 4. DNS and NTP (Critical for handshakes)
+# 4. Keep Winbox MAC and neighbor discovery reachable
+/tool mac-server set allowed-interface-list=all
+/tool mac-server mac-winbox set allowed-interface-list=all
+/ip neighbor discovery-settings set discover-interface-list=all
+
+# 5. DNS and NTP (Critical for handshakes)
 /ip dns set servers=8.8.8.8,8.8.4.4 allow-remote-requests=yes
 /system ntp client set enabled=yes
-/system ntp client servers add address=pool.ntp.org
+:if ([:len [/system ntp client servers find where address="pool.ntp.org"]] = 0) do={
+    /system ntp client servers add address=pool.ntp.org
+}
 
-# 5. Firewall Rules (Basic access for the billing system)
-/ip firewall filter
-add chain=input action=accept protocol=tcp dst-port=${apiPort},443 comment="Allow HQInvestment API Access" place-before=0
-add chain=input action=accept protocol=udp dst-port=51820 comment="Allow WireGuard VPN" place-before=0
+# 6. Firewall Rules (idempotent)
+:if ([:len [/ip firewall filter find where comment="Allow HQInvestment API Access"]] = 0) do={
+    /ip firewall filter add chain=input action=accept protocol=tcp dst-port=${apiPort},443,8291 comment="Allow HQInvestment API Access"
+}
+:if ([:len [/ip firewall filter find where comment="Allow WireGuard VPN"]] = 0) do={
+    /ip firewall filter add chain=input action=accept protocol=udp dst-port=51820 comment="Allow WireGuard VPN"
+}
 
-# 6. Success Notification
+# 7. Success Notification
 /log info "HQInvestment Configuration completed successfully!"
 /log info "Your router should now be reachable by the billing system."
 `;

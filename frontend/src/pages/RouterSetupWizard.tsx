@@ -228,20 +228,36 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
             `# Service: ${serviceType === 'pppoe' ? 'PPPoE' : serviceType === 'hotspot' ? 'Hotspot' : 'PPPoE + Hotspot'}`,
             `# VPN Mode: ${vpnEnabled ? vpnMode : 'Disabled'}`,
             '',
+            '# ===== Management Safety (prevent Winbox MAC timeout) =====',
+            '/tool mac-server set allowed-interface-list=all',
+            '/tool mac-server mac-winbox set allowed-interface-list=all',
+            '/ip neighbor discovery-settings set discover-interface-list=all',
+            '',
             '# ===== Bridge Setup =====',
         ];
         if (selectedInterfaces.length > 0) {
             lines.push(
-                `:if ([:len [/interface bridge find where name="radiax_bridge"]] = 0) do={`,
-                `  /interface bridge add name=radiax_bridge comment="HQ Investment Bridge"`,
+                ':local targetBridge "radiax_bridge"',
+                `:if ([:len [/interface bridge find where name=$targetBridge]] = 0) do={`,
+                `  :if ([:len [/interface bridge find where name="bridge"]] > 0) do={`,
+                `    :set targetBridge "bridge"`,
+                `  } else={`,
+                `    /interface bridge add name=$targetBridge comment="HQ Investment Bridge"`,
+                `  }`,
                 `} else={`,
-                `  /interface bridge set [find where name="radiax_bridge"] comment="HQ Investment Bridge"`,
+                `  /interface bridge set [find where name=$targetBridge] comment="HQ Investment Bridge"`,
                 `}`
             );
             selectedInterfaces.forEach(iface => {
                 lines.push(
-                    `:if ([:len [/interface bridge port find where bridge="radiax_bridge" and interface="${iface}"]] = 0) do={`,
-                    `  /interface bridge port add bridge=radiax_bridge interface=${iface}`,
+                    `:local existingBridgePort [/interface bridge port find where interface="${iface}"]`,
+                    `:if ([:len $existingBridgePort] > 0) do={`,
+                    `  :local existingBridge [/interface bridge port get $existingBridgePort bridge]`,
+                    `  :if ($existingBridge != $targetBridge) do={`,
+                    `    :set targetBridge $existingBridge`,
+                    `  }`,
+                    `} else={`,
+                    `  /interface bridge port add bridge=$targetBridge interface=${iface}`,
                     `}`
                 );
             });
@@ -261,9 +277,9 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                 `  /ppp profile set [find where name="radiax-pppoe"] local-address=${pppoeLocalAddress} remote-address=pppoe-pool dns-server=8.8.8.8,1.1.1.1 use-encryption=yes change-tcp-mss=yes`,
                 `}`,
                 `:if ([:len [/interface pppoe-server server find where service-name="pppoe-service"]] = 0) do={`,
-                `  /interface pppoe-server server add service-name=pppoe-service interface=radiax_bridge default-profile=radiax-pppoe authentication=pap,chap,mschap1,mschap2 disabled=no`,
+                `  /interface pppoe-server server add service-name=pppoe-service interface=$targetBridge default-profile=radiax-pppoe authentication=pap,chap,mschap1,mschap2 disabled=no`,
                 `} else={`,
-                `  /interface pppoe-server server set [find where service-name="pppoe-service"] interface=radiax_bridge default-profile=radiax-pppoe authentication=pap,chap,mschap1,mschap2 disabled=no`,
+                `  /interface pppoe-server server set [find where service-name="pppoe-service"] interface=$targetBridge default-profile=radiax-pppoe authentication=pap,chap,mschap1,mschap2 disabled=no`,
                 `}`,
             );
         }
@@ -276,8 +292,8 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                 `} else={`,
                 `  /ip pool set [find where name="hotspot-pool"] ranges=${hotspotPoolStart}-${hotspotPoolEnd}`,
                 `}`,
-                `:if ([:len [/ip address find where interface="radiax_bridge" and address="${hotspotCidr}"]] = 0) do={`,
-                `  /ip address add address=${hotspotCidr} interface=radiax_bridge`,
+                `:if ([:len [/ip address find where interface=$targetBridge and address="${hotspotCidr}"]] = 0) do={`,
+                `  /ip address add address=${hotspotCidr} interface=$targetBridge`,
                 `}`,
                 `:if ([:len [/ip dhcp-server network find where address="${hotspotNetwork}"]] = 0) do={`,
                 `  /ip dhcp-server network add address=${hotspotNetwork} gateway=${hotspotLocalAddress} dns-server=${hotspotLocalAddress}`,
@@ -285,9 +301,9 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                 `  /ip dhcp-server network set [find where address="${hotspotNetwork}"] gateway=${hotspotLocalAddress} dns-server=${hotspotLocalAddress}`,
                 `}`,
                 `:if ([:len [/ip dhcp-server find where name="dhcp-hotspot"]] = 0) do={`,
-                `  /ip dhcp-server add name=dhcp-hotspot interface=radiax_bridge address-pool=hotspot-pool authoritative=after-2sec-delay disabled=no`,
+                `  /ip dhcp-server add name=dhcp-hotspot interface=$targetBridge address-pool=hotspot-pool authoritative=after-2sec-delay disabled=no`,
                 `} else={`,
-                `  /ip dhcp-server set [find where name="dhcp-hotspot"] interface=radiax_bridge address-pool=hotspot-pool authoritative=after-2sec-delay disabled=no`,
+                `  /ip dhcp-server set [find where name="dhcp-hotspot"] interface=$targetBridge address-pool=hotspot-pool authoritative=after-2sec-delay disabled=no`,
                 `}`,
                 `:if ([:len [/ip hotspot profile find where name="hq-hotspot"]] = 0) do={`,
                 `  /ip hotspot profile add name=hq-hotspot hotspot-address=${hotspotLocalAddress} dns-name=login.spot login-by=http-chap,http-pap,cookie,mac-cookie html-directory=flash/hotspot http-cookie-lifetime=3d`,
@@ -295,9 +311,9 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                 `  /ip hotspot profile set [find where name="hq-hotspot"] hotspot-address=${hotspotLocalAddress} dns-name=login.spot login-by=http-chap,http-pap,cookie,mac-cookie html-directory=flash/hotspot http-cookie-lifetime=3d`,
                 `}`,
                 `:if ([:len [/ip hotspot find where name="hotspot1"]] = 0) do={`,
-                `  /ip hotspot add name=hotspot1 interface=radiax_bridge address-pool=hotspot-pool profile=hq-hotspot disabled=no`,
+                `  /ip hotspot add name=hotspot1 interface=$targetBridge address-pool=hotspot-pool profile=hq-hotspot disabled=no`,
                 `} else={`,
-                `  /ip hotspot set [find where name="hotspot1"] interface=radiax_bridge address-pool=hotspot-pool profile=hq-hotspot disabled=no`,
+                `  /ip hotspot set [find where name="hotspot1"] interface=$targetBridge address-pool=hotspot-pool profile=hq-hotspot disabled=no`,
                 `}`,
                 '', '# --- Hotspot Login Page (HTML Template) ---',
                 `# NOTE: Upload your custom hotspot HTML files separately.`,
