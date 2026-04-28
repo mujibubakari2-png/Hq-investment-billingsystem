@@ -301,6 +301,27 @@ export class MikroTikService {
         }
     }
 
+    async findPPPoEUserByName(username: string): Promise<PPPoEUser | null> {
+        try {
+            // RouterOS REST API filter syntax
+            const users = await this.apiRequest(`/ppp/secret?name=${username}`);
+            if (!users || !Array.isArray(users) || users.length === 0) return null;
+            const u = users[0];
+            return {
+                id: u[".id"],
+                name: u.name,
+                password: u.password || "***",
+                service: u.service || "pppoe",
+                profile: u.profile || "default",
+                disabled: u.disabled === "true" || u.disabled === true,
+                comment: u.comment || "",
+            };
+        } catch (err: any) {
+            console.error(`[MikroTik] Error finding PPPoE user ${username}:`, err.message);
+            return null;
+        }
+    }
+
     async createPPPoEUser(user: Omit<PPPoEUser, "id">): Promise<PPPoEUser> {
         try {
             const result = await this.apiRequest("/ppp/secret", "PUT", {
@@ -378,6 +399,29 @@ export class MikroTikService {
         } catch (err: any) {
             await this.log("list_hotspot_users", err.message, "error");
             throw err;
+        }
+    }
+
+    async findHotspotUserByName(username: string): Promise<HotspotUser | null> {
+        try {
+            const users = await this.apiRequest(`/ip/hotspot/user?name=${username}`);
+            if (!users || !Array.isArray(users) || users.length === 0) return null;
+            const u = users[0];
+            return {
+                id: u[".id"],
+                name: u.name,
+                password: u.password || "***",
+                profile: u.profile || "default",
+                server: u.server || "all",
+                disabled: u.disabled === "true" || u.disabled === true,
+                comment: u.comment || "",
+                macAddress: u["mac-address"] || "",
+                limitUptime: u["limit-uptime"] || "",
+                limitBytesTotal: u["limit-bytes-total"] || "",
+            };
+        } catch (err: any) {
+            console.error(`[MikroTik] Error finding Hotspot user ${username}:`, err.message);
+            return null;
         }
     }
 
@@ -597,27 +641,28 @@ export class MikroTikService {
      */
     async activateService(username: string, password: string, profileName: string, serviceType: "pppoe" | "hotspot"): Promise<void> {
         if (serviceType === "pppoe") {
-            // Try to find existing user first
-            const users = await this.listPPPoEUsers();
-            const existing = users.find(u => u.name === username);
-
+            const existing = await this.findPPPoEUserByName(username);
             if (existing && existing.id) {
                 await this.enablePPPoEUser(existing.id, username);
+                if (existing.profile !== profileName) {
+                    await this.updatePPPoEUser(existing.id, { profile: profileName, name: username });
+                }
             } else {
                 await this.createPPPoEUser({
                     name: username,
                     password,
-                    service: "pppoe",
                     profile: profileName,
+                    service: "pppoe",
                     disabled: false,
                 });
             }
         } else {
-            const users = await this.listHotspotUsers();
-            const existing = users.find(u => u.name === username);
-
+            const existing = await this.findHotspotUserByName(username);
             if (existing && existing.id) {
                 await this.enableHotspotUser(existing.id, username);
+                if (existing.profile !== profileName) {
+                    await this.updateHotspotUser(existing.id, { profile: profileName, name: username });
+                }
             } else {
                 await this.createHotspotUser({
                     name: username,
@@ -637,8 +682,7 @@ export class MikroTikService {
     async suspendService(username: string, serviceType: "pppoe" | "hotspot"): Promise<void> {
         try {
             if (serviceType === "pppoe") {
-                const users = await this.listPPPoEUsers();
-                const user = users.find(u => u.name === username);
+                const user = await this.findPPPoEUserByName(username);
                 if (user?.id) {
                     await this.disablePPPoEUser(user.id, username);
                     // Also disconnect active session
@@ -647,8 +691,7 @@ export class MikroTikService {
                     if (session) await this.disconnectPPPoESession(session.id, username);
                 }
             } else {
-                const users = await this.listHotspotUsers();
-                const user = users.find(u => u.name === username);
+                const user = await this.findHotspotUserByName(username);
                 if (user?.id) {
                     await this.disableHotspotUser(user.id, username);
                     const sessions = await this.listHotspotActiveSessions();

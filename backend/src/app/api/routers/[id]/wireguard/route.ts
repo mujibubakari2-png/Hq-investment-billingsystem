@@ -268,7 +268,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 try {
                     // Create management user
                     await service.apiRequestPublic("/user", "PUT", {
-                        name: "admin_kenge",
+                        name: "admin",
                         password: router.password || "admin",
                         group: "full",
                         comment: "Management User - DO NOT DELETE"
@@ -342,37 +342,37 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 // Step 4: Firewall Rules (Input and Forward)
                 // Use place-before="0" to ensure rules are at the top of the chain
                 const restPort = router.apiPort || (router.port === 8728 || router.port === 8729 ? 80 : router.port) || 80;
-                
+
                 const firewallRules = [
                     {
                         chain: "input", protocol: "udp", "dst-port": String(listenPort),
-                        action: "accept", comment: "Allow WireGuard - Kenge", "place-before": "0"
+                        action: "accept", comment: "Allow WireGuard - Kenge"
                     },
                     {
                         // Allow ICMP from VPN
                         chain: "input", protocol: "icmp",
                         "src-address": `${subnetPrefix}.0/24`,
-                        action: "accept", comment: "Allow ICMP from VPN - Kenge", "place-before": "0"
+                        action: "accept", comment: "Allow ICMP from VPN - Kenge"
                     },
                     {
                         // Allow the Droplet to reach MikroTik REST API over the VPN tunnel
                         chain: "input", protocol: "tcp", "dst-port": String(restPort),
                         "src-address": `${subnetPrefix}.0/24`,
-                        action: "accept", comment: "Allow REST API from VPN - Kenge", "place-before": "0"
+                        action: "accept", comment: "Allow REST API from VPN - Kenge"
                     },
                     {
                         // Allow Winbox access over VPN
                         chain: "input", protocol: "tcp", "dst-port": "8291",
                         "src-address": `${subnetPrefix}.0/24`,
-                        action: "accept", comment: "Allow Winbox from VPN - Kenge", "place-before": "0"
+                        action: "accept", comment: "Allow Winbox from VPN - Kenge"
                     },
                     {
                         chain: "forward", "in-interface": "wg-kenge",
-                        action: "accept", comment: "Allow WG traffic - Kenge", "place-before": "0"
+                        action: "accept", comment: "Allow WG traffic - Kenge"
                     },
                     {
                         chain: "forward", "out-interface": "wg-kenge",
-                        action: "accept", comment: "Allow WG return traffic - Kenge", "place-before": "0"
+                        action: "accept", comment: "Allow WG return traffic - Kenge"
                     }
                 ];
 
@@ -466,18 +466,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 select: { wgPublicKey: true }
             });
             const validKeys = new Set(allValidRouters.map(r => r.wgPublicKey));
-            
+
             const allPeers = await wireguardManager.listPeers();
             for (const peer of allPeers) {
                 // Keep the current router being activated
                 if (peer.publicKey === router.wgPublicKey) continue;
-                
+
                 // If peer is not in the database, OR it has lost its allowed IP, destroy it
                 if (!validKeys.has(peer.publicKey) || peer.allowedIps === "(none)") {
                     await wireguardManager.removePeer(peer.publicKey);
                 }
             }
-            
+
             await wireguardManager.addPeer(router.wgPublicKey, tunnelIp);
         } catch (err: any) {
             console.error("Failed to add peer:", err);
