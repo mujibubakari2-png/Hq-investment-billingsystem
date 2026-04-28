@@ -32,7 +32,7 @@ export default function Contact() {
   return (
     <section id="contact" className="py-20 bg-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-20 items-center">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 md:gap-14 lg:gap-20 items-center">
           <div>
             <h2 className="text-3xl md:text-5xl font-bold text-primary mb-6">Let's Find the Right Plan for Your Network</h2>
             <p className="text-lg text-gray-600 mb-10 leading-relaxed">
@@ -58,7 +58,7 @@ export default function Contact() {
             whileInView={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.5 }}
             viewport={{ once: true }}
-            className="p-10 rounded-3xl bg-softBg shadow-xl"
+            className="p-6 md:p-10 rounded-3xl bg-softBg shadow-xl"
           >
             <form onSubmit={handleSubmit} className="space-y-6">
               <div>

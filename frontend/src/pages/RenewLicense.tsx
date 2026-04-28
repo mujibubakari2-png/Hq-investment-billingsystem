@@ -239,7 +239,7 @@ export default function RenewLicense() {
     }
 
     return (
-        <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg-lighter)', fontFamily: 'var(--font-family)', justifyContent: 'center', padding: '2rem' }}>
+        <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg-lighter)', fontFamily: 'var(--font-family)', justifyContent: 'center', padding: 'clamp(10px, 3vw, 2rem)' }}>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', width: '100%', maxWidth: 1000 }}>
                 
                 {/* Left Column - Payment Selection */}
@@ -338,7 +338,7 @@ export default function RenewLicense() {
                 </div>
 
                 {/* Right Column - Invoice Preview */}
-                <div style={{ flex: '1 1 400px', background: '#fff', borderRadius: '12px', boxShadow: 'var(--shadow-md)', padding: '2rem', display: 'flex', flexDirection: 'column', overflowX: 'auto' }}>
+                <div style={{ flex: '1 1 400px', background: '#fff', borderRadius: '12px', boxShadow: 'var(--shadow-md)', padding: 'clamp(14px, 3.5vw, 2rem)', display: 'flex', flexDirection: 'column', overflowX: 'auto' }}>
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginBottom: '2rem' }}>
                         <button className="btn btn-outline" style={{ display: 'flex', alignItems: 'center', gap: '4px' }} onClick={handlePrintInvoice}><PrintIcon fontSize="small" /> Print</button>
                         <button className="btn btn-outline" style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#333', color: 'white' }} onClick={() => { alert('Choose "Save as PDF" as the destination in the print dialog to save.'); handlePrintInvoice(); }}><DescriptionIcon fontSize="small" /> PDF</button>
@@ -407,7 +407,7 @@ export default function RenewLicense() {
                     </table>
 
                     <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '2rem' }}>
-                        <div style={{ width: '250px' }}>
+                        <div style={{ width: 'min(250px, 100%)' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0', borderBottom: '1px solid var(--border-light)', fontSize: '0.9rem' }}>
                                 <span style={{ color: 'var(--text-secondary)' }}>Subtotal</span>
                                 <span>TZS {getAmountToPay().toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>

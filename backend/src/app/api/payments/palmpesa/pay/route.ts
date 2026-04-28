@@ -1,16 +1,18 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
-import { errorResponse, jsonResponse } from "@/lib/auth";
+import { errorResponse, jsonResponse, getUserFromRequest } from "@/lib/auth";
 
 // Environment variables or settings for PalmPesa API
 const PALMPESA_API_URL = process.env.PALMPESA_API_URL || "https://api.palmpesa.com/v1/payments/stk-push";
-const PALMPESA_API_KEY = process.env.PALMPESA_API_KEY || "demo_key";
+const PALMPESA_API_KEY = process.env.PALMPESA_API_KEY;
 
 export async function POST(req: NextRequest) {
     try {
-        // Authenticate the user (must be super admin or the tenant user)
-        // For simplicity in this endpoint, we'll assume the client passes the tenantId or it's extracted from a token.
-        // We'll read the body for tenantInvoiceId and phone.
+        const userPayload = getUserFromRequest(req);
+        if (!userPayload) return errorResponse("Unauthorized", 401);
+        if (userPayload.role !== "SUPER_ADMIN" && userPayload.role !== "ADMIN") {
+            return errorResponse("Forbidden: Admin access required", 403);
+        }
 
         const body = await req.json();
         const { tenantInvoiceId, phone } = body;
@@ -27,22 +29,33 @@ export async function POST(req: NextRequest) {
         if (!invoice) {
             return errorResponse("Invoice not found", 404);
         }
+        if (userPayload.role !== "SUPER_ADMIN" && invoice.tenantId !== userPayload.tenantId) {
+            return errorResponse("Forbidden", 403);
+        }
 
         if (invoice.status === "PAID") {
             return errorResponse("Invoice is already paid", 400);
         }
 
         // Mock PalmPesa API STK push request
+        const appUrl = process.env.APP_URL;
+        if (!appUrl) {
+            return errorResponse("Server payment callback URL is not configured", 500);
+        }
+
         const stkPayload = {
             PhoneNumber: phone,
             Amount: invoice.amount,
             AccountReference: invoice.invoiceNumber,
             TransactionDesc: `Payment for SaaS Plan ${invoice.planId}`,
-            CallbackUrl: `${process.env.APP_URL}/api/payments/palmpesa/webhook`,
+            CallbackUrl: `${appUrl}/api/payments/palmpesa/webhook`,
         };
 
-        // In a real scenario, we send this to PalmPesa:
+        // In a real scenario, we send this to PalmPesa once credentials exist:
         /*
+        if (!PALMPESA_API_KEY) {
+            return errorResponse("PalmPesa API key is not configured", 500);
+        }
         const response = await fetch(PALMPESA_API_URL, {
             method: "POST",
             headers: {

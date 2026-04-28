@@ -12,7 +12,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         const url = new URL(req.url);
         const type = url.searchParams.get("type") || "all";
 
-        const service = await getMikroTikService(id, userPayload.tenantId);
+        const service = await getMikroTikService(id, userPayload.role === "SUPER_ADMIN" ? null : userPayload.tenantId);
 
         if (type === "pppoe") {
             return jsonResponse(await service.listPPPoEProfiles());
@@ -31,7 +31,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
             hotspot: hotspot.status === "fulfilled" ? hotspot.value : [],
         });
     } catch (err: any) {
-        return errorResponse(err.message || "Failed to list profiles", 500);
+        return errorResponse("Failed to list profiles", 500);
     }
 }
 
@@ -48,7 +48,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             return errorResponse("name, rateLimit, and type (pppoe/hotspot) are required");
         }
 
-        const service = await getMikroTikService(id, userPayload.tenantId);
+        const service = await getMikroTikService(id, userPayload.role === "SUPER_ADMIN" ? null : userPayload.tenantId);
 
         if (body.type === "pppoe") {
             const profile = await service.createPPPoEProfile({
@@ -67,6 +67,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             return jsonResponse(profile, 201);
         }
     } catch (err: any) {
-        return errorResponse(err.message || "Failed to create profile", 500);
+        return errorResponse("Failed to create profile", 500);
     }
 }

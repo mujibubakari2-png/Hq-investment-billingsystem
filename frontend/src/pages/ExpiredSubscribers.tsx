@@ -140,7 +140,7 @@ export default function ExpiredSubscribers() {
             </div>
 
             {/* Stat Cards */}
-            <div className="stat-cards" style={{ gridTemplateColumns: 'repeat(6, 1fr)' }}>
+            <div className="stat-cards" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))' }}>
                 <div className="stat-card red">
                     <div className="stat-card-label">Total Expired</div>
                     <div className="stat-card-value">{stats.totalExpired}</div>

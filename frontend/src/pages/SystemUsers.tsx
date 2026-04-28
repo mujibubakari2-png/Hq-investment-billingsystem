@@ -162,7 +162,7 @@ export default function SystemUsers() {
                             <label className="form-label" style={{ color: 'var(--primary)', fontWeight: 600 }}>Email</label>
                             <input type="email" className="form-input" value={newUser.email} onChange={e => setNewUser({ ...newUser, email: e.target.value })} />
                         </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
                             <div className="form-group">
                                 <label className="form-label" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>City</label>
                                 <input type="text" className="form-input" placeholder="City" value={newUser.city} onChange={e => setNewUser({ ...newUser, city: e.target.value })} />
@@ -286,7 +286,7 @@ export default function SystemUsers() {
 
             {/* Stats Row */}
             <div style={{
-                display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)',
+                display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
                 gap: 0, border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)',
                 overflow: 'hidden', marginBottom: 20, background: '#fff',
             }}>

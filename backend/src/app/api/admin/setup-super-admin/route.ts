@@ -5,8 +5,22 @@ import { jsonResponse, errorResponse, hashPassword } from "@/lib/auth";
 
 export async function GET(req: NextRequest) {
     try {
-        const superAdminEmail = "superadmin@hqinvestment.co.tz";
-        const superAdminPassword = "hq-admin-2026";
+        if (process.env.NODE_ENV === "production") {
+            return errorResponse("Not found", 404);
+        }
+        const setupEnabled = process.env.ENABLE_SUPER_ADMIN_SETUP === "true";
+        const setupKey = process.env.SUPER_ADMIN_SETUP_KEY;
+        const providedKey = req.headers.get("x-setup-key");
+        if (!setupEnabled || !setupKey || providedKey !== setupKey) {
+            return errorResponse("Not found", 404);
+        }
+
+        const superAdminEmail = process.env.SUPER_ADMIN_EMAIL;
+        const superAdminPassword = process.env.SUPER_ADMIN_PASSWORD;
+        if (!superAdminEmail || !superAdminPassword) {
+            return errorResponse("Server setup is incomplete", 500);
+        }
+
         const hashedPassword = await hashPassword(superAdminPassword);
 
         console.log("Setting up unique Super Admin account...");
@@ -57,12 +71,11 @@ export async function GET(req: NextRequest) {
         return jsonResponse({
             message: "Super Admin setup complete.",
             superAdmin: superAdminEmail,
-            password: superAdminPassword,
             demotedCount: others.count
         });
         
     } catch (error: any) {
         console.error("Error setting up super admin:", error);
-        return errorResponse(error.message || "Error setting up super admin", 500);
+        return errorResponse("Error setting up super admin", 500);
     }
 }

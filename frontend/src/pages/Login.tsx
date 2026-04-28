@@ -72,13 +72,13 @@ export default function Login() {
 
     return (
         <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: '#f0f4f8' }}>
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-                <div style={{ backgroundColor: '#ffffff', padding: '40px', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)', width: '100%', maxWidth: '440px' }}>
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px' }}>
+                <div style={{ backgroundColor: '#ffffff', padding: 'clamp(18px, 4vw, 40px)', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)', width: '100%', maxWidth: '440px' }}>
                 {/* Text Logo */}
                 <div style={{ textAlign: 'center', marginBottom: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
 
-                        <h1 style={{ margin: 0, fontSize: '1.8rem', fontWeight: 800, letterSpacing: '-0.5px' }}>
+                        <h1 style={{ margin: 0, fontSize: 'clamp(1.3rem, 4.8vw, 1.8rem)', fontWeight: 800, letterSpacing: '-0.5px' }}>
                             <span style={{ color: '#334155' }}>HQ</span> <span style={{ color: '#10b981' }}>INVESTMENT</span>
                         </h1>
                     </div>
@@ -92,7 +92,7 @@ export default function Login() {
                 <p style={{ color: '#64748b', textAlign: 'center', margin: '0 0 16px 0', fontSize: '1rem' }}>
                     Sign in to manage your network and billing
                 </p>
-                <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+                <div style={{ textAlign: 'center', marginBottom: '24px' }}>
                     <a href="/register" style={{ color: '#008ee6', textDecoration: 'none', fontWeight: 500, fontSize: '1rem' }}>
                         New here? Create your free account
                     </a>
@@ -160,7 +160,7 @@ export default function Login() {
                         </div>
                     </div>
 
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px', marginBottom: '8px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px', marginBottom: '8px', gap: '8px', flexWrap: 'wrap' }}>
                         <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.95rem', color: '#475569', cursor: 'pointer' }}>
                             <input
                                 type="checkbox"

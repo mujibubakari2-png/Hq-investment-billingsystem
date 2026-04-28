@@ -11,7 +11,7 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16 items-center">
           <div className="flex-shrink-0">
-            <Link href="/" className="text-2xl font-bold text-primary">
+            <Link href="/" className="text-lg sm:text-2xl font-bold text-primary break-words leading-tight">
               HQInvestment <span className="text-secondary">Billing</span>
             </Link>
           </div>
@@ -45,7 +45,7 @@ export default function Navbar() {
 
       {/* Mobile menu */}
       {isOpen && (
-        <div className="md:hidden bg-white border-t p-4 space-y-4">
+        <div className="md:hidden bg-white border-t p-4 space-y-4 max-h-[calc(100vh-4rem)] overflow-y-auto">
           <Link href="/" onClick={() => setIsOpen(false)} className="block text-gray-700 font-medium">Home</Link>
           <Link href="#features" onClick={() => setIsOpen(false)} className="block text-gray-700 font-medium">Features</Link>
           <Link href="#pricing" onClick={() => setIsOpen(false)} className="block text-gray-700 font-medium">Pricing</Link>

@@ -9,10 +9,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         if (!userPayload) return errorResponse("Unauthorized", 401);
 
         const { id } = await params;
-        const service = await getMikroTikService(id, userPayload.tenantId);
+        const service = await getMikroTikService(id, userPayload.role === "SUPER_ADMIN" ? null : userPayload.tenantId);
         const sessions = await service.listAllActiveSessions();
         return jsonResponse(sessions);
     } catch (err: any) {
-        return errorResponse(err.message || "Failed to list active sessions", 500);
+        return errorResponse("Failed to list active sessions", 500);
     }
 }

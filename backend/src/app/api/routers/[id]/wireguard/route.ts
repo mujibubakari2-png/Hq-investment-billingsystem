@@ -3,7 +3,6 @@ import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { getMikroTikService } from "@/lib/mikrotik";
 import { wireguardManager } from "@/lib/wireguard";
-import crypto from "crypto";
 import { exec } from "child_process";
 import { promisify } from "util";
 const execAsync = promisify(exec);
@@ -60,13 +59,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         let wgPresharedKey = router.wgPresharedKey;
         let tunnelIp = router.wgTunnelIp;
 
-        // Server-side keys (for the HQInvestment server)
-        // Prevent random generation by using the hardcoded key from setup-vpn.sh as the ultimate fallback
-        const DEFAULT_SERVER_PRIVATE_KEY = "mPsn44hz/0c/ZuAREVBTit//tuazXSw5+E9OeeAZS1Q=";
-        const DEFAULT_SERVER_PUBLIC_KEY = "b7ADpdTy6UooXmb7Ve+PgGeXjGFLVFXqsuz32dYNaxA=";
-
-        const serverPrivateKey = process.env.WG_SERVER_PRIVATE_KEY || DEFAULT_SERVER_PRIVATE_KEY;
-        const serverPublicKey = process.env.WG_SERVER_PUBLIC_KEY || DEFAULT_SERVER_PUBLIC_KEY;
+        const configuredServerPublicKey = process.env.WG_SERVER_PUBLIC_KEY;
 
         const wgServerIp = await wireguardManager.getServerIp();
         const subnetPrefix = wgServerIp.split('.').slice(0, 3).join('.'); // e.g. "10.0.0"
@@ -92,14 +85,15 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
             try {
                 wgPrivateKey = await wireguardManager.generatePrivateKey();
                 wgPublicKey = await wireguardManager.derivePublicKey(wgPrivateKey);
-                wgPeerPublicKey = serverPublicKey;
+                wgPeerPublicKey = configuredServerPublicKey || await wireguardManager.getServerPublicKey();
                 wgPresharedKey = await wireguardManager.generatePrivateKey(); // Preshared keys use the same 32-byte format
             } catch (err) {
-                console.error("Failed to generate real WG keys, using fallback", err);
-                wgPrivateKey = crypto.randomBytes(32).toString("base64");
-                wgPublicKey = crypto.createHash("sha256").update(wgPrivateKey).digest("base64"); // INSECURE FALLBACK
-                wgPeerPublicKey = serverPublicKey;
-                wgPresharedKey = crypto.randomBytes(32).toString("base64");
+                console.error("Failed to generate WireGuard keys", err);
+                return errorResponse("Failed to generate WireGuard keys", 500);
+            }
+
+            if (!wgPeerPublicKey) {
+                return errorResponse("WireGuard server public key is not configured", 500);
             }
 
             await updateRouterWgFields(id, {
@@ -113,7 +107,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
         // Always ensure the peer public key is correct, even if keys were already generated
         const realServerPubKey = await wireguardManager.getServerPublicKey();
-        const currentServerPublicKey = realServerPubKey || serverPublicKey;
+        const currentServerPublicKey = realServerPubKey || configuredServerPublicKey;
+        if (!currentServerPublicKey) {
+            return errorResponse("WireGuard server public key is not configured", 500);
+        }
 
         if (wgPeerPublicKey !== currentServerPublicKey) {
             wgPeerPublicKey = currentServerPublicKey;
@@ -172,7 +169,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         });
     } catch (err: any) {
         console.error("WireGuard config error:", err);
-        return errorResponse(err.message || "Failed to get WireGuard config", 500);
+        return errorResponse("Failed to get WireGuard config", 500);
     }
 }
 
@@ -262,7 +259,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
         if (action === "push-config") {
             try {
-                const service = await getMikroTikService(id, userPayload.tenantId);
+                const service = await getMikroTikService(id, userPayload.role === "SUPER_ADMIN" ? null : userPayload.tenantId);
 
                 // Step 0: Initial Setup (Management User, Identity, DNS)
                 try {
@@ -453,7 +450,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 });
                 return jsonResponse({
                     success: false,
-                    message: `Failed to auto-configure: ${err.message}. Ensure the router is reachable and try manual setup.`,
+                    message: "Failed to auto-configure. Ensure the router is reachable and try manual setup.",
                 }, 200);
             }
         }
@@ -481,7 +478,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             await wireguardManager.addPeer(router.wgPublicKey, tunnelIp);
         } catch (err: any) {
             console.error("Failed to add peer:", err);
-            return errorResponse(`Failed to add peer to server: ${err.message}`, 500);
+            return errorResponse("Failed to add peer to server", 500);
         }
 
         // Wait a few seconds for MikroTik to complete the WireGuard handshake
@@ -531,6 +528,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         });
     } catch (err: any) {
         console.error("WireGuard activate error:", err);
-        return errorResponse(err.message || "Failed to activate WireGuard", 500);
+        return errorResponse("Failed to activate WireGuard", 500);
     }
 }

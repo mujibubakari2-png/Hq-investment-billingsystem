@@ -18,6 +18,6 @@ export async function GET(
         return jsonResponse(interfaces);
     } catch (e: any) {
         console.error("[INTERFACES GET ERROR]:", e);
-        return errorResponse(e.message || "Failed to fetch interfaces", 500);
+        return errorResponse("Failed to fetch interfaces", 500);
     }
 }

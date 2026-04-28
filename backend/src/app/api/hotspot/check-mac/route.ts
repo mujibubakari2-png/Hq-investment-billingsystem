@@ -16,12 +16,17 @@ export async function GET(req: NextRequest) {
         if (!mac) {
             return errorResponse("MAC address is required", 400);
         }
+        const normalizedMac = mac.trim().toLowerCase();
+        const isValidMac = /^([0-9a-f]{2}[:\-]){5}[0-9a-f]{2}$/.test(normalizedMac);
+        if (!isValidMac) {
+            return errorResponse("Invalid MAC address format", 400);
+        }
 
         // Find an active subscription for this MAC address
         const subscription = await prisma.subscription.findFirst({
             where: {
                 client: {
-                    macAddress: mac,
+                    macAddress: normalizedMac,
                 },
                 status: "ACTIVE",
                 expiresAt: {

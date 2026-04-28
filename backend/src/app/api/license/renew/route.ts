@@ -1,9 +1,10 @@
 import { NextRequest } from "next/server";
+import { randomUUID } from "node:crypto";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 
 const PALMPESA_API_URL = process.env.PALMPESA_API_URL || "https://api.palmpesa.com/v1/payments/stk-push";
-const PALMPESA_API_KEY = process.env.PALMPESA_API_KEY || "demo_key";
+const PALMPESA_API_KEY = process.env.PALMPESA_API_KEY;
 
 export async function POST(req: NextRequest) {
     try {
@@ -36,7 +37,7 @@ export async function POST(req: NextRequest) {
             if (!invoice) return errorResponse("Invoice not found", 404);
         } else {
             // CREATE PENDING INVOICE
-            const invoiceNumber = `INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+            const invoiceNumber = `INV-${new Date().getFullYear()}-${randomUUID().replace(/-/g, "").slice(0, 8).toUpperCase()}`;
             invoice = await prisma.tenantInvoice.create({
                 data: {
                     invoiceNumber,
@@ -50,16 +51,24 @@ export async function POST(req: NextRequest) {
             });
         }
 
+        const appUrl = process.env.APP_URL;
+        if (!appUrl) {
+            return errorResponse("Server payment callback URL is not configured", 500);
+        }
+
         const stkPayload = {
             PhoneNumber: phoneNumber,
             Amount: invoice.amount,
             AccountReference: invoice.invoiceNumber,
             TransactionDesc: `SaaS License Renewal - ${packageMonths} Month(s)`,
-            CallbackUrl: `${process.env.APP_URL || 'https://api.kenge.com'}/api/payments/palmpesa/webhook`,
+            CallbackUrl: `${appUrl}/api/payments/palmpesa/webhook`,
         };
 
         // In a real production deployment with credentials:
         /*
+        if (!PALMPESA_API_KEY) {
+            return errorResponse("PalmPesa API key is not configured", 500);
+        }
         const response = await fetch(PALMPESA_API_URL, {
             method: "POST",
             headers: {

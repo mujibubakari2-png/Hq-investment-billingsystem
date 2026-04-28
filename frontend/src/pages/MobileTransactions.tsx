@@ -90,10 +90,11 @@ export default function MobileTransactions() {
         <div>
             {/* Summary Row - pink/red theme */}
             <h3 style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8, marginTop: 4 }}>Period Summaries</h3>
+            <div style={{ overflowX: 'auto', marginBottom: 16 }}>
             <div style={{
                 display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1px 1fr 1fr 1fr',
                 border: '1px solid #fecdd3', borderRadius: 'var(--radius-md)',
-                overflow: 'hidden', marginBottom: 16, background: '#fff',
+                overflow: 'hidden', background: '#fff', minWidth: 900,
             }}>
                 <div style={{ textAlign: 'center', padding: '14px 0', position: 'relative' }}>
                     <div style={{ position: 'absolute', top: 6, left: 10, fontSize: '0.65rem', fontWeight: 700, color: '#e11d48', textTransform: 'uppercase', background: '#ffe4e6', padding: '2px 6px', borderRadius: 4 }}>Today</div>
@@ -123,9 +124,10 @@ export default function MobileTransactions() {
                     <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Revenue generated</div>
                 </div>
             </div>
+            </div>
 
             <h3 style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8 }}>This Month's Breakdown</h3>
-            <div className="stat-cards" style={{ gridTemplateColumns: 'repeat(6, 1fr)', marginBottom: 20, gap: 16 }}>
+            <div className="stat-cards" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', marginBottom: 20, gap: 16 }}>
                 <div style={{ background: '#fff', borderRadius: '12px', padding: '16px', borderLeft: '4px solid #e11d48', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <div style={{ width: 36, height: 36, borderRadius: 8, background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#e11d48' }}>

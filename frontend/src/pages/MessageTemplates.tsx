@@ -171,7 +171,7 @@ export default function MessageTemplates() {
             )}
 
             {/* Stat Cards */}
-            <div className="stat-cards" style={{ gridTemplateColumns: 'repeat(5, 1fr)' }}>
+            <div className="stat-cards" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))' }}>
                 {['Activation', 'Expiry', 'Payment', 'Reminder', 'Custom'].map(type => {
                     const count = templates.filter(t => t.type.toLowerCase() === type.toLowerCase()).length;
                     const style = getTypeBadgeStyle(type);

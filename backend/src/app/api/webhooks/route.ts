@@ -6,21 +6,20 @@ import crypto from 'crypto';
 
 export async function POST(req: Request) {
     try {
+        const webhookSecret = process.env.WEBHOOK_SECRET;
+        if (!webhookSecret) {
+            return NextResponse.json({ error: "Webhook secret is not configured" }, { status: 500 });
+        }
+        const providedSignature = req.headers.get("x-webhook-secret") || "";
+        const expected = Buffer.from(webhookSecret, "utf8");
+        const provided = Buffer.from(providedSignature, "utf8");
+        if (expected.length !== provided.length || !crypto.timingSafeEqual(expected, provided)) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
         const payload = await req.json();
 
-        // Example check: Assuming M-Pesa or a generalized generic provider structure
-        // providers often send an identifier like transactionId, amount, status
-        console.log('--- Incoming Webhook ---');
-        console.log(JSON.stringify(payload, null, 2));
-
         const { TransactionID, Amount, BillRefNumber, TransTime, BusinessShortCode } = payload;
-
-        // 1. Authenticate Request
-        // Some providers use HMAC signatures in Headers.
-        // const signature = req.headers.get('x-provider-signature');
-        // if (!isValidSignature(JSON.stringify(payload), signature, process.env.WEBHOOK_SECRET)) {
-        //     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-        // }
 
         if (TransactionID && Amount && BillRefNumber) {
             // Probably M-Pesa C2B

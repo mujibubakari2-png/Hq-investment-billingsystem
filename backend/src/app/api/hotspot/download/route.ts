@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { readFileSync, readdirSync, statSync } from "fs";
+import { readFileSync, readdirSync, statSync, existsSync } from "fs";
 import { join } from "path";
 
 /**
@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
 
         let hotspotDir = join(process.cwd(), "public", "hotspot");
         // Fallback for monorepo root process.cwd()
-        if (!require("fs").existsSync(hotspotDir)) {
+        if (!existsSync(hotspotDir)) {
             hotspotDir = join(process.cwd(), "backend", "public", "hotspot");
         }
 
@@ -72,6 +72,6 @@ export async function GET(req: NextRequest) {
 
     } catch (e: any) {
         console.error("Hotspot download error:", e);
-        return Response.json({ error: "Failed to package hotspot files: " + e.message }, { status: 500 });
+        return Response.json({ error: "Failed to package hotspot files" }, { status: 500 });
     }
 }

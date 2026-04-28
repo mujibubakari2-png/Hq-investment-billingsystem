@@ -266,7 +266,7 @@ export default function VpnManagement() {
             </div>
 
             {/* Stats */}
-            <div className="stat-cards" style={{ gridTemplateColumns: 'repeat(4, 1fr)', marginBottom: 24 }}>
+            <div className="stat-cards" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', marginBottom: 24 }}>
                 <div className="stat-card purple">
                     <div className="stat-card-label">Total VPN Users</div>
                     <div className="stat-card-value">{vpnUsers.length}</div>

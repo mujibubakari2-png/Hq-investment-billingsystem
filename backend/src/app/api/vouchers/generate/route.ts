@@ -12,8 +12,7 @@ export async function POST(req: NextRequest) {
         const currentUser = getUserFromRequest(req);
         if (!currentUser) return errorResponse("Unauthorized", 401);
         
-        const isSuperAdmin = currentUser.role === "SUPER_ADMIN";
-        const tenantIdValue = (currentUser.tenantId || null);
+        const tenantIdValue = currentUser.role === "SUPER_ADMIN" ? null : (currentUser.tenantId || null);
 
         let finalCreatedById = currentUser.userId || createdById;
         if (!finalCreatedById) {
@@ -96,6 +95,6 @@ export async function POST(req: NextRequest) {
         }, 201);
     } catch (e: any) {
         console.error("VOUCHER GENERATION ERROR:", e);
-        return errorResponse(`Internal server error: ${e.message}`, 500);
+        return errorResponse("Internal server error", 500);
     }
 }

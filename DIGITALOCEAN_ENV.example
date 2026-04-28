@@ -4,8 +4,51 @@
 DATABASE_URL=postgresql://db:password@host:port/dbname (Auto-set by DO)
 JWT_SECRET=generate-a-long-random-string
 GOOGLE_CLIENT_ID=96960694156-pg7m1cjdqas9nelo83nicrq4ig3kuq3l.apps.googleusercontent.com
+# Comma-separated allowed origins (no "*"), e.g. https://app.example.com,https://admin.example.com
 CORS_ORIGIN=${frontend.PUBLIC_URL} (Auto-set if using app.yaml)
 NODE_ENV=production
+# Public frontend URL (used by backend links + payment callbacks)
+APP_URL=${frontend.PUBLIC_URL}
+NEXT_PUBLIC_APP_URL=${frontend.PUBLIC_URL}
+ALLOW_AUTOMATION_BYPASS=false
+ACCOUNT_NOTIFICATIONS_ENABLED=true
+ACCOUNT_SMS_NOTIFICATIONS_ENABLED=false
+# Optional explicit portal URL for account notification links
+# ACCOUNT_PORTAL_URL=https://your-frontend-domain.com
+
+# SMTP (required for email notifications)
+# Example for Gmail:
+# SMTP_HOST=smtp.gmail.com
+# SMTP_PORT=465
+# SMTP_SECURE=true
+# SMTP_USER=your-email@gmail.com
+# SMTP_PASS=your-app-password
+# SMTP_FROM="HQ INVESTMENT <your-email@gmail.com>"
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=465
+SMTP_SECURE=true
+SMTP_USER=your-email@gmail.com
+SMTP_PASS=your-app-password
+SMTP_FROM="HQ INVESTMENT <your-email@gmail.com>"
+
+# Payment webhook security
+PAYMENT_WEBHOOK_SECRET=shared-fallback-secret
+MPESA_WEBHOOK_SECRET=mpesa-secret
+AIRTELMONEY_WEBHOOK_SECRET=airtel-secret
+HALOPESA_WEBHOOK_SECRET=halopesa-secret
+TPESA_WEBHOOK_SECRET=tpesa-secret
+MIXBYYAS_WEBHOOK_SECRET=mixbyyas-secret
+PALMPESA_WEBHOOK_SECRET=palmpesa-secret
+
+# Hotspot and generic webhook security
+HOTSPOT_WEBHOOK_SECRET=hotspot-secret
+ZENOPAY_WEBHOOK_SECRET=zenopay-secret
+HARAKAPAY_WEBHOOK_SECRET=harakapay-secret
+WEBHOOK_SECRET=generic-webhook-secret
+
+# Keep setup/test endpoints disabled in production
+ENABLE_SUPER_ADMIN_SETUP=false
+ENABLE_TEST_MIKROTIK_LOGIC=false
 
 # FRONTEND SERVICE
 VITE_API_URL=${backend.PUBLIC_URL}/api (Auto-set if using app.yaml)

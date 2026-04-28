@@ -177,6 +177,8 @@ table {
 .page-content {
   padding: 16px;
   min-height: calc(100vh - var(--header-height));
+  width: 100%;
+  overflow-x: hidden;
 }
 
 /* Page Header */
@@ -261,7 +263,7 @@ table {
 /* Stat Cards */
 .stat-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 16px;
   margin-bottom: 20px;
 }
@@ -675,7 +677,7 @@ table {
   border-radius: var(--radius);
   background: var(--bg-input);
   font-size: 0.85rem;
-  width: 220px;
+  width: clamp(160px, 45vw, 240px);
   transition: border-color 0.2s;
 }
 
@@ -1285,9 +1287,7 @@ table {
     margin-left: 0 !important;
   }
 
-  .page-content {
-    padding: 16px;
-  }
+  .page-content { padding: 12px; }
 
   .stat-cards {
     grid-template-columns: 1fr 1fr;
@@ -1311,15 +1311,15 @@ table {
     width: 100%;
   }
 
+  .table-toolbar-right {
+    justify-content: flex-start;
+  }
+
   .search-input input {
     width: 100%;
   }
 
-  .modal {
-    width: 95%;
-    max-height: 95vh;
-    margin: 8px;
-  }
+  .modal { width: min(95vw, 560px); max-height: 95vh; margin: 8px; }
 
   .pagination {
     flex-direction: column;
@@ -1335,6 +1335,15 @@ table {
 
   html {
     font-size: 13px;
+  }
+
+  .btn {
+    padding: 9px 12px;
+    font-size: 0.82rem;
+  }
+
+  .card-body {
+    padding: 16px;
   }
 }
 

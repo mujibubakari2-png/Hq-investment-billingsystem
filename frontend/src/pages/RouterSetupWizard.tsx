@@ -435,7 +435,7 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                         <h2 style={{ marginBottom: 6 }}>Choose Services to Configure</h2>
                         <p style={{ color: 'var(--text-secondary)', marginBottom: 30 }}>Select which services you want to configure</p>
 
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, maxWidth: 750, margin: '0 auto' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, maxWidth: 750, margin: '0 auto' }}>
                             {[
                                 { key: 'pppoe' as const, label: 'PPPoE Server Only', desc: 'Configure PPPoE server for client connections', icon: <DnsIcon style={{ fontSize: 40, color: 'var(--text-secondary)', marginBottom: 12 }} />, detail: 'radiax_pppoe bridge    10.10.10.x network\nradiax-pppoe service' },
                                 { key: 'hotspot' as const, label: 'Hotspot Only', desc: 'Configure WiFi hotspot with login portal', icon: <WifiIcon style={{ fontSize: 40, color: 'var(--text-secondary)', marginBottom: 12 }} />, detail: 'radiax_hotspot bridge    192.168.1.x network\nlogin.spot portal' },
@@ -591,7 +591,7 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                                             </div>
                                         </div>
                                     </div>
-                                    <div className="grid-2 gap-10">
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 }}>
                                         <div onClick={() => setVpnMode('wireguard')} style={{
                                             border: vpnMode === 'wireguard' ? '2px solid #7c3aed' : '1px solid var(--border)',
                                             borderRadius: 'var(--radius-md)', padding: 12, cursor: 'pointer',
@@ -1016,7 +1016,7 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                         <p style={{ color: 'var(--text-secondary)', marginBottom: 30 }}>Verifying service configuration</p>
 
                         {/* Service Checks */}
-                        <div style={{ display: 'grid', gridTemplateColumns: vpnEnabled ? '1fr 1fr' : '1fr', gap: 16, maxWidth: 650, margin: '0 auto 24px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: vpnEnabled ? 'repeat(auto-fit, minmax(260px, 1fr))' : '1fr', gap: 16, maxWidth: 650, margin: '0 auto 24px' }}>
                             <div style={{
                                 textAlign: 'left', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)', overflow: 'hidden',
                             }}>
@@ -1131,7 +1131,8 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
             </div>
 
             {/* Stepper */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '24px 0', margin: '0 auto', maxWidth: 800, width: '100%' }}>
+            <div style={{ overflowX: 'auto', width: '100%' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '24px 0', margin: '0 auto', maxWidth: 800, minWidth: 760 }}>
                 {steps.map((step, i) => (
                     <div key={i} style={{ display: 'flex', alignItems: 'center', flex: i < steps.length - 1 ? 1 : 0 }}>
                         <div style={{ textAlign: 'center', minWidth: 60 }}>
@@ -1156,6 +1157,7 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                         )}
                     </div>
                 ))}
+            </div>
             </div>
 
             {/* Step Content */}

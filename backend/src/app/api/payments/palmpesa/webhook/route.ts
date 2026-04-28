@@ -5,6 +5,15 @@ import nodemailer from "nodemailer";
 
 export async function POST(req: NextRequest) {
     try {
+        const webhookSecret = process.env.PALMPESA_WEBHOOK_SECRET || process.env.PAYMENT_WEBHOOK_SECRET;
+        if (!webhookSecret) {
+            return errorResponse("Webhook secret is not configured", 500);
+        }
+        const providedSecret = req.headers.get("x-webhook-secret");
+        if (providedSecret !== webhookSecret) {
+            return errorResponse("Unauthorized webhook", 401);
+        }
+
         const body = await req.json();
         
         // Example payload from PalmPesa
@@ -15,6 +24,9 @@ export async function POST(req: NextRequest) {
             ResultCode, // "0" for success
             ResultDesc
         } = body;
+        if (!AccountReference) {
+            return errorResponse("Missing payment reference", 400);
+        }
 
         if (ResultCode !== "0") {
             console.log("PalmPesa payment failed:", ResultDesc);

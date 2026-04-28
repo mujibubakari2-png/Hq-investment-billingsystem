@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
-import { comparePassword, signToken, jsonResponse, errorResponse } from "@/lib/auth";
+import { comparePassword, signToken, jsonResponse, errorResponse, isAutomationRequest } from "@/lib/auth";
 import { checkRateLimit, getClientIp } from "@/lib/rateLimiter";
 
 export async function GET() {
@@ -54,8 +54,7 @@ export async function POST(req: NextRequest) {
             return errorResponse("Account is disabled", 403);
         }
 
-        const automationKey = process.env.AUTOMATION_KEY;
-        const isAutomation = (req.headers.get("x-automation-key") === automationKey || req.headers.get("x-api-key") === automationKey) && automationKey !== undefined;
+        const isAutomation = isAutomationRequest(req);
 
         const valid = isAutomation || await comparePassword(password, user.password);
         console.log(`[LOGIN RESULT] User: ${username}, Success: ${valid}`);
@@ -93,6 +92,6 @@ export async function POST(req: NextRequest) {
         });
     } catch (e: any) {
         console.error("LOGIN ERROR:", e);
-        return errorResponse(`Internal server error: ${e.message || e}`, 500);
+        return errorResponse("Internal server error", 500);
     }
 }

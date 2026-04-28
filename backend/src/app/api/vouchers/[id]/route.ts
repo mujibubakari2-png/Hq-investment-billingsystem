@@ -31,7 +31,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         return jsonResponse(updated);
     } catch (e: any) {
         console.error("VOUCHER UPDATE ERROR:", e);
-        return errorResponse(`Failed to update voucher: ${e.message}`, 500);
+        return errorResponse("Failed to update voucher", 500);
     }
 }
 
@@ -55,6 +55,6 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
         return jsonResponse({ message: "Voucher deleted successfully" });
     } catch (e: any) {
         console.error("VOUCHER DELETE ERROR:", e);
-        return errorResponse(`Failed to delete voucher: ${e.message}`, 500);
+        return errorResponse("Failed to delete voucher", 500);
     }
 }

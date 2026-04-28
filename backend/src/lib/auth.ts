@@ -40,6 +40,13 @@ export interface JwtPayload {
     tenant_id?: string | null; // Alias for tests
 }
 
+export class UnauthorizedError extends Error {
+    constructor(message = "Unauthorized") {
+        super(message);
+        this.name = "UnauthorizedError";
+    }
+}
+
 export function hashPassword(password: string): Promise<string> {
     return bcrypt.hash(password, 12);
 }
@@ -68,15 +75,29 @@ export function getTokenFromRequest(req: NextRequest): string | null {
     return null;
 }
 
+function isAutomationEnv(): boolean {
+    return process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test";
+}
+
+function isAutomationBypassEnabled(): boolean {
+    return process.env.ALLOW_AUTOMATION_BYPASS === "true";
+}
+
+export function isAutomationRequest(req: NextRequest): boolean {
+    const automationKey = process.env.AUTOMATION_KEY;
+    if (!isAutomationEnv() || !isAutomationBypassEnabled() || !automationKey) return false;
+
+    const explicitKey = req.headers.get("x-automation-key") ?? req.headers.get("x-api-key");
+    const bearerToken = getTokenFromRequest(req);
+    return explicitKey === automationKey || bearerToken === automationKey;
+}
+
 export function getUserFromRequest(req: NextRequest): JwtPayload | null {
     const token = getTokenFromRequest(req);
     if (!token) return null;
 
-    // Automation key bypass — ONLY active in development/test environments.
-    // Never runs in production, preventing it from being a backdoor.
-    const isProduction = process.env.NODE_ENV === "production";
-    const automationKey = process.env.AUTOMATION_KEY;
-    if (!isProduction && automationKey && token === automationKey) {
+    // Automation key bypass for CI/test tooling only when explicitly enabled.
+    if (isAutomationRequest(req)) {
         return {
             userId: "automation-id",
             username: "automation",
@@ -87,6 +108,21 @@ export function getUserFromRequest(req: NextRequest): JwtPayload | null {
     }
 
     return verifyToken(token);
+}
+
+/**
+ * Enforce authentication for API routes.
+ *
+ * Throws an Error when the request does not contain a valid JWT.
+ * Routes should wrap calls in a try/catch and return `errorResponse`
+ * with status 401 on failure.
+ */
+export function requireAuth(req: NextRequest): JwtPayload {
+    const payload = getUserFromRequest(req);
+    if (!payload) {
+        throw new UnauthorizedError();
+    }
+    return payload;
 }
 
 export function jsonResponse(data: any, status = 200) {

@@ -91,7 +91,7 @@ export default function SmsMessages() {
             </div>
 
             {/* Stat Cards */}
-            <div className="stat-cards" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+            <div className="stat-cards" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))' }}>
                 <div className="stat-card blue" onClick={() => setStatusFilter('All')} style={{ cursor: 'pointer' }}>
                     <div className="stat-card-label">Total Messages</div>
                     <div className="stat-card-value">{stats.total}</div>

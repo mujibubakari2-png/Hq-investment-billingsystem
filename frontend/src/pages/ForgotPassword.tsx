@@ -107,7 +107,7 @@ export default function ForgotPassword() {
 
     return (
         <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: '#f0f4f8' }}>
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px' }}>
                 <div style={{ width: '100%', maxWidth: '440px' }}>
                     <button
                         onClick={() => {
@@ -129,10 +129,10 @@ export default function ForgotPassword() {
                             <p style={{ margin: 0, fontSize: '0.95rem', opacity: 0.9 }}>We'll get you back in within minutes.</p>
                         </div>
 
-                        <div style={{ padding: '32px 32px 40px 32px' }}>
+                        <div style={{ padding: 'clamp(16px, 4vw, 32px)' }}>
                             {/* Stepper */}
                             {!success && (
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', marginBottom: '32px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '24px', flexWrap: 'wrap' }}>
                                     {[1, 2, 3].map((step, idx) => {
                                         const isCompleted = step < activeStep;
                                         const isCurrent = step === activeStep;
@@ -147,7 +147,7 @@ export default function ForgotPassword() {
                                                 }}>
                                                     {isCompleted ? <CheckIcon fontSize="small" /> : step}
                                                 </div>
-                                                {idx < 2 && <div style={{ width: '40px', height: '2px', backgroundColor: '#e2e8f0' }} />}
+                                                {idx < 2 && <div style={{ width: 'clamp(20px, 8vw, 40px)', height: '2px', backgroundColor: '#e2e8f0' }} />}
                                             </div>
                                         );
                                     })}
@@ -214,7 +214,7 @@ export default function ForgotPassword() {
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#0f5132', fontWeight: 600, marginBottom: '16px', fontSize: '1.05rem' }}>
                                             <CheckCircleIcon fontSize="small" /> Account Found
                                         </div>
-                                        <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr', gap: '8px', fontSize: '0.95rem', color: '#475569' }}>
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(56px, 80px) 1fr', gap: '8px', fontSize: '0.95rem', color: '#475569' }}>
                                             <div style={{ color: '#64748b' }}>Email</div>
                                             <div style={{ color: '#0f172a', fontWeight: 500 }}>{email}</div>
                                         </div>
@@ -227,7 +227,7 @@ export default function ForgotPassword() {
                                     </div>
 
                                     {/* OTP Inputs */}
-                                    <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginBottom: '24px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', marginBottom: '24px', flexWrap: 'wrap' }}>
                                         {otpInputs.map((digit, idx) => (
                                             <input
                                                 key={idx}
@@ -237,7 +237,7 @@ export default function ForgotPassword() {
                                                 value={digit}
                                                 onChange={(e) => handleOtpChange(idx, e.target.value)}
                                                 style={{
-                                                    width: '40px', height: '48px', fontSize: '1.25rem', textAlign: 'center',
+                                                    width: 'clamp(36px, 8.5vw, 40px)', height: '48px', fontSize: '1.25rem', textAlign: 'center',
                                                     borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none',
                                                     color: '#334155', fontWeight: 500
                                                 }}

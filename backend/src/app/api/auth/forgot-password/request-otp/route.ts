@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
+import { randomInt } from "node:crypto";
 import prisma from "@/lib/prisma";
-import { errorResponse, jsonResponse } from "@/lib/auth";
+import { errorResponse, jsonResponse, isAutomationRequest } from "@/lib/auth";
 import { sendOtpEmail } from "@/lib/email";
 
 export async function POST(req: NextRequest) {
@@ -26,7 +27,7 @@ export async function POST(req: NextRequest) {
         }
 
         // Generate a 6-digit OTP
-        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const otp = randomInt(100000, 1000000).toString();
         const email = user.email || identifier;
 
         await prisma.userOtp.create({
@@ -49,8 +50,8 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // For TestSprite/Automation
-        const isAutomation = req.headers.get("x-automation-key") === process.env.AUTOMATION_KEY || process.env.NODE_ENV === "development";
+        // For TestSprite/Automation only when explicit automation key is supplied.
+        const isAutomation = isAutomationRequest(req);
 
         return jsonResponse({ 
             message: "Password reset OTP sent to your email.", 

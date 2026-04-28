@@ -200,6 +200,7 @@ export default function Register() {
                 email: formData.email,
                 phone: formData.phone,
                 password: formData.password,
+                otp: formData.otp.join(''),
             });
             alert(res.message || "Registration complete!");
             navigate('/login');
@@ -212,12 +213,12 @@ export default function Register() {
 
     return (
         <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: '#f4f7f9' }}>
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px' }}>
                 <div style={{ width: '100%', maxWidth: '700px' }}>
-                    <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', padding: '40px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)' }}>
+                    <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', padding: 'clamp(16px, 4vw, 40px)', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)' }}>
 
                         {/* Stepper Header */}
-                        <div style={{ position: 'relative', display: 'flex', justifyContent: 'center', gap: '80px', marginBottom: '40px' }}>
+                        <div style={{ position: 'relative', display: 'flex', justifyContent: 'center', gap: 'clamp(16px, 7vw, 80px)', marginBottom: '28px' }}>
                             {/* Connecting Line */}
                             <div style={{ position: 'absolute', top: '20px', left: 'calc(50% - 100px)', right: 'calc(50% - 100px)', height: '2px', backgroundColor: '#e2e8f0', zIndex: 0 }} />
 
@@ -301,7 +302,7 @@ export default function Register() {
                                 {/* Password strength UI */}
                                 <div style={{ backgroundColor: '#f8fafc', padding: '16px', borderRadius: '8px', marginBottom: '24px', border: '1px solid #e2e8f0' }}>
                                     <div style={{ width: '100%', height: '4px', backgroundColor: formData.password.length >= 6 ? '#22c55e' : '#e2e8f0', borderRadius: '2px', marginBottom: '12px', transition: 'background-color 0.3s' }} />
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#64748b' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#64748b', gap: '10px', flexWrap: 'wrap' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: formData.password.length >= 6 ? '#22c55e' : '#64748b' }}>
                                             <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: formData.password.length >= 6 ? '#22c55e' : '#64748b', transition: 'background-color 0.3s' }} /> 6+ characters
                                         </div>
@@ -312,7 +313,7 @@ export default function Register() {
                                             <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: /[a-z]/.test(formData.password) ? '#22c55e' : '#64748b', transition: 'background-color 0.3s' }} /> Lowercase
                                         </div>
                                     </div>
-                                    <div style={{ display: 'flex', gap: '24px', fontSize: '0.75rem', color: '#64748b', marginTop: '8px' }}>
+                                    <div style={{ display: 'flex', gap: '16px', fontSize: '0.75rem', color: '#64748b', marginTop: '8px', flexWrap: 'wrap' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: /[0-9]/.test(formData.password) ? '#22c55e' : '#64748b' }}>
                                             <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: /[0-9]/.test(formData.password) ? '#22c55e' : '#64748b', transition: 'background-color 0.3s' }} /> Number
                                         </div>
@@ -346,7 +347,7 @@ export default function Register() {
 
                                 <p style={{ color: '#475569', marginBottom: '24px' }}>We've sent a 6-digit verification code to<br /><strong>{formData.email || 'your@email.com'}</strong><br /><span style={{ fontSize: '0.85rem', color: '#64748b' }}>Check your inbox — it should arrive within a minute.</span></p>
 
-                                <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', marginBottom: '32px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginBottom: '24px', flexWrap: 'wrap' }}>
                                     {[0, 1, 2, 3, 4, 5].map(idx => (
                                         <input
                                             key={idx}
@@ -356,7 +357,7 @@ export default function Register() {
                                             value={formData.otp[idx]}
                                             onChange={(e) => handleOtpChange(idx, e)}
                                             onKeyDown={(e) => handleOtpKeyDown(idx, e)}
-                                            style={{ width: '48px', height: '56px', fontSize: '1.5rem', textAlign: 'center', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', transition: 'border-color 0.2s', boxSizing: 'border-box' }}
+                                            style={{ width: 'clamp(40px, 9vw, 48px)', height: '56px', fontSize: '1.5rem', textAlign: 'center', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', transition: 'border-color 0.2s', boxSizing: 'border-box' }}
                                             onFocus={e => e.target.style.borderColor = '#0ea5e9'}
                                             onBlur={e => e.target.style.borderColor = '#cbd5e1'}
                                         />

@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
+import { randomInt } from "node:crypto";
 import prisma from "@/lib/prisma";
-import { errorResponse, jsonResponse } from "@/lib/auth";
+import { errorResponse, jsonResponse, isAutomationRequest } from "@/lib/auth";
 import { sendOtpEmail } from "@/lib/email";
 
 export async function POST(req: NextRequest) {
@@ -17,7 +18,7 @@ export async function POST(req: NextRequest) {
         }
 
         // Generate a 6-digit OTP
-        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const otp = randomInt(100000, 1000000).toString();
 
         await prisma.userOtp.create({
             data: {
@@ -41,13 +42,12 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        return jsonResponse({ 
-            message: "Verification code sent to your email.", 
-            // In dev mode, return OTP for easy testing without working email
-            otp: process.env.NODE_ENV === 'development' ? otp : undefined 
+        return jsonResponse({
+            message: "Verification code sent to your email.",
+            otp: isAutomationRequest(req) ? otp : undefined
         });
     } catch (e: any) {
         console.error("REGISTER OTP ERROR:", e);
-        return errorResponse(e.message || "Internal server error", 500);
+        return errorResponse("Internal server error", 500);
     }
 }

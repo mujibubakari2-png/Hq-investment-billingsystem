@@ -82,12 +82,13 @@ else
     echo "ℹ️  WireGuard not installed — skipping VPN check (direct-connect routers will still work)"
 fi
 
-# ── 5. Run Prisma DB sync ────────────────────────────────────────────────────
-echo "🔧 Syncing database schema (prisma db push)..."
-if pnpm exec prisma db push --accept-data-loss; then
-    echo "✅ Schema sync successful"
+# ── 5. Apply Prisma migrations safely ────────────────────────────────────────
+echo "🔧 Applying database migrations (prisma migrate deploy)..."
+if pnpm exec prisma migrate deploy; then
+    echo "✅ Database migrations applied"
 else
-    echo "⚠️  Schema sync failed — continuing anyway (DB may already be up to date)"
+    echo "❌ Migration failed — refusing to start to avoid schema drift"
+    exit 1
 fi
 
 # ── 5. Seed database (only if empty) ─────────────────────────────────────────

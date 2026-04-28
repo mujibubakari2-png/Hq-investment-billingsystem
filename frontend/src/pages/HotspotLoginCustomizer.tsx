@@ -1084,7 +1084,7 @@ TROUBLESHOOTING:
                 )}
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: showPreview ? '1fr 400px' : '1fr', gap: 24 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: showPreview ? 'repeat(auto-fit, minmax(320px, 1fr))' : '1fr', gap: 24 }}>
                 {/* Left: Customization Options */}
                 <div>
                     <div className="card" style={{ padding: 24 }}>
@@ -1244,7 +1244,7 @@ TROUBLESHOOTING:
                         </div>
 
                         {/* Action buttons */}
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 24 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10, marginTop: 24 }}>
                             <button className="btn" onClick={handleSaveSettings} disabled={saving} style={{ background: saving ? '#818cf8' : '#4f46e5', color: '#fff', fontWeight: 600, padding: '10px 20px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
                                 {saving ? '⏳ Saving...' : '💾 Save Customization'}
                             </button>

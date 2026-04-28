@@ -9,11 +9,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         if (!userPayload) return errorResponse("Unauthorized", 401);
 
         const { id } = await params;
-        const service = await getMikroTikService(id, userPayload.tenantId);
+        const service = await getMikroTikService(id, userPayload.role === "SUPER_ADMIN" ? null : userPayload.tenantId);
         const users = await service.listHotspotUsers();
         return jsonResponse(users);
     } catch (err: any) {
-        return errorResponse(err.message || "Failed to list Hotspot users", 500);
+        return errorResponse("Failed to list Hotspot users", 500);
     }
 }
 
@@ -30,7 +30,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             return errorResponse("Username and password are required");
         }
 
-        const service = await getMikroTikService(id, userPayload.tenantId);
+        const service = await getMikroTikService(id, userPayload.role === "SUPER_ADMIN" ? null : userPayload.tenantId);
         const user = await service.createHotspotUser({
             name: body.name,
             password: body.password,
@@ -45,6 +45,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
         return jsonResponse(user, 201);
     } catch (err: any) {
-        return errorResponse(err.message || "Failed to create Hotspot user", 500);
+        return errorResponse("Failed to create Hotspot user", 500);
     }
 }

@@ -1,13 +1,21 @@
 import { NextRequest } from "next/server";
-import { jsonResponse } from "@/lib/auth";
+import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { MikroTikService } from "@/lib/mikrotik";
 
 
 export async function GET(req: NextRequest) {
+    if (process.env.NODE_ENV === "production") {
+        return errorResponse("Not found", 404);
+    }
+    const setupEnabled = process.env.ENABLE_TEST_MIKROTIK_LOGIC === "true";
+    const user = getUserFromRequest(req);
+    if (!setupEnabled || !user || user.role !== "SUPER_ADMIN") {
+        return errorResponse("Not found", 404);
+    }
+
+    const originalFetch = global.fetch;
     try {
         // Mock fetch globally for this request scope
-        const originalFetch = global.fetch;
-        
         (global as any).fetch = (url: string, options: any) => {
             if (url.includes("/rest/system/identity")) {
                 return Promise.resolve({
@@ -71,9 +79,9 @@ export async function GET(req: NextRequest) {
         });
 
     } catch (error: any) {
-        return jsonResponse({
-            success: false,
-            error: error.message
-        }, 500);
+        console.error("[TEST MIKROTIK LOGIC ERROR]:", error);
+        return errorResponse("Internal server error", 500);
+    } finally {
+        global.fetch = originalFetch;
     }
 }

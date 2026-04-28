@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
         if (!userPayload) return errorResponse("Unauthorized", 401);
 
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
-        const tenantFilter = { tenantId: userPayload.tenantId };
+        const tenantFilter: { tenantId?: string | null } = isSuperAdmin ? {} : { tenantId: userPayload.tenantId };
 
         // Super Admin can override tenant filter via query param
         const url = new URL(req.url);

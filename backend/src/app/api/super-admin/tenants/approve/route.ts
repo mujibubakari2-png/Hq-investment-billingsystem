@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { errorResponse, jsonResponse, getUserFromRequest } from "@/lib/auth";
-import nodemailer from "nodemailer";
+import { sendAccountApprovedNotifications } from "@/lib/accountNotifications";
 
 export async function POST(req: NextRequest) {
     try {
@@ -43,37 +43,12 @@ export async function POST(req: NextRequest) {
             }
         });
 
-        // Send approval email
-        try {
-            const transporter = nodemailer.createTransport({
-                host: process.env.SMTP_HOST || "smtp.ethereal.email",
-                port: Number(process.env.SMTP_PORT) || 587,
-                secure: process.env.SMTP_SECURE === "true",
-                auth: {
-                    user: process.env.SMTP_USER,
-                    pass: process.env.SMTP_PASS,
-                },
-            });
-
-            const mailOptions = {
-                from: process.env.SMTP_FROM || '"HQ INVESTMENT" <no-reply@hqinvestment.local>',
-                to: targetTenant.email,
-                subject: "Account Approved - Welcome to HQ INVESTMENT",
-                text: `Hello ${targetTenant.name},\n\nYour account has been approved. Your 10-day free trial starts now!\n\nYou can log in here: ${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:5173/'}`,
-                html: `<div style="font-family: sans-serif; padding: 20px;">
-                        <h2>Account Approved!</h2>
-                        <p>Hello <strong>${targetTenant.name}</strong>,</p>
-                        <p>Your account has been successfully reviewed and approved by our administration team.</p>
-                        <p>Your 10-day free trial has been activated and starts <strong>now</strong>.</p>
-                        <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:5173/'}" style="background-color: #1d4ed8; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin-top: 10px;">Log In to Dashboard</a>
-                       </div>`
-            };
-
-            await transporter.sendMail(mailOptions);
-            console.log("Approval email sent successfully to", targetTenant.email);
-        } catch (mailError) {
-            console.error("Failed to send approval email. Check SMTP settings:", mailError);
-        }
+        await sendAccountApprovedNotifications({
+            tenantId: updatedTenant.id,
+            tenantName: updatedTenant.name,
+            email: updatedTenant.email,
+            phone: updatedTenant.phone,
+        });
 
         return jsonResponse({
             message: "Tenant approved successfully! Their 10-day trial has begun.",

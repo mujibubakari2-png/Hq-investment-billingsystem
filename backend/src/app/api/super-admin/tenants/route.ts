@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { errorResponse, jsonResponse, getUserFromRequest } from "@/lib/auth";
+import { sendAccountApprovedNotifications } from "@/lib/accountNotifications";
 
 
 // GET /api/super-admin/tenants — list all tenants
@@ -76,6 +77,13 @@ export async function POST(req: NextRequest) {
             await prisma.tenant.update({
                 where: { id: tenantId },
                 data: { status: "TRIALLING", trialStart, trialEnd }
+            });
+
+            await sendAccountApprovedNotifications({
+                tenantId: tenant.id,
+                tenantName: tenant.name,
+                email: tenant.email,
+                phone: tenant.phone,
             });
 
             return jsonResponse({

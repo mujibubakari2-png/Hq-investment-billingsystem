@@ -105,7 +105,7 @@ export default function ExpenseTracking() {
                 </div>
             </div>
 
-            <div className="stat-cards" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+            <div className="stat-cards" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
                 <div className="stat-card blue">
                     <div className="stat-card-label">Total Expenses</div>
                     <div className="stat-card-value">{totalExpenses.toLocaleString()}</div>

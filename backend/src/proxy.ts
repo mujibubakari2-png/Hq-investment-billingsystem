@@ -1,23 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
 
-// In production, set CORS_ORIGIN to your frontend domain (e.g. "https://billing.hqinvestment.co.tz")
-const ALLOWED_ORIGIN = process.env.CORS_ORIGIN || "*";
+function getAllowedOrigins(): string[] {
+    const configured = process.env.CORS_ORIGIN || "";
+    return configured
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean);
+}
 
 export function proxy(request: NextRequest) {
-    const origin = request.headers.get("origin") || "*";
-    
-    // In production, you might want to restrict this to specific domains
-    // const ALLOWED_ORIGINS = ["https://hq-frontend.up.railway.app", "https://billing.hqinvestment.co.tz"];
-    // const isAllowed = ALLOWED_ORIGINS.includes(origin) || ALLOWED_ORIGIN === "*";
-    const isAllowed = true; // For now, allow all to resolve connectivity issues
-    const corsOrigin = isAllowed ? origin : ALLOWED_ORIGIN;
+    const origin = request.headers.get("origin");
+    const allowedOrigins = getAllowedOrigins();
+    const isAllowedOrigin = !!origin && allowedOrigins.includes(origin);
 
     // Handle preflight requests
     if (request.method === "OPTIONS") {
+        if (!isAllowedOrigin) {
+            return new NextResponse(null, { status: 403 });
+        }
         return new NextResponse(null, {
             status: 204, // 204 No Content is standard for OPTIONS
             headers: {
-                "Access-Control-Allow-Origin": corsOrigin,
+                "Access-Control-Allow-Origin": origin,
                 "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
                 "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With, Accept",
                 "Access-Control-Max-Age": "86400",
@@ -27,10 +31,12 @@ export function proxy(request: NextRequest) {
     }
 
     const response = NextResponse.next();
-    response.headers.set("Access-Control-Allow-Origin", corsOrigin);
-    response.headers.set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH");
-    response.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Accept");
-    response.headers.set("Access-Control-Allow-Credentials", "true");
+    if (isAllowedOrigin && origin) {
+        response.headers.set("Access-Control-Allow-Origin", origin);
+        response.headers.set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH");
+        response.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Accept");
+        response.headers.set("Access-Control-Allow-Credentials", "true");
+    }
 
     return response;
 }

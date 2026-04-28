@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
         if (!userPayload) return errorResponse("Unauthorized", 401);
 
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
-        const tenantFilter = { tenantId: userPayload.tenantId };
+        const tenantFilter = isSuperAdmin ? {} : { tenantId: userPayload.tenantId };
 
         const { searchParams } = new URL(req.url);
         const search = searchParams.get("search")?.toLowerCase() || "";
@@ -31,7 +31,6 @@ export async function GET(req: NextRequest) {
             host: r.host,
             ip: r.host, // Alias
             username: r.username,
-            password: r.password,
             port: r.port,
             apiPort: r.apiPort,
             type: r.type,
@@ -69,7 +68,7 @@ export async function GET(req: NextRequest) {
         return jsonResponse(mapped);
     } catch (e: any) {
         console.error("[ROUTER GET ERROR]:", e);
-        return errorResponse(`Failed to fetch routers: ${e.message || "Internal server error"}`, 500);
+        return errorResponse("Failed to fetch routers", 500);
     }
 }
 
@@ -175,6 +174,6 @@ export async function POST(req: NextRequest) {
         }, 201);
     } catch (e: any) {
         console.error("[ROUTER CREATE ERROR]:", e);
-        return errorResponse(`Failed to create router: ${e.message || "Internal server error"}`, 500);
+        return errorResponse("Failed to create router", 500);
     }
 }

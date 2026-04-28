@@ -52,7 +52,7 @@ export default function SendBulkMessage() {
                 </button>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 20 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20 }}>
                 {/* Left: Compose Form */}
                 <div>
                     <div className="card" style={{ padding: 24 }}>

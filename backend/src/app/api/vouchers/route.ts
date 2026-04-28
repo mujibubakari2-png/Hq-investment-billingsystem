@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
         if (!userPayload) return errorResponse("Unauthorized", 401);
 
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
-        const tenantFilter = { tenantId: userPayload.tenantId };
+        const tenantFilter = isSuperAdmin ? {} : { tenantId: userPayload.tenantId };
         
         const { searchParams } = new URL(req.url);
         const status = searchParams.get("status") || "";
@@ -122,6 +122,6 @@ export async function POST(req: NextRequest) {
         return jsonResponse(voucher, 201);
     } catch (e: any) {
         console.error("VOUCHER POST ERROR:", e);
-        return errorResponse(`Internal server error: ${e.message}`, 500);
+        return errorResponse("Internal server error", 500);
     }
 }

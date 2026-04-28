@@ -13,7 +13,7 @@ export default function Footer() {
             <p className="text-blue-100 leading-relaxed">
               Trusted by hundreds of ISPs across East Africa. We simplify billing so you can focus on connecting more customers.
             </p>
-            <div className="flex space-x-4">
+            <div className="flex flex-wrap gap-3">
               <Link href="#" className="p-2 bg-accent rounded-lg hover:bg-secondary transition-colors"><Facebook size={20} /></Link>
               <Link href="#" className="p-2 bg-accent rounded-lg hover:bg-secondary transition-colors"><Twitter size={20} /></Link>
               <Link href="#" className="p-2 bg-accent rounded-lg hover:bg-secondary transition-colors"><Instagram size={20} /></Link>
@@ -55,7 +55,7 @@ export default function Footer() {
             </ul>
           </div>
         </div>
-        <div className="border-t border-accent pt-8 flex flex-col md:flex-row justify-between items-center text-blue-100 text-sm">
+        <div className="border-t border-accent pt-8 flex flex-col md:flex-row justify-between items-center text-blue-100 text-sm gap-3">
           <p>© {currentYear} HQInvestment Billing. All rights reserved.</p>
           <div className="flex space-x-6 mt-4 md:mt-0">
             <Link href="#" className="hover:text-white transition-colors">Privacy Policy</Link>

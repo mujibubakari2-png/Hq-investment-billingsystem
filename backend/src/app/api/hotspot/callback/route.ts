@@ -16,6 +16,20 @@ import { getMikroTikService } from "@/lib/mikrotik";
  */
 export async function POST(req: NextRequest) {
     try {
+        const webhookSecret =
+            process.env.HOTSPOT_WEBHOOK_SECRET ||
+            process.env.ZENOPAY_WEBHOOK_SECRET ||
+            process.env.HARAKAPAY_WEBHOOK_SECRET ||
+            process.env.MPESA_WEBHOOK_SECRET ||
+            process.env.PAYMENT_WEBHOOK_SECRET;
+        if (!webhookSecret) {
+            return errorResponse("Webhook secret is not configured", 500);
+        }
+        const providedSecret = req.headers.get("x-webhook-secret");
+        if (providedSecret !== webhookSecret) {
+            return errorResponse("Unauthorized webhook", 401);
+        }
+
         const body = await req.json();
 
         // Standard payment callback fields
@@ -27,6 +41,9 @@ export async function POST(req: NextRequest) {
             ResultDesc,
             PhoneNumber,
         } = body;
+        if (!AccountReference) {
+            return errorResponse("Missing payment reference", 400);
+        }
 
         console.log("📥 Hotspot payment callback:", { AccountReference, TransactionId, ResultCode, ResultDesc });
 

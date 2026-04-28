@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { randomUUID } from "node:crypto";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 import { getMikroTikService } from "@/lib/mikrotik";
@@ -127,7 +128,7 @@ export async function POST(req: NextRequest) {
         }
 
         // Generate a unique transaction reference
-        const reference = `HP-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+        const reference = `HP-${randomUUID().replace(/-/g, "").slice(0, 20).toUpperCase()}`;
 
         // Create a PENDING transaction
         const transaction = await prisma.transaction.create({

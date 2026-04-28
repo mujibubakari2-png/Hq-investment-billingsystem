@@ -5,8 +5,22 @@ import { jsonResponse, errorResponse, hashPassword } from "@/lib/auth";
 
 export async function GET(req: NextRequest) {
     try {
-        const email = "superadmin@hqinvestment.co.tz";
-        const password = "hq-admin-2026";
+        if (process.env.NODE_ENV === "production") {
+            return errorResponse("Not found", 404);
+        }
+        const setupEnabled = process.env.ENABLE_SUPER_ADMIN_SETUP === "true";
+        const setupKey = process.env.SUPER_ADMIN_SETUP_KEY;
+        const providedKey = req.headers.get("x-setup-key");
+        if (!setupEnabled || !setupKey || providedKey !== setupKey) {
+            return errorResponse("Not found", 404);
+        }
+
+        const email = process.env.SUPER_ADMIN_EMAIL;
+        const password = process.env.SUPER_ADMIN_PASSWORD;
+        if (!email || !password) {
+            return errorResponse("Server setup is incomplete", 500);
+        }
+
         const hashedPassword = await hashPassword(password);
         
         await prisma.user.upsert({
@@ -28,9 +42,10 @@ export async function GET(req: NextRequest) {
         });
         
         return jsonResponse({
-            message: `User ${email} is now SUPER_ADMIN with password ${password}`
+            message: `User ${email} is now SUPER_ADMIN`
         });
     } catch (error: any) {
-        return errorResponse(error.message || "Error resetting user", 500);
+        console.error("[FORCE RESET ERROR]:", error);
+        return errorResponse("Error resetting user", 500);
     }
 }

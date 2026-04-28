@@ -1,7 +1,8 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
-import { errorResponse, jsonResponse, hashPassword, signToken } from "@/lib/auth";
+import { errorResponse, jsonResponse, hashPassword, signToken, isAutomationRequest } from "@/lib/auth";
 import { checkRateLimit, getClientIp } from "@/lib/rateLimiter";
+import { sendAccountCreatedNotifications } from "@/lib/accountNotifications";
 
 export async function POST(req: NextRequest) {
     // Rate limit: 10 registrations per 30 minutes per IP
@@ -86,10 +87,8 @@ export async function POST(req: NextRequest) {
             return errorResponse("User already exists with this email", 409);
         }
 
-        // Automation bypass — ONLY active in development/test environments, never in production
-        const isProduction = process.env.NODE_ENV === "production";
-        const automationKey = process.env.AUTOMATION_KEY;
-        const isAutomation = !isProduction && (req.headers.get("x-automation-key") === automationKey || req.headers.get("x-api-key") === automationKey) && automationKey !== undefined;
+        // Automation bypass for CI/test tooling in development/test environments only.
+        const isAutomation = isAutomationRequest(req);
 
         if (isAutomation) {
             const hashedPassword = await hashPassword(password);
@@ -214,6 +213,13 @@ export async function POST(req: NextRequest) {
             username: result.user.username,
             role: result.user.role,
             tenantId: result.tenant.id,
+        });
+
+        await sendAccountCreatedNotifications({
+            tenantId: result.tenant.id,
+            tenantName: result.tenant.name,
+            email: result.tenant.email,
+            phone: result.tenant.phone,
         });
 
         return jsonResponse({
