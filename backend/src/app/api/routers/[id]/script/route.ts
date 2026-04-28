@@ -40,9 +40,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
 # 3. Create Management User (if not exists)
 :if ([:len [/user find name="admin"]] = 0) do={
-    /user add name="admin" password="${router.password || 'admin'}" group=full comment="HQInvestment Admin"
+    /user add name="admin" password="${router.password || ''}" group=full comment="HQInvestment Admin"
 } else={
-    /user set [find name="admin"] password="${router.password || 'admin'}" group=full
+    /user set [find name="admin"] password="${router.password || ''}" group=full
 }
 
 # 4. DNS and NTP (Critical for handshakes)
