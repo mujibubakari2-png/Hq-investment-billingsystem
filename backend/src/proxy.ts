@@ -10,11 +10,26 @@ function getAllowedOrigins(): string[] {
 
 export function proxy(request: NextRequest) {
     const origin = request.headers.get("origin");
+    const pathname = new URL(request.url).pathname;
     const allowedOrigins = getAllowedOrigins();
     const isAllowedOrigin = !!origin && allowedOrigins.includes(origin);
+    const isPublicHotspotApi = pathname.startsWith("/api/hotspot/");
 
     // Handle preflight requests
     if (request.method === "OPTIONS") {
+        // Public hotspot endpoints are called from the MikroTik captive portal origin (router IP).
+        // Allow cross-origin requests without credentials.
+        if (isPublicHotspotApi) {
+            return new NextResponse(null, {
+                status: 204,
+                headers: {
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+                    "Access-Control-Allow-Headers": "Content-Type, X-Requested-With, Accept",
+                    "Access-Control-Max-Age": "86400",
+                },
+            });
+        }
         if (!isAllowedOrigin) {
             return new NextResponse(null, { status: 403 });
         }
@@ -31,6 +46,12 @@ export function proxy(request: NextRequest) {
     }
 
     const response = NextResponse.next();
+    if (isPublicHotspotApi) {
+        response.headers.set("Access-Control-Allow-Origin", "*");
+        response.headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+        response.headers.set("Access-Control-Allow-Headers", "Content-Type, X-Requested-With, Accept");
+        return response;
+    }
     if (isAllowedOrigin && origin) {
         response.headers.set("Access-Control-Allow-Origin", origin);
         response.headers.set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH");

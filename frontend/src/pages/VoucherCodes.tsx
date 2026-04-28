@@ -73,6 +73,10 @@ export default function VoucherCodes() {
             fetchVouchers();
         } catch (err) {
             console.error('Failed to generate vouchers', err);
+            const message =
+                err instanceof Error ? err.message : 'Failed to generate vouchers. Please check router/package selection and try again.';
+            alert(message);
+            throw err;
         }
     };
 

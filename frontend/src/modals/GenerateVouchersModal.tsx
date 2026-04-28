@@ -8,7 +8,7 @@ import type { Package, Router } from '../types';
 
 interface GenerateVouchersModalProps {
     onClose: () => void;
-    onGenerate?: (data: VoucherConfig) => void;
+    onGenerate?: (data: VoucherConfig) => Promise<void>;
 }
 
 interface VoucherConfig {
@@ -36,6 +36,7 @@ export default function GenerateVouchersModal({ onClose, onGenerate }: GenerateV
     const [smsPhone, setSmsPhone] = useState('');
     const [sendSms, setSendSms] = useState(false);
     const [showAdvanced, setShowAdvanced] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
     const [routersList, setRoutersList] = useState<Router[]>([]);
     const [packagesList, setPackagesList] = useState<Package[]>([]);
 
@@ -50,12 +51,13 @@ export default function GenerateVouchersModal({ onClose, onGenerate }: GenerateV
         (!routerId || p.router === selectedRouter?.name)
     );
 
-    const handleGenerate = () => {
+    const handleGenerate = async () => {
         if (!packageId || !routerId) {
             setError('Router and Package are required');
             return;
         }
         setError(null);
+        setSubmitting(true);
 
         let currentUserId = undefined;
         try {
@@ -67,13 +69,31 @@ export default function GenerateVouchersModal({ onClose, onGenerate }: GenerateV
             // Ignore parsing errors
         }
 
-        if (onGenerate) {
-            onGenerate({
-                packageType, routerId, packageId, count, codeLength, codeFormat, prefix, smsPhone, sendSms,
+        if (!onGenerate) {
+            setError("Voucher generation handler is not configured.");
+            setSubmitting(false);
+            return;
+        }
+
+        try {
+            await onGenerate({
+                packageType,
+                routerId,
+                packageId,
+                count,
+                codeLength,
+                codeFormat,
+                prefix,
+                smsPhone,
+                sendSms,
                 createdById: currentUserId
             } as VoucherConfig);
+            onClose();
+        } catch (e: any) {
+            setError(e?.message || "Failed to generate vouchers. Please try again.");
+        } finally {
+            setSubmitting(false);
         }
-        onClose();
     };
 
     return (
@@ -232,9 +252,9 @@ export default function GenerateVouchersModal({ onClose, onGenerate }: GenerateV
                             className="btn btn-primary"
                             id="generate-vouchers-btn"
                             onClick={handleGenerate}
-                            disabled={!packageId || !routerId}
+                            disabled={!packageId || !routerId || submitting}
                         >
-                            <ConfirmationNumberIcon fontSize="small" /> Generate Vouchers
+                            <ConfirmationNumberIcon fontSize="small" /> {submitting ? 'Generating...' : 'Generate Vouchers'}
                         </button>
                     </div>
                 </div>
