@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
             console.error(`[AUTH] Failed to send password reset OTP to ${email}:`, emailResult.error);
             
             return errorResponse(
-                `Email error: ${emailResult.error}. Please check your SMTP settings in Railway.`, 
+                `Email error: ${emailResult.error}. Please check your SMTP settings in your .env file.`, 
                 500
             );
         }

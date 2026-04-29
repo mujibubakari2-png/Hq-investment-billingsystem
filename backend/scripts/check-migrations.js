@@ -6,7 +6,7 @@ import { Pool } from "pg";
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
     console.error("❌ DATABASE_URL environment variable is not set");
-    console.error("   Please set DATABASE_URL in your Railway dashboard");
+    console.error("   Please set DATABASE_URL in your .env file");
     console.error("   Format: postgresql://user:password@host:port/database");
     process.exit(1);
 }
@@ -60,7 +60,7 @@ async function checkMigrations() {
         } else {
             console.error(`❌ NO TABLES FOUND in 'public' schema!`);
             console.error(`   This means 'prisma db push' or 'prisma migrate deploy' did not run successfully.`);
-            console.error(`   Please check your Railway build/deploy logs.`);
+            console.error(`   Please check your build/deploy logs.`);
             process.exit(1);
         }
 
@@ -124,14 +124,14 @@ async function checkMigrations() {
         } else if (err.message.includes('relation') && err.message.includes('does not exist')) {
             console.error(`   - Tables not created yet`);
             console.error(`   - Migrations failed to run`);
-            console.error(`   - Check Railway logs for 'npx prisma migrate deploy' errors`);
+            console.error(`   - Check deployment logs for 'npx prisma migrate deploy' errors`);
         }
 
         console.error(`\n💡 To fix this issue:`);
-        console.error(`   1. Check Railway backend service logs`);
+        console.error(`   1. Check your backend service logs`);
         console.error(`   2. Look for migration errors during deploy phase`);
-        console.error(`   3. Verify DATABASE_URL is set correctly`);
-        console.error(`   4. Try redeploying the service`);
+        console.error(`   3. Verify DATABASE_URL is set correctly in .env`);
+        console.error(`   4. Try restarting the service`);
 
         process.exit(1);
     } finally {

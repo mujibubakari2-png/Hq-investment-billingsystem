@@ -2,7 +2,7 @@
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Kenge ISP Billing — DigitalOcean Droplet Start Script
-# Replaces railway-start.sh for Droplet deployments
+# Primary start script for Droplet deployments
 # ─────────────────────────────────────────────────────────────────────────────
 
 set -e  # Exit immediately on error

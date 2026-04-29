@@ -36,7 +36,7 @@ const swaggerOptions = {
                 description: 'Development server',
             },
             {
-                url: 'https://backend-name.railway.app',
+                url: 'https://api.yourdomain.com',
                 description: 'Production server',
             },
         ],

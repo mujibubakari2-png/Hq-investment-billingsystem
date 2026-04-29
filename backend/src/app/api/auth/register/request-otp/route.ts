@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
             
             // Return the specific SMTP error to help the user fix their config
             return errorResponse(
-                `Email error: ${emailResult.error}. Please check your SMTP settings in Railway.`, 
+                `Email error: ${emailResult.error}. Please check your SMTP settings in your .env file.`, 
                 500
             );
         }

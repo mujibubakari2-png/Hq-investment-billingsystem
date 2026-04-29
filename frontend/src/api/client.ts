@@ -1,7 +1,7 @@
 // ── Central API client for the ISP Billing System ──────────────────────────
 
 // In dev: VITE_API_URL is unset so BASE = '/api' (Vite dev proxy forwards to localhost:3001).
-// In prod: VITE_API_URL = 'https://backend-name.railway.app' so calls go directly to the API.
+// In prod: VITE_API_URL = 'https://api.yourdomain.com' so calls go directly to the API.
 const API_URL = (import.meta.env.VITE_API_URL as string) ?? '';
 // Remove trailing slash if present to avoid double slashes
 export const CLEAN_API_URL = API_URL.endsWith('/') ? API_URL.slice(0, -1) : API_URL;

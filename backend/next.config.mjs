@@ -1,7 +1,7 @@
 // CORS is handled by src/proxy.ts (the single source of truth).
 // Do not add CORS headers here to avoid conflicting/duplicate headers.
 const nextConfig = {
-    // Build optimizations for Railway deployment
+    // Build optimizations for production deployment
     // Reduce bundle size and build time
     compiler: {
         removeConsole: process.env.NODE_ENV === "production",

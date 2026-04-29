@@ -1235,7 +1235,7 @@ TROUBLESHOOTING:
                                     className="form-input" 
                                     value={backendUrl} 
                                     onChange={e => setBackendUrl(e.target.value)} 
-                                    placeholder="https://your-backend.railway.app"
+                                    placeholder="https://api.yourdomain.com"
                                 />
                                 <div className="form-hint" style={{ fontSize: '0.72rem', marginTop: 4 }}>
                                     The public URL of this billing system backend. Used for payments and voucher redemption.

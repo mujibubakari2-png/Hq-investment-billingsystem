@@ -17,7 +17,7 @@ function getJwtSecret(): string {
         const secret = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET;
         if (!secret) {
             // Use fallback for build time or CI environments
-            if (isNextBuild() || process.env.RAILWAY_PROJECT_ID || process.env.CI || process.env.VERCEL || process.env.NETLIFY) {
+            if (isNextBuild() || process.env.CI || process.env.VERCEL || process.env.NETLIFY) {
                 jwtSecret = "build-time-fallback-secret-please-set-JWT_SECRET";
                 console.warn("WARNING: Using fallback JWT_SECRET/NEXTAUTH_SECRET for build/CI environment. Ensure JWT_SECRET is set in production!");
                 return jwtSecret;

@@ -8,7 +8,7 @@ const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
     throw new Error(
         "DATABASE_URL environment variable is not set. " +
-        "Please set it in your Railway dashboard or .env file.\n" +
+        "Please set it in your .env file.\n" +
         "Format: postgresql://user:password@host:port/database"
     );
 }
@@ -21,7 +21,7 @@ let adapter: PrismaPg;
 try {
     const isProduction = process.env.NODE_ENV === "production";
 
-    // Production: Adjust pool size for Railway (smaller to conserve resources)
+    // Production: Adjust pool size for optimal performance
     // Development: Use smaller pool
     const maxConnections = isProduction ? 5 : 5;
     const idleTimeoutMillis = isProduction ? 30000 : 10000;

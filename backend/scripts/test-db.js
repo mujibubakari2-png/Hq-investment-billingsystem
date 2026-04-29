@@ -6,7 +6,7 @@ import { Pool } from "pg";
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
     console.error("❌ DATABASE_URL environment variable is not set");
-    console.error("   Please set DATABASE_URL in your Railway dashboard");
+    console.error("   Please set DATABASE_URL in your .env file");
     console.error("   Format: postgresql://user:password@host:port/database");
     process.exit(1);
 }
