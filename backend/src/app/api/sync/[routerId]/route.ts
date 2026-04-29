@@ -3,9 +3,9 @@ import prisma from "../../../../lib/prisma";
 
 export async function GET(
     request: Request,
-    { params }: { params: { routerId: string } }
+    context: { params: Promise<{ routerId: string }> }
 ) {
-    const { routerId } = params;
+    const { routerId } = await context.params;
 
     console.log(`[SYNC] Sync request received for router: ${routerId}`);
 
