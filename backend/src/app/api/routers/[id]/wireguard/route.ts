@@ -536,170 +536,170 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                     { chain: "input", "in-interface": "bridge-lan", protocol: "tcp", "dst-port": "80,443", action: "accept", comment: "Allow Hotspot HTTP/HTTPS - Kenge" },
                     { chain: "input", "in-interface": "bridge-lan", protocol: "udp", "dst-port": "67", action: "accept", comment: "Allow Hotspot DHCP - Kenge" },
                     { chain: "input", "in-interface": "bridge-lan", protocol: "udp", "dst-port": "53", action: "accept", comment: "Allow Hotspot DNS - Kenge" },
-                    { chain: "forward", "in-interface": "bridge-lan", out- interface: "ether1", action: "accept", comment: "Allow Hotspot to Internet - Kenge" },
-            { chain: "forward", "in-interface": "ether1", out - interface: "bridge-lan", "connection-state": "established,related", action: "accept", comment: "Allow Internet to Hotspot - Kenge" },
-            { chain: "forward", "in-interface": "wg-kenge", action: "accept", comment: "Allow WG traffic - Kenge" },
-            { chain: "forward", "out-interface": "wg-kenge", action: "accept", comment: "Allow WG return - Kenge" }
+                    { chain: "forward", "in-interface": "bridge-lan", "out-interface": "ether1", action: "accept", comment: "Allow Hotspot to Internet - Kenge" },
+                    { chain: "forward", "in-interface": "ether1", "out-interface": "bridge-lan", "connection-state": "established,related", action: "accept", comment: "Allow Internet to Hotspot - Kenge" },
+                    { chain: "forward", "in-interface": "wg-kenge", action: "accept", comment: "Allow WG traffic - Kenge" },
+                    { chain: "forward", "out-interface": "wg-kenge", action: "accept", comment: "Allow WG return - Kenge" }
                 ];
 
-            for (const rule of firewallRules) {
+                for (const rule of firewallRules) {
+                    try {
+                        await service.apiRequestPublic("/ip/firewall/filter", "PUT", rule);
+                    } catch (e: any) { console.warn("FW note:", e.message); }
+                }
+
+                // ──────────────────────────────────────────────────────────
+                // STEP 5: NAT (FIXED CONFLICT! - ONLY ETHER1!)
+                // ──────────────────────────────────────────────────────────
+                console.log("[PUSH-CONFIG] Setting up NAT...");
+
                 try {
-                    await service.apiRequestPublic("/ip/firewall/filter", "PUT", rule);
-                } catch (e: any) { console.warn("FW note:", e.message); }
-            }
+                    await service.apiRequestPublic("/ip/firewall/nat", "PUT", {
+                        chain: "srcnat", "out-interface": "ether1",
+                        action: "masquerade", comment: "NAT for Internet - Kenge", "place-before": "0"
+                    });
+                } catch (e: any) { console.warn("NAT note:", e.message); }
 
-            // ──────────────────────────────────────────────────────────
-            // STEP 5: NAT (FIXED CONFLICT! - ONLY ETHER1!)
-            // ──────────────────────────────────────────────────────────
-            console.log("[PUSH-CONFIG] Setting up NAT...");
+                // ──────────────────────────────────────────────────────────
+                // STEP 6: ROUTE
+                // ──────────────────────────────────────────────────────────
+                try {
+                    await service.apiRequestPublic("/ip/route", "PUT", {
+                        "dst-address": `${subnetPrefix}.0/24`, gateway: "wg-kenge",
+                        comment: "WireGuard route - Kenge"
+                    });
+                } catch (e: any) { console.warn("Route note:", e.message); }
 
-            try {
-                await service.apiRequestPublic("/ip/firewall/nat", "PUT", {
-                    chain: "srcnat", "out-interface": "ether1",
-                    action: "masquerade", comment: "NAT for Internet - Kenge", "place-before": "0"
+                // Add peer to the Server's WireGuard interface
+                try {
+                    await wireguardManager.addPeer(router.wgPublicKey, tunnelIp);
+                } catch (e: any) {
+                    console.error("Failed to add peer to wg0:", e.message);
+                }
+
+                // Verification Step: Wait for tunnel to establish, then check real handshake
+                await new Promise(resolve => setTimeout(resolve, 5000));
+                const tunnelVerified = await wireguardManager.checkPeerHandshake(router.wgPublicKey);
+
+                // Update router state
+                const updateData: Record<string, any> = {
+                    wgEnabled: true,
+                    wgConfiguredAt: new Date(),
+                };
+                // Only switch host to tunnel IP if the MikroTik actually connected back
+                if (tunnelVerified) {
+                    updateData.host = tunnelIp;
+                } else {
+                    console.warn(`[WireGuard] Peer ${tunnelIp} has not completed handshake yet. Keeping current host IP.`);
+                }
+                await updateRouterWgFields(id, updateData);
+
+                await prisma.routerLog.create({
+                    data: {
+                        routerId: id,
+                        action: "wireguard_pushed",
+                        details: `WireGuard config auto-pushed to ${router.name}.${tunnelVerified ? ` Connection switched to tunnel IP ${tunnelIp}.` : " Tunnel verification failed - keeping current host."}`,
+                        status: "success",
+                    },
                 });
-            } catch (e: any) { console.warn("NAT note:", e.message); }
 
-            // ──────────────────────────────────────────────────────────
-            // STEP 6: ROUTE
-            // ──────────────────────────────────────────────────────────
-            try {
-                await service.apiRequestPublic("/ip/route", "PUT", {
-                    "dst-address": `${subnetPrefix}.0/24`, gateway: "wg-kenge",
-                    comment: "WireGuard route - Kenge"
+                return jsonResponse({
+                    success: true,
+                    message: tunnelVerified
+                        ? `WireGuard configured and assumed reachable on ${router.name}. Tunnel IP: ${tunnelIp}.`
+                        : `WireGuard configured on ${router.name}, but tunnel verification failed. Keeping original host IP for now.`,
+                    tunnelVerified,
                 });
-            } catch (e: any) { console.warn("Route note:", e.message); }
 
-            // Add peer to the Server's WireGuard interface
-            try {
-                await wireguardManager.addPeer(router.wgPublicKey, tunnelIp);
-            } catch (e: any) {
-                console.error("Failed to add peer to wg0:", e.message);
+            } catch (err: any) {
+                await prisma.routerLog.create({
+                    data: {
+                        routerId: id,
+                        action: "wireguard_push_failed",
+                        details: `Failed to push WireGuard config: ${err.message}`,
+                        status: "error",
+                    },
+                });
+                return jsonResponse({
+                    success: false,
+                    message: "Failed to auto-configure. Ensure the router is reachable and try manual setup.",
+                }, 200);
             }
-
-            // Verification Step: Wait for tunnel to establish, then check real handshake
-            await new Promise(resolve => setTimeout(resolve, 5000));
-            const tunnelVerified = await wireguardManager.checkPeerHandshake(router.wgPublicKey);
-
-            // Update router state
-            const updateData: Record<string, any> = {
-                wgEnabled: true,
-                wgConfiguredAt: new Date(),
-            };
-            // Only switch host to tunnel IP if the MikroTik actually connected back
-            if (tunnelVerified) {
-                updateData.host = tunnelIp;
-            } else {
-                console.warn(`[WireGuard] Peer ${tunnelIp} has not completed handshake yet. Keeping current host IP.`);
-            }
-            await updateRouterWgFields(id, updateData);
-
-            await prisma.routerLog.create({
-                data: {
-                    routerId: id,
-                    action: "wireguard_pushed",
-                    details: `WireGuard config auto-pushed to ${router.name}.${tunnelVerified ? ` Connection switched to tunnel IP ${tunnelIp}.` : " Tunnel verification failed - keeping current host."}`,
-                    status: "success",
-                },
-            });
-
-            return jsonResponse({
-                success: true,
-                message: tunnelVerified
-                    ? `WireGuard configured and assumed reachable on ${router.name}. Tunnel IP: ${tunnelIp}.`
-                    : `WireGuard configured on ${router.name}, but tunnel verification failed. Keeping original host IP for now.`,
-                tunnelVerified,
-            });
-
-        } catch (err: any) {
-            await prisma.routerLog.create({
-                data: {
-                    routerId: id,
-                    action: "wireguard_push_failed",
-                    details: `Failed to push WireGuard config: ${err.message}`,
-                    status: "error",
-                },
-            });
-            return jsonResponse({
-                success: false,
-                message: "Failed to auto-configure. Ensure the router is reachable and try manual setup.",
-            }, 200);
         }
-    }
 
         // Default: manual activate (user pasted the script on MikroTik)
         try {
-        // Aggressive Cleanup: Remove any peer that is not actively registered in the DB
-        const allValidRouters = await prisma.router.findMany({
-            where: { wgPublicKey: { not: null } },
-            select: { wgPublicKey: true }
-        });
-        const validKeys = new Set(allValidRouters.map(r => r.wgPublicKey));
+            // Aggressive Cleanup: Remove any peer that is not actively registered in the DB
+            const allValidRouters = await prisma.router.findMany({
+                where: { wgPublicKey: { not: null } },
+                select: { wgPublicKey: true }
+            });
+            const validKeys = new Set(allValidRouters.map(r => r.wgPublicKey));
 
-        const allPeers = await wireguardManager.listPeers();
-        for (const peer of allPeers) {
-            // Keep the current router being activated
-            if (peer.publicKey === router.wgPublicKey) continue;
+            const allPeers = await wireguardManager.listPeers();
+            for (const peer of allPeers) {
+                // Keep the current router being activated
+                if (peer.publicKey === router.wgPublicKey) continue;
 
-            // If peer is not in the database, OR it has lost its allowed IP, destroy it
-            if (!validKeys.has(peer.publicKey) || peer.allowedIps === "(none)") {
-                await wireguardManager.removePeer(peer.publicKey);
+                // If peer is not in the database, OR it has lost its allowed IP, destroy it
+                if (!validKeys.has(peer.publicKey) || peer.allowedIps === "(none)") {
+                    await wireguardManager.removePeer(peer.publicKey);
+                }
             }
-        }
 
-        await wireguardManager.addPeer(router.wgPublicKey, tunnelIp);
-    } catch (err: any) {
-        console.error("Failed to add peer:", err);
-        return errorResponse("Failed to add peer to server", 500);
-    }
-
-    // Wait a few seconds for MikroTik to complete the WireGuard handshake
-    await new Promise(resolve => setTimeout(resolve, 8000));
-    const peerConnected = await wireguardManager.checkPeerHandshake(router.wgPublicKey);
-
-    const activateData: Record<string, any> = {
-        wgEnabled: true,
-        wgConfiguredAt: new Date(),
-    };
-
-    let pingResult = "Ping not attempted";
-    let responseMessage: string;
-
-    if (peerConnected) {
-        // Only switch host to tunnel IP once tunnel is actually confirmed
-        activateData.host = tunnelIp;
-        try {
-            const { stdout } = await execAsync(`ping -c 3 -W 3 ${tunnelIp}`);
-            pingResult = stdout;
+            await wireguardManager.addPeer(router.wgPublicKey, tunnelIp);
         } catch (err: any) {
-            pingResult = err.message || "Ping failed";
+            console.error("Failed to add peer:", err);
+            return errorResponse("Failed to add peer to server", 500);
         }
-        responseMessage = `WireGuard tunnel established! Router is now accessible via tunnel IP ${tunnelIp}. Ping result:\n${pingResult.substring(0, 150)}`;
-        console.log(`[WireGuard] Activate: peer ${tunnelIp} connected. Switching host to tunnel IP.`);
-    } else {
-        // Handshake not confirmed — keep original host to preserve connectivity
-        console.warn(`[WireGuard] Activate: peer ${tunnelIp} has NOT completed a WireGuard handshake. Keeping original host IP to preserve connectivity.`);
-        responseMessage = `WireGuard peer registered on server, but MikroTik has NOT connected yet (no handshake).\n\nTo fix:\n1. Verify the config was pasted correctly on MikroTik.\n2. Check UDP port ${listenPort} is open on MikroTik (firewall rule must be above any DROP rule).\n3. Run on Droplet: sudo wg show wg0\n4. Once the MikroTik peer appears with a handshake, click Activate again.`;
+
+        // Wait a few seconds for MikroTik to complete the WireGuard handshake
+        await new Promise(resolve => setTimeout(resolve, 8000));
+        const peerConnected = await wireguardManager.checkPeerHandshake(router.wgPublicKey);
+
+        const activateData: Record<string, any> = {
+            wgEnabled: true,
+            wgConfiguredAt: new Date(),
+        };
+
+        let pingResult = "Ping not attempted";
+        let responseMessage: string;
+
+        if (peerConnected) {
+            // Only switch host to tunnel IP once tunnel is actually confirmed
+            activateData.host = tunnelIp;
+            try {
+                const { stdout } = await execAsync(`ping -c 3 -W 3 ${tunnelIp}`);
+                pingResult = stdout;
+            } catch (err: any) {
+                pingResult = err.message || "Ping failed";
+            }
+            responseMessage = `WireGuard tunnel established! Router is now accessible via tunnel IP ${tunnelIp}. Ping result:\n${pingResult.substring(0, 150)}`;
+            console.log(`[WireGuard] Activate: peer ${tunnelIp} connected. Switching host to tunnel IP.`);
+        } else {
+            // Handshake not confirmed — keep original host to preserve connectivity
+            console.warn(`[WireGuard] Activate: peer ${tunnelIp} has NOT completed a WireGuard handshake. Keeping original host IP to preserve connectivity.`);
+            responseMessage = `WireGuard peer registered on server, but MikroTik has NOT connected yet (no handshake).\n\nTo fix:\n1. Verify the config was pasted correctly on MikroTik.\n2. Check UDP port ${listenPort} is open on MikroTik (firewall rule must be above any DROP rule).\n3. Run on Droplet: sudo wg show wg0\n4. Once the MikroTik peer appears with a handshake, click Activate again.`;
+        }
+
+        await updateRouterWgFields(id, activateData);
+
+        await prisma.routerLog.create({
+            data: {
+                routerId: id,
+                action: "wireguard_activated",
+                details: `WireGuard activation for ${router.name}. Tunnel ${peerConnected ? 'verified — host switched to ' + tunnelIp : 'NOT yet connected — original host preserved'}.`,
+                status: "success",
+            },
+        });
+
+        return jsonResponse({
+            success: peerConnected,
+            tunnelVerified: peerConnected,
+            message: responseMessage,
+        });
+    } catch (err: any) {
+        console.error("WireGuard activate error:", err);
+        return errorResponse("Failed to activate WireGuard", 500);
     }
-
-    await updateRouterWgFields(id, activateData);
-
-    await prisma.routerLog.create({
-        data: {
-            routerId: id,
-            action: "wireguard_activated",
-            details: `WireGuard activation for ${router.name}. Tunnel ${peerConnected ? 'verified — host switched to ' + tunnelIp : 'NOT yet connected — original host preserved'}.`,
-            status: "success",
-        },
-    });
-
-    return jsonResponse({
-        success: peerConnected,
-        tunnelVerified: peerConnected,
-        message: responseMessage,
-    });
-} catch (err: any) {
-    console.error("WireGuard activate error:", err);
-    return errorResponse("Failed to activate WireGuard", 500);
-}
 }
