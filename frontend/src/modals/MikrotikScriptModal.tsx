@@ -14,7 +14,26 @@ interface MikrotikScriptModalProps {
 export default function MikrotikScriptModal({ router, onClose }: MikrotikScriptModalProps) {
     const [copied, setCopied] = useState(false);
 
-    const routerIdCode = `MYR-${router.id.padStart(3, '0')}VBHBC`;
+    // Sanitize router name for use in RouterOS scripts (remove special chars that could break scripts)
+    const sanitizeForScript = (name: string): string => {
+        return name.replace(/[^a-zA-Z0-9_-]/g, '-').replace(/-+/g, '-').toLowerCase();
+    };
+
+    // Generate router ID code - handle both numeric IDs and UUIDs
+    const generateRouterIdCode = (id: string): string => {
+        // If it's a numeric ID, pad it; if it's a UUID, use first 8 chars
+        const numericId = parseInt(id, 10);
+        if (!isNaN(numericId)) {
+            return `MYR-${String(numericId).padStart(3, '0')}VBHBC`;
+        }
+        // For UUIDs or other formats, extract alphanumeric prefix
+        const prefix = id.replace(/[^a-zA-Z0-9]/g, '').substring(0, 8).toUpperCase();
+        return `MYR-${prefix}VBHBC`;
+    };
+
+    const routerIdCode = generateRouterIdCode(router.id);
+    const safeRouterName = sanitizeForScript(router.name);
+    const displayRouterName = router.name.replace(/"/g, '\\"'); // Escape quotes for display
 
     const mikrotikScript = `# ═══════════════════════════════════════════════════════════════
 # HQINVESTMENT ISP Billing - MikroTik Auto-Configuration Script
@@ -24,51 +43,51 @@ export default function MikrotikScriptModal({ router, onClose }: MikrotikScriptM
 # ═══════════════════════════════════════════════════════════════
 
 # ── 1. System Identity ────────────────────────────────────────
-/system identity set name="${router.name}"
+/system identity set name="${displayRouterName}"
 
 # ── 2. Hotspot Server Setup ───────────────────────────────────
-:if ([:len [/ip hotspot profile find name="hsprof-${router.name}"]] = 0) do={
-    /ip hotspot profile add name="hsprof-${router.name}" hotspot-address=192.168.88.1 dns-name="${router.name.toLowerCase().replace(/\s+/g, '-')}.hotspot" \\
+:if ([:len [/ip hotspot profile find name="hsprof-${safeRouterName}"]] = 0) do={
+    /ip hotspot profile add name="hsprof-${safeRouterName}" hotspot-address=10.116.0.2 dns-name="${safeRouterName}.hotspot" \\
         html-directory=hotspot login-by=http-chap,http-pap,cookie,mac-cookie \\
         http-cookie-lifetime=3d
 }
 
-:if ([:len [/ip pool find name="hs-pool-${router.name}"]] = 0) do={
-    /ip pool add name="hs-pool-${router.name}" ranges=192.168.88.2-192.168.88.254
+:if ([:len [/ip pool find name="hs-pool-${safeRouterName}"]] = 0) do={
+    /ip pool add name="hs-pool-${safeRouterName}" ranges=10.116.0.3-10.116.0.254
 }
 
-:if ([:len [/ip hotspot find name="hotspot-${router.name}"]] = 0) do={
-    /ip hotspot add name="hotspot-${router.name}" interface=ether2 address-pool="hs-pool-${router.name}" \\
-        profile="hsprof-${router.name}" disabled=no
+:if ([:len [/ip hotspot find name="hotspot-${safeRouterName}"]] = 0) do={
+    /ip hotspot add name="hotspot-${safeRouterName}" interface=ether2 address-pool="hs-pool-${safeRouterName}" \\
+        profile="hsprof-${safeRouterName}" disabled=no
 }
 
 # Ensure ALL existing hotspots use this new profile so the login page works everywhere
-/ip hotspot set [find] profile="hsprof-${router.name}"
+/ip hotspot set [find] profile="hsprof-${safeRouterName}"
 
 # ── 3. PPPoE Server Setup ─────────────────────────────────────
-:if ([:len [/ip pool find name="pppoe-pool-${router.name}"]] = 0) do={
-    /ip pool add name="pppoe-pool-${router.name}" ranges=10.10.10.2-10.10.10.254
+:if ([:len [/ip pool find name="pppoe-pool-${safeRouterName}"]] = 0) do={
+    /ip pool add name="pppoe-pool-${safeRouterName}" ranges=10.116.0.3-10.116.0.254
 }
 
-:if ([:len [/ppp profile find name="pppoe-profile-${router.name}"]] = 0) do={
-    /ppp profile add name="pppoe-profile-${router.name}" local-address=10.10.10.1 remote-address="pppoe-pool-${router.name}" dns-server=8.8.8.8,1.1.1.1 use-encryption=yes
+:if ([:len [/ppp profile find name="pppoe-profile-${safeRouterName}"]] = 0) do={
+    /ppp profile add name="pppoe-profile-${safeRouterName}" local-address=10.116.0.2 remote-address="pppoe-pool-${safeRouterName}" dns-server=8.8.8.8,1.1.1.1 use-encryption=yes
 }
 
-:if ([:len [/interface pppoe-server server find service-name="pppoe-svc-${router.name}"]] = 0) do={
-    /interface pppoe-server server add service-name="pppoe-svc-${router.name}" interface=ether1 default-profile="pppoe-profile-${router.name}" disabled=no
+:if ([:len [/interface pppoe-server server find service-name="pppoe-svc-${safeRouterName}"]] = 0) do={
+    /interface pppoe-server server add service-name="pppoe-svc-${safeRouterName}" interface=ether1 default-profile="pppoe-profile-${safeRouterName}" disabled=no
 }
 
 # ── 4. DHCP Server ───────────────────────────────────────────
-:if ([:len [/ip address find address="192.168.88.1/24"]] = 0) do={
-    /ip address add address=192.168.88.1/24 interface=ether2
+:if ([:len [/ip address find address="10.116.0.2/24"]] = 0) do={
+    /ip address add address=10.116.0.2/24 interface=ether2
 }
 
-:if ([:len [/ip dhcp-server network find address="192.168.88.0/24"]] = 0) do={
-    /ip dhcp-server network add address=192.168.88.0/24 gateway=192.168.88.1 dns-server=192.168.88.1
+:if ([:len [/ip dhcp-server network find address="10.116.0.0/24"]] = 0) do={
+    /ip dhcp-server network add address=10.116.0.0/24 gateway=10.116.0.2 dns-server=10.116.0.2
 }
 
-:if ([:len [/ip dhcp-server find name="dhcp-${router.name}"]] = 0) do={
-    /ip dhcp-server add name="dhcp-${router.name}" interface=ether2 address-pool="hs-pool-${router.name}" disabled=no
+:if ([:len [/ip dhcp-server find name="dhcp-${safeRouterName}"]] = 0) do={
+    /ip dhcp-server add name="dhcp-${safeRouterName}" interface=ether2 address-pool="hs-pool-${safeRouterName}" disabled=no
 }
 
 # ── 4. NAT (Masquerade) ──────────────────────────────────────
@@ -93,8 +112,8 @@ add chain=input action=drop comment="Drop all other input"
 add service=hotspot,ppp address=${window.location.hostname} secret=hqinvestment-radius-secret \\
     authentication-port=1812 accounting-port=1813
 
-/ip hotspot profile set "hsprof-${router.name}" use-radius=yes radius-accounting=yes
-/ppp profile set "pppoe-profile-${router.name}" use-radius=yes
+/ip hotspot profile set "hsprof-${safeRouterName}" use-radius=yes radius-accounting=yes
+/ppp profile set "pppoe-profile-${safeRouterName}" use-radius=yes
 
 # ── 9. Walled Garden (Allow billing portal) ──────────────────
 /ip hotspot walled-garden

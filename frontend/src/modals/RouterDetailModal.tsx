@@ -37,13 +37,13 @@ export default function RouterDetailModal({ router, onClose, onDelete }: RouterD
 
 # ── 2. Hotspot Server Setup ───────────────────────────────────
 :if ([:len [/ip hotspot profile find name="hsprof-${router.name}"]] = 0) do={
-    /ip hotspot profile add name="hsprof-${router.name}" hotspot-address=192.168.88.1 dns-name="${router.name.toLowerCase().replace(/\s+/g, '-')}.hotspot" \\
+    /ip hotspot profile add name="hsprof-${router.name}" hotspot-address=10.116.0.2 dns-name="${router.name.toLowerCase().replace(/\s+/g, '-')}.hotspot" \\
         html-directory=hotspot login-by=http-chap,http-pap,cookie,mac-cookie \\
         http-cookie-lifetime=3d
 }
 
 :if ([:len [/ip pool find name="hs-pool-${router.name}"]] = 0) do={
-    /ip pool add name="hs-pool-${router.name}" ranges=192.168.88.2-192.168.88.254
+    /ip pool add name="hs-pool-${router.name}" ranges=10.116.0.3-10.116.0.254
 }
 
 :if ([:len [/ip hotspot find name="hotspot-${router.name}"]] = 0) do={
@@ -56,11 +56,11 @@ export default function RouterDetailModal({ router, onClose, onDelete }: RouterD
 
 # ── 3. PPPoE Server Setup ─────────────────────────────────────
 :if ([:len [/ip pool find name="pppoe-pool-${router.name}"]] = 0) do={
-    /ip pool add name="pppoe-pool-${router.name}" ranges=10.10.10.2-10.10.10.254
+    /ip pool add name="pppoe-pool-${router.name}" ranges=10.116.0.3-10.116.0.254
 }
 
 :if ([:len [/ppp profile find name="pppoe-profile-${router.name}"]] = 0) do={
-    /ppp profile add name="pppoe-profile-${router.name}" local-address=10.10.10.1 remote-address="pppoe-pool-${router.name}" dns-server=8.8.8.8,1.1.1.1 use-encryption=yes
+    /ppp profile add name="pppoe-profile-${router.name}" local-address=10.116.0.2 remote-address="pppoe-pool-${router.name}" dns-server=8.8.8.8,1.1.1.1 use-encryption=yes
 }
 
 :if ([:len [/interface pppoe-server server find service-name="pppoe-svc-${router.name}"]] = 0) do={
@@ -68,12 +68,12 @@ export default function RouterDetailModal({ router, onClose, onDelete }: RouterD
 }
 
 # ── 4. DHCP Server ───────────────────────────────────────────
-:if ([:len [/ip address find address="192.168.88.1/24"]] = 0) do={
-    /ip address add address=192.168.88.1/24 interface=ether2
+:if ([:len [/ip address find address="10.116.0.2/24"]] = 0) do={
+    /ip address add address=10.116.0.2/24 interface=ether2
 }
 
-:if ([:len [/ip dhcp-server network find address="192.168.88.0/24"]] = 0) do={
-    /ip dhcp-server network add address=192.168.88.0/24 gateway=192.168.88.1 dns-server=8.8.8.8,1.1.1.1
+:if ([:len [/ip dhcp-server network find address="10.116.0.0/24"]] = 0) do={
+    /ip dhcp-server network add address=10.116.0.0/24 gateway=10.116.0.2 dns-server=8.8.8.8,1.1.1.1
 }
 
 :if ([:len [/ip dhcp-server find name="dhcp-${router.name}"]] = 0) do={

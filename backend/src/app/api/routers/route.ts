@@ -117,7 +117,7 @@ export async function POST(req: NextRequest) {
 
         const existing = await prisma.router.findFirst({ where: { name, ...tenantFilter } });
         const isDev = process.env.NODE_ENV !== "production";
-        
+
         if (existing && !isDev) {
             return errorResponse(`Router with name "${name}" already exists in your tenant`);
         }
@@ -142,7 +142,7 @@ export async function POST(req: NextRequest) {
         if (body.wgServerEndpoint !== undefined) routerData.wgServerEndpoint = body.wgServerEndpoint;
         if (body.wgListenPort) routerData.wgListenPort = parseInt(body.wgListenPort.toString());
 
-        const router = existing 
+        const router = existing
             ? await prisma.router.update({ where: { id: existing.id }, data: routerData })
             : await prisma.router.create({ data: routerData });
 

@@ -71,6 +71,39 @@ export interface RouterSystemInfo {
     architecture: string;
 }
 
+// ── Input Validation Helpers ─────────────────────────────────────────────
+
+const USERNAME_REGEX = /^[a-zA-Z0-9_.-]+$/;
+const MAX_USERNAME_LENGTH = 50;
+const MAX_PASSWORD_LENGTH = 100;
+const MAX_COMMENT_LENGTH = 255;
+
+function validateUsername(username: string): void {
+    if (!username || username.trim().length === 0) {
+        throw new Error("Username is required");
+    }
+    if (username.length > MAX_USERNAME_LENGTH) {
+        throw new Error(`Username must not exceed ${MAX_USERNAME_LENGTH} characters`);
+    }
+    if (!USERNAME_REGEX.test(username)) {
+        throw new Error("Username can only contain letters, numbers, underscores, dots, and hyphens");
+    }
+}
+
+function validatePassword(password: string): void {
+    if (!password || password.length === 0) {
+        throw new Error("Password is required");
+    }
+    if (password.length > MAX_PASSWORD_LENGTH) {
+        throw new Error(`Password must not exceed ${MAX_PASSWORD_LENGTH} characters`);
+    }
+}
+
+function sanitizeComment(comment: string): string {
+    // Remove any characters that could break RouterOS scripts
+    return comment.replace(/[;|&$`\{}[\]]/g, "").substring(0, MAX_COMMENT_LENGTH);
+}
+
 // ── MikroTik API Service Class ──────────────────────────────────────────────
 
 export class MikroTikService {
@@ -112,7 +145,10 @@ export class MikroTikService {
                 signal: controller.signal,
             };
             // If using HTTPS and insecure flag is set, allow self‑signed certificates
+            // SECURITY WARNING: Only enable MIKROTIK_INSECURE in development or isolated networks.
+            // Disabling certificate verification makes connections vulnerable to MITM attacks.
             if (this.baseUrl.startsWith('https') && process.env.MIKROTIK_INSECURE === 'true') {
+                console.warn(`[SECURITY WARNING] MIKROTIK_INSECURE is enabled for ${this.conn.host}. Certificate verification is disabled. This should only be used in development or isolated network environments.`);
                 const https = require('https');
                 fetchOptions.agent = new https.Agent({ rejectUnauthorized: false });
             }
@@ -126,11 +162,11 @@ export class MikroTikService {
                 if (this.baseUrl.startsWith('https')) {
                     clearTimeout(timeout);
                     const httpUrl = url.replace('https://', 'http://');
-                    
+
                     // Create a fresh controller for the fallback attempt
                     const fallbackController = new AbortController();
                     const fallbackTimeout = setTimeout(() => fallbackController.abort(), timeoutMs);
-                    
+
                     const fallbackOptions = {
                         ...fetchOptions,
                         signal: fallbackController.signal
@@ -289,7 +325,7 @@ export class MikroTikService {
             return (users || []).map((u: any) => ({
                 id: u[".id"],
                 name: u.name,
-                password: u.password || "***",
+                password: "***",
                 service: u.service || "pppoe",
                 profile: u.profile || "default",
                 disabled: u.disabled === "true" || u.disabled === true,
@@ -310,7 +346,7 @@ export class MikroTikService {
             return {
                 id: u[".id"],
                 name: u.name,
-                password: u.password || "***",
+                password: "***",
                 service: u.service || "pppoe",
                 profile: u.profile || "default",
                 disabled: u.disabled === "true" || u.disabled === true,
@@ -324,13 +360,16 @@ export class MikroTikService {
 
     async createPPPoEUser(user: Omit<PPPoEUser, "id">): Promise<PPPoEUser> {
         try {
+            validateUsername(user.name);
+            validatePassword(user.password);
+
             const result = await this.apiRequest("/ppp/secret", "PUT", {
                 name: user.name,
                 password: user.password,
                 service: user.service || "pppoe",
                 profile: user.profile || "default",
                 disabled: user.disabled ? "true" : "false",
-                comment: user.comment || `Managed by HQInvestment ISP Billing`,
+                comment: sanitizeComment(user.comment || `Managed by HQInvestment ISP Billing`),
             });
 
             await this.log("create_pppoe_user", `Created PPPoE user: ${user.name}`, "success", user.name);
@@ -387,7 +426,7 @@ export class MikroTikService {
             return (users || []).map((u: any) => ({
                 id: u[".id"],
                 name: u.name,
-                password: u.password || "***",
+                password: "***",
                 profile: u.profile || "default",
                 server: u.server || "all",
                 disabled: u.disabled === "true" || u.disabled === true,
@@ -410,7 +449,7 @@ export class MikroTikService {
             return {
                 id: u[".id"],
                 name: u.name,
-                password: u.password || "***",
+                password: "***",
                 profile: u.profile || "default",
                 server: u.server || "all",
                 disabled: u.disabled === "true" || u.disabled === true,
@@ -427,13 +466,16 @@ export class MikroTikService {
 
     async createHotspotUser(user: Omit<HotspotUser, "id">): Promise<HotspotUser> {
         try {
+            validateUsername(user.name);
+            validatePassword(user.password);
+
             const payload: any = {
                 name: user.name,
                 password: user.password,
                 profile: user.profile || "default",
                 server: user.server || "all",
                 disabled: user.disabled ? "true" : "false",
-                comment: user.comment || `Managed by HQInvestment ISP Billing`,
+                comment: sanitizeComment(user.comment || `Managed by HQInvestment ISP Billing`),
             };
             if (user.macAddress) payload["mac-address"] = user.macAddress;
             if (user.limitUptime) payload["limit-uptime"] = user.limitUptime;
@@ -817,7 +859,7 @@ export class MikroTikService {
             // Find the peer by public key or comment
             const peers = await this.apiRequest("/interface/wireguard/peers");
             const peer = (peers || []).find((p: any) => p["public-key"] === publicKeyOrComment || p.comment === publicKeyOrComment);
-            
+
             if (peer?.[".id"]) {
                 await this.apiRequest(`/interface/wireguard/peers/${peer[".id"]}`, "DELETE");
                 await this.log("delete_wg_peer", `Deleted WireGuard peer: ${publicKeyOrComment}`, "success");

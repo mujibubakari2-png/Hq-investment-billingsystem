@@ -53,26 +53,26 @@ export default function AddRouterModal({ onClose, onSave, initialData }: AddRout
     };
 
     return (
-        <div className="modal-overlay" onClick={onClose} style={{ 
-            display: 'flex', alignItems: 'center', justifyContent: 'center', 
+        <div className="modal-overlay" onClick={onClose} style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
             zIndex: 1100, backdropFilter: 'blur(4px)', background: 'var(--bg-modal-overlay)'
         }}>
-            <div className="modal" style={{ 
+            <div className="modal" style={{
                 maxWidth: 600, width: '95%', maxHeight: '92vh', overflow: 'auto',
                 borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-lg)',
                 background: 'var(--bg-card)', border: '1px solid var(--border)',
                 backdropFilter: 'var(--glass-blur)',
                 display: 'flex', flexDirection: 'column'
             }} onClick={e => e.stopPropagation()}>
-                
+
                 {/* Header */}
                 <div style={{
                     padding: '24px 28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                     borderBottom: '1px solid var(--border-light)', background: 'transparent'
                 }}>
                     <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, letterSpacing: '-0.02em' }}>Add Router</h2>
-                    <button onClick={onClose} style={{ 
-                        background: 'var(--bg-hover)', border: 'none', borderRadius: '50%', 
+                    <button onClick={onClose} style={{
+                        background: 'var(--bg-hover)', border: 'none', borderRadius: '50%',
                         width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center',
                         cursor: 'pointer', color: 'var(--text-secondary)', transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
                     }}>
@@ -93,16 +93,16 @@ export default function AddRouterModal({ onClose, onSave, initialData }: AddRout
                                 placeholder="Enter access code"
                                 value={accessCode}
                                 onChange={e => setAccessCode(e.target.value)}
-                                style={{ 
-                                    paddingRight: 50, height: 52, fontSize: '1rem', 
+                                style={{
+                                    paddingRight: 50, height: 52, fontSize: '1rem',
                                     background: 'var(--bg-input)', border: '1.5px solid var(--border)',
                                     borderRadius: 'var(--radius-sm)', transition: 'all 0.2s'
                                 }}
                             />
                             <button
                                 type="button"
-                                style={{ 
-                                    position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', 
+                                style={{
+                                    position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
                                     border: 'none', background: 'var(--bg-hover)', borderRadius: 8,
                                     padding: '6px 10px', cursor: 'pointer', color: 'var(--text-secondary)',
                                     display: 'flex', alignItems: 'center', transition: 'all 0.2s'
@@ -128,8 +128,8 @@ export default function AddRouterModal({ onClose, onSave, initialData }: AddRout
                             placeholder="e.g., Router-Branch-01"
                             value={routerName}
                             onChange={e => setRouterName(e.target.value)}
-                            style={{ 
-                                height: 52, fontSize: '1rem', 
+                            style={{
+                                height: 52, fontSize: '1rem',
                                 background: 'var(--bg-input)', border: '1.5px solid var(--border)',
                                 borderRadius: 'var(--radius-sm)', transition: 'all 0.2s'
                             }}
@@ -146,7 +146,7 @@ export default function AddRouterModal({ onClose, onSave, initialData }: AddRout
                         </label>
 
                         {/* Hybrid Mode Selection */}
-                        <div 
+                        <div
                             onClick={() => setVpnMode('hybrid')}
                             style={{
                                 border: vpnMode === 'hybrid' ? '2px solid var(--primary)' : '1.5px solid var(--border)',
@@ -158,23 +158,23 @@ export default function AddRouterModal({ onClose, onSave, initialData }: AddRout
                             }}
                         >
                             <div style={{ position: 'absolute', top: 20, left: 20 }}>
-                                <div style={{ 
-                                    width: 20, height: 20, borderRadius: '50%', 
+                                <div style={{
+                                    width: 20, height: 20, borderRadius: '50%',
                                     border: vpnMode === 'hybrid' ? `6px solid var(--primary)` : '2.5px solid var(--border)',
                                     background: '#fff', transition: 'all 0.3s'
                                 }} />
                             </div>
                             <div style={{ paddingLeft: 36 }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
-                                    <div style={{ 
-                                        width: 36, height: 36, borderRadius: 10, background: 'var(--secondary-light)', 
-                                        display: 'flex', alignItems: 'center', justifyContent: 'center' 
+                                    <div style={{
+                                        width: 36, height: 36, borderRadius: 10, background: 'var(--secondary-light)',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center'
                                     }}>
                                         <AddTaskIcon style={{ color: 'var(--secondary)', fontSize: 20 }} />
                                     </div>
                                     <strong style={{ fontSize: '1.05rem', color: 'var(--text-primary)' }}>Hybrid Mode</strong>
-                                    <span style={{ 
-                                        background: 'var(--secondary)', color: '#fff', padding: '3px 12px', 
+                                    <span style={{
+                                        background: 'var(--secondary)', color: '#fff', padding: '3px 12px',
                                         borderRadius: 20, fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px'
                                     }}>Recommended</span>
                                 </div>
@@ -186,7 +186,7 @@ export default function AddRouterModal({ onClose, onSave, initialData }: AddRout
                                         <CheckIcon style={{ fontSize: 16, color: 'var(--secondary)' }} /> <span>OpenVPN: Management tunnel with port forwarding (Winbox/WebFig)</span>
                                     </li>
                                 </ul>
-                                <div style={{ 
+                                <div style={{
                                     marginTop: 12, display: 'inline-flex', alignItems: 'center', gap: 6,
                                     background: 'var(--secondary-light)', color: 'var(--secondary)', padding: '4px 12px', borderRadius: 8,
                                     fontSize: '0.75rem', fontWeight: 700, border: '1px solid var(--border-light)'
@@ -199,7 +199,7 @@ export default function AddRouterModal({ onClose, onSave, initialData }: AddRout
                         {/* Split Options */}
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                             {/* WireGuard Only */}
-                            <div 
+                            <div
                                 onClick={() => setVpnMode('wireguard')}
                                 style={{
                                     border: vpnMode === 'wireguard' ? '2px solid var(--primary)' : '1.5px solid var(--border)',
@@ -210,8 +210,8 @@ export default function AddRouterModal({ onClose, onSave, initialData }: AddRout
                                 }}
                             >
                                 <div style={{ position: 'absolute', top: 18, left: 18 }}>
-                                    <div style={{ 
-                                        width: 18, height: 18, borderRadius: '50%', 
+                                    <div style={{
+                                        width: 18, height: 18, borderRadius: '50%',
                                         border: vpnMode === 'wireguard' ? `5px solid var(--primary)` : '2.5px solid var(--border)',
                                         background: '#fff'
                                     }} />
@@ -222,13 +222,13 @@ export default function AddRouterModal({ onClose, onSave, initialData }: AddRout
                                         <strong style={{ fontSize: '0.95rem', color: 'var(--text-primary)' }}>WireGuard Only</strong>
                                     </div>
                                     <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-                                        Fast & modern protocol<br/>Lightweight VPN<br/>Direct IP access
+                                        Fast & modern protocol<br />Lightweight VPN<br />Direct IP access
                                     </div>
                                 </div>
                             </div>
 
                             {/* OpenVPN Only */}
-                            <div 
+                            <div
                                 onClick={() => setVpnMode('openvpn')}
                                 style={{
                                     border: vpnMode === 'openvpn' ? '2px solid var(--primary)' : '1.5px solid var(--border)',
@@ -239,8 +239,8 @@ export default function AddRouterModal({ onClose, onSave, initialData }: AddRout
                                 }}
                             >
                                 <div style={{ position: 'absolute', top: 18, left: 18 }}>
-                                    <div style={{ 
-                                        width: 18, height: 18, borderRadius: '50%', 
+                                    <div style={{
+                                        width: 18, height: 18, borderRadius: '50%',
                                         border: vpnMode === 'openvpn' ? `5px solid var(--primary)` : '2.5px solid var(--border)',
                                         background: '#fff'
                                     }} />
@@ -251,14 +251,14 @@ export default function AddRouterModal({ onClose, onSave, initialData }: AddRout
                                         <strong style={{ fontSize: '0.95rem', color: 'var(--text-primary)' }}>OpenVPN Only</strong>
                                     </div>
                                     <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-                                        Traditional VPN<br/>Port forwarding<br/>Wide compatibility
+                                        Traditional VPN<br />Port forwarding<br />Wide compatibility
                                     </div>
                                 </div>
                             </div>
                         </div>
 
                         {/* Hybrid Info Banner */}
-                        <div style={{ 
+                        <div style={{
                             marginTop: 20, padding: 16, borderRadius: 12, background: 'var(--info-light)',
                             border: '1px solid var(--border-light)', display: 'flex', alignItems: 'flex-start', gap: 10,
                             animation: 'fadeIn 0.3s ease-out'
@@ -266,11 +266,11 @@ export default function AddRouterModal({ onClose, onSave, initialData }: AddRout
                             <InfoOutlinedIcon style={{ color: 'var(--info)', fontSize: 20, marginTop: 1 }} />
                             <div style={{ fontSize: '0.82rem', color: 'var(--info)', lineHeight: 1.6, fontWeight: 500 }}>
                                 <strong>{vpnMode === 'hybrid' ? 'Hybrid Mode' : vpnMode === 'wireguard' ? 'WireGuard' : 'OpenVPN'}:</strong> {
-                                    vpnMode === 'hybrid' 
-                                    ? 'Uses WireGuard for customer traffic and OpenVPN for management access. Optimal performance with convenient remote management.'
-                                    : vpnMode === 'wireguard'
-                                    ? 'Best for high-speed connectivity and lower resource usage. Modern and efficient.'
-                                    : 'Best for compatibility and easy management features across any network.'
+                                    vpnMode === 'hybrid'
+                                        ? 'Uses WireGuard for customer traffic and OpenVPN for management access. Optimal performance with convenient remote management.'
+                                        : vpnMode === 'wireguard'
+                                            ? 'Best for high-speed connectivity and lower resource usage. Modern and efficient.'
+                                            : 'Best for compatibility and easy management features across any network.'
                                 }
                             </div>
                         </div>
@@ -287,8 +287,8 @@ export default function AddRouterModal({ onClose, onSave, initialData }: AddRout
                             rows={3}
                             value={description}
                             onChange={e => setDescription(e.target.value)}
-                            style={{ 
-                                padding: 14, resize: 'none', background: 'var(--bg-input)', 
+                            style={{
+                                padding: 14, resize: 'none', background: 'var(--bg-input)',
                                 border: '1.5px solid var(--border)', borderRadius: 'var(--radius-sm)',
                                 fontSize: '0.95rem'
                             }}
@@ -297,11 +297,11 @@ export default function AddRouterModal({ onClose, onSave, initialData }: AddRout
 
                     {/* Advanced Settings Toggle */}
                     <div style={{ marginBottom: 20 }}>
-                        <button 
-                            type="button" 
+                        <button
+                            type="button"
                             onClick={() => setShowAdvanced(!showAdvanced)}
-                            style={{ 
-                                background: 'transparent', border: 'none', color: 'var(--primary)', 
+                            style={{
+                                background: 'transparent', border: 'none', color: 'var(--primary)',
                                 fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer',
                                 display: 'flex', alignItems: 'center', gap: 6, padding: 0
                             }}
@@ -310,8 +310,8 @@ export default function AddRouterModal({ onClose, onSave, initialData }: AddRout
                         </button>
 
                         {showAdvanced && (
-                            <div style={{ 
-                                marginTop: 16, padding: 20, background: 'var(--bg-input)', 
+                            <div style={{
+                                marginTop: 16, padding: 20, background: 'var(--bg-input)',
                                 border: '1.5px solid var(--border)', borderRadius: 'var(--radius)',
                                 animation: 'fadeIn 0.3s ease-out'
                             }}>
@@ -323,7 +323,7 @@ export default function AddRouterModal({ onClose, onSave, initialData }: AddRout
                                         <input
                                             type="text"
                                             className="form-input"
-                                            placeholder="e.g., 192.168.88.1"
+                                            placeholder="e.g., 10.116.0.2"
                                             value={host}
                                             onChange={e => setHost(e.target.value)}
                                             style={{ height: 44, fontSize: '0.9rem' }}
@@ -375,12 +375,12 @@ export default function AddRouterModal({ onClose, onSave, initialData }: AddRout
                             <PowerSettingsNewIcon style={{ fontSize: 18, color: 'var(--primary)' }} /> Initial Status
                         </label>
                         <div style={{ display: 'flex', gap: 32 }}>
-                            <div 
+                            <div
                                 onClick={() => setStatus('Online')}
                                 style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', transition: 'all 0.2s' }}
                             >
-                                <div style={{ 
-                                    width: 20, height: 20, borderRadius: '50%', 
+                                <div style={{
+                                    width: 20, height: 20, borderRadius: '50%',
                                     border: status === 'Online' ? `6px solid var(--secondary)` : '2.5px solid var(--border)',
                                     background: '#fff', transition: 'all 0.2s'
                                 }} />
@@ -388,12 +388,12 @@ export default function AddRouterModal({ onClose, onSave, initialData }: AddRout
                                     <CheckIcon style={{ fontSize: 18, color: 'var(--secondary)' }} /> Enable
                                 </span>
                             </div>
-                            <div 
+                            <div
                                 onClick={() => setStatus('Offline')}
                                 style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', transition: 'all 0.2s' }}
                             >
-                                <div style={{ 
-                                    width: 20, height: 20, borderRadius: '50%', 
+                                <div style={{
+                                    width: 20, height: 20, borderRadius: '50%',
                                     border: status === 'Offline' ? `6px solid var(--danger)` : '2.5px solid var(--border)',
                                     background: '#fff', transition: 'all 0.2s'
                                 }} />
@@ -405,7 +405,7 @@ export default function AddRouterModal({ onClose, onSave, initialData }: AddRout
                     </div>
 
                     {/* Note Box */}
-                    <div style={{ 
+                    <div style={{
                         background: 'var(--warning-light)', border: '1px solid var(--border-light)', borderRadius: 'var(--radius)',
                         padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 12,
                         boxShadow: 'inset 0 0 10px rgba(0,0,0,0.02)'
@@ -418,22 +418,22 @@ export default function AddRouterModal({ onClose, onSave, initialData }: AddRout
                 </div>
 
                 {/* Footer */}
-                <div style={{ 
+                <div style={{
                     padding: '24px 28px', background: 'var(--bg-hover)', borderTop: '1px solid var(--border-light)',
                     display: 'flex', justifyContent: 'flex-end', gap: 16
                 }}>
-                    <button 
-                        className="btn btn-secondary" 
+                    <button
+                        className="btn btn-secondary"
                         onClick={onClose}
                         style={{ background: 'var(--bg-card)', padding: '0 28px', height: 48, borderRadius: 'var(--radius-sm)' }}
                     >
                         ✕ Cancel
                     </button>
-                    <button 
-                        className="btn btn-primary" 
+                    <button
+                        className="btn btn-primary"
                         onClick={handleSave}
-                        style={{ 
-                            padding: '0 32px', height: 48, 
+                        style={{
+                            padding: '0 32px', height: 48,
                             fontWeight: 800, borderRadius: 'var(--radius-sm)',
                             display: 'flex', alignItems: 'center', gap: 10,
                             boxShadow: '0 10px 15px -3px rgba(79, 70, 229, 0.4)'

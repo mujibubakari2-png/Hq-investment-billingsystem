@@ -149,13 +149,13 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
     const [ipsecSecret, setIpsecSecret] = useState('MyISPVpnKey2024!');
 
     // PPPoE & Hotspot IP Settings
-    const [pppoeLocalAddress, setPppoeLocalAddress] = useState('10.10.10.1');
-    const [pppoePoolStart, setPppoePoolStart] = useState('10.10.10.2');
-    const [pppoePoolEnd, setPppoePoolEnd] = useState('10.10.10.254');
-    
-    const [hotspotLocalAddress, setHotspotLocalAddress] = useState('192.168.88.1');
-    const [hotspotPoolStart, setHotspotPoolStart] = useState('192.168.88.2');
-    const [hotspotPoolEnd, setHotspotPoolEnd] = useState('192.168.88.254');
+    const [pppoeLocalAddress, setPppoeLocalAddress] = useState('10.116.0.2');
+    const [pppoePoolStart, setPppoePoolStart] = useState('10.116.0.3');
+    const [pppoePoolEnd, setPppoePoolEnd] = useState('10.116.0.254');
+
+    const [hotspotLocalAddress, setHotspotLocalAddress] = useState('10.116.0.2');
+    const [hotspotPoolStart, setHotspotPoolStart] = useState('10.116.0.3');
+    const [hotspotPoolEnd, setHotspotPoolEnd] = useState('10.116.0.254');
 
     const [radiusAddress, setRadiusAddress] = useState(window.location.hostname || '127.0.0.1');
     const [radiusSecret, setRadiusSecret] = useState('radiax2024');
@@ -476,7 +476,7 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                                         {connectionError || 'Could not establish connection to the router.'}
                                         {routerData?.host?.startsWith('10.') && (
                                             <div style={{ marginTop: 12, padding: 10, background: '#fff5f5', border: '1px solid #fed7d7', borderRadius: 6, color: '#c53030', fontSize: '0.82rem', textAlign: 'left' }}>
-                                                <strong>VPN Hint:</strong> This router uses a private IP ({routerData.host}). 
+                                                <strong>VPN Hint:</strong> This router uses a private IP ({routerData.host}).
                                                 Ensure your <strong>WireGuard</strong> or <strong>OpenVPN</strong> tunnel is connected on the router.
                                             </div>
                                         )}
@@ -505,9 +505,9 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
 
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, maxWidth: 750, margin: '0 auto' }}>
                             {[
-                                { key: 'pppoe' as const, label: 'PPPoE Server Only', desc: 'Configure PPPoE server for client connections', icon: <DnsIcon style={{ fontSize: 40, color: 'var(--text-secondary)', marginBottom: 12 }} />, detail: 'radiax_pppoe bridge    10.10.10.x network\nradiax-pppoe service' },
-                                { key: 'hotspot' as const, label: 'Hotspot Only', desc: 'Configure WiFi hotspot with login portal', icon: <WifiIcon style={{ fontSize: 40, color: 'var(--text-secondary)', marginBottom: 12 }} />, detail: 'radiax_hotspot bridge    192.168.1.x network\nlogin.spot portal' },
-                                { key: 'both' as const, label: 'Both Services', desc: 'Configure both PPPoE and Hotspot', icon: <DeviceHubIcon style={{ fontSize: 40, color: 'var(--text-secondary)', marginBottom: 12 }} />, detail: 'radiax_bridge    PPPoE: 10.10.10.x\nHotspot: 192.168.1.x' },
+                                { key: 'pppoe' as const, label: 'PPPoE Server Only', desc: 'Configure PPPoE server for client connections', icon: <DnsIcon style={{ fontSize: 40, color: 'var(--text-secondary)', marginBottom: 12 }} />, detail: 'radiax_pppoe bridge    10.116.0.x network\nradiax-pppoe service' },
+                                { key: 'hotspot' as const, label: 'Hotspot Only', desc: 'Configure WiFi hotspot with login portal', icon: <WifiIcon style={{ fontSize: 40, color: 'var(--text-secondary)', marginBottom: 12 }} />, detail: 'radiax_hotspot bridge    10.116.0.x network\nlogin.spot portal' },
+                                { key: 'both' as const, label: 'Both Services', desc: 'Configure both PPPoE and Hotspot', icon: <DeviceHubIcon style={{ fontSize: 40, color: 'var(--text-secondary)', marginBottom: 12 }} />, detail: 'radiax_bridge    PPPoE: 10.116.0.x\nHotspot: 10.116.0.x' },
                             ].map(svc => (
                                 <div key={svc.key} onClick={() => setServiceType(svc.key)} style={{
                                     border: serviceType === svc.key ? '2px solid #0d9488' : '1px solid var(--border)',
@@ -540,16 +540,16 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                                         <div style={{ fontWeight: 600, fontSize: '0.85rem', marginBottom: 12, color: '#0d9488' }}>PPPoE Network Settings</div>
                                         <div className="form-group">
                                             <label className="form-label">Local Gateway Address</label>
-                                            <input className="form-input" value={pppoeLocalAddress} onChange={e => setPppoeLocalAddress(e.target.value)} placeholder="10.10.10.1" />
+                                            <input className="form-input" value={pppoeLocalAddress} onChange={e => setPppoeLocalAddress(e.target.value)} placeholder="10.116.0.2" />
                                         </div>
                                         <div className="grid-2 gap-10">
                                             <div className="form-group">
                                                 <label className="form-label">Pool Start</label>
-                                                <input className="form-input" value={pppoePoolStart} onChange={e => setPppoePoolStart(e.target.value)} placeholder="10.10.10.2" />
+                                                <input className="form-input" value={pppoePoolStart} onChange={e => setPppoePoolStart(e.target.value)} placeholder="10.116.0.3" />
                                             </div>
                                             <div className="form-group">
                                                 <label className="form-label">Pool End</label>
-                                                <input className="form-input" value={pppoePoolEnd} onChange={e => setPppoePoolEnd(e.target.value)} placeholder="10.10.10.254" />
+                                                <input className="form-input" value={pppoePoolEnd} onChange={e => setPppoePoolEnd(e.target.value)} placeholder="10.116.0.254" />
                                             </div>
                                         </div>
                                     </div>
@@ -561,16 +561,16 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                                         <div style={{ fontWeight: 600, fontSize: '0.85rem', marginBottom: 12, color: '#0d9488' }}>Hotspot Network Settings</div>
                                         <div className="form-group">
                                             <label className="form-label">Hotspot Gateway Address</label>
-                                            <input className="form-input" value={hotspotLocalAddress} onChange={e => setHotspotLocalAddress(e.target.value)} placeholder="192.168.88.1" />
+                                            <input className="form-input" value={hotspotLocalAddress} onChange={e => setHotspotLocalAddress(e.target.value)} placeholder="10.116.0.2" />
                                         </div>
                                         <div className="grid-2 gap-10">
                                             <div className="form-group">
                                                 <label className="form-label">Pool Start</label>
-                                                <input className="form-input" value={hotspotPoolStart} onChange={e => setHotspotPoolStart(e.target.value)} placeholder="192.168.88.2" />
+                                                <input className="form-input" value={hotspotPoolStart} onChange={e => setHotspotPoolStart(e.target.value)} placeholder="10.116.0.3" />
                                             </div>
                                             <div className="form-group">
                                                 <label className="form-label">Pool End</label>
-                                                <input className="form-input" value={hotspotPoolEnd} onChange={e => setHotspotPoolEnd(e.target.value)} placeholder="192.168.88.254" />
+                                                <input className="form-input" value={hotspotPoolEnd} onChange={e => setHotspotPoolEnd(e.target.value)} placeholder="10.116.0.254" />
                                             </div>
                                         </div>
                                     </div>
@@ -1039,7 +1039,7 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                                     <FileDownloadIcon fontSize="small" /> Generate & Download
                                 </button>
                             </div>
-                            
+
                             {showPreview && (
                                 <div style={{ marginTop: 20, textAlign: 'left', background: '#1e293b', borderRadius: 'var(--radius-md)', padding: '16px', overflowX: 'auto' }}>
                                     <div style={{ color: '#94a3b8', fontSize: '0.75rem', marginBottom: 8, fontWeight: 600, textTransform: 'uppercase' }}>Script Preview</div>
@@ -1200,32 +1200,32 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
 
             {/* Stepper */}
             <div style={{ overflowX: 'auto', width: '100%' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '24px 0', margin: '0 auto', maxWidth: 800, minWidth: 760 }}>
-                {steps.map((step, i) => (
-                    <div key={i} style={{ display: 'flex', alignItems: 'center', flex: i < steps.length - 1 ? 1 : 0 }}>
-                        <div style={{ textAlign: 'center', minWidth: 60 }}>
-                            <div style={{
-                                width: 36, height: 36, borderRadius: '50%', margin: '0 auto 4px',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                background: i < currentStep ? '#16a34a' : i === currentStep ? (i === 3 ? '#7c3aed' : '#16a34a') : '#e5e7eb',
-                                color: i <= currentStep ? '#fff' : '#9ca3af',
-                                fontWeight: 600, fontSize: '0.85rem', transition: 'all 0.3s',
-                            }}>
-                                {i < currentStep ? <CheckCircleIcon style={{ fontSize: 18 }} /> : React.cloneElement(step.icon, { style: { fontSize: 18 } })}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '24px 0', margin: '0 auto', maxWidth: 800, minWidth: 760 }}>
+                    {steps.map((step, i) => (
+                        <div key={i} style={{ display: 'flex', alignItems: 'center', flex: i < steps.length - 1 ? 1 : 0 }}>
+                            <div style={{ textAlign: 'center', minWidth: 60 }}>
+                                <div style={{
+                                    width: 36, height: 36, borderRadius: '50%', margin: '0 auto 4px',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    background: i < currentStep ? '#16a34a' : i === currentStep ? (i === 3 ? '#7c3aed' : '#16a34a') : '#e5e7eb',
+                                    color: i <= currentStep ? '#fff' : '#9ca3af',
+                                    fontWeight: 600, fontSize: '0.85rem', transition: 'all 0.3s',
+                                }}>
+                                    {i < currentStep ? <CheckCircleIcon style={{ fontSize: 18 }} /> : React.cloneElement(step.icon, { style: { fontSize: 18 } })}
+                                </div>
+                                <div style={{ fontSize: '0.7rem', fontWeight: i === currentStep ? 700 : 400, color: i <= currentStep ? (i === 3 && i === currentStep ? '#7c3aed' : '#16a34a') : '#9ca3af' }}>{step.label}</div>
+                                <div style={{ fontSize: '0.6rem', color: i <= currentStep ? (i === 3 && i === currentStep ? '#7c3aed' : '#16a34a') : '#9ca3af' }}>{step.sub}</div>
                             </div>
-                            <div style={{ fontSize: '0.7rem', fontWeight: i === currentStep ? 700 : 400, color: i <= currentStep ? (i === 3 && i === currentStep ? '#7c3aed' : '#16a34a') : '#9ca3af' }}>{step.label}</div>
-                            <div style={{ fontSize: '0.6rem', color: i <= currentStep ? (i === 3 && i === currentStep ? '#7c3aed' : '#16a34a') : '#9ca3af' }}>{step.sub}</div>
+                            {i < steps.length - 1 && (
+                                <div style={{
+                                    flex: 1, height: 2, margin: '0 4px',
+                                    background: i < currentStep ? '#16a34a' : '#e5e7eb',
+                                    transition: 'all 0.3s', marginBottom: 24,
+                                }} />
+                            )}
                         </div>
-                        {i < steps.length - 1 && (
-                            <div style={{
-                                flex: 1, height: 2, margin: '0 4px',
-                                background: i < currentStep ? '#16a34a' : '#e5e7eb',
-                                transition: 'all 0.3s', marginBottom: 24,
-                            }} />
-                        )}
-                    </div>
-                ))}
-            </div>
+                    ))}
+                </div>
             </div>
 
             {/* Step Content */}

@@ -268,7 +268,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 // STEP 0: CLEANUP OLD KENGE RULES & CONFIGS (NO DUPLICATES!)
                 // ──────────────────────────────────────────────────────────
                 console.log("[PUSH-CONFIG] Cleaning up old Kenge configs...");
-                
+
                 try {
                     const oldFilterRules = await service.apiRequestPublic("/ip/firewall/filter");
                     if (Array.isArray(oldFilterRules)) {
@@ -276,11 +276,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                             if (rule.comment?.includes("Kenge")) {
                                 try {
                                     await service.apiRequestPublic(`/ip/firewall/filter/${rule[".id"]}`, "DELETE");
-                                } catch {}
+                                } catch { }
                             }
                         }
                     }
-                } catch {}
+                } catch { }
 
                 try {
                     const oldNatRules = await service.apiRequestPublic("/ip/firewall/nat");
@@ -289,11 +289,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                             if (rule.comment?.includes("Kenge")) {
                                 try {
                                     await service.apiRequestPublic(`/ip/firewall/nat/${rule[".id"]}`, "DELETE");
-                                } catch {}
+                                } catch { }
                             }
                         }
                     }
-                } catch {}
+                } catch { }
 
                 try {
                     const oldRoutes = await service.apiRequestPublic("/ip/route");
@@ -302,11 +302,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                             if (route.comment?.includes("Kenge")) {
                                 try {
                                     await service.apiRequestPublic(`/ip/route/${route[".id"]}`, "DELETE");
-                                } catch {}
+                                } catch { }
                             }
                         }
                     }
-                } catch {}
+                } catch { }
 
                 try {
                     const oldAddresses = await service.apiRequestPublic("/ip/address");
@@ -315,11 +315,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                             if (addr.comment?.includes("Kenge")) {
                                 try {
                                     await service.apiRequestPublic(`/ip/address/${addr[".id"]}`, "DELETE");
-                                } catch {}
+                                } catch { }
                             }
                         }
                     }
-                } catch {}
+                } catch { }
 
                 // ──────────────────────────────────────────────────────────
                 // STEP 1: BASIC SETUP (User, Identity, DNS, NTP
@@ -352,16 +352,31 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 } catch (e: any) { console.warn("NTP note:", e.message); }
 
                 // ──────────────────────────────────────────────────────────
-                // STEP 2: HOTSPOT + PPPOE + DHCP
+                // STEP 2: BRIDGE + HOTSPOT + PPPOE + DHCP
                 // ──────────────────────────────────────────────────────────
-                console.log("[PUSH-CONFIG] Setting up Hotspot & PPPoE...");
+                console.log("[PUSH-CONFIG] Setting up Bridge, Hotspot & PPPoE...");
 
                 const hotspotProfileName = `hsprof-${router.name.toLowerCase().replace(/\s+/g, '-')}`;
-                
+
+                try {
+                    await service.apiRequestPublic("/interface/bridge", "PUT", {
+                        name: "bridge-lan",
+                        comment: "Kenge LAN Bridge - Hotspot & PPPoE"
+                    });
+                } catch (e: any) { if (!e.message?.includes("already")) console.warn("Bridge note:", e.message); }
+
+                try {
+                    await service.apiRequestPublic("/interface/bridge/port", "PUT", {
+                        interface: "ether2",
+                        bridge: "bridge-lan",
+                        comment: "Kenge Bridge Port - ether2"
+                    });
+                } catch (e: any) { if (!e.message?.includes("already")) console.warn("Bridge port note:", e.message); }
+
                 try {
                     await service.apiRequestPublic("/ip/hotspot/profile", "PUT", {
                         name: hotspotProfileName,
-                        "hotspot-address": "192.168.88.1",
+                        "hotspot-address": "10.116.0.2",
                         "dns-name": `${router.name.toLowerCase().replace(/\s+/g, '-')}.hotspot`,
                         "html-directory": "hotspot",
                         "login-by": "http-chap,http-pap,cookie,mac-cookie",
@@ -372,14 +387,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 try {
                     await service.apiRequestPublic("/ip/pool", "PUT", {
                         name: `hs-pool-${router.name}`,
-                        ranges: "192.168.88.2-192.168.88.254"
+                        ranges: "10.116.0.3-10.116.0.254"
                     });
                 } catch (e: any) { if (!e.message?.includes("already")) console.warn("HS pool note:", e.message); }
 
                 try {
                     await service.apiRequestPublic("/ip/hotspot", "PUT", {
                         name: `hotspot-${router.name}`,
-                        interface: "ether2",
+                        interface: "bridge-lan",
                         "address-pool": `hs-pool-${router.name}`,
                         profile: hotspotProfileName,
                         disabled: "no"
@@ -389,14 +404,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 try {
                     await service.apiRequestPublic("/ip/pool", "PUT", {
                         name: `pppoe-pool-${router.name}`,
-                        ranges: "10.10.10.2-10.10.10.254"
+                        ranges: "10.116.0.3-10.116.0.254"
                     });
                 } catch (e: any) { if (!e.message?.includes("already")) console.warn("PPPoE pool note:", e.message); }
 
                 try {
                     await service.apiRequestPublic("/ppp/profile", "PUT", {
                         name: `pppoe-profile-${router.name}`,
-                        "local-address": "10.10.10.1",
+                        "local-address": "10.116.0.2",
                         "remote-address": `pppoe-pool-${router.name}`,
                         "dns-server": "8.8.8.8,1.1.1.1",
                         "use-encryption": "yes"
@@ -406,7 +421,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 try {
                     await service.apiRequestPublic("/interface/pppoe-server/server", "PUT", {
                         "service-name": `pppoe-svc-${router.name}`,
-                        interface: "ether1",
+                        interface: "bridge-lan",
                         "default-profile": `pppoe-profile-${router.name}`,
                         disabled: "no"
                     });
@@ -414,24 +429,24 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
                 try {
                     await service.apiRequestPublic("/ip/address", "PUT", {
-                        address: "192.168.88.1/24",
-                        interface: "ether2",
+                        address: "10.116.0.2/24",
+                        interface: "bridge-lan",
                         comment: "Kenge Hotspot LAN"
                     });
                 } catch (e: any) { if (!e.message?.includes("already")) console.warn("HS IP note:", e.message); }
 
                 try {
                     await service.apiRequestPublic("/ip/dhcp-server/network", "PUT", {
-                        address: "192.168.88.0/24",
-                        gateway: "192.168.88.1",
-                        "dns-server": "192.168.88.1"
+                        address: "10.116.0.0/24",
+                        gateway: "10.116.0.2",
+                        "dns-server": "10.116.0.2"
                     });
                 } catch (e: any) { if (!e.message?.includes("already")) console.warn("DHCP network note:", e.message); }
 
                 try {
                     await service.apiRequestPublic("/ip/dhcp-server", "PUT", {
                         name: `dhcp-${router.name}`,
-                        interface: "ether2",
+                        interface: "bridge-lan",
                         "address-pool": `hs-pool-${router.name}`,
                         disabled: "no"
                     });
@@ -441,7 +456,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 // STEP 3: WIREGUARD VPN
                 // ──────────────────────────────────────────────────────────
                 console.log("[PUSH-CONFIG] Setting up WireGuard...");
-                
+
                 try {
                     await service.apiRequestPublic("/interface/wireguard", "PUT", {
                         name: "wg-kenge",
@@ -462,7 +477,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                                     });
                                 }
                             }
-                        } catch {}
+                        } catch { }
                     } else {
                         throw e;
                     }
@@ -484,11 +499,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                             if (peer.comment?.includes("Kenge") || peer.interface === "wg-kenge") {
                                 try {
                                     await service.apiRequestPublic(`/interface/wireguard/peers/${peer[".id"]}`, "DELETE");
-                                } catch {}
+                                } catch { }
                             }
                         }
                     }
-                } catch {}
+                } catch { }
 
                 try {
                     await service.apiRequestPublic("/interface/wireguard/peers", "PUT", {
@@ -503,10 +518,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 } catch (e: any) { console.warn("Peer note:", e.message); }
 
                 // ──────────────────────────────────────────────────────────
-                // STEP 4: FIREWALL RULES (CLEAN, NO DUPLICATES!)
+                // STEP 4: FIREWALL RULES (COMPLETE HOTSPOT PROTECTION!)
                 // ──────────────────────────────────────────────────────────
                 console.log("[PUSH-CONFIG] Setting up Firewall...");
-                
+
                 const restPort = router.apiPort || (router.port === 8728 || router.port === 8729 ? 80 : router.port) || 80;
 
                 const firewallRules = [
@@ -518,168 +533,173 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                     { chain: "input", protocol: "udp", "dst-port": "53,67", action: "accept", comment: "Allow DNS & DHCP - Kenge" },
                     { chain: "input", protocol: "icmp", action: "accept", comment: "Allow Ping - Kenge" },
                     { chain: "input", "connection-state": "established,related", action: "accept", comment: "Allow Established - Kenge" },
-                    { chain: "forward", "in-interface": "wg-kenge", action: "accept", comment: "Allow WG traffic - Kenge" },
-                    { chain: "forward", "out-interface": "wg-kenge", action: "accept", comment: "Allow WG return - Kenge" }
+                    { chain: "input", "in-interface": "bridge-lan", protocol: "tcp", "dst-port": "80,443", action: "accept", comment: "Allow Hotspot HTTP/HTTPS - Kenge" },
+                    { chain: "input", "in-interface": "bridge-lan", protocol: "udp", "dst-port": "67", action: "accept", comment: "Allow Hotspot DHCP - Kenge" },
+                    { chain: "input", "in-interface": "bridge-lan", protocol: "udp", "dst-port": "53", action: "accept", comment: "Allow Hotspot DNS - Kenge" },
+                    { chain: "forward", "in-interface": "bridge-lan", out- interface: "ether1", action: "accept", comment: "Allow Hotspot to Internet - Kenge" },
+            { chain: "forward", "in-interface": "ether1", out - interface: "bridge-lan", "connection-state": "established,related", action: "accept", comment: "Allow Internet to Hotspot - Kenge" },
+            { chain: "forward", "in-interface": "wg-kenge", action: "accept", comment: "Allow WG traffic - Kenge" },
+            { chain: "forward", "out-interface": "wg-kenge", action: "accept", comment: "Allow WG return - Kenge" }
                 ];
 
-                for (const rule of firewallRules) {
-                    try {
-                        await service.apiRequestPublic("/ip/firewall/filter", "PUT", rule);
-                    } catch (e: any) { console.warn("FW note:", e.message); }
-                }
-
-                // ──────────────────────────────────────────────────────────
-                // STEP 5: NAT (FIXED CONFLICT! - ONLY ETHER1!)
-                // ──────────────────────────────────────────────────────────
-                console.log("[PUSH-CONFIG] Setting up NAT...");
-                
+            for (const rule of firewallRules) {
                 try {
-                    await service.apiRequestPublic("/ip/firewall/nat", "PUT", {
-                        chain: "srcnat", "out-interface": "ether1",
-                        action: "masquerade", comment: "NAT for Internet - Kenge", "place-before": "0"
-                    });
-                } catch (e: any) { console.warn("NAT note:", e.message); }
-
-                // ──────────────────────────────────────────────────────────
-                // STEP 6: ROUTE
-                // ──────────────────────────────────────────────────────────
-                try {
-                    await service.apiRequestPublic("/ip/route", "PUT", {
-                        "dst-address": `${subnetPrefix}.0/24`, gateway: "wg-kenge",
-                        comment: "WireGuard route - Kenge"
-                    });
-                } catch (e: any) { console.warn("Route note:", e.message); }
-
-                // Add peer to the Server's WireGuard interface
-                try {
-                    await wireguardManager.addPeer(router.wgPublicKey, tunnelIp);
-                } catch (e: any) {
-                    console.error("Failed to add peer to wg0:", e.message);
-                }
-
-                // Verification Step: Wait for tunnel to establish, then check real handshake
-                await new Promise(resolve => setTimeout(resolve, 5000));
-                const tunnelVerified = await wireguardManager.checkPeerHandshake(router.wgPublicKey);
-
-                // Update router state
-                const updateData: Record<string, any> = {
-                    wgEnabled: true,
-                    wgConfiguredAt: new Date(),
-                };
-                // Only switch host to tunnel IP if the MikroTik actually connected back
-                if (tunnelVerified) {
-                    updateData.host = tunnelIp;
-                } else {
-                    console.warn(`[WireGuard] Peer ${tunnelIp} has not completed handshake yet. Keeping current host IP.`);
-                }
-                await updateRouterWgFields(id, updateData);
-
-                await prisma.routerLog.create({
-                    data: {
-                        routerId: id,
-                        action: "wireguard_pushed",
-                        details: `WireGuard config auto-pushed to ${router.name}.${tunnelVerified ? ` Connection switched to tunnel IP ${tunnelIp}.` : " Tunnel verification failed - keeping current host."}`,
-                        status: "success",
-                    },
-                });
-
-                return jsonResponse({
-                    success: true,
-                    message: tunnelVerified
-                        ? `WireGuard configured and assumed reachable on ${router.name}. Tunnel IP: ${tunnelIp}.`
-                        : `WireGuard configured on ${router.name}, but tunnel verification failed. Keeping original host IP for now.`,
-                    tunnelVerified,
-                });
-
-            } catch (err: any) {
-                await prisma.routerLog.create({
-                    data: {
-                        routerId: id,
-                        action: "wireguard_push_failed",
-                        details: `Failed to push WireGuard config: ${err.message}`,
-                        status: "error",
-                    },
-                });
-                return jsonResponse({
-                    success: false,
-                    message: "Failed to auto-configure. Ensure the router is reachable and try manual setup.",
-                }, 200);
+                    await service.apiRequestPublic("/ip/firewall/filter", "PUT", rule);
+                } catch (e: any) { console.warn("FW note:", e.message); }
             }
+
+            // ──────────────────────────────────────────────────────────
+            // STEP 5: NAT (FIXED CONFLICT! - ONLY ETHER1!)
+            // ──────────────────────────────────────────────────────────
+            console.log("[PUSH-CONFIG] Setting up NAT...");
+
+            try {
+                await service.apiRequestPublic("/ip/firewall/nat", "PUT", {
+                    chain: "srcnat", "out-interface": "ether1",
+                    action: "masquerade", comment: "NAT for Internet - Kenge", "place-before": "0"
+                });
+            } catch (e: any) { console.warn("NAT note:", e.message); }
+
+            // ──────────────────────────────────────────────────────────
+            // STEP 6: ROUTE
+            // ──────────────────────────────────────────────────────────
+            try {
+                await service.apiRequestPublic("/ip/route", "PUT", {
+                    "dst-address": `${subnetPrefix}.0/24`, gateway: "wg-kenge",
+                    comment: "WireGuard route - Kenge"
+                });
+            } catch (e: any) { console.warn("Route note:", e.message); }
+
+            // Add peer to the Server's WireGuard interface
+            try {
+                await wireguardManager.addPeer(router.wgPublicKey, tunnelIp);
+            } catch (e: any) {
+                console.error("Failed to add peer to wg0:", e.message);
+            }
+
+            // Verification Step: Wait for tunnel to establish, then check real handshake
+            await new Promise(resolve => setTimeout(resolve, 5000));
+            const tunnelVerified = await wireguardManager.checkPeerHandshake(router.wgPublicKey);
+
+            // Update router state
+            const updateData: Record<string, any> = {
+                wgEnabled: true,
+                wgConfiguredAt: new Date(),
+            };
+            // Only switch host to tunnel IP if the MikroTik actually connected back
+            if (tunnelVerified) {
+                updateData.host = tunnelIp;
+            } else {
+                console.warn(`[WireGuard] Peer ${tunnelIp} has not completed handshake yet. Keeping current host IP.`);
+            }
+            await updateRouterWgFields(id, updateData);
+
+            await prisma.routerLog.create({
+                data: {
+                    routerId: id,
+                    action: "wireguard_pushed",
+                    details: `WireGuard config auto-pushed to ${router.name}.${tunnelVerified ? ` Connection switched to tunnel IP ${tunnelIp}.` : " Tunnel verification failed - keeping current host."}`,
+                    status: "success",
+                },
+            });
+
+            return jsonResponse({
+                success: true,
+                message: tunnelVerified
+                    ? `WireGuard configured and assumed reachable on ${router.name}. Tunnel IP: ${tunnelIp}.`
+                    : `WireGuard configured on ${router.name}, but tunnel verification failed. Keeping original host IP for now.`,
+                tunnelVerified,
+            });
+
+        } catch (err: any) {
+            await prisma.routerLog.create({
+                data: {
+                    routerId: id,
+                    action: "wireguard_push_failed",
+                    details: `Failed to push WireGuard config: ${err.message}`,
+                    status: "error",
+                },
+            });
+            return jsonResponse({
+                success: false,
+                message: "Failed to auto-configure. Ensure the router is reachable and try manual setup.",
+            }, 200);
         }
+    }
 
         // Default: manual activate (user pasted the script on MikroTik)
         try {
-            // Aggressive Cleanup: Remove any peer that is not actively registered in the DB
-            const allValidRouters = await prisma.router.findMany({
-                where: { wgPublicKey: { not: null } },
-                select: { wgPublicKey: true }
-            });
-            const validKeys = new Set(allValidRouters.map(r => r.wgPublicKey));
+        // Aggressive Cleanup: Remove any peer that is not actively registered in the DB
+        const allValidRouters = await prisma.router.findMany({
+            where: { wgPublicKey: { not: null } },
+            select: { wgPublicKey: true }
+        });
+        const validKeys = new Set(allValidRouters.map(r => r.wgPublicKey));
 
-            const allPeers = await wireguardManager.listPeers();
-            for (const peer of allPeers) {
-                // Keep the current router being activated
-                if (peer.publicKey === router.wgPublicKey) continue;
+        const allPeers = await wireguardManager.listPeers();
+        for (const peer of allPeers) {
+            // Keep the current router being activated
+            if (peer.publicKey === router.wgPublicKey) continue;
 
-                // If peer is not in the database, OR it has lost its allowed IP, destroy it
-                if (!validKeys.has(peer.publicKey) || peer.allowedIps === "(none)") {
-                    await wireguardManager.removePeer(peer.publicKey);
-                }
+            // If peer is not in the database, OR it has lost its allowed IP, destroy it
+            if (!validKeys.has(peer.publicKey) || peer.allowedIps === "(none)") {
+                await wireguardManager.removePeer(peer.publicKey);
             }
-
-            await wireguardManager.addPeer(router.wgPublicKey, tunnelIp);
-        } catch (err: any) {
-            console.error("Failed to add peer:", err);
-            return errorResponse("Failed to add peer to server", 500);
         }
 
-        // Wait a few seconds for MikroTik to complete the WireGuard handshake
-        await new Promise(resolve => setTimeout(resolve, 8000));
-        const peerConnected = await wireguardManager.checkPeerHandshake(router.wgPublicKey);
-
-        const activateData: Record<string, any> = {
-            wgEnabled: true,
-            wgConfiguredAt: new Date(),
-        };
-
-        let pingResult = "Ping not attempted";
-        let responseMessage: string;
-
-        if (peerConnected) {
-            // Only switch host to tunnel IP once tunnel is actually confirmed
-            activateData.host = tunnelIp;
-            try {
-                const { stdout } = await execAsync(`ping -c 3 -W 3 ${tunnelIp}`);
-                pingResult = stdout;
-            } catch (err: any) {
-                pingResult = err.message || "Ping failed";
-            }
-            responseMessage = `WireGuard tunnel established! Router is now accessible via tunnel IP ${tunnelIp}. Ping result:\n${pingResult.substring(0, 150)}`;
-            console.log(`[WireGuard] Activate: peer ${tunnelIp} connected. Switching host to tunnel IP.`);
-        } else {
-            // Handshake not confirmed — keep original host to preserve connectivity
-            console.warn(`[WireGuard] Activate: peer ${tunnelIp} has NOT completed a WireGuard handshake. Keeping original host IP to preserve connectivity.`);
-            responseMessage = `WireGuard peer registered on server, but MikroTik has NOT connected yet (no handshake).\n\nTo fix:\n1. Verify the config was pasted correctly on MikroTik.\n2. Check UDP port ${listenPort} is open on MikroTik (firewall rule must be above any DROP rule).\n3. Run on Droplet: sudo wg show wg0\n4. Once the MikroTik peer appears with a handshake, click Activate again.`;
-        }
-
-        await updateRouterWgFields(id, activateData);
-
-        await prisma.routerLog.create({
-            data: {
-                routerId: id,
-                action: "wireguard_activated",
-                details: `WireGuard activation for ${router.name}. Tunnel ${peerConnected ? 'verified — host switched to ' + tunnelIp : 'NOT yet connected — original host preserved'}.`,
-                status: "success",
-            },
-        });
-
-        return jsonResponse({
-            success: peerConnected,
-            tunnelVerified: peerConnected,
-            message: responseMessage,
-        });
+        await wireguardManager.addPeer(router.wgPublicKey, tunnelIp);
     } catch (err: any) {
-        console.error("WireGuard activate error:", err);
-        return errorResponse("Failed to activate WireGuard", 500);
+        console.error("Failed to add peer:", err);
+        return errorResponse("Failed to add peer to server", 500);
     }
+
+    // Wait a few seconds for MikroTik to complete the WireGuard handshake
+    await new Promise(resolve => setTimeout(resolve, 8000));
+    const peerConnected = await wireguardManager.checkPeerHandshake(router.wgPublicKey);
+
+    const activateData: Record<string, any> = {
+        wgEnabled: true,
+        wgConfiguredAt: new Date(),
+    };
+
+    let pingResult = "Ping not attempted";
+    let responseMessage: string;
+
+    if (peerConnected) {
+        // Only switch host to tunnel IP once tunnel is actually confirmed
+        activateData.host = tunnelIp;
+        try {
+            const { stdout } = await execAsync(`ping -c 3 -W 3 ${tunnelIp}`);
+            pingResult = stdout;
+        } catch (err: any) {
+            pingResult = err.message || "Ping failed";
+        }
+        responseMessage = `WireGuard tunnel established! Router is now accessible via tunnel IP ${tunnelIp}. Ping result:\n${pingResult.substring(0, 150)}`;
+        console.log(`[WireGuard] Activate: peer ${tunnelIp} connected. Switching host to tunnel IP.`);
+    } else {
+        // Handshake not confirmed — keep original host to preserve connectivity
+        console.warn(`[WireGuard] Activate: peer ${tunnelIp} has NOT completed a WireGuard handshake. Keeping original host IP to preserve connectivity.`);
+        responseMessage = `WireGuard peer registered on server, but MikroTik has NOT connected yet (no handshake).\n\nTo fix:\n1. Verify the config was pasted correctly on MikroTik.\n2. Check UDP port ${listenPort} is open on MikroTik (firewall rule must be above any DROP rule).\n3. Run on Droplet: sudo wg show wg0\n4. Once the MikroTik peer appears with a handshake, click Activate again.`;
+    }
+
+    await updateRouterWgFields(id, activateData);
+
+    await prisma.routerLog.create({
+        data: {
+            routerId: id,
+            action: "wireguard_activated",
+            details: `WireGuard activation for ${router.name}. Tunnel ${peerConnected ? 'verified — host switched to ' + tunnelIp : 'NOT yet connected — original host preserved'}.`,
+            status: "success",
+        },
+    });
+
+    return jsonResponse({
+        success: peerConnected,
+        tunnelVerified: peerConnected,
+        message: responseMessage,
+    });
+} catch (err: any) {
+    console.error("WireGuard activate error:", err);
+    return errorResponse("Failed to activate WireGuard", 500);
+}
 }
