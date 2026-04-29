@@ -1,15 +1,28 @@
 # DigitalOcean Environment Variables Reference
+# Use this as a reference for setting up environment variables in DigitalOcean App Platform
 
-# BACKEND SERVICE
-DATABASE_URL=postgresql://db:password@host:port/dbname (Auto-set by DO)
+# ─── BACKEND SERVICE ─────────────────────────────────────────────────────────
+
+# Database (Auto-set by DigitalOcean App Platform)
+DATABASE_URL=${db.DATABASE_URL}
+
+# Auth
 JWT_SECRET=generate-a-long-random-string
 GOOGLE_CLIENT_ID=96960694156-pg7m1cjdqas9nelo83nicrq4ig3kuq3l.apps.googleusercontent.com
+
+# CORS
 # Comma-separated allowed origins (no "*"), e.g. https://app.example.com,https://admin.example.com
-CORS_ORIGIN=${frontend.PUBLIC_URL} (Auto-set if using app.yaml)
+CORS_ORIGIN=${frontend.PUBLIC_URL}
+
+# Environment
 NODE_ENV=production
+
+# App URLs
 # Public frontend URL (used by backend links + payment callbacks)
 APP_URL=${frontend.PUBLIC_URL}
 NEXT_PUBLIC_APP_URL=${frontend.PUBLIC_URL}
+
+# Automation & Notifications
 ALLOW_AUTOMATION_BYPASS=false
 ACCOUNT_NOTIFICATIONS_ENABLED=true
 ACCOUNT_SMS_NOTIFICATIONS_ENABLED=false
@@ -18,12 +31,6 @@ ACCOUNT_SMS_NOTIFICATIONS_ENABLED=false
 
 # SMTP (required for email notifications)
 # Example for Gmail:
-# SMTP_HOST=smtp.gmail.com
-# SMTP_PORT=465
-# SMTP_SECURE=true
-# SMTP_USER=your-email@gmail.com
-# SMTP_PASS=your-app-password
-# SMTP_FROM="HQ INVESTMENT <your-email@gmail.com>"
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=465
 SMTP_SECURE=true
@@ -50,8 +57,14 @@ WEBHOOK_SECRET=generic-webhook-secret
 ENABLE_SUPER_ADMIN_SETUP=false
 ENABLE_TEST_MIKROTIK_LOGIC=false
 
-# FRONTEND SERVICE
-VITE_API_URL=${backend.PUBLIC_URL}/api (Auto-set if using app.yaml)
+# ─── FRONTEND SERVICE ────────────────────────────────────────────────────────
 
-# LANDING PAGE SERVICE
+# Backend API URL (Auto-set by DigitalOcean App Platform)
+VITE_API_URL=${backend.PUBLIC_URL}/api
+
+# Google OAuth Client ID (optional, if using Google Sign In)
+VITE_GOOGLE_CLIENT_ID=96960694156-pg7m1cjdqas9nelo83nicrq4ig3kuq3l.apps.googleusercontent.com
+
+# ─── LANDING PAGE SERVICE ─────────────────────────────────────────────────────
+
 NODE_ENV=production

@@ -6,7 +6,7 @@ services:
   instance_size_slug: basic-xxs
   source_dir: .
   build_command: pnpm install && pnpm --filter backend build
-  run_command: pnpm --filter backend start
+  run_command: pnpm --filter backend next:start
   envs:
   - key: DATABASE_URL
     scope: RUN_AND_BUILD_TIME
@@ -23,9 +23,22 @@ services:
   - key: CORS_ORIGIN
     scope: RUN_TIME
     value: ${frontend.PUBLIC_URL}
+  - key: APP_URL
+    scope: RUN_TIME
+    value: ${frontend.PUBLIC_URL}
+  - key: ACCOUNT_NOTIFICATIONS_ENABLED
+    scope: RUN_TIME
+    value: "true"
+  - key: ENABLE_SUPER_ADMIN_SETUP
+    scope: RUN_TIME
+    value: "false"
+  - key: ENABLE_TEST_MIKROTIK_LOGIC
+    scope: RUN_TIME
+    value: "false"
   http_port: 3000
   routes:
   - path: /api
+  - path: /hotspot
 
 - name: landing-page
   instance_count: 1
@@ -52,6 +65,51 @@ static_sites:
     value: ${backend.PUBLIC_URL}/api
   routes:
   - path: /dashboard
+  - path: /login
+  - path: /register
+  - path: /forgot-password
+  - path: /pending-approval
+  - path: /restricted
+  - path: /renew
+  - path: /invoices
+  - path: /system-tenants
+  - path: /clients
+  - path: /active-subscribers
+  - path: /expired-subscribers
+  - path: /packages
+  - path: /voucher-codes
+  - path: /all-transactions
+  - path: /mobile-transactions
+  - path: /expense-tracking
+  - path: /mikrotiks
+  - path: /vpn-management
+  - path: /equipments
+  - path: /sms-messages
+  - path: /message-templates
+  - path: /send-bulk-message
+  - path: /system-settings
+  - path: /payment-channels
+  - path: /system-users
+  - path: /license-management
+  - path: /reports
+  - path: /tutorial-videos
+  - path: /technical-support
+  - path: /profile
+  - path: /recharge
+  - path: /add-package
+  - path: /hotspot-customizer
+  - path: /bank-payment-config
+  - path: /mpesa-till-config
+  - path: /harakapay-config
+  - path: /mpesa-paybill-config
+  - path: /palmpesa-config
+  - path: /zenopay-config
+  - path: /edit-plan
+  - path: /edit-package
+  - path: /router-setup
+  - path: /edit-plan/
+  - path: /edit-package/
+  - path: /router-setup/
 
 databases:
 - engine: PG

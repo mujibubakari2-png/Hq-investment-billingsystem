@@ -32,7 +32,7 @@ We use Docker to run PostgreSQL on the same droplet.
 1. Edit `docker-compose.yml` and change the `POSTGRES_PASSWORD`.
 2. Start the database:
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 ## Step 4: Configure Environment Variables
@@ -47,7 +47,7 @@ Set the `DATABASE_URL` to:
 
 Also set `JWT_SECRET` and `GOOGLE_CLIENT_ID`.
 
-## Step 5: Build and Start Applications
+## Step 5: Build Applications
 Go back to the root directory and install dependencies:
 ```bash
 cd ..
@@ -55,14 +55,21 @@ pnpm install
 pnpm build:all
 ```
 
-Start everything with PM2:
+## Step 6: Deploy Frontend Static Files
+Copy the frontend build files to the Nginx web root:
+```bash
+cp -r frontend/dist/* /var/www/html/billing/
+```
+
+## Step 7: Start Backend and Landing Page
+Start with PM2:
 ```bash
 pm2 start ecosystem.config.js
 pm2 save
 pm2 startup
 ```
 
-## Step 6: Configure Nginx
+## Step 8: Configure Nginx
 Copy the provided Nginx config to the system:
 ```bash
 sudo cp nginx.conf /etc/nginx/sites-available/kenge
@@ -71,7 +78,7 @@ sudo nginx -t
 sudo systemctl restart nginx
 ```
 
-## Step 7: SSL (HTTPS)
+## Step 9: SSL (HTTPS)
 Use Certbot to get a free SSL certificate:
 ```bash
 sudo apt install certbot python3-certbot-nginx
@@ -81,5 +88,5 @@ sudo certbot --nginx -d your-domain.com
 ## Summary of Ports
 - **Backend**: 3000
 - **Landing Page**: 3001
-- **Frontend Dashboard**: 5173 (Preview mode)
+- **Frontend Dashboard**: Served statically by Nginx
 - **Database**: 5432 (Internal to droplet)

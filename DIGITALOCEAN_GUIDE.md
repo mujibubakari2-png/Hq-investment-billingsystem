@@ -39,9 +39,13 @@ In the DigitalOcean Dashboard, go to the **Settings** tab for your App and ensur
 
 ## Step 4: Database Migrations
 The `backend` is configured to use Prisma. 
-In the `app.yaml`, the backend start command is `pnpm start`. 
-You should ensure that migrations run. You can update the `backend/package.json` start script or run a one-time console command in DO:
-`npx prisma migrate deploy`
+You should run database migrations before starting the backend. You can do this by:
+1. Running a one-time console command in DigitalOcean App Platform:
+   ```bash
+   cd backend
+   npx prisma migrate deploy
+   ```
+2. Or updating the start command to run migrations automatically (optional)
 
 ## Current Configuration Summary
 - **Region**: NYC (New York)
