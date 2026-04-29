@@ -87,11 +87,24 @@ echo "🔧 Applying database migrations (prisma migrate deploy)..."
 if pnpm exec prisma migrate deploy; then
     echo "✅ Database migrations applied"
 else
-    echo "❌ Migration failed — refusing to start to avoid schema drift"
-    exit 1
+    echo "❌ Migration failed!"
+    echo ""
+    echo "🔍 Troubleshooting steps:"
+    echo "1. Check if your database is running: docker compose ps"
+    echo "2. Verify DATABASE_URL in your .env file"
+    echo "3. Try running migrations manually: cd backend && pnpm exec prisma migrate deploy"
+    echo "4. If you get schema drift errors, consider: pnpm exec prisma db push (for development only!)"
+    echo "5. Check Prisma logs for more details"
+    echo ""
+    echo "⚠️  The app will still start without running migrations, but some features may not work!"
+    echo "   If you want to force start without migrations, set SKIP_MIGRATIONS=true in .env"
+    if [ "$SKIP_MIGRATIONS" != "true" ]; then
+        exit 1
+    fi
+    echo "⚠️  SKIP_MIGRATIONS is true — starting without applying migrations!"
 fi
 
-# ── 5. Seed database (only if empty) ─────────────────────────────────────────
+# ── 6. Seed database (only if empty) ─────────────────────────────────────────
 echo "🌱 Running database seed (safe — skips if data exists)..."
 if pnpm exec tsx scripts/seed.ts; then
     echo "✅ Seed complete"

@@ -85,6 +85,50 @@ sudo apt install certbot python3-certbot-nginx
 sudo certbot --nginx -d your-domain.com
 ```
 
+## Troubleshooting Migration Failures
+
+### If you see "❌ Migration failed — refusing to start to avoid schema drift"
+
+1. **Verify Database is Running
+```bash
+docker compose ps
+```
+Make sure the kenge-db container is running. If not, start it:
+```bash
+docker compose up -d
+```
+
+2. **Check DATABASE_URL
+Verify your backend/.env has the correct DATABASE_URL:
+```
+DATABASE_URL="postgresql://kenge_user:your_password@localhost:5432/kenge_isp"
+```
+
+3. **Try Running Migrations Manually
+```bash
+cd backend
+pnpm exec prisma migrate deploy
+```
+
+4. **Fix Schema Drift (Development Only!)
+If you get schema drift errors and this is a non-production environment, you can force push the schema:
+```bash
+cd backend
+pnpm exec prisma db push
+```
+⚠️ WARNING: This will drop data! Only use for fresh databases!
+
+5. **Force Start Without Migrations (Temporary!)**
+If you need to start the app temporarily to diagnose, set this in backend/.env:
+```
+SKIP_MIGRATIONS=true
+```
+Then restart PM2:
+```bash
+pm2 restart backend
+```
+⚠️ Remember to set this back to false once migrations are fixed!
+
 ## Summary of Ports
 - **Backend**: 3000
 - **Landing Page**: 3001
