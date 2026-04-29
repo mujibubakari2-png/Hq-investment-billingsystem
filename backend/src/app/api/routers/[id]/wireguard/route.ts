@@ -260,10 +260,71 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         if (action === "push-config") {
             try {
                 const service = await getMikroTikService(id, userPayload.role === "SUPER_ADMIN" ? null : userPayload.tenantId);
+                const routerIdCode = `MYR-${router.id.padStart(3, '0')}VBHBC`;
 
-                // Step 0: Initial Setup (Management User, Identity, DNS)
+                console.log(`[PUSH-CONFIG] Starting unified config for router: ${router.name}`);
+
+                // ──────────────────────────────────────────────────────────
+                // STEP 0: CLEANUP OLD KENGE RULES & CONFIGS (NO DUPLICATES!)
+                // ──────────────────────────────────────────────────────────
+                console.log("[PUSH-CONFIG] Cleaning up old Kenge configs...");
+                
                 try {
-                    // Create management user
+                    const oldFilterRules = await service.apiRequestPublic("/ip/firewall/filter");
+                    if (Array.isArray(oldFilterRules)) {
+                        for (const rule of oldFilterRules) {
+                            if (rule.comment?.includes("Kenge")) {
+                                try {
+                                    await service.apiRequestPublic(`/ip/firewall/filter/${rule[".id"]}`, "DELETE");
+                                } catch {}
+                            }
+                        }
+                    }
+                } catch {}
+
+                try {
+                    const oldNatRules = await service.apiRequestPublic("/ip/firewall/nat");
+                    if (Array.isArray(oldNatRules)) {
+                        for (const rule of oldNatRules) {
+                            if (rule.comment?.includes("Kenge")) {
+                                try {
+                                    await service.apiRequestPublic(`/ip/firewall/nat/${rule[".id"]}`, "DELETE");
+                                } catch {}
+                            }
+                        }
+                    }
+                } catch {}
+
+                try {
+                    const oldRoutes = await service.apiRequestPublic("/ip/route");
+                    if (Array.isArray(oldRoutes)) {
+                        for (const route of oldRoutes) {
+                            if (route.comment?.includes("Kenge")) {
+                                try {
+                                    await service.apiRequestPublic(`/ip/route/${route[".id"]}`, "DELETE");
+                                } catch {}
+                            }
+                        }
+                    }
+                } catch {}
+
+                try {
+                    const oldAddresses = await service.apiRequestPublic("/ip/address");
+                    if (Array.isArray(oldAddresses)) {
+                        for (const addr of oldAddresses) {
+                            if (addr.comment?.includes("Kenge")) {
+                                try {
+                                    await service.apiRequestPublic(`/ip/address/${addr[".id"]}`, "DELETE");
+                                } catch {}
+                            }
+                        }
+                    }
+                } catch {}
+
+                // ──────────────────────────────────────────────────────────
+                // STEP 1: BASIC SETUP (User, Identity, DNS, NTP
+                // ──────────────────────────────────────────────────────────
+                try {
                     await service.apiRequestPublic("/user", "PUT", {
                         name: "admin",
                         password: router.password || "admin",
@@ -273,14 +334,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 } catch (e: any) { if (!e.message?.includes("already")) console.warn("User note:", e.message); }
 
                 try {
-                    // Set system identity
-                    await service.apiRequestPublic("/system/identity", "PATCH", {
-                        name: router.name
-                    });
+                    await service.apiRequestPublic("/system/identity", "PATCH", { name: router.name });
                 } catch (e: any) { console.warn("Identity note:", e.message); }
 
                 try {
-                    // Set DNS
                     await service.apiRequestPublic("/ip/dns", "PATCH", {
                         servers: "8.8.8.8,8.8.4.4",
                         "allow-remote-requests": "yes"
@@ -288,14 +345,103 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 } catch (e: any) { console.warn("DNS note:", e.message); }
 
                 try {
-                    // Set NTP Client (Critical for WireGuard handshake timestamps after reboot)
                     await service.apiRequestPublic("/system/ntp/client", "PATCH", {
                         enabled: "yes",
                         servers: "pool.ntp.org"
                     });
                 } catch (e: any) { console.warn("NTP note:", e.message); }
 
-                // Step 1: Create WireGuard interface
+                // ──────────────────────────────────────────────────────────
+                // STEP 2: HOTSPOT + PPPOE + DHCP
+                // ──────────────────────────────────────────────────────────
+                console.log("[PUSH-CONFIG] Setting up Hotspot & PPPoE...");
+
+                const hotspotProfileName = `hsprof-${router.name.toLowerCase().replace(/\s+/g, '-')}`;
+                
+                try {
+                    await service.apiRequestPublic("/ip/hotspot/profile", "PUT", {
+                        name: hotspotProfileName,
+                        "hotspot-address": "192.168.88.1",
+                        "dns-name": `${router.name.toLowerCase().replace(/\s+/g, '-')}.hotspot`,
+                        "html-directory": "hotspot",
+                        "login-by": "http-chap,http-pap,cookie,mac-cookie",
+                        "http-cookie-lifetime": "3d"
+                    });
+                } catch (e: any) { if (!e.message?.includes("already")) console.warn("Hotspot profile note:", e.message); }
+
+                try {
+                    await service.apiRequestPublic("/ip/pool", "PUT", {
+                        name: `hs-pool-${router.name}`,
+                        ranges: "192.168.88.2-192.168.88.254"
+                    });
+                } catch (e: any) { if (!e.message?.includes("already")) console.warn("HS pool note:", e.message); }
+
+                try {
+                    await service.apiRequestPublic("/ip/hotspot", "PUT", {
+                        name: `hotspot-${router.name}`,
+                        interface: "ether2",
+                        "address-pool": `hs-pool-${router.name}`,
+                        profile: hotspotProfileName,
+                        disabled: "no"
+                    });
+                } catch (e: any) { if (!e.message?.includes("already")) console.warn("Hotspot note:", e.message); }
+
+                try {
+                    await service.apiRequestPublic("/ip/pool", "PUT", {
+                        name: `pppoe-pool-${router.name}`,
+                        ranges: "10.10.10.2-10.10.10.254"
+                    });
+                } catch (e: any) { if (!e.message?.includes("already")) console.warn("PPPoE pool note:", e.message); }
+
+                try {
+                    await service.apiRequestPublic("/ppp/profile", "PUT", {
+                        name: `pppoe-profile-${router.name}`,
+                        "local-address": "10.10.10.1",
+                        "remote-address": `pppoe-pool-${router.name}`,
+                        "dns-server": "8.8.8.8,1.1.1.1",
+                        "use-encryption": "yes"
+                    });
+                } catch (e: any) { if (!e.message?.includes("already")) console.warn("PPPoE profile note:", e.message); }
+
+                try {
+                    await service.apiRequestPublic("/interface/pppoe-server/server", "PUT", {
+                        "service-name": `pppoe-svc-${router.name}`,
+                        interface: "ether1",
+                        "default-profile": `pppoe-profile-${router.name}`,
+                        disabled: "no"
+                    });
+                } catch (e: any) { if (!e.message?.includes("already")) console.warn("PPPoE server note:", e.message); }
+
+                try {
+                    await service.apiRequestPublic("/ip/address", "PUT", {
+                        address: "192.168.88.1/24",
+                        interface: "ether2",
+                        comment: "Kenge Hotspot LAN"
+                    });
+                } catch (e: any) { if (!e.message?.includes("already")) console.warn("HS IP note:", e.message); }
+
+                try {
+                    await service.apiRequestPublic("/ip/dhcp-server/network", "PUT", {
+                        address: "192.168.88.0/24",
+                        gateway: "192.168.88.1",
+                        "dns-server": "192.168.88.1"
+                    });
+                } catch (e: any) { if (!e.message?.includes("already")) console.warn("DHCP network note:", e.message); }
+
+                try {
+                    await service.apiRequestPublic("/ip/dhcp-server", "PUT", {
+                        name: `dhcp-${router.name}`,
+                        interface: "ether2",
+                        "address-pool": `hs-pool-${router.name}`,
+                        disabled: "no"
+                    });
+                } catch (e: any) { if (!e.message?.includes("already")) console.warn("DHCP server note:", e.message); }
+
+                // ──────────────────────────────────────────────────────────
+                // STEP 3: WIREGUARD VPN
+                // ──────────────────────────────────────────────────────────
+                console.log("[PUSH-CONFIG] Setting up WireGuard...");
+                
                 try {
                     await service.apiRequestPublic("/interface/wireguard", "PUT", {
                         name: "wg-kenge",
@@ -304,12 +450,24 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                         comment: "Kenge VPN Interface"
                     });
                 } catch (e: any) {
-                    if (!e.message?.includes("already")) throw e;
-                    // If already exists, we might want to update the private key?
-                    // For now, assume it's correct or managed manually.
+                    if (!e.message?.includes("already")) {
+                        try {
+                            const wgInterfaces = await service.apiRequestPublic("/interface/wireguard");
+                            if (Array.isArray(wgInterfaces)) {
+                                const existing = wgInterfaces.find((i: any) => i.name === "wg-kenge");
+                                if (existing?.[".id"]) {
+                                    await service.apiRequestPublic("/interface/wireguard", "PATCH", {
+                                        ".id": existing[".id"],
+                                        "private-key": router.wgPrivateKey
+                                    });
+                                }
+                            }
+                        } catch {}
+                    } else {
+                        throw e;
+                    }
                 }
 
-                // Step 2: Assign IP address
                 try {
                     await service.apiRequestPublic("/ip/address", "PUT", {
                         address: `${tunnelIp}/24`,
@@ -317,11 +475,21 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                         network: `${subnetPrefix}.0`,
                         comment: "Kenge VPN Address"
                     });
-                } catch (e: any) {
-                    if (!e.message?.includes("already")) console.warn("IP note:", e.message);
-                }
+                } catch (e: any) { if (!e.message?.includes("already")) console.warn("WG IP note:", e.message); }
 
-                // Step 3: Add peer
+                try {
+                    const oldPeers = await service.apiRequestPublic("/interface/wireguard/peers");
+                    if (Array.isArray(oldPeers)) {
+                        for (const peer of oldPeers) {
+                            if (peer.comment?.includes("Kenge") || peer.interface === "wg-kenge") {
+                                try {
+                                    await service.apiRequestPublic(`/interface/wireguard/peers/${peer[".id"]}`, "DELETE");
+                                } catch {}
+                            }
+                        }
+                    }
+                } catch {}
+
                 try {
                     await service.apiRequestPublic("/interface/wireguard/peers", "PUT", {
                         interface: "wg-kenge",
@@ -332,69 +500,53 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                         "persistent-keepalive": "25s",
                         comment: "Kenge ISP Server",
                     });
-                } catch (e: any) {
-                    if (!e.message?.includes("already")) console.warn("Peer note:", e.message);
-                }
+                } catch (e: any) { console.warn("Peer note:", e.message); }
 
-                // Step 4: Firewall Rules (Input and Forward)
-                // Use place-before="0" to ensure rules are at the top of the chain
+                // ──────────────────────────────────────────────────────────
+                // STEP 4: FIREWALL RULES (CLEAN, NO DUPLICATES!)
+                // ──────────────────────────────────────────────────────────
+                console.log("[PUSH-CONFIG] Setting up Firewall...");
+                
                 const restPort = router.apiPort || (router.port === 8728 || router.port === 8729 ? 80 : router.port) || 80;
 
                 const firewallRules = [
-                    {
-                        chain: "input", protocol: "udp", "dst-port": String(listenPort),
-                        action: "accept", comment: "Allow WireGuard - Kenge"
-                    },
-                    {
-                        // Allow ICMP from VPN
-                        chain: "input", protocol: "icmp",
-                        "src-address": `${subnetPrefix}.0/24`,
-                        action: "accept", comment: "Allow ICMP from VPN - Kenge"
-                    },
-                    {
-                        // Allow the Droplet to reach MikroTik REST API over the VPN tunnel
-                        chain: "input", protocol: "tcp", "dst-port": String(restPort),
-                        "src-address": `${subnetPrefix}.0/24`,
-                        action: "accept", comment: "Allow REST API from VPN - Kenge"
-                    },
-                    {
-                        // Allow Winbox access over VPN
-                        chain: "input", protocol: "tcp", "dst-port": "8291",
-                        "src-address": `${subnetPrefix}.0/24`,
-                        action: "accept", comment: "Allow Winbox from VPN - Kenge"
-                    },
-                    {
-                        chain: "forward", "in-interface": "wg-kenge",
-                        action: "accept", comment: "Allow WG traffic - Kenge"
-                    },
-                    {
-                        chain: "forward", "out-interface": "wg-kenge",
-                        action: "accept", comment: "Allow WG return traffic - Kenge"
-                    }
+                    { chain: "input", protocol: "udp", "dst-port": String(listenPort), action: "accept", comment: "Allow WireGuard - Kenge" },
+                    { chain: "input", protocol: "icmp", "src-address": `${subnetPrefix}.0/24`, action: "accept", comment: "Allow ICMP from VPN - Kenge" },
+                    { chain: "input", protocol: "tcp", "dst-port": String(restPort), "src-address": `${subnetPrefix}.0/24`, action: "accept", comment: "Allow REST API from VPN - Kenge" },
+                    { chain: "input", protocol: "tcp", "dst-port": "8291", "src-address": `${subnetPrefix}.0/24`, action: "accept", comment: "Allow Winbox from VPN - Kenge" },
+                    { chain: "input", protocol: "tcp", "dst-port": "80,443", action: "accept", comment: "Allow Web - Kenge" },
+                    { chain: "input", protocol: "udp", "dst-port": "53,67", action: "accept", comment: "Allow DNS & DHCP - Kenge" },
+                    { chain: "input", protocol: "icmp", action: "accept", comment: "Allow Ping - Kenge" },
+                    { chain: "input", "connection-state": "established,related", action: "accept", comment: "Allow Established - Kenge" },
+                    { chain: "forward", "in-interface": "wg-kenge", action: "accept", comment: "Allow WG traffic - Kenge" },
+                    { chain: "forward", "out-interface": "wg-kenge", action: "accept", comment: "Allow WG return - Kenge" }
                 ];
 
                 for (const rule of firewallRules) {
                     try {
                         await service.apiRequestPublic("/ip/firewall/filter", "PUT", rule);
-                    } catch (e: any) {
-                        // Ignore if exactly the same rule exists (some versions of ROS might allow duplicates if comment is different)
-                        console.warn("FW note:", e.message);
-                    }
+                    } catch (e: any) { console.warn("FW note:", e.message); }
                 }
 
-                // Step 5: NAT
+                // ──────────────────────────────────────────────────────────
+                // STEP 5: NAT (FIXED CONFLICT! - ONLY ETHER1!)
+                // ──────────────────────────────────────────────────────────
+                console.log("[PUSH-CONFIG] Setting up NAT...");
+                
                 try {
                     await service.apiRequestPublic("/ip/firewall/nat", "PUT", {
-                        chain: "srcnat", "out-interface": "wg-kenge",
-                        action: "masquerade", comment: "NAT WireGuard - Kenge", "place-before": "0"
+                        chain: "srcnat", "out-interface": "ether1",
+                        action: "masquerade", comment: "NAT for Internet - Kenge", "place-before": "0"
                     });
                 } catch (e: any) { console.warn("NAT note:", e.message); }
 
-                // Step 6: Route
+                // ──────────────────────────────────────────────────────────
+                // STEP 6: ROUTE
+                // ──────────────────────────────────────────────────────────
                 try {
                     await service.apiRequestPublic("/ip/route", "PUT", {
                         "dst-address": `${subnetPrefix}.0/24`, gateway: "wg-kenge",
-                        comment: "WireGuard subnet route - Kenge",
+                        comment: "WireGuard route - Kenge"
                     });
                 } catch (e: any) { console.warn("Route note:", e.message); }
 
