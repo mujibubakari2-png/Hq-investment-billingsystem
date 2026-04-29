@@ -16,4 +16,17 @@ export default defineConfig({
     host: '0.0.0.0',
     allowedHosts: true,
   },
+  build: {
+    chunkSizeWarningLimit: 1000,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          mui: ['@mui/material', '@mui/icons-material', '@emotion/react', '@emotion/styled'],
+          router: ['react-router-dom'],
+          utilities: ['react-hook-form', '@hookform/resolvers', 'zod', 'axios', 'date-fns', 'recharts', 'zustand', 'jszip', 'file-saver']
+        }
+      }
+    }
+  }
 })
