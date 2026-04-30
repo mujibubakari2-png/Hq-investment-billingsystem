@@ -117,46 +117,47 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
 # ============================================
 /system identity set name="${config.routerName}"
 /ip dns set servers=8.8.8.8,8.8.4.4 allow-remote-requests=yes
-/system ntp client set enabled=yes servers=pool.ntp.org
+/system ntp client set enabled=yes
+:if ([:len [/system ntp client servers find where address="pool.ntp.org"]] = 0) do={ /system ntp client servers add address=pool.ntp.org }
 
 # ============================================
 # STEP 2: Bridge (No ports added - add manually)
 # ============================================
-/interface bridge add name=bridge-lan comment="Kenge LAN Bridge - Hotspot & PPPoE"
+/interface bridge add name="bridge-lan" comment="Kenge LAN Bridge - Hotspot & PPPoE"
 
 # ============================================
 # STEP 3: IP Pools & LAN Address
 # ============================================
-/ip address add address=10.116.0.2/24 interface=bridge-lan comment="Kenge Hotspot LAN"
-/ip pool add name=hs-pool-${safeRouterName} ranges=10.116.0.3-10.116.0.254
-/ip pool add name=pppoe-pool-${safeRouterName} ranges=10.116.0.3-10.116.0.254
+/ip address add address=10.116.0.2/24 interface="bridge-lan" comment="Kenge Hotspot LAN"
+/ip pool add name="hs-pool-${safeRouterName}" ranges=10.116.0.3-10.116.0.254
+/ip pool add name="pppoe-pool-${safeRouterName}" ranges=10.116.0.3-10.116.0.254
 
 # ============================================
 # STEP 4: DHCP Server & Hotspot Setup
 # ============================================
 /ip dhcp-server network add address=10.116.0.0/24 gateway=10.116.0.2 dns-server=10.116.0.2
-/ip dhcp-server add address-pool=hs-pool-${safeRouterName} disabled=no interface=bridge-lan name=dhcp-${safeRouterName}
-/ip hotspot profile add hotspot-address=10.116.0.2 dns-name=${safeRouterNameLower}.hotspot html-directory=hotspot login-by=http-chap,http-pap,cookie,mac-cookie http-cookie-lifetime=3d name=hsprof-${safeRouterNameLower}
-/ip hotspot add address-pool=hs-pool-${safeRouterName} disabled=no interface=bridge-lan name=hotspot-${safeRouterName} profile=hsprof-${safeRouterNameLower}
+/ip dhcp-server add address-pool="hs-pool-${safeRouterName}" disabled=no interface="bridge-lan" name="dhcp-${safeRouterName}"
+/ip hotspot profile add hotspot-address=10.116.0.2 dns-name="${safeRouterNameLower}.hotspot" html-directory=hotspot login-by=http-chap,http-pap,cookie,mac-cookie http-cookie-lifetime=3d name="hsprof-${safeRouterNameLower}"
+/ip hotspot add address-pool="hs-pool-${safeRouterName}" disabled=no interface="bridge-lan" name="hotspot-${safeRouterName}" profile="hsprof-${safeRouterNameLower}"
 
 # ============================================
 # STEP 5: PPPoE Server Setup
 # ============================================
-/ppp profile add name=pppoe-profile-${safeRouterName} local-address=10.116.0.2 remote-address=pppoe-pool-${safeRouterName} dns-server=8.8.8.8,1.1.1.1 use-encryption=yes
-/interface pppoe-server server add disabled=no interface=bridge-lan default-profile=pppoe-profile-${safeRouterName} service-name=pppoe-svc-${safeRouterName}
+/ppp profile add name="pppoe-profile-${safeRouterName}" local-address=10.116.0.2 remote-address="pppoe-pool-${safeRouterName}" dns-server=8.8.8.8,1.1.1.1 use-encryption=yes
+/interface pppoe-server server add disabled=no interface="bridge-lan" default-profile="pppoe-profile-${safeRouterName}" service-name="pppoe-svc-${safeRouterName}"
 
 # ============================================
 # STEP 6: WireGuard VPN Configuration
 # ============================================
-/interface wireguard add name=wg-kenge listen-port=${config.listenPort} private-key="${config.routerPrivateKey}" comment="Kenge VPN Interface"
-/interface wireguard peers add interface=wg-kenge public-key="${serverPubKey}" endpoint-address=${config.serverEndpoint} endpoint-port=${config.serverPort} allowed-address=${subnetAddress} persistent-keepalive=25s comment="Kenge ISP Server"
-/ip address add address=${config.routerTunnelIp}/24 interface=wg-kenge comment="VPN Address"
-/ip route add dst-address=${subnetAddress} gateway=wg-kenge comment="VPN Route"
+/interface wireguard add name="wg-kenge" listen-port=${config.listenPort} private-key="${config.routerPrivateKey}" comment="Kenge VPN Interface"
+/interface wireguard peers add interface="wg-kenge" public-key="${serverPubKey}" endpoint-address=${config.serverEndpoint} endpoint-port=${config.serverPort} allowed-address=${subnetAddress} persistent-keepalive=25s comment="Kenge ISP Server"
+/ip address add address=${config.routerTunnelIp}/24 interface="wg-kenge" comment="VPN Address"
+/ip route add dst-address=${subnetAddress} gateway="wg-kenge" comment="VPN Route"
 
 # ============================================
 # STEP 7: Firewall & NAT
 # ============================================
-/ip firewall nat add chain=srcnat out-interface=ether1 action=masquerade comment="NAT for Internet - Kenge" place-before=0
+/ip firewall nat add chain=srcnat out-interface=ether1 action=masquerade comment="NAT for Internet - Kenge"
 
 /ip firewall filter add chain=input action=accept protocol=udp dst-port=${config.listenPort} comment="Allow WireGuard - Kenge"
 /ip firewall filter add chain=input action=accept protocol=icmp src-address=${subnetAddress} comment="Allow ICMP from VPN - Kenge"
