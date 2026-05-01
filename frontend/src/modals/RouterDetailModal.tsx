@@ -26,6 +26,9 @@ export default function RouterDetailModal({ router, onClose, onDelete }: RouterD
 
     const downloadScript = () => {
         const routerIdCode = `MYR-${router.id.padStart(3, '0')}VBHBC`;
+        const safeRouterName = router.name.replace(/[^a-zA-Z0-9_-]/g, '-').replace(/-+/g, '-').toLowerCase();
+        const displayRouterName = router.name.replace(/"/g, '\\"');
+
         const script = `# ═══════════════════════════════════════════════════════════════
 # HQINVESTMENT ISP Billing - MikroTik Auto-Configuration Script
 # Router: ${router.name}
@@ -33,98 +36,127 @@ export default function RouterDetailModal({ router, onClose, onDelete }: RouterD
 # Generated: ${new Date().toISOString().split('T')[0]}
 # ═══════════════════════════════════════════════════════════════
 
+:global lanBridge "bridge-lan";
+:global wanInterface "ether1";
+
 # ── 1. System Identity ────────────────────────────────────────
-/system identity set name="${router.name}"
+/system identity set name="${displayRouterName}"
 
-# ── 2. Hotspot Server Setup ───────────────────────────────────
-:if ([:len [/ip hotspot profile find name="hsprof-${router.name}"]] = 0) do={
-    /ip hotspot profile add name="hsprof-${router.name}" hotspot-address=10.116.0.2 dns-name="${router.name.toLowerCase().replace(/\s+/g, '-')}.hotspot" \\
+# ── 2. Bridge Setup ─────────────────────────────────────────────
+# Check if default bridge exists, use it instead
+:local existingBridge [/interface bridge find name="bridge"];
+:if ([:len $existingBridge] > 0) do={
+    :set lanBridge "bridge";
+} else={
+    :if ([:len [/interface bridge find name=$lanBridge]] = 0) do={
+        /interface bridge add name=$lanBridge comment="LAN Bridge - Hotspot & PPPoE"
+        # Add default ports if they aren't in another bridge
+        :foreach iface in=[/interface ethernet find name!="ether1"] do={
+            :local ifaceName [/interface get $iface name];
+            :if ([:len [/interface bridge port find interface=$ifaceName]] = 0) do={
+                /interface bridge port add bridge=$lanBridge interface=$ifaceName
+            }
+        }
+    }
+}
+
+# ── 3. Hotspot Server Setup ───────────────────────────────────
+:if ([:len [/ip hotspot profile find name="hsprof-${safeRouterName}"]] = 0) do={
+    /ip hotspot profile add name="hsprof-${safeRouterName}" hotspot-address=10.116.0.2 dns-name="${safeRouterName}.hotspot" \\
         html-directory=hotspot login-by=http-chap,http-pap,cookie,mac-cookie \\
-        http-cookie-lifetime=3d
+        http-cookie-lifetime=3d use-radius=yes radius-accounting=yes
 }
 
-:if ([:len [/ip pool find name="hs-pool-${router.name}"]] = 0) do={
-    /ip pool add name="hs-pool-${router.name}" ranges=10.116.0.3-10.116.0.254
+:if ([:len [/ip pool find name="hs-pool-${safeRouterName}"]] = 0) do={
+    /ip pool add name="hs-pool-${safeRouterName}" ranges=10.116.0.3-10.116.0.254
 }
 
-:if ([:len [/ip hotspot find name="hotspot-${router.name}"]] = 0) do={
-    /ip hotspot add name="hotspot-${router.name}" interface=ether2 address-pool="hs-pool-${router.name}" \\
-        profile="hsprof-${router.name}" disabled=no
+:if ([:len [/ip hotspot find name="hotspot-${safeRouterName}"]] = 0) do={
+    :if ([:len [/ip hotspot find interface=$lanBridge]] = 0) do={
+        /ip hotspot add name="hotspot-${safeRouterName}" interface=$lanBridge address-pool="hs-pool-${safeRouterName}" \\
+            profile="hsprof-${safeRouterName}" disabled=no
+    } else={
+        /ip hotspot set [find interface=$lanBridge] profile="hsprof-${safeRouterName}"
+    }
 }
 
-# Ensure ALL existing hotspots use this new profile so the login page works everywhere
-/ip hotspot set [find] profile="hsprof-${router.name}"
-
-# ── 3. PPPoE Server Setup ─────────────────────────────────────
-:if ([:len [/ip pool find name="pppoe-pool-${router.name}"]] = 0) do={
-    /ip pool add name="pppoe-pool-${router.name}" ranges=10.116.0.3-10.116.0.254
+# ── 4. PPPoE Server Setup ─────────────────────────────────────
+:if ([:len [/ip pool find name="pppoe-pool-${safeRouterName}"]] = 0) do={
+    /ip pool add name="pppoe-pool-${safeRouterName}" ranges=10.116.0.3-10.116.0.254
 }
 
-:if ([:len [/ppp profile find name="pppoe-profile-${router.name}"]] = 0) do={
-    /ppp profile add name="pppoe-profile-${router.name}" local-address=10.116.0.2 remote-address="pppoe-pool-${router.name}" dns-server=8.8.8.8,1.1.1.1 use-encryption=yes
+:if ([:len [/ppp profile find name="pppoe-profile-${safeRouterName}"]] = 0) do={
+    /ppp profile add name="pppoe-profile-${safeRouterName}" local-address=10.116.0.2 remote-address="pppoe-pool-${safeRouterName}" dns-server=8.8.8.8,1.1.1.1 use-encryption=yes use-radius=yes
 }
 
-:if ([:len [/interface pppoe-server server find service-name="pppoe-svc-${router.name}"]] = 0) do={
-    /interface pppoe-server server add service-name="pppoe-svc-${router.name}" interface=ether1 default-profile="pppoe-profile-${router.name}" disabled=no
+:if ([:len [/interface pppoe-server server find service-name="pppoe-svc-${safeRouterName}"]] = 0) do={
+    /interface pppoe-server server add service-name="pppoe-svc-${safeRouterName}" interface=$lanBridge default-profile="pppoe-profile-${safeRouterName}" disabled=no
 }
 
-# ── 4. DHCP Server ───────────────────────────────────────────
+# ── 5. DHCP Server ───────────────────────────────────────────
 :if ([:len [/ip address find address="10.116.0.2/24"]] = 0) do={
-    /ip address add address=10.116.0.2/24 interface=ether2
+    /ip address add address=10.116.0.2/24 interface=$lanBridge
 }
 
 :if ([:len [/ip dhcp-server network find address="10.116.0.0/24"]] = 0) do={
-    /ip dhcp-server network add address=10.116.0.0/24 gateway=10.116.0.2 dns-server=8.8.8.8,1.1.1.1
+    /ip dhcp-server network add address=10.116.0.0/24 gateway=10.116.0.2 dns-server=10.116.0.2,8.8.8.8
 }
 
-:if ([:len [/ip dhcp-server find name="dhcp-${router.name}"]] = 0) do={
-    /ip dhcp-server add name="dhcp-${router.name}" interface=ether2 address-pool="hs-pool-${router.name}" disabled=no
+:if ([:len [/ip dhcp-server find interface=$lanBridge]] = 0) do={
+    /ip dhcp-server add name="dhcp-${safeRouterName}" interface=$lanBridge address-pool="hs-pool-${safeRouterName}" disabled=no
 }
 
-# ── 5. NAT (Masquerade) ──────────────────────────────────────
-:if ([:len [/ip firewall nat find action=masquerade chain=srcnat out-interface=ether1]] = 0) do={
-    /ip firewall nat add chain=srcnat out-interface=ether1 action=masquerade comment="Masquerade for internet"
+# ── 6. NAT (Masquerade) ──────────────────────────────────────
+:if ([:len [/ip firewall nat find action=masquerade]] = 0) do={
+    /ip firewall nat add chain=srcnat out-interface=$wanInterface action=masquerade comment="Masquerade for internet"
 }
 
-# ── 6. DNS Settings ──────────────────────────────────────────
+# ── 7. DNS Settings ──────────────────────────────────────────
 /ip dns set servers=8.8.8.8,1.1.1.1 allow-remote-requests=yes
 
-# ── 7. Firewall Rules ────────────────────────────────────────
+# ── 8. Firewall Rules ────────────────────────────────────────
 /ip firewall filter
 add chain=input protocol=tcp dst-port=8291 action=accept comment="Allow Winbox"
 add chain=input protocol=tcp dst-port=80,443 action=accept comment="Allow Web"
+add chain=input protocol=tcp dst-port=8728,8729 action=accept comment="Allow API"
 add chain=input protocol=udp dst-port=53,67 action=accept comment="Allow DNS & DHCP"
 add chain=input protocol=icmp action=accept comment="Allow Ping"
 add chain=input connection-state=established,related action=accept
-add chain=input protocol=tcp dst-port=80 action=accept comment="Allow RouterOS API (HTTP)"
-add chain=input protocol=tcp dst-port=443 action=accept comment="Allow RouterOS API (HTTPS)"
-add chain=input action=drop comment="Drop all other input"
 
-# ── 8. RADIUS Client (HQInvestment ISP Billing) ───────────────────────
-/radius
-add service=hotspot,ppp address=${window.location.hostname} secret=hqinvestment-radius-secret \\
-    authentication-port=1812 accounting-port=1813
+add chain=forward action=accept connection-state=established,related comment="Allow established forward"
+add chain=forward in-interface=$lanBridge action=accept comment="Allow LAN to WAN"
 
-/ip hotspot profile set "hsprof-${router.name}" use-radius=yes radius-accounting=yes
-/ppp profile set "pppoe-profile-${router.name}" use-radius=yes
+# ── 9. RADIUS Client (HQInvestment ISP Billing) ───────────────────────
+:if ([:len [/radius find address="${window.location.hostname}"]] = 0) do={
+    /radius add service=hotspot,ppp address="${window.location.hostname}" secret="hqinvestment-radius-secret" \\
+        authentication-port=1812 accounting-port=1813
+}
 
-# ── 9. Walled Garden (Allow billing portal) ──────────────────
-/ip hotspot walled-garden
-add dst-host="${window.location.hostname}" action=allow comment="Billing Portal"
+# ── 10. Walled Garden (Allow billing portal & Mgmt) ───────────
+:if ([:len [/ip hotspot walled-garden find dst-host="${window.location.hostname}"]] = 0) do={
+    /ip hotspot walled-garden add dst-host="${window.location.hostname}" action=allow comment="Billing Portal"
+}
+:if ([:len [/ip hotspot walled-garden ip find dst-address="${window.location.hostname}"]] = 0) do={
+    /ip hotspot walled-garden ip add dst-address="${window.location.hostname}" action=accept comment="Billing Portal IP"
+}
+
+# Unblock Management Ports so network admin is not locked out!
 /ip hotspot walled-garden ip
-add dst-address="${window.location.hostname}" action=accept comment="Billing Portal IP"
+add action=accept dst-port=8291 protocol=tcp comment="Allow Winbox Management"
+add action=accept dst-port=8728,8729 protocol=tcp comment="Allow API Management"
+add action=accept dst-port=80,443 protocol=tcp comment="Allow Web Management"
 
-# ── 10. System Scheduler (Auto-sync with HQInvestment) ───────────────────
+# ── 11. System Scheduler (Auto-sync with HQInvestment) ───────────────────
 /system scheduler
 :if ([:len [find name="billing-sync"]] > 0) do={ remove [find name="billing-sync"] }
 add name="billing-sync" interval=5m on-event="/tool fetch url=\\"${PUBLIC_API_BASE}/api/sync/${routerIdCode}\\"" \\
     start-time=startup
 
-# ── 11. Logging ──────────────────────────────────────────────
+# ── 12. Logging ──────────────────────────────────────────────
 /system logging
-add topics=hotspot action=memory
-add topics=radius action=memory
-add topics=pppoe action=memory
+:if ([:len [/system logging find topics=hotspot]] = 0) do={ add topics=hotspot action=memory }
+:if ([:len [/system logging find topics=radius]] = 0) do={ add topics=radius action=memory }
+:if ([:len [/system logging find topics=pppoe]] = 0) do={ add topics=pppoe action=memory }
 
 # ═══════════════════════════════════════════════════════════════
 # ✅ Script Complete! Router "${router.name}" is configured.
@@ -134,7 +166,7 @@ add topics=pppoe action=memory
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `mikrotik-script-${router.name.toLowerCase().replace(/\s+/g, '-')}.rsc`;
+        a.download = `mikrotik-script-${safeRouterName}.rsc`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
