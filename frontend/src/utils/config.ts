@@ -7,4 +7,4 @@
 export const PUBLIC_API_BASE =
   import.meta.env.VITE_PUBLIC_API_URL ||
   // <-- replace the string below with your actual droplet public IP
-  "http://YOUR_DROPLET_PUBLIC_IP";
+  "http://174.138.42.168";
