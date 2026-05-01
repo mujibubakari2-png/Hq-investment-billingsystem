@@ -14,8 +14,8 @@ const envSchema = z.object({
 
   // SMTP Settings
   SMTP_HOST: z.string().default("smtp.ethereal.email"),
-  SMTP_PORT: z.string().transform(Number).default("587"),
-  SMTP_SECURE: z.string().transform((v) => v === "true").default("false"),
+  SMTP_PORT: z.string().default("587").transform(Number),
+  SMTP_SECURE: z.string().default("false").transform((v) => v === "true"),
   SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
   SMTP_FROM: z.string().optional(),
@@ -28,9 +28,9 @@ const envSchema = z.object({
   PAYMENT_WEBHOOK_SECRET: z.string().optional(),
 
   // Mikrotik
-  MIKROTIK_USE_HTTPS: z.string().transform((v) => v === "true").default("false"),
-  MIKROTIK_TIMEOUT_MS: z.string().transform(Number).default("8000"),
-  MIKROTIK_INSECURE: z.string().transform((v) => v === "true").default("false"),
+  MIKROTIK_USE_HTTPS: z.string().default("false").transform((v) => v === "true"),
+  MIKROTIK_TIMEOUT_MS: z.string().default("8000").transform(Number),
+  MIKROTIK_INSECURE: z.string().default("false").transform((v) => v === "true"),
 });
 
 // Since Next.js might bundle this for Edge/Client sometimes, we fallback gracefully
