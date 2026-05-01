@@ -323,7 +323,7 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
         }
         if (vpnEnabled) {
             lines.push('', `# ===== VPN Setup (${vpnMode}) =====`,
-                `/ip pool add name=vpn-pool ranges=${vpnPoolStart}-${vpnPoolEnd}`,
+                `:if ([:len [/ip pool find where name="vpn-pool"]] = 0) do={ /ip pool add name=vpn-pool ranges=${vpnPoolStart}-${vpnPoolEnd} } else={ /ip pool set [/ip pool find where name="vpn-pool"] ranges=${vpnPoolStart}-${vpnPoolEnd} }`,
                 `/ip dns set servers=${vpnDns}`,
             );
             if (vpnMode === 'hybrid' || vpnMode === 'openvpn') {
@@ -332,16 +332,28 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
             if (vpnMode === 'hybrid' || vpnMode === 'wireguard') {
                 const wgAddress = '10.0.0.2'; // First router usually gets .2
                 const dropletIp = window.location.hostname;
-                lines.push('/interface wireguard add listen-port=13231 name=wireguard1',
-                    `/ip address add address=${wgAddress}/24 interface=wireguard1`,
-                    `/interface wireguard peers add allowed-address=0.0.0.0/0 endpoint-address=${dropletIp} endpoint-port=51820 interface=wireguard1 public-key="b7ADpdTy6UooXmb7Ve+PgGeXjGFLVFXqsuz32dYNaxA=" persistent-keepalive=25s comment="HQ-VPN-Server"`);
+                lines.push(
+                    `:if ([:len [/interface wireguard find where name="wireguard1"]] = 0) do={ /interface wireguard add listen-port=13231 name=wireguard1 }`,
+                    `:if ([:len [/ip address find where address="${wgAddress}/24" interface="wireguard1"]] = 0) do={ /ip address add address=${wgAddress}/24 interface=wireguard1 }`,
+                    `:if ([:len [/interface wireguard peers find where comment="HQ-VPN-Server"]] = 0) do={ /interface wireguard peers add allowed-address=0.0.0.0/0 endpoint-address=${dropletIp} endpoint-port=51820 interface=wireguard1 public-key="b7ADpdTy6UooXmb7Ve+PgGeXjGFLVFXqsuz32dYNaxA=" persistent-keepalive=25s comment="HQ-VPN-Server" }`
+                );
             }
             if (vpnMode === 'openvpn' || vpnMode === 'hybrid') {
-                lines.push(`/ip ipsec peer add address=0.0.0.0/0 exchange-mode=main secret=${ipsecSecret}`,
-                    `/interface l2tp-server server set enabled=yes default-profile=default use-ipsec=yes ipsec-secret=${ipsecSecret}`);
+                lines.push(
+                    `:if ([:len [/ip ipsec peer find where secret="${ipsecSecret}"]] = 0) do={ /ip ipsec peer add address=0.0.0.0/0 exchange-mode=main secret="${ipsecSecret}" }`,
+                    `/interface l2tp-server server set enabled=yes default-profile=default use-ipsec=yes ipsec-secret="${ipsecSecret}"`
+                );
             }
             vpnSecrets.forEach(s => {
-                lines.push(`/ppp secret add name=${s.username} password=${s.password} service=${s.protocol.toLowerCase()} profile=${s.profile}${s.localAddress ? ` local-address=${s.localAddress}` : ''}${s.remoteAddress ? ` remote-address=${s.remoteAddress}` : ''}`);
+                const localAddr = s.localAddress ? ` local-address=${s.localAddress}` : '';
+                const remoteAddr = s.remoteAddress ? ` remote-address=${s.remoteAddress}` : '';
+                lines.push(
+                    `:if ([:len [/ppp secret find where name="${s.username}"]] = 0) do={`,
+                    `  /ppp secret add name=${s.username} password=${s.password} service=${s.protocol.toLowerCase()} profile=${s.profile}${localAddr}${remoteAddr}`,
+                    `} else={`,
+                    `  /ppp secret set [/ppp secret find where name="${s.username}"] password=${s.password} service=${s.protocol.toLowerCase()} profile=${s.profile}${localAddr}${remoteAddr}`,
+                    `}`
+                );
             });
         }
         lines.push('', '# ===== RADIUS Client =====',
@@ -403,7 +415,7 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                                 onClick={() => {
                                     const vpnUser = routerData?.username || (routerName ? routerName.toLowerCase().replace(/\s+/g, '') : 'vpn');
                                     const vpnPass = routerData?.password || 'secret';
-                                    const scriptContent = `# OpenVPN Setup Script for ${routerName}\n/interface ovpn-client add name=ovpn-out1 connect-to=${window.location.hostname} user=${vpnUser} password=${vpnPass}\n/ip hotspot walled-garden\nadd action=allow dst-host=${window.location.hostname}\n/ip hotspot walled-garden ip\nadd action=accept dst-address=${window.location.hostname}\n`;
+                                    const scriptContent = `# OpenVPN Setup Script for ${routerName}\n:if ([:len [/interface ovpn-client find where name="ovpn-out1"]] = 0) do={ /interface ovpn-client add name=ovpn-out1 connect-to=${window.location.hostname} user=${vpnUser} password=${vpnPass} } else={ /interface ovpn-client set [/interface ovpn-client find where name="ovpn-out1"] connect-to=${window.location.hostname} user=${vpnUser} password=${vpnPass} }\n:if ([:len [/ip hotspot walled-garden find where dst-host="${window.location.hostname}"]] = 0) do={ /ip hotspot walled-garden add action=allow dst-host=${window.location.hostname} }\n:if ([:len [/ip hotspot walled-garden ip find where dst-address="${window.location.hostname}"]] = 0) do={ /ip hotspot walled-garden ip add action=accept dst-address=${window.location.hostname} }\n`;
                                     const blob = new Blob([scriptContent], { type: 'application/octet-stream' });
                                     const url = URL.createObjectURL(blob);
                                     const a = document.createElement('a');
