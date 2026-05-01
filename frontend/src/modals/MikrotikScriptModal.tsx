@@ -60,13 +60,6 @@ export default function MikrotikScriptModal({ router, onClose }: MikrotikScriptM
 } else={
     :if ([:len [/interface bridge find name=$lanBridge]] = 0) do={
         /interface bridge add name=$lanBridge comment="LAN Bridge - Hotspot & PPPoE"
-        # Add default ports if they aren't in another bridge
-        :foreach iface in=[/interface ethernet find name!="ether1"] do={
-            :local ifaceName [/interface get $iface name];
-            :if ([:len [/interface bridge port find interface=$ifaceName]] = 0) do={
-                /interface bridge port add bridge=$lanBridge interface=$ifaceName
-            }
-        }
     }
 }
 
@@ -126,15 +119,13 @@ export default function MikrotikScriptModal({ router, onClose }: MikrotikScriptM
 
 # ── 8. Firewall Rules ────────────────────────────────────────
 /ip firewall filter
-add chain=input protocol=tcp dst-port=8291 action=accept comment="Allow Winbox"
-add chain=input protocol=tcp dst-port=80,443 action=accept comment="Allow Web"
-add chain=input protocol=tcp dst-port=8728,8729 action=accept comment="Allow API"
-add chain=input protocol=udp dst-port=53,67 action=accept comment="Allow DNS & DHCP"
-add chain=input protocol=icmp action=accept comment="Allow Ping"
-add chain=input connection-state=established,related action=accept
+:if ([:len [find where comment="Allow Winbox"]] = 0) do={ add place-before=0 chain=input protocol=tcp dst-port=8291 action=accept comment="Allow Winbox" }
+:if ([:len [find where comment="Allow Web"]] = 0) do={ add place-before=0 chain=input protocol=tcp dst-port=80,443 action=accept comment="Allow Web" }
+:if ([:len [find where comment="Allow API"]] = 0) do={ add place-before=0 chain=input protocol=tcp dst-port=8728,8729 action=accept comment="Allow API" }
+:if ([:len [find where comment="Allow DNS & DHCP"]] = 0) do={ add place-before=0 chain=input protocol=udp dst-port=53,67 action=accept comment="Allow DNS & DHCP" }
+:if ([:len [find where comment="Allow Ping"]] = 0) do={ add place-before=0 chain=input protocol=icmp action=accept comment="Allow Ping" }
 
-add chain=forward action=accept connection-state=established,related comment="Allow established forward"
-add chain=forward in-interface=$lanBridge action=accept comment="Allow LAN to WAN"
+:if ([:len [find where comment="Allow LAN to WAN"]] = 0) do={ add chain=forward in-interface=$lanBridge action=accept comment="Allow LAN to WAN" }
 
 # ── 9. RADIUS Client (HQInvestment ISP Billing) ───────────────────────
 :if ([:len [/radius find address="${apiHost}"]] = 0) do={

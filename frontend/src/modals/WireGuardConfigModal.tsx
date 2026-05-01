@@ -10,6 +10,7 @@ import PowerSettingsNewIcon from '@mui/icons-material/PowerSettingsNew';
 import SyncIcon from '@mui/icons-material/Sync';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import { routersApi } from '../api/client';
+import { PUBLIC_API_BASE } from '../utils/config';
 import type { Router } from '../types';
 import RouterIcon from '@mui/icons-material/Router';
 
@@ -103,6 +104,8 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
     const safeRouterName = config.routerName.replace(/\\s+/g, '-');
     const safeRouterNameLower = config.routerName.toLowerCase().replace(/\\s+/g, '-');
 
+    const apiHost = new URL(PUBLIC_API_BASE).hostname;
+
     const serverConfig = `# ============================================
 # Kenge Complete Router Setup Script
 # ============================================
@@ -111,6 +114,9 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
 # VPN IP: ${config.routerTunnelIp}
 # Generated: ${new Date().toLocaleString()}
 # ============================================
+
+:global lanBridge "bridge-lan";
+:global wanInterface "ether1";
 
 # ============================================
 # STEP 1: Set Router Identity & Clean DNS
@@ -123,58 +129,111 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
 # ============================================
 # STEP 2: Bridge (No ports added - add manually)
 # ============================================
-/interface bridge add name="bridge-lan" comment="Kenge LAN Bridge - Hotspot & PPPoE"
+:local existingBridge [/interface bridge find name="bridge"];
+:if ([:len $existingBridge] > 0) do={
+    :set lanBridge "bridge";
+} else={
+    :if ([:len [/interface bridge find name=$lanBridge]] = 0) do={
+        /interface bridge add name=$lanBridge comment="Kenge LAN Bridge - Hotspot & PPPoE"
+    }
+}
 
 # ============================================
 # STEP 3: IP Pools & LAN Address
 # ============================================
-/ip address add address=10.116.0.2/24 interface="bridge-lan" comment="Kenge Hotspot LAN"
-/ip pool add name="hs-pool-${safeRouterName}" ranges=10.116.0.3-10.116.0.254
-/ip pool add name="pppoe-pool-${safeRouterName}" ranges=10.116.0.3-10.116.0.254
+:if ([:len [/ip address find address="10.116.0.2/24"]] = 0) do={
+    /ip address add address=10.116.0.2/24 interface=$lanBridge comment="Kenge Hotspot LAN"
+}
+:if ([:len [/ip pool find name="hs-pool-${safeRouterName}"]] = 0) do={
+    /ip pool add name="hs-pool-${safeRouterName}" ranges=10.116.0.3-10.116.0.254
+}
+:if ([:len [/ip pool find name="pppoe-pool-${safeRouterName}"]] = 0) do={
+    /ip pool add name="pppoe-pool-${safeRouterName}" ranges=10.116.0.3-10.116.0.254
+}
 
 # ============================================
 # STEP 4: DHCP Server & Hotspot Setup
 # ============================================
-/ip dhcp-server network add address=10.116.0.0/24 gateway=10.116.0.2 dns-server=10.116.0.2
-/ip dhcp-server add address-pool="hs-pool-${safeRouterName}" disabled=no interface="bridge-lan" name="dhcp-${safeRouterName}"
-/ip hotspot profile add hotspot-address=10.116.0.2 dns-name="${safeRouterNameLower}.hotspot" html-directory=hotspot login-by=http-chap,http-pap,cookie,mac-cookie http-cookie-lifetime=3d name="hsprof-${safeRouterNameLower}"
-/ip hotspot add address-pool="hs-pool-${safeRouterName}" disabled=no interface="bridge-lan" name="hotspot-${safeRouterName}" profile="hsprof-${safeRouterNameLower}"
+:if ([:len [/ip dhcp-server network find address="10.116.0.0/24"]] = 0) do={
+    /ip dhcp-server network add address=10.116.0.0/24 gateway=10.116.0.2 dns-server=10.116.0.2
+}
+:if ([:len [/ip dhcp-server find interface=$lanBridge]] = 0) do={
+    /ip dhcp-server add address-pool="hs-pool-${safeRouterName}" disabled=no interface=$lanBridge name="dhcp-${safeRouterName}"
+}
+:if ([:len [/ip hotspot profile find name="hsprof-${safeRouterNameLower}"]] = 0) do={
+    /ip hotspot profile add hotspot-address=10.116.0.2 dns-name="${safeRouterNameLower}.hotspot" html-directory=hotspot login-by=http-chap,http-pap,cookie,mac-cookie http-cookie-lifetime=3d name="hsprof-${safeRouterNameLower}" use-radius=yes radius-accounting=yes
+}
+:if ([:len [/ip hotspot find name="hotspot-${safeRouterName}"]] = 0) do={
+    /ip hotspot add address-pool="hs-pool-${safeRouterName}" disabled=no interface=$lanBridge name="hotspot-${safeRouterName}" profile="hsprof-${safeRouterNameLower}"
+}
 
 # ============================================
 # STEP 5: PPPoE Server Setup
 # ============================================
-/ppp profile add name="pppoe-profile-${safeRouterName}" local-address=10.116.0.2 remote-address="pppoe-pool-${safeRouterName}" dns-server=8.8.8.8,1.1.1.1 use-encryption=yes
-/interface pppoe-server server add disabled=no interface="bridge-lan" default-profile="pppoe-profile-${safeRouterName}" service-name="pppoe-svc-${safeRouterName}"
+:if ([:len [/ppp profile find name="pppoe-profile-${safeRouterName}"]] = 0) do={
+    /ppp profile add name="pppoe-profile-${safeRouterName}" local-address=10.116.0.2 remote-address="pppoe-pool-${safeRouterName}" dns-server=8.8.8.8,1.1.1.1 use-encryption=yes use-radius=yes
+}
+:if ([:len [/interface pppoe-server server find service-name="pppoe-svc-${safeRouterName}"]] = 0) do={
+    /interface pppoe-server server add disabled=no interface=$lanBridge default-profile="pppoe-profile-${safeRouterName}" service-name="pppoe-svc-${safeRouterName}"
+}
 
 # ============================================
 # STEP 6: WireGuard VPN Configuration
 # ============================================
-/interface wireguard add name="wg-kenge" listen-port=${config.listenPort} private-key="${config.routerPrivateKey}" comment="Kenge VPN Interface"
-/interface wireguard peers add interface="wg-kenge" public-key="${serverPubKey}" endpoint-address=${config.serverEndpoint} endpoint-port=${config.serverPort} allowed-address=${subnetAddress} persistent-keepalive=25s comment="Kenge ISP Server"
-/ip address add address=${config.routerTunnelIp}/24 interface="wg-kenge" comment="VPN Address"
-/ip route add dst-address=${subnetAddress} gateway="wg-kenge" comment="VPN Route"
+:if ([:len [/interface wireguard find name="wg-kenge"]] = 0) do={
+    /interface wireguard add name="wg-kenge" listen-port=${config.listenPort} private-key="${config.routerPrivateKey}" comment="Kenge VPN Interface"
+}
+:if ([:len [/interface wireguard peers find interface="wg-kenge" public-key="${serverPubKey}"]] = 0) do={
+    /interface wireguard peers add interface="wg-kenge" public-key="${serverPubKey}" endpoint-address=${config.serverEndpoint} endpoint-port=${config.serverPort} allowed-address=${subnetAddress} persistent-keepalive=25s comment="Kenge ISP Server"
+}
+:if ([:len [/ip address find address="${config.routerTunnelIp}/24"]] = 0) do={
+    /ip address add address=${config.routerTunnelIp}/24 interface="wg-kenge" comment="VPN Address"
+}
+:if ([:len [/ip route find dst-address="${subnetAddress}"]] = 0) do={
+    /ip route add dst-address=${subnetAddress} gateway="wg-kenge" comment="VPN Route"
+}
 
 # ============================================
 # STEP 7: Firewall & NAT
 # ============================================
-/ip firewall nat add chain=srcnat out-interface=ether1 action=masquerade comment="NAT for Internet - Kenge"
+:if ([:len [/ip firewall nat find action=masquerade chain=srcnat out-interface=$wanInterface]] = 0) do={
+    /ip firewall nat add chain=srcnat out-interface=$wanInterface action=masquerade comment="NAT for Internet - Kenge"
+}
 
-/ip firewall filter add chain=input action=accept protocol=udp dst-port=${config.listenPort} comment="Allow WireGuard - Kenge"
-/ip firewall filter add chain=input action=accept protocol=icmp src-address=${subnetAddress} comment="Allow ICMP from VPN - Kenge"
-/ip firewall filter add chain=input action=accept protocol=tcp dst-port=${restPort} src-address=${subnetAddress} comment="Allow REST API from VPN - Kenge"
-/ip firewall filter add chain=input action=accept protocol=tcp dst-port=8291 src-address=${subnetAddress} comment="Allow Winbox from VPN - Kenge"
-/ip firewall filter add chain=input action=accept protocol=tcp dst-port=80,443 comment="Allow Web - Kenge"
-/ip firewall filter add chain=input action=accept protocol=udp dst-port=53,67 comment="Allow DNS & DHCP - Kenge"
-/ip firewall filter add chain=input action=accept protocol=icmp comment="Allow Ping - Kenge"
-/ip firewall filter add chain=input action=accept connection-state=established,related comment="Allow Established - Kenge"
-/ip firewall filter add chain=input action=accept in-interface=bridge-lan protocol=tcp dst-port=80,443 comment="Allow Hotspot HTTP/HTTPS - Kenge"
-/ip firewall filter add chain=input action=accept in-interface=bridge-lan protocol=udp dst-port=67 comment="Allow Hotspot DHCP - Kenge"
-/ip firewall filter add chain=input action=accept in-interface=bridge-lan protocol=udp dst-port=53 comment="Allow Hotspot DNS - Kenge"
+# Add WireGuard to LAN list so default firewall doesn't block it
+:if ([:len [/interface list find name=LAN]] = 0) do={ /interface list add name=LAN }
+:if ([:len [/interface list member find list=LAN interface="wg-kenge"]] = 0) do={
+    /interface list member add list=LAN interface="wg-kenge"
+}
 
-/ip firewall filter add chain=forward action=accept in-interface=bridge-lan out-interface=ether1 comment="Allow Hotspot to Internet - Kenge"
-/ip firewall filter add chain=forward action=accept in-interface=ether1 out-interface=bridge-lan connection-state=established,related comment="Allow Internet to Hotspot - Kenge"
-/ip firewall filter add chain=forward action=accept in-interface=wg-kenge comment="Allow WG traffic - Kenge"
-/ip firewall filter add chain=forward action=accept out-interface=wg-kenge comment="Allow WG return - Kenge"
+# We add our custom input rules at the TOP to prevent being dropped by default rules
+/ip firewall filter
+:if ([:len [find where comment="Allow WireGuard - Kenge"]] = 0) do={
+    add place-before=0 chain=input action=accept protocol=udp dst-port=${config.listenPort} comment="Allow WireGuard - Kenge"
+}
+:if ([:len [find where comment="Allow API/Winbox from VPN - Kenge"]] = 0) do={
+    add place-before=0 chain=input action=accept protocol=tcp dst-port=${restPort},8291 src-address=${subnetAddress} comment="Allow API/Winbox from VPN - Kenge"
+}
+
+# ============================================
+# STEP 8: RADIUS & Walled Garden
+# ============================================
+:if ([:len [/radius find address="\${apiHost}"]] = 0) do={
+    /radius add service=hotspot,ppp address="\${apiHost}" secret="hqinvestment-radius-secret" authentication-port=1812 accounting-port=1813
+}
+
+/ip hotspot walled-garden ip
+:if ([:len [find dst-address="\${apiHost}"]] = 0) do={ add action=accept dst-address="\${apiHost}" comment="Billing Portal IP" }
+:if ([:len [find dst-port=8291]] = 0) do={ add action=accept dst-port=8291 protocol=tcp comment="Allow Winbox Management" }
+:if ([:len [find dst-port=8728]] = 0) do={ add action=accept dst-port=8728,8729 protocol=tcp comment="Allow API Management" }
+:if ([:len [find dst-port=80]] = 0) do={ add action=accept dst-port=80,443 protocol=tcp comment="Allow Web Management" }
+
+# ============================================
+# STEP 9: System Scheduler (Auto-sync)
+# ============================================
+/system scheduler
+:if ([:len [find name="billing-sync"]] > 0) do={ remove [find name="billing-sync"] }
+add name="billing-sync" interval=5m on-event="/tool fetch url=\\"${PUBLIC_API_BASE}/api/sync/${config.routerId}\\"" start-time=startup
 
 # ============================================
 # Configuration Complete!
