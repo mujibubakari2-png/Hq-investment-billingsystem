@@ -8,7 +8,12 @@ export default function MainLayout() {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [sidebarVisible, setSidebarVisible] = useState(true);
     const [darkMode, setDarkMode] = useState(false);
-    const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+    const [isMobile, setIsMobile] = useState(() => {
+        if (typeof window !== 'undefined') {
+            return window.innerWidth <= 768;
+        }
+        return false; // assume desktop on server
+    });
 
     useEffect(() => {
         const handleResize = () => {

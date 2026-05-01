@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { errorResponse, jsonResponse, hashPassword, signToken, isAutomationRequest } from "@/lib/auth";
 import { checkRateLimit, getClientIp } from "@/lib/rateLimiter";
 import { sendAccountCreatedNotifications } from "@/lib/accountNotifications";
+import { env } from "@/lib/env";
 
 export async function POST(req: NextRequest) {
     // Rate limit: 10 registrations per 30 minutes per IP
@@ -150,7 +151,7 @@ export async function POST(req: NextRequest) {
         }
 
         const inputOtp = body.otp;
-        const isProd = process.env.NODE_ENV === "production";
+        const isProd = env.NODE_ENV === "production";
         if (!inputOtp && isProd) {
             return errorResponse("Verification Code (OTP) is explicitly required to create an account", 400);
         }

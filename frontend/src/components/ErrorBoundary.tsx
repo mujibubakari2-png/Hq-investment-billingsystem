@@ -104,7 +104,7 @@ export default class ErrorBoundary extends Component<Props, State> {
                             Try Again
                         </button>
                     </div>
-                    {process.env.NODE_ENV === 'development' && this.state.error && (
+                    {(import.meta.env?.DEV || (typeof process !== 'undefined' && process.env.NODE_ENV === 'development')) && this.state.error && (
                         <details style={{
                             marginTop: 24,
                             padding: '12px 16px',

@@ -1,22 +1,23 @@
 import nodemailer from "nodemailer";
+import { env } from "@/lib/env";
 
 /**
  * Centralized email service for HQ Investment ISP Billing System.
  * Handles OTP and system notifications using SMTP.
  */
 
-const isGmail = (process.env.SMTP_HOST || "").includes("gmail.com");
+const isGmail = (env.SMTP_HOST || "").includes("gmail.com");
 
-const smtpConfig: any = {
-    // If it's Gmail, Nodemailer can handle settings automatically using 'service'
+export const emailConfig: any = {
+    // Note: Some services like Gmail require App Passwords, not regular account passwords
     service: isGmail ? "gmail" : undefined,
-    host: !isGmail ? (process.env.SMTP_HOST || "smtp.ethereal.email") : undefined,
-    port: Number(process.env.SMTP_PORT) || (isGmail ? 465 : 587),
+    host: !isGmail ? (env.SMTP_HOST || "smtp.ethereal.email") : undefined,
+    port: Number(env.SMTP_PORT) || (isGmail ? 465 : 587),
     // 465 is ALWAYS secure, 587 is STARTTLS (secure: false)
-    secure: process.env.SMTP_SECURE === "true" || Number(process.env.SMTP_PORT) === 465,
+    secure: env.SMTP_SECURE || Number(env.SMTP_PORT) === 465,
     auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
+        user: env.SMTP_USER,
+        pass: env.SMTP_PASS,
     },
     tls: {
         rejectUnauthorized: false
@@ -27,9 +28,9 @@ const smtpConfig: any = {
     greetingTimeout: 10000
 };
 
-console.log(`[EMAIL] SMTP Configuration: Host=${smtpConfig.host}, Port=${smtpConfig.port}, Secure=${smtpConfig.secure}, User=${smtpConfig.auth.user ? "Set" : "Not Set"}`);
+console.log(`[EMAIL] SMTP Configuration: Host=${emailConfig.host}, Port=${emailConfig.port}, Secure=${emailConfig.secure}, User=${emailConfig.auth.user ? "Set" : "Not Set"}`);
 
-const transporter = nodemailer.createTransport(smtpConfig);
+const transporter = nodemailer.createTransport(emailConfig);
 
 export async function sendEmail({
     to,
@@ -42,14 +43,14 @@ export async function sendEmail({
     text: string;
     html: string;
 }) {
-    const from = process.env.SMTP_FROM || `"${process.env.APP_NAME || "HQ INVESTMENT"}" <${process.env.SMTP_USER || "no-reply@billing-system.local"}>`;
+    const from = env.SMTP_FROM || `"${env.APP_NAME || "HQ INVESTMENT"}" <${env.SMTP_USER || "no-reply@billing-system.local"}>`;
 
-    console.log(`[EMAIL] Attempting to send email to ${to} (Host: ${smtpConfig.host})`);
+    console.log(`[EMAIL] Attempting to send email to ${to} (Host: ${emailConfig.host})`);
 
     try {
         // Test connection before sending if we are using custom SMTP
-        if (process.env.SMTP_HOST && process.env.SMTP_HOST !== "smtp.ethereal.email") {
-            console.log(`[EMAIL] Verifying connection to ${smtpConfig.host}...`);
+        if (env.SMTP_HOST && env.SMTP_HOST !== "smtp.ethereal.email") {
+            console.log(`[EMAIL] Verifying connection to ${emailConfig.host}...`);
             await transporter.verify();
         }
 
@@ -72,7 +73,7 @@ export async function sendEmail({
         if (error.code === 'EAUTH') {
             userFriendlyError = "Authentication failed. Please verify your SMTP_USER and SMTP_PASS (App Password).";
         } else if (error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT') {
-            userFriendlyError = `Could not connect to ${smtpConfig.host}:${smtpConfig.port}. Check your firewall or port settings.`;
+            userFriendlyError = `Could not connect to ${emailConfig.host}:${emailConfig.port}. Check your firewall or port settings.`;
         } else if (error.code === 'ENETUNREACH') {
             userFriendlyError = `Network unreachable. Try changing SMTP_PORT to 465 and setting SMTP_SECURE to true.`;
         }

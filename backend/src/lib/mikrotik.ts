@@ -7,6 +7,8 @@
  * Uses HTTP REST API (RouterOS v7+) or falls back to simulation mode.
  */
 
+import { isIPv4 } from "net";
+import { env } from "@/lib/env";
 import prisma from "./prisma";
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -118,7 +120,7 @@ export class MikroTikService {
         this.tenantId = tenantId || null;
         // RouterOS REST API runs on the HTTP (80) or HTTPS (443) port, not the terminal API port (8728)
         // Determine protocol based on environment or port. Prefer HTTPS if enabled.
-        const useHttps = process.env.MIKROTIK_USE_HTTPS === "true";
+        const useHttps = env.MIKROTIK_USE_HTTPS;
         const restPort = conn.port === 8728 || conn.port === 8729 ? (useHttps ? 443 : 80) : conn.port;
         const protocol = useHttps ? "https" : "http";
         this.baseUrl = `${protocol}://${conn.host}:${restPort}`;
@@ -132,7 +134,7 @@ export class MikroTikService {
             "Content-Type": "application/json",
             "Authorization": "Basic " + Buffer.from(`${this.conn.username}:${this.conn.password}`).toString("base64"),
         };
-        const timeoutMs = parseInt(process.env.MIKROTIK_TIMEOUT_MS || "8000");
+        const timeoutMs = env.MIKROTIK_TIMEOUT_MS;
 
         try {
             const controller = new AbortController();
@@ -147,7 +149,7 @@ export class MikroTikService {
             // If using HTTPS and insecure flag is set, allow self‑signed certificates
             // SECURITY WARNING: Only enable MIKROTIK_INSECURE in development or isolated networks.
             // Disabling certificate verification makes connections vulnerable to MITM attacks.
-            if (this.baseUrl.startsWith('https') && process.env.MIKROTIK_INSECURE === 'true') {
+            if (this.baseUrl.startsWith('https') && env.MIKROTIK_INSECURE) {
                 console.warn(`[SECURITY WARNING] MIKROTIK_INSECURE is enabled for ${this.conn.host}. Certificate verification is disabled. This should only be used in development or isolated network environments.`);
                 const https = require('https');
                 fetchOptions.agent = new https.Agent({ rejectUnauthorized: false });

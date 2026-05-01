@@ -155,8 +155,10 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         };
 
         fetchBrand();
-        window.addEventListener('settingsUpdated', fetchBrand);
-        return () => window.removeEventListener('settingsUpdated', fetchBrand);
+        if (typeof window !== 'undefined') {
+            window.addEventListener('settingsUpdated', fetchBrand);
+            return () => window.removeEventListener('settingsUpdated', fetchBrand);
+        }
     }, []);
 
     return (

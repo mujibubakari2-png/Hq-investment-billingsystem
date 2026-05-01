@@ -25,9 +25,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
         });
 
         if (res.status === 401) {
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
-            window.location.href = '/login';
+            if (typeof window !== 'undefined') {
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                window.location.href = '/login';
+            }
             throw new Error('Unauthorized');
         }
 

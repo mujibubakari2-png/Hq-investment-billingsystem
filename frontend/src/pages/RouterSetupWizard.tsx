@@ -158,7 +158,10 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
     const [hotspotPoolStart, setHotspotPoolStart] = useState('10.116.0.3');
     const [hotspotPoolEnd, setHotspotPoolEnd] = useState('10.116.0.254');
 
-    const apiHost = PUBLIC_API_BASE && PUBLIC_API_BASE.startsWith('http') ? new URL(PUBLIC_API_BASE).hostname : window.location.hostname;
+    // ALWAYS use PUBLIC_API_BASE in production. Fallback to import.meta.env.BASE_URL if provided.
+    const apiHost = PUBLIC_API_BASE && PUBLIC_API_BASE.startsWith('http')
+        ? new URL(PUBLIC_API_BASE).hostname
+        : (import.meta.env?.BASE_URL ? new URL(import.meta.env.BASE_URL).hostname : '' );
 
     const [radiusAddress, setRadiusAddress] = useState(apiHost || '127.0.0.1');
     const [radiusSecret, setRadiusSecret] = useState('hqinvestment-radius-secret');

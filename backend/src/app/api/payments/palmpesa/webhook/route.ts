@@ -2,10 +2,17 @@ import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { errorResponse, jsonResponse } from "@/lib/auth";
 import nodemailer from "nodemailer";
+import { env } from "@/lib/env";
+import { rateLimitMiddleware } from "@/middleware/rateLimiter";
 
 export async function POST(req: NextRequest) {
     try {
-        const webhookSecret = process.env.PALMPESA_WEBHOOK_SECRET || process.env.PAYMENT_WEBHOOK_SECRET;
+        // Apply rate limiting
+        const rateLimited = rateLimitMiddleware(req);
+        if (rateLimited) {
+            return rateLimited;
+        }
+        const webhookSecret = env.PALMPESA_WEBHOOK_SECRET || env.PAYMENT_WEBHOOK_SECRET;
         if (!webhookSecret) {
             return errorResponse("Webhook secret is not configured", 500);
         }
@@ -89,26 +96,26 @@ export async function POST(req: NextRequest) {
         // Send activation email
         try {
             const transporter = nodemailer.createTransport({
-                host: process.env.SMTP_HOST || "smtp.ethereal.email",
-                port: Number(process.env.SMTP_PORT) || 587,
-                secure: process.env.SMTP_SECURE === "true",
+                host: env.SMTP_HOST,
+                port: Number(env.SMTP_PORT) || 587,
+                secure: env.SMTP_SECURE === "true",
                 auth: {
-                    user: process.env.SMTP_USER,
-                    pass: process.env.SMTP_PASS,
+                    user: env.SMTP_USER,
+                    pass: env.SMTP_PASS,
                 },
             });
 
             const mailOptions = {
-                from: process.env.SMTP_FROM || '"HQ INVESTMENT" <no-reply@hqinvestment.local>',
+                from: env.SMTP_FROM,
                 to: invoice.tenant.email,
                 subject: "Payment Received & Account Activated",
-                text: `Hello ${invoice.tenant.name},\n\nYour payment of ${Amount} has been received. Your account has been successfully renewed and activated!\n\nLog in here: ${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:5173/'}`,
+                text: `Hello ${invoice.tenant.name},\n\nYour payment of ${Amount} has been received. Your account has been successfully renewed and activated!\n\nLog in here: ${env.NEXT_PUBLIC_APP_URL || 'http://localhost:5173/'}`,
                 html: `<div style="font-family: sans-serif; padding: 20px;">
                         <h2>Account Activated!</h2>
                         <p>Hello <strong>${invoice.tenant.name}</strong>,</p>
                         <p>We have successfully received your payment of <strong>${Amount}/=</strong>.</p>
                         <p>Your subscription has been renewed and your account is now <strong>ACTIVE</strong>.</p>
-                        <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:5173/'}" style="background-color: #1d4ed8; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin-top: 10px;">Log In to Dashboard</a>
+                        <a href="${env.NEXT_PUBLIC_APP_URL || 'http://localhost:5173/'}" style="background-color: #1d4ed8; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin-top: 10px;">Log In to Dashboard</a>
                        </div>`
             };
 

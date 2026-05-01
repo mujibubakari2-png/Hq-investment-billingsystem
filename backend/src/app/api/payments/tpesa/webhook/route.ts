@@ -2,6 +2,8 @@ import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 import { getMikroTikService } from "@/lib/mikrotik";
+import { env } from "@/lib/env";
+import { rateLimitMiddleware } from "@/middleware/rateLimiter";
 
 /**
  * POST /api/hotspot/callback
@@ -16,7 +18,12 @@ import { getMikroTikService } from "@/lib/mikrotik";
  */
 export async function POST(req: NextRequest) {
     try {
-        const webhookSecret = process.env.TPESA_WEBHOOK_SECRET || process.env.PAYMENT_WEBHOOK_SECRET;
+        // Apply rate limiting
+        const rateLimited = rateLimitMiddleware(req);
+        if (rateLimited) {
+            return rateLimited;
+        }
+        const webhookSecret = env.TPESA_WEBHOOK_SECRET || env.PAYMENT_WEBHOOK_SECRET;
         if (!webhookSecret) {
             return errorResponse("Webhook secret is not configured", 500);
         }
