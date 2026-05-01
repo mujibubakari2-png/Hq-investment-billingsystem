@@ -306,9 +306,9 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                 `  /ip dhcp-server set [/ip dhcp-server find where name="dhcp-hotspot"] interface=$targetBridge address-pool=hotspot-pool authoritative=after-2sec-delay disabled=no`,
                 `}`,
                 `:if ([:len [/ip hotspot profile find where name="hq-hotspot"]] = 0) do={`,
-                `  /ip hotspot profile add name=hq-hotspot hotspot-address=${hotspotLocalAddress} dns-name=login.spot login-by=http-chap,http-pap,cookie,mac-cookie html-directory=flash/hotspot http-cookie-lifetime=3d`,
+                `  /ip hotspot profile add name=hq-hotspot hotspot-address=${hotspotLocalAddress} dns-name=login.spot login-by=http-chap,http-pap,cookie,mac-cookie html-directory=hotspot http-cookie-lifetime=3d`,
                 `} else={`,
-                `  /ip hotspot profile set [/ip hotspot profile find where name="hq-hotspot"] hotspot-address=${hotspotLocalAddress} dns-name=login.spot login-by=http-chap,http-pap,cookie,mac-cookie html-directory=flash/hotspot http-cookie-lifetime=3d`,
+                `  /ip hotspot profile set [/ip hotspot profile find where name="hq-hotspot"] hotspot-address=${hotspotLocalAddress} dns-name=login.spot login-by=http-chap,http-pap,cookie,mac-cookie html-directory=hotspot http-cookie-lifetime=3d`,
                 `}`,
                 `:if ([:len [/ip hotspot find where name="hotspot1"]] = 0) do={`,
                 `  /ip hotspot add name=hotspot1 interface=$targetBridge address-pool=hotspot-pool profile=hq-hotspot disabled=no`,
@@ -354,6 +354,7 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
             ':if ([:len [/ppp profile find where name="radiax-pppoe"]] > 0) do={ /ppp profile set [/ppp profile find where name="radiax-pppoe"] use-radius=yes }',
             '', '# ===== Walled Garden =====',
             `:if ([:len [/ip hotspot walled-garden find where dst-host="${window.location.hostname}"]] = 0) do={ /ip hotspot walled-garden add dst-host="${window.location.hostname}" action=allow comment="Billing Portal" }`,
+            `:if ([:len [/ip hotspot walled-garden ip find where dst-address="${window.location.hostname}"]] = 0) do={ /ip hotspot walled-garden ip add dst-address="${window.location.hostname}" action=accept comment="Billing Portal IP" }`,
             '', '# Configuration complete', '');
 
         return lines.join('\n');
@@ -895,6 +896,13 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                         <CableIcon style={{ fontSize: 56, color: 'var(--text-secondary)', marginBottom: 16 }} />
                         <h2 style={{ marginBottom: 6 }}>Select Network Interfaces</h2>
                         <p style={{ color: 'var(--text-secondary)', marginBottom: 24 }}>Choose ethernet ports for your services</p>
+
+                        <div style={{ maxWidth: 650, margin: '0 auto 20px', padding: '12px 16px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 'var(--radius-sm)', textAlign: 'left', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                            <WarningAmberIcon style={{ color: '#d97706', fontSize: 20, marginTop: 2 }} />
+                            <div style={{ fontSize: '0.85rem', color: '#b45309' }}>
+                                <strong>Important:</strong> Do NOT select the interface that provides your router's Internet connection (usually <strong>ether1</strong> or your WAN port). Adding it to the service bridge will disconnect your router from the internet!
+                            </div>
+                        </div>
 
                         <div style={{ maxWidth: 650, margin: '0 auto', textAlign: 'left' }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
