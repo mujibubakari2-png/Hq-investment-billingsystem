@@ -1109,25 +1109,26 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                                 textAlign: 'left', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)', overflow: 'hidden',
                             }}>
                                 <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--border-light)', fontWeight: 600, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: 8 }}>
-                                    <DnsIcon style={{ fontSize: 16 }} /> PPPoE Server Status
+                                    {serviceType === 'hotspot' ? <WifiIcon style={{ fontSize: 16 }} /> : serviceType === 'both' ? <DeviceHubIcon style={{ fontSize: 16 }} /> : <DnsIcon style={{ fontSize: 16 }} />}
+                                    {serviceType === 'pppoe' ? 'PPPoE Server Status' : serviceType === 'hotspot' ? 'Hotspot Server Status' : 'PPPoE & Hotspot Status'}
                                 </div>
                                 <div style={{ padding: 20, textAlign: 'center' }}>
                                     {verifyStatus === 'checking' ? (
                                         <>
                                             <RefreshIcon className="spin" style={{ fontSize: 40, color: 'var(--primary)', marginBottom: 8 }} />
-                                            <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Checking PPPoE server...</div>
+                                            <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Checking {serviceType === 'both' ? 'services' : 'server'}...</div>
                                         </>
                                     ) : verifyStatus === 'failed' ? (
                                         <>
                                             <CancelIcon style={{ fontSize: 40, color: 'var(--primary)', marginBottom: 8 }} />
                                             <div style={{ color: 'var(--primary)', fontWeight: 600, marginBottom: 4 }}>Configuration Failed</div>
-                                            <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>PPPoE Server not found</div>
+                                            <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{serviceType === 'pppoe' ? 'PPPoE Server' : serviceType === 'hotspot' ? 'Hotspot Server' : 'Services'} not found</div>
                                         </>
                                     ) : (
                                         <>
                                             <CheckCircleIcon style={{ fontSize: 40, color: '#16a34a', marginBottom: 8 }} />
                                             <div style={{ color: '#16a34a', fontWeight: 600, marginBottom: 4 }}>Configuration Successful</div>
-                                            <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>PPPoE Server is running</div>
+                                            <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{serviceType === 'pppoe' ? 'PPPoE Server is' : serviceType === 'hotspot' ? 'Hotspot Server is' : 'Services are'} running</div>
                                         </>
                                     )}
                                 </div>
