@@ -29,6 +29,9 @@ export default function RouterDetailModal({ router, onClose, onDelete }: RouterD
         const safeRouterName = router.name.replace(/[^a-zA-Z0-9_-]/g, '-').replace(/-+/g, '-').toLowerCase();
         const displayRouterName = router.name.replace(/"/g, '\\"');
 
+        // Extract the actual backend/RADIUS IP or domain from PUBLIC_API_BASE
+        const apiHost = new URL(PUBLIC_API_BASE).hostname;
+
         const script = `# ═══════════════════════════════════════════════════════════════
 # HQINVESTMENT ISP Billing - MikroTik Auto-Configuration Script
 # Router: ${router.name}
@@ -127,17 +130,17 @@ add chain=forward action=accept connection-state=established,related comment="Al
 add chain=forward in-interface=$lanBridge action=accept comment="Allow LAN to WAN"
 
 # ── 9. RADIUS Client (HQInvestment ISP Billing) ───────────────────────
-:if ([:len [/radius find address="${window.location.hostname}"]] = 0) do={
-    /radius add service=hotspot,ppp address="${window.location.hostname}" secret="hqinvestment-radius-secret" \\
+:if ([:len [/radius find address="${apiHost}"]] = 0) do={
+    /radius add service=hotspot,ppp address="${apiHost}" secret="hqinvestment-radius-secret" \\
         authentication-port=1812 accounting-port=1813
 }
 
 # ── 10. Walled Garden (Allow billing portal & Mgmt) ───────────
-:if ([:len [/ip hotspot walled-garden find dst-host="${window.location.hostname}"]] = 0) do={
-    /ip hotspot walled-garden add dst-host="${window.location.hostname}" action=allow comment="Billing Portal"
+:if ([:len [/ip hotspot walled-garden find dst-host="${apiHost}"]] = 0) do={
+    /ip hotspot walled-garden add dst-host="${apiHost}" action=allow comment="Billing Portal"
 }
-:if ([:len [/ip hotspot walled-garden ip find dst-address="${window.location.hostname}"]] = 0) do={
-    /ip hotspot walled-garden ip add dst-address="${window.location.hostname}" action=accept comment="Billing Portal IP"
+:if ([:len [/ip hotspot walled-garden ip find dst-address="${apiHost}"]] = 0) do={
+    /ip hotspot walled-garden ip add dst-address="${apiHost}" action=accept comment="Billing Portal IP"
 }
 
 # Unblock Management Ports so network admin is not locked out!
