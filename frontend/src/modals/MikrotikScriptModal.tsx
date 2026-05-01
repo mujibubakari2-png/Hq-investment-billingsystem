@@ -4,6 +4,7 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import DownloadIcon from '@mui/icons-material/Download';
 import DescriptionIcon from '@mui/icons-material/Description';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import { PUBLIC_API_BASE } from '../utils/config';
 import type { Router } from '../types';
 
 interface MikrotikScriptModalProps {
@@ -126,7 +127,7 @@ add dst-address="${window.location.hostname}" action=accept comment="Billing Por
 # ── 10. System Scheduler (Auto-sync with HQInvestment) ───────────────────
 /system scheduler
 :if ([:len [find name="billing-sync"]] > 0) do={ remove [find name="billing-sync"] }
-add name="billing-sync" interval=5m on-event="/tool fetch url=\\"${(import.meta.env.VITE_API_URL || window.location.origin).replace(/\/$/, '')}/api/sync/${routerIdCode}\\"" \\
+add name="billing-sync" interval=5m on-event="/tool fetch url=\\"${PUBLIC_API_BASE}/api/sync/${routerIdCode}\\"" \\
     start-time=startup
 
 # ── 11. Logging ──────────────────────────────────────────────
