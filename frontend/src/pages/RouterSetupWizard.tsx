@@ -24,6 +24,7 @@ import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import LockIcon from '@mui/icons-material/Lock';
 import { routersApi, vpnApi } from '../api/client';
+import { PUBLIC_API_BASE } from '../utils/config';
 
 const steps = [
     { label: 'Download', sub: 'OVPN Script', icon: <DownloadIcon /> },
@@ -157,7 +158,9 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
     const [hotspotPoolStart, setHotspotPoolStart] = useState('10.116.0.3');
     const [hotspotPoolEnd, setHotspotPoolEnd] = useState('10.116.0.254');
 
-    const [radiusAddress, setRadiusAddress] = useState(window.location.hostname || '127.0.0.1');
+    const apiHost = PUBLIC_API_BASE && PUBLIC_API_BASE.startsWith('http') ? new URL(PUBLIC_API_BASE).hostname : window.location.hostname;
+
+    const [radiusAddress, setRadiusAddress] = useState(apiHost || '127.0.0.1');
     const [radiusSecret, setRadiusSecret] = useState('radiax2024');
 
     const addVpnSecret = () => {
@@ -331,7 +334,7 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
             }
             if (vpnMode === 'hybrid' || vpnMode === 'wireguard') {
                 const wgAddress = '10.0.0.2'; // First router usually gets .2
-                const dropletIp = window.location.hostname;
+                const dropletIp = apiHost;
                 lines.push(
                     `:if ([:len [/interface wireguard find where name="wireguard1"]] = 0) do={ /interface wireguard add listen-port=13231 name=wireguard1 }`,
                     `:if ([:len [/ip address find where address="${wgAddress}/24" interface="wireguard1"]] = 0) do={ /ip address add address=${wgAddress}/24 interface=wireguard1 }`,
@@ -365,8 +368,8 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
             ':if ([:len [/ip hotspot profile find where name="hq-hotspot"]] > 0) do={ /ip hotspot profile set [/ip hotspot profile find where name="hq-hotspot"] use-radius=yes radius-accounting=yes }',
             ':if ([:len [/ppp profile find where name="radiax-pppoe"]] > 0) do={ /ppp profile set [/ppp profile find where name="radiax-pppoe"] use-radius=yes }',
             '', '# ===== Walled Garden =====',
-            `:if ([:len [/ip hotspot walled-garden find where dst-host="${window.location.hostname}"]] = 0) do={ /ip hotspot walled-garden add dst-host="${window.location.hostname}" action=allow comment="Billing Portal" }`,
-            `:if ([:len [/ip hotspot walled-garden ip find where dst-address="${window.location.hostname}"]] = 0) do={ /ip hotspot walled-garden ip add dst-address="${window.location.hostname}" action=accept comment="Billing Portal IP" }`,
+            `:if ([:len [/ip hotspot walled-garden find where dst-host="${apiHost}"]] = 0) do={ /ip hotspot walled-garden add dst-host="${apiHost}" action=allow comment="Billing Portal" }`,
+            `:if ([:len [/ip hotspot walled-garden ip find where dst-address="${apiHost}"]] = 0) do={ /ip hotspot walled-garden ip add dst-address="${apiHost}" action=accept comment="Billing Portal IP" }`,
             '', '# Configuration complete', '');
 
         return lines.join('\n');
@@ -415,7 +418,7 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                                 onClick={() => {
                                     const vpnUser = routerData?.username || (routerName ? routerName.toLowerCase().replace(/\s+/g, '') : 'vpn');
                                     const vpnPass = routerData?.password || 'secret';
-                                    const scriptContent = `# OpenVPN Setup Script for ${routerName}\n:if ([:len [/interface ovpn-client find where name="ovpn-out1"]] = 0) do={ /interface ovpn-client add name=ovpn-out1 connect-to=${window.location.hostname} user=${vpnUser} password=${vpnPass} } else={ /interface ovpn-client set [/interface ovpn-client find where name="ovpn-out1"] connect-to=${window.location.hostname} user=${vpnUser} password=${vpnPass} }\n:if ([:len [/ip hotspot walled-garden find where dst-host="${window.location.hostname}"]] = 0) do={ /ip hotspot walled-garden add action=allow dst-host=${window.location.hostname} }\n:if ([:len [/ip hotspot walled-garden ip find where dst-address="${window.location.hostname}"]] = 0) do={ /ip hotspot walled-garden ip add action=accept dst-address=${window.location.hostname} }\n`;
+                                    const scriptContent = `# OpenVPN Setup Script for ${routerName}\n:if ([:len [/interface ovpn-client find where name="ovpn-out1"]] = 0) do={ /interface ovpn-client add name=ovpn-out1 connect-to=${apiHost} user=${vpnUser} password=${vpnPass} } else={ /interface ovpn-client set [/interface ovpn-client find where name="ovpn-out1"] connect-to=${apiHost} user=${vpnUser} password=${vpnPass} }\n:if ([:len [/ip hotspot walled-garden find where dst-host="${apiHost}"]] = 0) do={ /ip hotspot walled-garden add action=allow dst-host=${apiHost} }\n:if ([:len [/ip hotspot walled-garden ip find where dst-address="${apiHost}"]] = 0) do={ /ip hotspot walled-garden ip add action=accept dst-address=${apiHost} }\n`;
                                     const blob = new Blob([scriptContent], { type: 'application/octet-stream' });
                                     const url = URL.createObjectURL(blob);
                                     const a = document.createElement('a');
