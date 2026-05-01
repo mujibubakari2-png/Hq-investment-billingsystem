@@ -219,7 +219,7 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
 # STEP 8: RADIUS & Walled Garden
 # ============================================
 :if ([:len [/radius find address="\${apiHost}"]] = 0) do={
-    /radius add service=hotspot,ppp address="\${apiHost}" secret="hqinvestment-radius-secret" authentication-port=1812 accounting-port=1813
+    /radius add service=hotspot,ppp address="\${apiHost}" secret="hqinvestment-radius-secret" authentication-port=1812 accounting-port=1813 timeout=3s
 }
 
 /ip hotspot walled-garden ip

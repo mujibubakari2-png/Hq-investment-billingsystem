@@ -132,7 +132,7 @@ add chain=forward in-interface=$lanBridge action=accept comment="Allow LAN to WA
 # ── 9. RADIUS Client (HQInvestment ISP Billing) ───────────────────────
 :if ([:len [/radius find address="${apiHost}"]] = 0) do={
     /radius add service=hotspot,ppp address="${apiHost}" secret="hqinvestment-radius-secret" \\
-        authentication-port=1812 accounting-port=1813
+        authentication-port=1812 accounting-port=1813 timeout=3s
 }
 
 # ── 10. Walled Garden (Allow billing portal & Mgmt) ───────────

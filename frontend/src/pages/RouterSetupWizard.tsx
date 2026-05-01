@@ -161,7 +161,7 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
     const apiHost = PUBLIC_API_BASE && PUBLIC_API_BASE.startsWith('http') ? new URL(PUBLIC_API_BASE).hostname : window.location.hostname;
 
     const [radiusAddress, setRadiusAddress] = useState(apiHost || '127.0.0.1');
-    const [radiusSecret, setRadiusSecret] = useState('radiax2024');
+    const [radiusSecret, setRadiusSecret] = useState('hqinvestment-radius-secret');
 
     const addVpnSecret = () => {
         if (!vpnForm.username || !vpnForm.password) {
@@ -361,9 +361,9 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
         }
         lines.push('', '# ===== RADIUS Client =====',
             `:if ([:len [/radius find where address="${radiusAddress}"]] = 0) do={`,
-            `  /radius add service=hotspot,ppp address=${radiusAddress} secret=${radiusSecret} authentication-port=1812 accounting-port=1813`,
+            `  /radius add service=hotspot,ppp address=${radiusAddress} secret=${radiusSecret} authentication-port=1812 accounting-port=1813 timeout=3s`,
             `} else={`,
-            `  /radius set [/radius find where address="${radiusAddress}"] service=hotspot,ppp secret=${radiusSecret} authentication-port=1812 accounting-port=1813`,
+            `  /radius set [/radius find where address="${radiusAddress}"] service=hotspot,ppp secret=${radiusSecret} authentication-port=1812 accounting-port=1813 timeout=3s`,
             `}`,
             ':if ([:len [/ip hotspot profile find where name="hq-hotspot"]] > 0) do={ /ip hotspot profile set [/ip hotspot profile find where name="hq-hotspot"] use-radius=yes radius-accounting=yes }',
             ':if ([:len [/ppp profile find where name="radiax-pppoe"]] > 0) do={ /ppp profile set [/ppp profile find where name="radiax-pppoe"] use-radius=yes }',
