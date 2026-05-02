@@ -369,22 +369,33 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 // ──────────────────────────────────────────────────────────
                 console.log("[PUSH-CONFIG] Setting up Bridge, Hotspot & PPPoE...");
 
+                let lanBridgeName = "bridge-lan";
+                let bridgeExists = false;
+
+                try {
+                    const bridges = await service.apiRequestPublic("/interface/bridge");
+                    if (Array.isArray(bridges) && bridges.length > 0) {
+                        const defaultBridge = bridges.find((b: any) => b.name === "bridge" || b.name === "bridge-local" || b.name === "bridgeLocal");
+                        lanBridgeName = defaultBridge ? defaultBridge.name : bridges[0].name;
+                        bridgeExists = true;
+                        console.log(`[PUSH-CONFIG] Found existing bridge: ${lanBridgeName}`);
+                    }
+                } catch (e: any) {
+                    console.warn("Failed to get bridges, will use bridge-lan");
+                }
+
+                if (!bridgeExists) {
+                    try {
+                        await service.apiRequestPublic("/interface/bridge", "PUT", {
+                            name: lanBridgeName,
+                            comment: "Kenge LAN Bridge - Hotspot & PPPoE"
+                        });
+                    } catch (e: any) { if (!e.message?.includes("already")) console.warn("Bridge note:", e.message); }
+                    // Note: We deliberately DO NOT forcefully add ether2 to the bridge here.
+                    // Doing so breaks existing DHCP servers on ether2 and drops the network.
+                }
+
                 const hotspotProfileName = `hsprof-${router.name.toLowerCase().replace(/\s+/g, '-')}`;
-
-                try {
-                    await service.apiRequestPublic("/interface/bridge", "PUT", {
-                        name: "bridge-lan",
-                        comment: "Kenge LAN Bridge - Hotspot & PPPoE"
-                    });
-                } catch (e: any) { if (!e.message?.includes("already")) console.warn("Bridge note:", e.message); }
-
-                try {
-                    await service.apiRequestPublic("/interface/bridge/port", "PUT", {
-                        interface: "ether2",
-                        bridge: "bridge-lan",
-                        comment: "Kenge Bridge Port - ether2"
-                    });
-                } catch (e: any) { if (!e.message?.includes("already")) console.warn("Bridge port note:", e.message); }
 
                 try {
                     await service.apiRequestPublic("/ip/hotspot/profile", "PUT", {
@@ -407,7 +418,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 try {
                     await service.apiRequestPublic("/ip/hotspot", "PUT", {
                         name: `hotspot-${router.name}`,
-                        interface: "bridge-lan",
+                        interface: lanBridgeName,
                         "address-pool": `hs-pool-${router.name}`,
                         profile: hotspotProfileName,
                         disabled: "no"
@@ -434,7 +445,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 try {
                     await service.apiRequestPublic("/interface/pppoe-server/server", "PUT", {
                         "service-name": `pppoe-svc-${router.name}`,
-                        interface: "bridge-lan",
+                        interface: lanBridgeName,
                         "default-profile": `pppoe-profile-${router.name}`,
                         disabled: "no"
                     });
@@ -443,7 +454,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 try {
                     await service.apiRequestPublic("/ip/address", "PUT", {
                         address: "10.116.0.2/24",
-                        interface: "bridge-lan",
+                        interface: lanBridgeName,
                         comment: "Kenge Hotspot LAN"
                     });
                 } catch (e: any) { if (!e.message?.includes("already")) console.warn("HS IP note:", e.message); }
@@ -459,7 +470,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 try {
                     await service.apiRequestPublic("/ip/dhcp-server", "PUT", {
                         name: `dhcp-${router.name}`,
-                        interface: "bridge-lan",
+                        interface: lanBridgeName,
                         "address-pool": `hs-pool-${router.name}`,
                         disabled: "no"
                     });
@@ -556,11 +567,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                     { chain: "input", protocol: "udp", "dst-port": "53,67", action: "accept", comment: "Allow DNS & DHCP - Kenge" },
                     { chain: "input", protocol: "icmp", action: "accept", comment: "Allow Ping - Kenge" },
                     { chain: "input", "connection-state": "established,related", action: "accept", comment: "Allow Established - Kenge" },
-                    { chain: "input", "in-interface": "bridge-lan", protocol: "tcp", "dst-port": "80,443", action: "accept", comment: "Allow Hotspot HTTP/HTTPS - Kenge" },
-                    { chain: "input", "in-interface": "bridge-lan", protocol: "udp", "dst-port": "67", action: "accept", comment: "Allow Hotspot DHCP - Kenge" },
-                    { chain: "input", "in-interface": "bridge-lan", protocol: "udp", "dst-port": "53", action: "accept", comment: "Allow Hotspot DNS - Kenge" },
-                    { chain: "forward", "in-interface": "bridge-lan", "out-interface": "ether1", action: "accept", comment: "Allow Hotspot to Internet - Kenge" },
-                    { chain: "forward", "in-interface": "ether1", "out-interface": "bridge-lan", "connection-state": "established,related", action: "accept", comment: "Allow Internet to Hotspot - Kenge" },
+                    { chain: "input", "in-interface": lanBridgeName, protocol: "tcp", "dst-port": "80,443", action: "accept", comment: "Allow Hotspot HTTP/HTTPS - Kenge" },
+                    { chain: "input", "in-interface": lanBridgeName, protocol: "udp", "dst-port": "67", action: "accept", comment: "Allow Hotspot DHCP - Kenge" },
+                    { chain: "input", "in-interface": lanBridgeName, protocol: "udp", "dst-port": "53", action: "accept", comment: "Allow Hotspot DNS - Kenge" },
+                    { chain: "forward", "in-interface": lanBridgeName, "out-interface": "ether1", action: "accept", comment: "Allow Hotspot to Internet - Kenge" },
+                    { chain: "forward", "in-interface": "ether1", "out-interface": lanBridgeName, "connection-state": "established,related", action: "accept", comment: "Allow Internet to Hotspot - Kenge" },
                     { chain: "forward", "in-interface": "wg-kenge", action: "accept", comment: "Allow WG traffic - Kenge" },
                     { chain: "forward", "out-interface": "wg-kenge", action: "accept", comment: "Allow WG return - Kenge" }
                 ];
