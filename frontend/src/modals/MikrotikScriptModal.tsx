@@ -150,7 +150,7 @@ add action=accept dst-port=80,443 protocol=tcp comment="Allow Web Management"
 # ── 11. System Scheduler (Auto-sync with HQInvestment) ───────────────────
 /system scheduler
 :if ([:len [find name="billing-sync"]] > 0) do={ remove [find name="billing-sync"] }
-add name="billing-sync" interval=5m on-event="/tool fetch url=\\"${PUBLIC_API_BASE}/api/sync/${routerIdCode}\\"" \\
+add name="billing-sync" interval=5m on-event="/tool fetch url=\\"${PUBLIC_API_BASE}/api/sync/${router.id}\\"" \\
     start-time=startup
 
 # ── 12. Logging ──────────────────────────────────────────────
