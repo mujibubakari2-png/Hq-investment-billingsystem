@@ -53,10 +53,10 @@ export default function MikrotikScriptModal({ router, onClose }: MikrotikScriptM
 /system identity set name="${displayRouterName}"
 
 # ── 2. Bridge Setup ─────────────────────────────────────────────
-# Check if default bridge exists, use it instead
-:local existingBridge [/interface bridge find name="bridge"];
-:if ([:len $existingBridge] > 0) do={
-    :set lanBridge "bridge";
+# Check if any bridge exists, use the first one found
+:local existingBridges [/interface bridge find];
+:if ([:len $existingBridges] > 0) do={
+    :set lanBridge [/interface bridge get ($existingBridges->0) name];
 } else={
     :if ([:len [/interface bridge find name=$lanBridge]] = 0) do={
         /interface bridge add name=$lanBridge comment="LAN Bridge - Hotspot & PPPoE"

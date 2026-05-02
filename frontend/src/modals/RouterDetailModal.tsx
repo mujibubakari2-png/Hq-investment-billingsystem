@@ -47,20 +47,13 @@ export default function RouterDetailModal({ router, onClose, onDelete }: RouterD
 :if ([:len [/user find name="admin"]] > 0) do={ /user set [find name="admin"] name="${router.username || 'admin'}" password="${router.password || ''}" } else={ :if ([:len [/user find name="${router.username || 'admin'}"]] > 0) do={ /user set [find name="${router.username || 'admin'}"] password="${router.password || ''}" } }
 
 # ── 2. Bridge Setup ─────────────────────────────────────────────
-# Check if default bridge exists, use it instead
-:local existingBridge [/interface bridge find name="bridge"];
-:if ([:len $existingBridge] > 0) do={
-    :set lanBridge "bridge";
+# Check if any bridge exists, use the first one found
+:local existingBridges [/interface bridge find];
+:if ([:len $existingBridges] > 0) do={
+    :set lanBridge [/interface bridge get ($existingBridges->0) name];
 } else={
     :if ([:len [/interface bridge find name=$lanBridge]] = 0) do={
         /interface bridge add name=$lanBridge comment="LAN Bridge - Hotspot & PPPoE"
-        # Add default ports if they aren't in another bridge
-        :foreach iface in=[/interface ethernet find name!="ether1"] do={
-            :local ifaceName [/interface get $iface name];
-            :if ([:len [/interface bridge port find interface=$ifaceName]] = 0) do={
-                /interface bridge port add bridge=$lanBridge interface=$ifaceName
-            }
-        }
     }
 }
 
