@@ -373,6 +373,15 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
             '', '# ===== Walled Garden =====',
             `:if ([:len [/ip hotspot walled-garden find where dst-host="${apiHost}"]] = 0) do={ /ip hotspot walled-garden add dst-host="${apiHost}" action=allow comment="Billing Portal" }`,
             `:if ([:len [/ip hotspot walled-garden ip find where dst-address="${apiHost}"]] = 0) do={ /ip hotspot walled-garden ip add dst-address="${apiHost}" action=accept comment="Billing Portal IP" }`,
+            '', '# Unblock Management Ports so network admin is not locked out!',
+            '/ip hotspot walled-garden ip',
+            'add action=accept dst-port=8291 protocol=tcp comment="Allow Winbox Management"',
+            'add action=accept dst-port=8728,8729 protocol=tcp comment="Allow API Management"',
+            'add action=accept dst-port=80,443 protocol=tcp comment="Allow Web Management"',
+            '', '# ===== NAT (Masquerade) =====',
+            ':if ([:len [/ip firewall nat find where action=masquerade]] = 0) do={',
+            '  /ip firewall nat add chain=srcnat out-interface=ether1 action=masquerade comment="Masquerade for internet"',
+            '}',
             '', '# Configuration complete', '');
 
         return lines.join('\n');
