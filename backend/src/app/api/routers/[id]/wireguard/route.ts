@@ -470,11 +470,21 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 // ──────────────────────────────────────────────────────────
                 console.log("[PUSH-CONFIG] Setting up WireGuard...");
 
+                // Add peer to the Server's WireGuard interface FIRST to avoid race condition
+                // (If Mikrotik tries to connect before the server expects it, handshake fails)
+                try {
+                    await wireguardManager.addPeer(router.wgPublicKey, tunnelIp);
+                } catch (e: any) {
+                    console.error("Failed to add peer to wg0:", e.message);
+                }
+
+
                 try {
                     await service.apiRequestPublic("/interface/wireguard", "PUT", {
                         name: "wg-kenge",
                         "listen-port": String(listenPort),
                         "private-key": router.wgPrivateKey,
+                        disabled: "no",
                         comment: "Kenge VPN Interface"
                     });
                 } catch (e: any) {
@@ -555,9 +565,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                     { chain: "forward", "out-interface": "wg-kenge", action: "accept", comment: "Allow WG return - Kenge" }
                 ];
 
-                for (const rule of firewallRules) {
+                // Reverse the array so that by putting them at index 0, they end up in the correct order at the very top.
+                const reversedRules = [...firewallRules].reverse();
+
+                for (const rule of reversedRules) {
                     try {
-                        await service.apiRequestPublic("/ip/firewall/filter", "PUT", rule);
+                        await service.apiRequestPublic("/ip/firewall/filter", "PUT", { ...rule, "place-before": "0" });
                     } catch (e: any) { console.warn("FW note:", e.message); }
                 }
 
@@ -583,15 +596,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                     });
                 } catch (e: any) { console.warn("Route note:", e.message); }
 
-                // Add peer to the Server's WireGuard interface
-                try {
-                    await wireguardManager.addPeer(router.wgPublicKey, tunnelIp);
-                } catch (e: any) {
-                    console.error("Failed to add peer to wg0:", e.message);
-                }
-
                 // Verification Step: Wait for tunnel to establish, then check real handshake
-                await new Promise(resolve => setTimeout(resolve, 5000));
+                // We wait up to 15 seconds to allow Mikrotik to retry handshake if needed
+                await new Promise(resolve => setTimeout(resolve, 15000));
                 const tunnelVerified = await wireguardManager.checkPeerHandshake(router.wgPublicKey);
 
                 // Update router state
