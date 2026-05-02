@@ -102,7 +102,7 @@ export default function Mikrotiks() {
                 host: data.host,
                 username: data.username,
                 password: data.password,
-                port: data.apiPort || undefined,
+                port: data.port || undefined,
                 apiPort: data.apiPort || undefined,
                 vpnMode: data.vpnMode,
                 description: data.description,

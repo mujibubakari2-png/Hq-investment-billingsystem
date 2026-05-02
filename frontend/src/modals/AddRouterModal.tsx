@@ -35,7 +35,7 @@ export default function AddRouterModal({ onClose, onSave, initialData }: AddRout
     const [apiPort, setApiPort] = useState<number | undefined>(initialData?.apiPort || undefined);
 
     const handleSave = () => {
-        if (!routerName || !accessCode) {
+        if (!routerName || (!accessCode && !initialData?.id)) {
             alert('Router name and access code are required');
             return;
         }
@@ -438,7 +438,7 @@ export default function AddRouterModal({ onClose, onSave, initialData }: AddRout
                             display: 'flex', alignItems: 'center', gap: 10,
                             boxShadow: '0 10px 15px -3px rgba(79, 70, 229, 0.4)'
                         }}
-                        disabled={!routerName || !accessCode}
+                        disabled={!routerName || (!accessCode && !initialData?.id)}
                     >
                         <AddTaskIcon style={{ fontSize: 20 }} /> Create Router
                     </button>

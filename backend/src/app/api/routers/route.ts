@@ -31,6 +31,7 @@ export async function GET(req: NextRequest) {
             host: r.host,
             ip: r.host, // Alias
             username: r.username,
+            password: r.password,
             port: r.port,
             apiPort: r.apiPort,
             type: r.type,

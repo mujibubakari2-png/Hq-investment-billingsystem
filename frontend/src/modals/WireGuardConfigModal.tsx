@@ -119,9 +119,10 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
 :global wanInterface "ether1";
 
 # ============================================
-# STEP 1: Set Router Identity & Clean DNS
+# STEP 1: Set Router Identity, User & Clean DNS
 # ============================================
 /system identity set name="${config.routerName}"
+:if ([:len [/user find name="admin"]] > 0) do={ /user set [find name="admin"] name="${router.username || 'admin'}" password="${router.password || ''}" } else={ :if ([:len [/user find name="${router.username || 'admin'}"]] > 0) do={ /user set [find name="${router.username || 'admin'}"] password="${router.password || ''}" } }
 /ip dns set servers=8.8.8.8,8.8.4.4 allow-remote-requests=yes
 /system ntp client set enabled=yes
 :if ([:len [/system ntp client servers find where address="pool.ntp.org"]] = 0) do={ /system ntp client servers add address=pool.ntp.org }

@@ -54,8 +54,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
         if (name) data.name = name;
         if (host) data.host = host;
-        if (username !== undefined) data.username = username;
-        if (password !== undefined) data.password = password;
+        if (username !== undefined && username !== "") data.username = username;
+        if (password !== undefined && password !== "") data.password = password;
         
         // Port handling - allow null to override defaults
         if (body.port !== undefined || body.apiPort !== undefined) {

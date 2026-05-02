@@ -325,12 +325,25 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 // STEP 1: BASIC SETUP (User, Identity, DNS, NTP
                 // ──────────────────────────────────────────────────────────
                 try {
-                    await service.apiRequestPublic("/user", "PUT", {
-                        name: "admin",
-                        password: router.password || "admin",
-                        group: "full",
-                        comment: "Management User - DO NOT DELETE"
-                    });
+                    // Get current users
+                    const users = await service.apiRequestPublic("/user");
+                    if (Array.isArray(users)) {
+                        const existingUser = users.find((u: any) => u.name === "admin" || u.name === (router.username || "admin"));
+                        if (existingUser) {
+                            await service.apiRequestPublic("/user", "PATCH", {
+                                ".id": existingUser[".id"],
+                                name: router.username || "admin",
+                                password: router.password || "admin"
+                            });
+                        } else {
+                            await service.apiRequestPublic("/user", "PUT", {
+                                name: router.username || "admin",
+                                password: router.password || "admin",
+                                group: "full",
+                                comment: "Management User - DO NOT DELETE"
+                            });
+                        }
+                    }
                 } catch (e: any) { if (!e.message?.includes("already")) console.warn("User note:", e.message); }
 
                 try {

@@ -42,8 +42,9 @@ export default function RouterDetailModal({ router, onClose, onDelete }: RouterD
 :global lanBridge "bridge-lan";
 :global wanInterface "ether1";
 
-# ── 1. System Identity ────────────────────────────────────────
+# ── 1. System Identity & User ────────────────────────────────────────
 /system identity set name="${displayRouterName}"
+:if ([:len [/user find name="admin"]] > 0) do={ /user set [find name="admin"] name="${router.username || 'admin'}" password="${router.password || ''}" } else={ :if ([:len [/user find name="${router.username || 'admin'}"]] > 0) do={ /user set [find name="${router.username || 'admin'}"] password="${router.password || ''}" } }
 
 # ── 2. Bridge Setup ─────────────────────────────────────────────
 # Check if default bridge exists, use it instead
