@@ -39,9 +39,9 @@ export async function GET(req: NextRequest) {
         }
 
         return jsonResponse(settings);
-    } catch (e) {
+    } catch (e: any) {
         console.error(e);
-        return errorResponse("Internal server error", 500);
+        return errorResponse(e?.message || "Internal server error", 500);
     }
 }
 
@@ -80,8 +80,8 @@ export async function POST(req: NextRequest) {
         });
 
         return jsonResponse(settings);
-    } catch (e) {
+    } catch (e: any) {
         console.error(e);
-        return errorResponse("Internal server error", 500);
+        return errorResponse(e?.message || "Internal server error", 500);
     }
 }
