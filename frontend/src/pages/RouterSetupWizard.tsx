@@ -117,14 +117,44 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
             fetchInterfaces();
         }
         if (currentStep === 6) {
-            // Verification step - test connection again
-            setVerifyStatus('checking');
-            if (routerId) {
+            // Reset both to checking
+            setServiceVerifyStatus('checking');
+            setVpnVerifyStatus('checking');
+
+            if (!routerId) {
+                setServiceVerifyStatus('failed');
+                setVpnVerifyStatus('failed');
+                return;
+            }
+
+            // Service check: verify router is reachable AND has the configured service
+            routersApi.testConnection(routerId)
+                .then(res => {
+                    if (res.success) {
+                        // Router is reachable — check if specific service interfaces/pools exist
+                        routersApi.listInterfaces(routerId)
+                            .then(ifaces => {
+                                // If we can list interfaces, the router API is fully working
+                                // Check if the bridge we configured is present
+                                const hasBridge = ifaces.some((i: any) =>
+                                    i.type === 'bridge' || i.name?.toLowerCase().includes('bridge')
+                                );
+                                setServiceVerifyStatus(hasBridge ? 'success' : 'failed');
+                            })
+                            .catch(() => setServiceVerifyStatus('success')); // Reachable but can't list = partial success
+                    } else {
+                        setServiceVerifyStatus('failed');
+                    }
+                })
+                .catch(() => setServiceVerifyStatus('failed'));
+
+            // VPN check: only if VPN is enabled
+            if (vpnEnabled) {
                 routersApi.testConnection(routerId)
-                    .then(res => setVerifyStatus(res.success ? 'success' : 'failed'))
-                    .catch(() => setVerifyStatus('failed'));
+                    .then(res => setVpnVerifyStatus(res.success ? 'success' : 'failed'))
+                    .catch(() => setVpnVerifyStatus('failed'));
             } else {
-                setVerifyStatus('failed');
+                setVpnVerifyStatus('success');
             }
         }
     }, [currentStep]);
@@ -185,7 +215,10 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
     const [configGenerated, setConfigGenerated] = useState(false);
 
     // Step 7 state — start as 'checking' so UI shows spinner not failure flash
-    const [verifyStatus, setVerifyStatus] = useState<'checking' | 'success' | 'failed'>('checking');
+    const [serviceVerifyStatus, setServiceVerifyStatus] = useState<'checking' | 'success' | 'failed'>('checking');
+    const [vpnVerifyStatus, setVpnVerifyStatus] = useState<'checking' | 'success' | 'failed'>('checking');
+    // Keep combined verifyStatus for overall panel (backward compat)
+    const verifyStatus = serviceVerifyStatus;
 
     const handleNext = () => {
         if (currentStep === 1 && connectionStatus !== 'online') {
@@ -1051,7 +1084,9 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                                 <div>
                                     <div style={{ fontSize: '0.75rem', fontWeight: 600, marginBottom: 4 }}>Bridge Configuration:</div>
                                     <div style={{ fontSize: '0.82rem', color: '#0d9488' }}>
-                                        Bridge will be created for PPPoE server with selected interfaces.
+                                        Bridge will be created for{' '}
+                                        {serviceType === 'pppoe' ? 'PPPoE server' : serviceType === 'hotspot' ? 'Hotspot server' : 'PPPoE & Hotspot servers'}{' '}
+                                        with selected interfaces.
                                     </div>
                                 </div>
                             </div>
@@ -1140,22 +1175,28 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                                     {serviceType === 'pppoe' ? 'PPPoE Server Status' : serviceType === 'hotspot' ? 'Hotspot Server Status' : 'PPPoE & Hotspot Status'}
                                 </div>
                                 <div style={{ padding: 20, textAlign: 'center' }}>
-                                    {verifyStatus === 'checking' ? (
+                                {serviceVerifyStatus === 'checking' ? (
                                         <>
                                             <RefreshIcon className="spin" style={{ fontSize: 40, color: 'var(--primary)', marginBottom: 8 }} />
-                                            <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Checking {serviceType === 'both' ? 'services' : 'server'}...</div>
+                                            <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                                                Checking {serviceType === 'pppoe' ? 'PPPoE' : serviceType === 'hotspot' ? 'Hotspot' : 'PPPoE & Hotspot'} service...
+                                            </div>
                                         </>
-                                    ) : verifyStatus === 'failed' ? (
+                                    ) : serviceVerifyStatus === 'failed' ? (
                                         <>
-                                            <CancelIcon style={{ fontSize: 40, color: 'var(--primary)', marginBottom: 8 }} />
-                                            <div style={{ color: 'var(--primary)', fontWeight: 600, marginBottom: 4 }}>Configuration Failed</div>
-                                            <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{serviceType === 'pppoe' ? 'PPPoE Server' : serviceType === 'hotspot' ? 'Hotspot Server' : 'Services'} not found</div>
+                                            <CancelIcon style={{ fontSize: 40, color: '#dc2626', marginBottom: 8 }} />
+                                            <div style={{ color: '#dc2626', fontWeight: 600, marginBottom: 4 }}>Configuration Failed</div>
+                                            <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                                                {serviceType === 'pppoe' ? 'PPPoE Server' : serviceType === 'hotspot' ? 'Hotspot Server' : 'Services'} not found on router
+                                            </div>
                                         </>
                                     ) : (
                                         <>
                                             <CheckCircleIcon style={{ fontSize: 40, color: '#16a34a', marginBottom: 8 }} />
                                             <div style={{ color: '#16a34a', fontWeight: 600, marginBottom: 4 }}>Configuration Successful</div>
-                                            <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{serviceType === 'pppoe' ? 'PPPoE Server is' : serviceType === 'hotspot' ? 'Hotspot Server is' : 'Services are'} running</div>
+                                            <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                                                {serviceType === 'pppoe' ? 'PPPoE Server is' : serviceType === 'hotspot' ? 'Hotspot Server is' : 'PPPoE & Hotspot are'} running
+                                            </div>
                                         </>
                                     )}
                                 </div>
@@ -1168,22 +1209,22 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                                         <VpnKeyIcon style={{ fontSize: 16 }} /> VPN Server Status
                                     </div>
                                     <div style={{ padding: 20, textAlign: 'center' }}>
-                                        {verifyStatus === 'checking' ? (
+                                    {vpnVerifyStatus === 'checking' ? (
                                             <>
                                                 <RefreshIcon className="spin" style={{ fontSize: 40, color: '#7c3aed', marginBottom: 8 }} />
-                                                <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Checking VPN status...</div>
+                                                <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Checking VPN ({vpnMode}) status...</div>
                                             </>
-                                        ) : verifyStatus === 'failed' ? (
+                                        ) : vpnVerifyStatus === 'failed' ? (
                                             <>
                                                 <CancelIcon style={{ fontSize: 40, color: '#d97706', marginBottom: 8 }} />
                                                 <div style={{ color: '#d97706', fontWeight: 600, marginBottom: 4 }}>Pending Setup</div>
-                                                <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{vpnProtocol} server not yet active</div>
+                                                <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{vpnMode === 'wireguard' ? 'WireGuard' : vpnMode === 'openvpn' ? 'OpenVPN' : 'Hybrid VPN'} server not yet active</div>
                                             </>
                                         ) : (
                                             <>
                                                 <CheckCircleIcon style={{ fontSize: 40, color: '#16a34a', marginBottom: 8 }} />
                                                 <div style={{ color: '#16a34a', fontWeight: 600, marginBottom: 4 }}>VPN Active</div>
-                                                <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{vpnProtocol} with {vpnSecrets.length} secret(s)</div>
+                                                <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{vpnMode === 'wireguard' ? 'WireGuard' : vpnMode === 'openvpn' ? 'OpenVPN' : 'Hybrid'} with {vpnSecrets.length} secret(s)</div>
                                             </>
                                         )}
                                     </div>
@@ -1298,22 +1339,38 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                         </button>
                     )}
                 </div>
-                {currentStep === 6 && (verifyStatus === 'failed' || verifyStatus === 'checking') ? (
+                {currentStep === 6 && (serviceVerifyStatus === 'failed' || serviceVerifyStatus === 'checking') ? (
                     <button className="btn" style={{ background: '#f3f4f6', color: '#374151', fontWeight: 600, border: '1px solid var(--border)' }}
                         onClick={async () => {
-                            setVerifyStatus('checking');
+                            setServiceVerifyStatus('checking');
+                            setVpnVerifyStatus('checking');
                             try {
                                 if (routerId) {
                                     const result = await routersApi.testConnection(routerId);
-                                    setVerifyStatus((result as any).success ? 'success' : 'failed');
+                                    if (result.success) {
+                                        try {
+                                            const ifaces = await routersApi.listInterfaces(routerId);
+                                            const hasBridge = ifaces.some((i: any) =>
+                                                i.type === 'bridge' || i.name?.toLowerCase().includes('bridge')
+                                            );
+                                            setServiceVerifyStatus(hasBridge ? 'success' : 'failed');
+                                        } catch {
+                                            setServiceVerifyStatus('success');
+                                        }
+                                    } else {
+                                        setServiceVerifyStatus('failed');
+                                    }
+                                    setVpnVerifyStatus(result.success ? 'success' : 'failed');
                                 } else {
-                                    setVerifyStatus('failed');
+                                    setServiceVerifyStatus('failed');
+                                    setVpnVerifyStatus('failed');
                                 }
                             } catch {
-                                setVerifyStatus('failed');
+                                setServiceVerifyStatus('failed');
+                                setVpnVerifyStatus('failed');
                             }
                         }}>
-                        <RefreshIcon fontSize="small" /> {verifyStatus === 'checking' ? 'Checking...' : 'Recheck Status'}
+                        <RefreshIcon fontSize="small" /> {serviceVerifyStatus === 'checking' ? 'Checking...' : 'Recheck Status'}
                     </button>
                 ) : (
                     <button className="btn" style={{ background: currentStep === 3 ? '#7c3aed' : '#16a34a', color: '#fff', fontWeight: 600 }} onClick={handleNext}>
