@@ -168,6 +168,7 @@ export async function POST(req: NextRequest) {
                     }
                 });
             } catch (err: any) {
+                console.error("MikroTik Sync Error:", err);
                 await prisma.routerLog.create({
                     data: {
                         routerId: pkg.routerId,
