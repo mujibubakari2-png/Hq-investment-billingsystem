@@ -2,7 +2,6 @@
   "name": "backend",
   "version": "0.1.0",
   "private": true,
-  "packageManager": "pnpm@9.15.0",
   "scripts": {
     "dev": "next dev --hostname 0.0.0.0 --port 3001",
     "build": "prisma generate && next build",
@@ -11,11 +10,11 @@
     "start:droplet": "bash scripts/droplet-start.sh",
     "next:start": "next start --hostname 0.0.0.0 --port ${PORT:-3000}",
     "test": "vitest",
-    "db:seed": "pnpm exec tsx scripts/seed.ts",
-    "db:migrate": "pnpm exec prisma migrate deploy",
-    "db:test": "pnpm exec tsx scripts/test-db.js",
-    "db:check-migrations": "pnpm exec tsx scripts/check-migrations.js",
-    "db:fix-migrations": "pnpm exec tsx scripts/fix-migrations.js",
+    "db:seed": "npx tsx scripts/seed.ts",
+    "db:migrate": "npx prisma migrate deploy",
+    "db:test": "npx tsx scripts/test-db.js",
+    "db:check-migrations": "npx tsx scripts/check-migrations.js",
+    "db:fix-migrations": "npx tsx scripts/fix-migrations.js",
     "db:generate": "prisma generate"
   },
   "prisma": {
@@ -31,8 +30,8 @@
     ]
   },
   "dependencies": {
-    "@prisma/adapter-pg": "7.4.2",
-    "@prisma/client": "7.4.2",
+    "@prisma/adapter-pg": "^7.4.2",
+    "@prisma/client": "^7.4.2",
     "@types/nodemailer": "^7.0.11",
     "bcryptjs": "^3.0.3",
     "dotenv": "^17.3.1",
@@ -41,7 +40,6 @@
     "next": "15.1.11",
     "nodemailer": "^8.0.4",
     "pg": "^8.20.0",
-    "prisma": "7.4.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "tsx": "^4.21.0",
@@ -56,6 +54,7 @@
     "@types/react-dom": "^18.3.1",
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
+    "prisma": "^7.4.2",
     "typescript": "^5"
   }
 }
