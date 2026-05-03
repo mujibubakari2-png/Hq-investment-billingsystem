@@ -59,9 +59,7 @@ export default function RouterDetailModal({ router, onClose, onDelete }: RouterD
 
 # ── 3. Hotspot Server Setup ───────────────────────────────────
 :if ([:len [/ip hotspot profile find name="hsprof-${safeRouterName}"]] = 0) do={
-    /ip hotspot profile add name="hsprof-${safeRouterName}" hotspot-address=10.116.0.2 dns-name="${safeRouterName}.hotspot" \\
-        html-directory=hotspot login-by=http-chap,http-pap,cookie,mac-cookie \\
-        http-cookie-lifetime=3d use-radius=yes radius-accounting=yes
+    /ip hotspot profile add name="hsprof-${safeRouterName}" hotspot-address=10.116.0.2 dns-name="${safeRouterName}.hotspot" html-directory=hotspot login-by=http-chap,http-pap,cookie,mac-cookie http-cookie-lifetime=3d use-radius=yes radius-accounting=yes
 }
 
 :if ([:len [/ip pool find name="hs-pool-${safeRouterName}"]] = 0) do={
@@ -70,8 +68,7 @@ export default function RouterDetailModal({ router, onClose, onDelete }: RouterD
 
 :if ([:len [/ip hotspot find name="hotspot-${safeRouterName}"]] = 0) do={
     :if ([:len [/ip hotspot find interface=$lanBridge]] = 0) do={
-        /ip hotspot add name="hotspot-${safeRouterName}" interface=$lanBridge address-pool="hs-pool-${safeRouterName}" \\
-            profile="hsprof-${safeRouterName}" disabled=no
+        /ip hotspot add name="hotspot-${safeRouterName}" interface=$lanBridge address-pool="hs-pool-${safeRouterName}" profile="hsprof-${safeRouterName}" disabled=no
     } else={
         /ip hotspot set [find interface=$lanBridge] profile="hsprof-${safeRouterName}"
     }
@@ -112,21 +109,34 @@ export default function RouterDetailModal({ router, onClose, onDelete }: RouterD
 /ip dns set servers=8.8.8.8,1.1.1.1 allow-remote-requests=yes
 
 # ── 8. Firewall Rules ────────────────────────────────────────
-/ip firewall filter
-add chain=input protocol=tcp dst-port=8291 action=accept comment="Allow Winbox"
-add chain=input protocol=tcp dst-port=80,443 action=accept comment="Allow Web"
-add chain=input protocol=tcp dst-port=8728,8729 action=accept comment="Allow API"
-add chain=input protocol=udp dst-port=53,67 action=accept comment="Allow DNS & DHCP"
-add chain=input protocol=icmp action=accept comment="Allow Ping"
-add chain=input connection-state=established,related action=accept
-
-add chain=forward action=accept connection-state=established,related comment="Allow established forward"
-add chain=forward in-interface=$lanBridge action=accept comment="Allow LAN to WAN"
+:if ([:len [/ip firewall filter find where comment="Allow Winbox"]] = 0) do={
+    /ip firewall filter add chain=input protocol=tcp dst-port=8291 action=accept comment="Allow Winbox"
+}
+:if ([:len [/ip firewall filter find where comment="Allow Web"]] = 0) do={
+    /ip firewall filter add chain=input protocol=tcp dst-port=80,443 action=accept comment="Allow Web"
+}
+:if ([:len [/ip firewall filter find where comment="Allow API"]] = 0) do={
+    /ip firewall filter add chain=input protocol=tcp dst-port=8728,8729 action=accept comment="Allow API"
+}
+:if ([:len [/ip firewall filter find where comment="Allow DNS & DHCP"]] = 0) do={
+    /ip firewall filter add chain=input protocol=udp dst-port=53,67 action=accept comment="Allow DNS & DHCP"
+}
+:if ([:len [/ip firewall filter find where comment="Allow Ping"]] = 0) do={
+    /ip firewall filter add chain=input protocol=icmp action=accept comment="Allow Ping"
+}
+:if ([:len [/ip firewall filter find where connection-state=established,related chain=input]] = 0) do={
+    /ip firewall filter add chain=input connection-state=established,related action=accept comment="Allow established input"
+}
+:if ([:len [/ip firewall filter find where comment="Allow established forward"]] = 0) do={
+    /ip firewall filter add chain=forward action=accept connection-state=established,related comment="Allow established forward"
+}
+:if ([:len [/ip firewall filter find where comment="Allow LAN to WAN"]] = 0) do={
+    /ip firewall filter add chain=forward in-interface=$lanBridge action=accept comment="Allow LAN to WAN"
+}
 
 # ── 9. RADIUS Client (HQInvestment ISP Billing) ───────────────────────
 :if ([:len [/radius find address="${apiHost}"]] = 0) do={
-    /radius add service=hotspot,ppp address="${apiHost}" secret="hqinvestment-radius-secret" \\
-        authentication-port=1812 accounting-port=1813 timeout=3s
+    /radius add service=hotspot,ppp address="${apiHost}" secret="hqinvestment-radius-secret" authentication-port=1812 accounting-port=1813 timeout=3s
 }
 
 # ── 10. Walled Garden (Allow billing portal & Mgmt) ───────────
@@ -136,24 +146,25 @@ add chain=forward in-interface=$lanBridge action=accept comment="Allow LAN to WA
 :if ([:len [/ip hotspot walled-garden ip find dst-address="${apiHost}"]] = 0) do={
     /ip hotspot walled-garden ip add dst-address="${apiHost}" action=accept comment="Billing Portal IP"
 }
-
-# Unblock Management Ports so network admin is not locked out!
-/ip hotspot walled-garden ip
-add action=accept dst-port=8291 protocol=tcp comment="Allow Winbox Management"
-add action=accept dst-port=8728,8729 protocol=tcp comment="Allow API Management"
-add action=accept dst-port=80,443 protocol=tcp comment="Allow Web Management"
+# Management ports - idempotent
+:if ([:len [/ip hotspot walled-garden ip find where comment="Allow Winbox Management"]] = 0) do={
+    /ip hotspot walled-garden ip add action=accept dst-port=8291 protocol=tcp comment="Allow Winbox Management"
+}
+:if ([:len [/ip hotspot walled-garden ip find where comment="Allow API Management"]] = 0) do={
+    /ip hotspot walled-garden ip add action=accept dst-port=8728,8729 protocol=tcp comment="Allow API Management"
+}
+:if ([:len [/ip hotspot walled-garden ip find where comment="Allow Web Management"]] = 0) do={
+    /ip hotspot walled-garden ip add action=accept dst-port=80,443 protocol=tcp comment="Allow Web Management"
+}
 
 # ── 11. System Scheduler (Auto-sync with HQInvestment) ───────────────────
-/system scheduler
-:if ([:len [find name="billing-sync"]] > 0) do={ remove [find name="billing-sync"] }
-add name="billing-sync" interval=5m on-event="/tool fetch url=\\"${PUBLIC_API_BASE}/api/sync/${router.id}\\"" \\
-    start-time=startup
+:if ([:len [/system scheduler find name="billing-sync"]] > 0) do={ /system scheduler remove [find name="billing-sync"] }
+/system scheduler add name="billing-sync" interval=5m on-event="/tool fetch url=${PUBLIC_API_BASE}/api/sync/${router.id}" start-time=startup
 
 # ── 12. Logging ──────────────────────────────────────────────
-/system logging
-:if ([:len [/system logging find topics=hotspot]] = 0) do={ add topics=hotspot action=memory }
-:if ([:len [/system logging find topics=radius]] = 0) do={ add topics=radius action=memory }
-:if ([:len [/system logging find topics=pppoe]] = 0) do={ add topics=pppoe action=memory }
+:if ([:len [/system logging find topics=hotspot]] = 0) do={ /system logging add topics=hotspot action=memory }
+:if ([:len [/system logging find topics=radius]] = 0) do={ /system logging add topics=radius action=memory }
+:if ([:len [/system logging find topics=pppoe]] = 0) do={ /system logging add topics=pppoe action=memory }
 
 # ═══════════════════════════════════════════════════════════════
 # ✅ Script Complete! Router "${router.name}" is configured.

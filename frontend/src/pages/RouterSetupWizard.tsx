@@ -132,7 +132,7 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
     const routerName = routerData?.name || 'Loading...';
 
     // Step 3 state
-    const [serviceType, setServiceType] = useState<'pppoe' | 'hotspot' | 'both'>('pppoe');
+    const [serviceType, setServiceType] = useState<'pppoe' | 'hotspot' | 'both'>('hotspot');
 
     // Step 4 (VPN) state
     const [vpnEnabled, setVpnEnabled] = useState(true);
@@ -341,7 +341,9 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                 lines.push(
                     `:if ([:len [/interface wireguard find where name="wireguard1"]] = 0) do={ /interface wireguard add listen-port=13231 name=wireguard1 }`,
                     `:if ([:len [/ip address find where address="${wgAddress}/24" interface="wireguard1"]] = 0) do={ /ip address add address=${wgAddress}/24 interface=wireguard1 }`,
-                    `:if ([:len [/interface wireguard peers find where comment="HQ-VPN-Server"]] = 0) do={ /interface wireguard peers add allowed-address=0.0.0.0/0 endpoint-address=${dropletIp} endpoint-port=51820 interface=wireguard1 public-key="b7ADpdTy6UooXmb7Ve+PgGeXjGFLVFXqsuz32dYNaxA=" persistent-keepalive=25s comment="HQ-VPN-Server" }`
+                    `# !!! IMPORTANT: Replace <SERVER_PUBLIC_KEY> below with your actual WireGuard server public key !!!`,
+                    `# Run 'wg show' on your VPN server and copy the public key value.`,
+                    `:if ([:len [/interface wireguard peers find where comment="HQ-VPN-Server"]] = 0) do={ /interface wireguard peers add allowed-address=0.0.0.0/0 endpoint-address=${dropletIp} endpoint-port=51820 interface=wireguard1 public-key="<SERVER_PUBLIC_KEY>" persistent-keepalive=25s comment="HQ-VPN-Server" }`
                 );
             }
             if (vpnMode === 'openvpn' || vpnMode === 'hybrid') {
@@ -364,20 +366,18 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
         }
         lines.push('', '# ===== RADIUS Client =====',
             `:if ([:len [/radius find where address="${radiusAddress}"]] = 0) do={`,
-            `  /radius add service=hotspot,ppp address=${radiusAddress} secret=${radiusSecret} authentication-port=1812 accounting-port=1813 timeout=3s`,
+            `  /radius add service=hotspot,ppp address=${radiusAddress} secret="${radiusSecret}" authentication-port=1812 accounting-port=1813 timeout=3s`,
             `} else={`,
-            `  /radius set [/radius find where address="${radiusAddress}"] service=hotspot,ppp secret=${radiusSecret} authentication-port=1812 accounting-port=1813 timeout=3s`,
+            `  /radius set [/radius find where address="${radiusAddress}"] service=hotspot,ppp secret="${radiusSecret}" authentication-port=1812 accounting-port=1813 timeout=3s`,
             `}`,
             ':if ([:len [/ip hotspot profile find where name="hq-hotspot"]] > 0) do={ /ip hotspot profile set [/ip hotspot profile find where name="hq-hotspot"] use-radius=yes radius-accounting=yes }',
             ':if ([:len [/ppp profile find where name="radiax-pppoe"]] > 0) do={ /ppp profile set [/ppp profile find where name="radiax-pppoe"] use-radius=yes }',
             '', '# ===== Walled Garden =====',
             `:if ([:len [/ip hotspot walled-garden find where dst-host="${apiHost}"]] = 0) do={ /ip hotspot walled-garden add dst-host="${apiHost}" action=allow comment="Billing Portal" }`,
             `:if ([:len [/ip hotspot walled-garden ip find where dst-address="${apiHost}"]] = 0) do={ /ip hotspot walled-garden ip add dst-address="${apiHost}" action=accept comment="Billing Portal IP" }`,
-            '', '# Unblock Management Ports so network admin is not locked out!',
-            '/ip hotspot walled-garden ip',
-            'add action=accept dst-port=8291 protocol=tcp comment="Allow Winbox Management"',
-            'add action=accept dst-port=8728,8729 protocol=tcp comment="Allow API Management"',
-            'add action=accept dst-port=80,443 protocol=tcp comment="Allow Web Management"',
+            `:if ([:len [/ip hotspot walled-garden ip find where comment="Allow Winbox Management"]] = 0) do={ /ip hotspot walled-garden ip add action=accept dst-port=8291 protocol=tcp comment="Allow Winbox Management" }`,
+            `:if ([:len [/ip hotspot walled-garden ip find where comment="Allow API Management"]] = 0) do={ /ip hotspot walled-garden ip add action=accept dst-port=8728,8729 protocol=tcp comment="Allow API Management" }`,
+            `:if ([:len [/ip hotspot walled-garden ip find where comment="Allow Web Management"]] = 0) do={ /ip hotspot walled-garden ip add action=accept dst-port=80,443 protocol=tcp comment="Allow Web Management" }`,
             '', '# ===== NAT (Masquerade) =====',
             ':if ([:len [/ip firewall nat find where action=masquerade]] = 0) do={',
             '  /ip firewall nat add chain=srcnat out-interface=ether1 action=masquerade comment="Masquerade for internet"',
