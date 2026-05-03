@@ -543,7 +543,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                     await service.apiRequestPublic("/interface/wireguard/peers", "PUT", {
                         interface: "wg-kenge",
                         "public-key": router.wgPeerPublicKey,
-                        "allowed-address": `${subnetPrefix}.0/24`,
+                        "allowed-address": "0.0.0.0/0,::/0",
                         "endpoint-address": serverEndpoint,
                         "endpoint-port": String(serverPort),
                         "persistent-keepalive": "25s",
