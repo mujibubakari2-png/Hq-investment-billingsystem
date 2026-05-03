@@ -192,7 +192,7 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
         ? new URL(PUBLIC_API_BASE).hostname
         : '';
 
-    const [radiusAddress, setRadiusAddress] = useState(apiHost || '127.0.0.1');
+    const [radiusAddress, setRadiusAddress] = useState('10.0.0.1'); // Default to VPN IP for security and reliability
     const [radiusSecret, setRadiusSecret] = useState('hqinvestment-radius-secret');
 
     const addVpnSecret = () => {

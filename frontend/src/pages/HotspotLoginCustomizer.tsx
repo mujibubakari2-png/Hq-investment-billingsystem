@@ -470,20 +470,22 @@ export default function HotspotLoginCustomizer() {
 
     <script src="md5.js"></script>
     <script>
-        // ── Configuration ──
-        var API_BASE = '${backendUrl || CLEAN_API_URL || window.location.origin}';
+        // ── Configuration (URL is BAKED IN at download time — never use window.location here) ──
+        var API_BASE = '${(backendUrl || CLEAN_API_URL || '').replace(/\/$/, '')}';
         var ROUTER_ID = '${selectedRouterId}';
         var ACCENT = '${accentColor}';
         var PRIMARY = '${primaryColor}';
         var currentPkg = null;
         var pollInterval = null;
 
-        // ── Fallback packages (baked at generation time) ──
+        // ── Packages baked-in at generation time (always show these immediately) ──
         var fallbackPackages = ${JSON.stringify(
             routerPackages.length > 0
                 ? routerPackages.map(p => ({
-                    id: p.id, name: p.name, price: p.price || 0,
-                    validity: p.validity || '',
+                    id: p.id,
+                    name: p.name,
+                    price: p.price || 0,
+                    validity: p.validity || (p.duration ? p.duration + ' ' + (p.durationUnit || '') : ''),
                 }))
                 : [
                     { id: 'p1', name: 'MASAA 6', price: 450, validity: '6 Hours' },
@@ -653,32 +655,52 @@ export default function HotspotLoginCustomizer() {
             }, 10000);
         }
 
-        // Load packages and check for active subscription
+        // ── INIT: Show baked-in packages immediately, then try to fetch live ones ──
         (function() {
+            // STEP 1: Always show baked-in packages immediately (no delay, no spinner)
             renderPackages(fallbackPackages);
-            if (!ROUTER_ID) return;
 
-            // 1. Fetch live packages
-            fetch(API_BASE + '/api/packages?routerId=' + ROUTER_ID + '&status=ACTIVE')
-                .then(function(r) { return r.json(); })
-                .then(function(d) { 
-                    var pkgs = Array.isArray(d) ? d : (d.data || []);
-                    if (pkgs.length > 0) renderPackages(pkgs); 
+            // STEP 2: Only attempt live fetch if we have a valid API_BASE and ROUTER_ID
+            if (!API_BASE || API_BASE === '' || !ROUTER_ID) {
+                console.log('[Hotspot] No API_BASE or ROUTER_ID — using baked-in packages only.');
+                return;
+            }
+
+            // Fetch live packages (may fail due to CORS from MikroTik — that is OK)
+            fetch(API_BASE + '/api/packages?routerId=' + ROUTER_ID + '&status=ACTIVE', { mode: 'cors' })
+                .then(function(r) {
+                    if (!r.ok) throw new Error('HTTP ' + r.status);
+                    return r.json();
                 })
-                .catch(function() { console.log('Using baked-in packages'); });
+                .then(function(d) {
+                    var pkgs = Array.isArray(d) ? d : (d.data || []);
+                    if (pkgs.length > 0) {
+                        // Map live packages to display format
+                        var mapped = pkgs.map(function(p) {
+                            var validity = p.validity || (p.duration ? p.duration + ' ' + (p.durationUnit || '') : '');
+                            return { id: p.id, name: p.name, price: p.price || 0, validity: validity };
+                        });
+                        renderPackages(mapped);
+                        console.log('[Hotspot] Loaded ' + mapped.length + ' live packages.');
+                    }
+                })
+                .catch(function(err) {
+                    // CORS or network error — baked packages already showing, do nothing
+                    console.log('[Hotspot] Live package fetch failed (using baked-in). Error: ' + err.message);
+                });
 
-            // 2. Check for active subscription (Auto-reconnect)
+            // STEP 3: Check for active subscription (Auto-reconnect by MAC)
             var currentMac = '$(mac)';
             if (currentMac && currentMac !== '' && currentMac.indexOf('$') === -1) {
-                fetch(API_BASE + '/api/hotspot/check-mac?mac=' + encodeURIComponent(currentMac))
+                fetch(API_BASE + '/api/hotspot/check-mac?mac=' + encodeURIComponent(currentMac), { mode: 'cors' })
                     .then(function(r) { return r.json(); })
                     .then(function(d) {
                         if (d.active) {
-                            console.log('Active subscription found for MAC. Connecting...');
+                            console.log('[Hotspot] Active subscription found for MAC. Auto-connecting...');
                             connectUser(d.username, d.password);
                         }
                     })
-                    .catch(function(e) { console.log('MAC check failed', e); });
+                    .catch(function(e) { console.log('[Hotspot] MAC check failed:', e.message); });
             }
         })();
     </script>
