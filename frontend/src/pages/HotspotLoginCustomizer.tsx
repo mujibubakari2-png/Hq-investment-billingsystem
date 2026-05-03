@@ -667,7 +667,7 @@ export default function HotspotLoginCustomizer() {
             }
 
             // Fetch live packages (may fail due to CORS from MikroTik — that is OK)
-            fetch(API_BASE + '/api/packages?routerId=' + ROUTER_ID + '&status=ACTIVE', { mode: 'cors' })
+            fetch(API_BASE + '/api/hotspot/packages?routerId=' + ROUTER_ID, { mode: 'cors' })
                 .then(function(r) {
                     if (!r.ok) throw new Error('HTTP ' + r.status);
                     return r.json();

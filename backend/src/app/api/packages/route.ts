@@ -177,6 +177,10 @@ export async function POST(req: NextRequest) {
                         status: "error",
                     }
                 });
+                
+                // Rollback package creation if sync fails
+                await prisma.package.delete({ where: { id: pkg.id } });
+                return errorResponse(`Failed to sync package to MikroTik: ${err?.message}. Package creation was cancelled.`, 400);
             }
         }
 

@@ -24,8 +24,9 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         const { id } = await params;
         const body = await req.json();
 
-        const router = body.router
-            ? await prisma.router.findFirst({ where: { name: body.router } })
+        const routerId = body.routerId || body.router;
+        const router = routerId
+            ? await prisma.router.findFirst({ where: { OR: [{ id: routerId }, { name: routerId }] } })
             : null;
 
         const pkg = await prisma.package.update({
