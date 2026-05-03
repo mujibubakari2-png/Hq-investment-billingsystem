@@ -647,7 +647,7 @@ export class MikroTikService {
 
     async createPPPoEProfile(profile: Omit<BandwidthProfile, "id">): Promise<BandwidthProfile> {
         try {
-            const result = await this.apiRequest("/ppp/profile/add", "POST", {
+            const result = await this.apiRequest("/ppp/profile", "PUT", {
                 name: profile.name,
                 "rate-limit": profile.rateLimit,
                 comment: profile.comment || `HQInvestment ISP - ${profile.name}`,
@@ -662,10 +662,10 @@ export class MikroTikService {
 
     async createHotspotProfile(profile: Omit<BandwidthProfile, "id">): Promise<BandwidthProfile> {
         try {
-            const result = await this.apiRequest("/ip/hotspot/user/profile/add", "POST", {
+            const result = await this.apiRequest("/ip/hotspot/user/profile", "PUT", {
                 name: profile.name,
                 "rate-limit": profile.rateLimit,
-                "shared-users": String(profile.sharedUsers || 1),
+                "shared-users": profile.sharedUsers || 1,
                 comment: profile.comment || `HQInvestment ISP - ${profile.name}`,
             });
             await this.log("create_hotspot_profile", `Created Hotspot profile: ${profile.name} (${profile.rateLimit})`, "success");
@@ -681,8 +681,7 @@ export class MikroTikService {
         if (!existing?.id) {
             return this.createPPPoEProfile(profile);
         }
-        await this.apiRequest("/ppp/profile/set", "POST", {
-            ".id": existing.id,
+        await this.apiRequest(`/ppp/profile/${existing.id}`, "PATCH", {
             "rate-limit": profile.rateLimit,
             comment: profile.comment || existing.comment || `HQInvestment ISP - ${profile.name}`,
         });
@@ -695,10 +694,9 @@ export class MikroTikService {
         if (!existing?.id) {
             return this.createHotspotProfile(profile);
         }
-        await this.apiRequest("/ip/hotspot/user/profile/set", "POST", {
-            ".id": existing.id,
+        await this.apiRequest(`/ip/hotspot/user/profile/${existing.id}`, "PATCH", {
             "rate-limit": profile.rateLimit,
-            "shared-users": String(profile.sharedUsers || 1),
+            "shared-users": profile.sharedUsers || 1,
             comment: profile.comment || existing.comment || `HQInvestment ISP - ${profile.name}`,
         });
         await this.log("update_hotspot_profile", `Updated Hotspot profile: ${profile.name} (${profile.rateLimit})`, "success");
