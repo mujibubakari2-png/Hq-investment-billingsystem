@@ -98,7 +98,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
         const { id } = await params;
         await prisma.package.delete({ where: { id } });
         return jsonResponse({ message: "Package deleted" });
-    } catch {
-        return errorResponse("Internal server error", 500);
+    } catch (err: any) {
+        return errorResponse(`Failed to delete package: ${err.message}`, 500);
     }
 }
