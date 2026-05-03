@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev --hostname 0.0.0.0 --port 3001",
-    "build": "prisma generate && next build",
-    "build:full": "prisma generate && next build",
+    "build": "npx prisma generate && next build",
+    "build:full": "npx prisma generate && next build",
     "start": "bash scripts/droplet-start.sh",
     "start:droplet": "bash scripts/droplet-start.sh",
     "next:start": "next start --hostname 0.0.0.0 --port ${PORT:-3000}",
@@ -15,7 +15,7 @@
     "db:test": "npx tsx scripts/test-db.js",
     "db:check-migrations": "npx tsx scripts/check-migrations.js",
     "db:fix-migrations": "npx tsx scripts/fix-migrations.js",
-    "db:generate": "prisma generate"
+    "db:generate": "npx prisma generate"
   },
   "prisma": {
     "seed": "npx tsx scripts/seed.ts"
