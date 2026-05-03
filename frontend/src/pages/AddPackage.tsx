@@ -57,9 +57,9 @@ export default function AddPackage() {
                 payStatus
             });
             navigate('/packages');
-        } catch (error) {
+        } catch (error: any) {
             console.error('Failed to create package:', error);
-            alert('Failed to create package');
+            alert(error.message || 'Failed to create package');
             setSubmitting(false);
         }
     };
