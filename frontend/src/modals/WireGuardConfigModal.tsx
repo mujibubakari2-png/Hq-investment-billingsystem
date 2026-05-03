@@ -212,22 +212,21 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
     /interface list member add list=LAN interface="wg-kenge"
 }
 
-# Firewall rules - placed at TOP (place-before=0) to run before any drop rules
-/ip firewall filter
-:if ([:len [find where comment="Allow WireGuard - Kenge"]] = 0) do={
-    add place-before=0 chain=input action=accept protocol=udp dst-port=${config.listenPort} comment="Allow WireGuard - Kenge"
+# Firewall rules - placed at TOP to run before any drop rules
+:if ([:len [/ip firewall filter find where comment="Allow WireGuard - Kenge"]] = 0) do={
+    /ip firewall filter add place-before=0 chain=input action=accept protocol=udp dst-port=${config.listenPort} comment="Allow WireGuard - Kenge"
 }
-:if ([:len [find where comment="Allow API/Winbox from VPN - Kenge"]] = 0) do={
-    add place-before=0 chain=input action=accept protocol=tcp dst-port=${restPort},8291 src-address=${subnetAddress} comment="Allow API/Winbox from VPN - Kenge"
+:if ([:len [/ip firewall filter find where comment="Allow API/Winbox from VPN - Kenge"]] = 0) do={
+    /ip firewall filter add place-before=0 chain=input action=accept protocol=tcp dst-port=${restPort},8291 src-address=${subnetAddress} comment="Allow API/Winbox from VPN - Kenge"
 }
-:if ([:len [find where comment="Allow established/related - Kenge"]] = 0) do={
-    add place-before=0 chain=input action=accept connection-state=established,related comment="Allow established/related - Kenge"
+:if ([:len [/ip firewall filter find where comment="Allow established/related - Kenge"]] = 0) do={
+    /ip firewall filter add place-before=0 chain=input action=accept connection-state=established,related comment="Allow established/related - Kenge"
 }
-:if ([:len [find where comment="Allow LAN to WAN forward - Kenge"]] = 0) do={
-    add place-before=0 chain=forward action=accept in-interface=$lanBridge out-interface=$wanInterface comment="Allow LAN to WAN forward - Kenge"
+:if ([:len [/ip firewall filter find where comment="Allow LAN to WAN forward - Kenge"]] = 0) do={
+    /ip firewall filter add place-before=0 chain=forward action=accept in-interface=$lanBridge out-interface=$wanInterface comment="Allow LAN to WAN forward - Kenge"
 }
-:if ([:len [find where comment="Allow established forward - Kenge"]] = 0) do={
-    add place-before=0 chain=forward action=accept connection-state=established,related comment="Allow established forward - Kenge"
+:if ([:len [/ip firewall filter find where comment="Allow established forward - Kenge"]] = 0) do={
+    /ip firewall filter add place-before=0 chain=forward action=accept connection-state=established,related comment="Allow established forward - Kenge"
 }
 
 # ============================================
@@ -241,11 +240,18 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
 :if ([:len [/ip hotspot walled-garden find dst-host="${apiHost}"]] = 0) do={
     /ip hotspot walled-garden add dst-host="${apiHost}" action=allow comment="Billing Portal"
 }
-/ip hotspot walled-garden ip
-:if ([:len [find dst-address="${apiHost}"]] = 0) do={ add action=accept dst-address="${apiHost}" comment="Billing Portal IP" }
-:if ([:len [find where comment="Allow Winbox Management"]] = 0) do={ add action=accept dst-port=8291 protocol=tcp comment="Allow Winbox Management" }
-:if ([:len [find where comment="Allow API Management"]] = 0) do={ add action=accept dst-port=8728,8729 protocol=tcp comment="Allow API Management" }
-:if ([:len [find where comment="Allow Web Management"]] = 0) do={ add action=accept dst-port=80,443 protocol=tcp comment="Allow Web Management" }
+:if ([:len [/ip hotspot walled-garden ip find dst-address="${apiHost}"]] = 0) do={
+    /ip hotspot walled-garden ip add action=accept dst-address="${apiHost}" comment="Billing Portal IP"
+}
+:if ([:len [/ip hotspot walled-garden ip find where comment="Allow Winbox Management"]] = 0) do={
+    /ip hotspot walled-garden ip add action=accept dst-port=8291 protocol=tcp comment="Allow Winbox Management"
+}
+:if ([:len [/ip hotspot walled-garden ip find where comment="Allow API Management"]] = 0) do={
+    /ip hotspot walled-garden ip add action=accept dst-port=8728,8729 protocol=tcp comment="Allow API Management"
+}
+:if ([:len [/ip hotspot walled-garden ip find where comment="Allow Web Management"]] = 0) do={
+    /ip hotspot walled-garden ip add action=accept dst-port=80,443 protocol=tcp comment="Allow Web Management"
+}
 
 # ============================================
 # STEP 9: System Logging
@@ -257,9 +263,8 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
 # ============================================
 # STEP 10: System Scheduler (Auto-sync)
 # ============================================
-/system scheduler
-:if ([:len [find name="billing-sync"]] > 0) do={ remove [find name="billing-sync"] }
-add name="billing-sync" interval=5m on-event="/tool fetch url=\"${PUBLIC_API_BASE}/api/sync/${config.routerId}\"" start-time=startup
+:if ([:len [/system scheduler find name="billing-sync"]] > 0) do={ /system scheduler remove [find name="billing-sync"] }
+/system scheduler add name="billing-sync" interval=5m on-event="/tool fetch url=${PUBLIC_API_BASE}/api/sync/${config.routerId}" start-time=startup
 
 # ============================================
 # Configuration Complete!
