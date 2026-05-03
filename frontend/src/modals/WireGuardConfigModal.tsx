@@ -101,8 +101,8 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
     const restPort = router.apiPort || (router.port === 8728 || router.port === 8729 ? 80 : router.port) || 80;
 
     // Build MikroTik server script with CORRECT syntax
-    const safeRouterName = config.routerName.replace(/\\s+/g, '-');
-    const safeRouterNameLower = config.routerName.toLowerCase().replace(/\\s+/g, '-');
+    const safeRouterName = config.routerName.replace(/\s+/g, '-');
+    const safeRouterNameLower = config.routerName.toLowerCase().replace(/\s+/g, '-');
 
     const apiHost = new URL(PUBLIC_API_BASE).hostname;
 
@@ -156,7 +156,7 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
 # STEP 4: DHCP Server & Hotspot Setup
 # ============================================
 :if ([:len [/ip dhcp-server network find address="10.116.0.0/24"]] = 0) do={
-    /ip dhcp-server network add address=10.116.0.0/24 gateway=10.116.0.2 dns-server=10.116.0.2
+    /ip dhcp-server network add address=10.116.0.0/24 gateway=10.116.0.2 dns-server=10.116.0.2,8.8.8.8
 }
 :if ([:len [/ip dhcp-server find interface=$lanBridge]] = 0) do={
     /ip dhcp-server add address-pool="hs-pool-${safeRouterName}" disabled=no interface=$lanBridge name="dhcp-${safeRouterName}"
@@ -183,15 +183,16 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
 # ============================================
 :if ([:len [/interface wireguard find name="wg-kenge"]] = 0) do={
     /interface wireguard add name="wg-kenge" listen-port=${config.listenPort} private-key="${config.routerPrivateKey}" comment="Kenge VPN Interface"
+} else={
+    /interface wireguard set [find name="wg-kenge"] listen-port=${config.listenPort} private-key="${config.routerPrivateKey}"
 }
 :if ([:len [/interface wireguard peers find interface="wg-kenge" public-key="${serverPubKey}"]] = 0) do={
-    /interface wireguard peers add interface="wg-kenge" public-key="${serverPubKey}" endpoint-address=${config.serverEndpoint} endpoint-port=${config.serverPort} allowed-address=${subnetAddress} persistent-keepalive=25s comment="Kenge ISP Server"
+    /interface wireguard peers add interface="wg-kenge" public-key="${serverPubKey}" endpoint-address=${config.serverEndpoint} endpoint-port=${config.serverPort} allowed-address=0.0.0.0/0 persistent-keepalive=25s comment="Kenge ISP Server"
+} else={
+    /interface wireguard peers set [find interface="wg-kenge" public-key="${serverPubKey}"] endpoint-address=${config.serverEndpoint} endpoint-port=${config.serverPort} allowed-address=0.0.0.0/0 persistent-keepalive=25s
 }
-:if ([:len [/ip address find address="${config.routerTunnelIp}/24"]] = 0) do={
-    /ip address add address=${config.routerTunnelIp}/24 interface="wg-kenge" comment="VPN Address"
-}
-:if ([:len [/ip route find dst-address="${subnetAddress}"]] = 0) do={
-    /ip route add dst-address=${subnetAddress} gateway="wg-kenge" comment="VPN Route"
+:if ([:len [/ip address find address="${config.routerTunnelIp}/24" interface="wg-kenge"]] = 0) do={
+    /ip address add address=${config.routerTunnelIp}/24 interface="wg-kenge" comment="Kenge VPN Address"
 }
 
 # ============================================
@@ -201,13 +202,17 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
     /ip firewall nat add chain=srcnat out-interface=$wanInterface action=masquerade comment="NAT for Internet - Kenge"
 }
 
-# Add WireGuard to LAN list so default firewall doesn't block it
+# Add WireGuard to interface lists so default firewall trusts it
+:if ([:len [/interface list find name=WAN]] = 0) do={ /interface list add name=WAN }
 :if ([:len [/interface list find name=LAN]] = 0) do={ /interface list add name=LAN }
+:if ([:len [/interface list member find list=WAN interface=$wanInterface]] = 0) do={
+    /interface list member add list=WAN interface=$wanInterface
+}
 :if ([:len [/interface list member find list=LAN interface="wg-kenge"]] = 0) do={
     /interface list member add list=LAN interface="wg-kenge"
 }
 
-# We add our custom input rules at the TOP to prevent being dropped by default rules
+# Firewall rules - placed at TOP (place-before=0) to run before any drop rules
 /ip firewall filter
 :if ([:len [find where comment="Allow WireGuard - Kenge"]] = 0) do={
     add place-before=0 chain=input action=accept protocol=udp dst-port=${config.listenPort} comment="Allow WireGuard - Kenge"
@@ -215,26 +220,46 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
 :if ([:len [find where comment="Allow API/Winbox from VPN - Kenge"]] = 0) do={
     add place-before=0 chain=input action=accept protocol=tcp dst-port=${restPort},8291 src-address=${subnetAddress} comment="Allow API/Winbox from VPN - Kenge"
 }
+:if ([:len [find where comment="Allow established/related - Kenge"]] = 0) do={
+    add place-before=0 chain=input action=accept connection-state=established,related comment="Allow established/related - Kenge"
+}
+:if ([:len [find where comment="Allow LAN to WAN forward - Kenge"]] = 0) do={
+    add place-before=0 chain=forward action=accept in-interface=$lanBridge out-interface=$wanInterface comment="Allow LAN to WAN forward - Kenge"
+}
+:if ([:len [find where comment="Allow established forward - Kenge"]] = 0) do={
+    add place-before=0 chain=forward action=accept connection-state=established,related comment="Allow established forward - Kenge"
+}
 
 # ============================================
 # STEP 8: RADIUS & Walled Garden
 # ============================================
-:if ([:len [/radius find address="\${apiHost}"]] = 0) do={
-    /radius add service=hotspot,ppp address="\${apiHost}" secret="hqinvestment-radius-secret" authentication-port=1812 accounting-port=1813 timeout=3s
+:if ([:len [/radius find address="${apiHost}"]] = 0) do={
+    /radius add service=hotspot,ppp address="${apiHost}" secret="hqinvestment-radius-secret" authentication-port=1812 accounting-port=1813 timeout=3s
 }
 
+# Walled Garden - allow billing portal (DNS-based and IP-based)
+:if ([:len [/ip hotspot walled-garden find dst-host="${apiHost}"]] = 0) do={
+    /ip hotspot walled-garden add dst-host="${apiHost}" action=allow comment="Billing Portal"
+}
 /ip hotspot walled-garden ip
-:if ([:len [find dst-address="\${apiHost}"]] = 0) do={ add action=accept dst-address="\${apiHost}" comment="Billing Portal IP" }
-:if ([:len [find dst-port=8291]] = 0) do={ add action=accept dst-port=8291 protocol=tcp comment="Allow Winbox Management" }
-:if ([:len [find dst-port=8728]] = 0) do={ add action=accept dst-port=8728,8729 protocol=tcp comment="Allow API Management" }
-:if ([:len [find dst-port=80]] = 0) do={ add action=accept dst-port=80,443 protocol=tcp comment="Allow Web Management" }
+:if ([:len [find dst-address="${apiHost}"]] = 0) do={ add action=accept dst-address="${apiHost}" comment="Billing Portal IP" }
+:if ([:len [find where comment="Allow Winbox Management"]] = 0) do={ add action=accept dst-port=8291 protocol=tcp comment="Allow Winbox Management" }
+:if ([:len [find where comment="Allow API Management"]] = 0) do={ add action=accept dst-port=8728,8729 protocol=tcp comment="Allow API Management" }
+:if ([:len [find where comment="Allow Web Management"]] = 0) do={ add action=accept dst-port=80,443 protocol=tcp comment="Allow Web Management" }
 
 # ============================================
-# STEP 9: System Scheduler (Auto-sync)
+# STEP 9: System Logging
+# ============================================
+:if ([:len [/system logging find topics=hotspot]] = 0) do={ /system logging add topics=hotspot action=memory }
+:if ([:len [/system logging find topics=radius]] = 0) do={ /system logging add topics=radius action=memory }
+:if ([:len [/system logging find topics=pppoe]] = 0) do={ /system logging add topics=pppoe action=memory }
+
+# ============================================
+# STEP 10: System Scheduler (Auto-sync)
 # ============================================
 /system scheduler
 :if ([:len [find name="billing-sync"]] > 0) do={ remove [find name="billing-sync"] }
-add name="billing-sync" interval=5m on-event="/tool fetch url=\\"${PUBLIC_API_BASE}/api/sync/${config.routerId}\\"" start-time=startup
+add name="billing-sync" interval=5m on-event="/tool fetch url=\"${PUBLIC_API_BASE}/api/sync/${config.routerId}\"" start-time=startup
 
 # ============================================
 # Configuration Complete!
@@ -245,6 +270,7 @@ add name="billing-sync" interval=5m on-event="/tool fetch url=\\"${PUBLIC_API_BA
 # - Server Endpoint: ${config.serverEndpoint}:${config.serverPort}
 # - Interface      : wg-kenge
 # - Listen Port    : ${config.listenPort}
+# - RADIUS Server  : ${apiHost}
 # ============================================`;
 
     // Client config for the HQInvestment ISP server
