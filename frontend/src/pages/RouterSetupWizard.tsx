@@ -158,10 +158,9 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
     const [hotspotPoolStart, setHotspotPoolStart] = useState('10.116.0.3');
     const [hotspotPoolEnd, setHotspotPoolEnd] = useState('10.116.0.254');
 
-    // ALWAYS use PUBLIC_API_BASE in production. Fallback to import.meta.env.BASE_URL if provided.
     const apiHost = PUBLIC_API_BASE && PUBLIC_API_BASE.startsWith('http')
         ? new URL(PUBLIC_API_BASE).hostname
-        : (import.meta.env?.BASE_URL ? new URL(import.meta.env.BASE_URL).hostname : '' );
+        : '';
 
     const [radiusAddress, setRadiusAddress] = useState(apiHost || '127.0.0.1');
     const [radiusSecret, setRadiusSecret] = useState('hqinvestment-radius-secret');
@@ -185,8 +184,8 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
     // Step 6 state
     const [configGenerated, setConfigGenerated] = useState(false);
 
-    // Step 7 state
-    const [verifyStatus, setVerifyStatus] = useState<'checking' | 'success' | 'failed'>('failed');
+    // Step 7 state — start as 'checking' so UI shows spinner not failure flash
+    const [verifyStatus, setVerifyStatus] = useState<'checking' | 'success' | 'failed'>('checking');
 
     const handleNext = () => {
         if (currentStep === 1 && connectionStatus !== 'online') {
@@ -194,8 +193,12 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
             return;
         }
         if (currentStep === 4 && selectedInterfaces.length === 0) {
-            alert('Please select at least one interface.');
+            alert('Please select at least one interface for the service bridge.');
             return;
+        }
+        if (currentStep === 5 && !configGenerated) {
+            const ok = window.confirm('You have not generated the RSC config yet. Continue anyway?');
+            if (!ok) return;
         }
 
         if (currentStep < steps.length - 1) {
@@ -353,13 +356,13 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                 );
             }
             vpnSecrets.forEach(s => {
-                const localAddr = s.localAddress ? ` local-address=${s.localAddress}` : '';
-                const remoteAddr = s.remoteAddress ? ` remote-address=${s.remoteAddress}` : '';
+                const localAddr = s.localAddress ? ` local-address="${s.localAddress}"` : '';
+                const remoteAddr = s.remoteAddress ? ` remote-address="${s.remoteAddress}"` : '';
                 lines.push(
                     `:if ([:len [/ppp secret find where name="${s.username}"]] = 0) do={`,
-                    `  /ppp secret add name=${s.username} password=${s.password} service=${s.protocol.toLowerCase()} profile=${s.profile}${localAddr}${remoteAddr}`,
+                    `  /ppp secret add name="${s.username}" password="${s.password}" service=${s.protocol.toLowerCase()} profile="${s.profile}"${localAddr}${remoteAddr}`,
                     `} else={`,
-                    `  /ppp secret set [/ppp secret find where name="${s.username}"] password=${s.password} service=${s.protocol.toLowerCase()} profile=${s.profile}${localAddr}${remoteAddr}`,
+                    `  /ppp secret set [/ppp secret find where name="${s.username}"] password="${s.password}" service=${s.protocol.toLowerCase()} profile="${s.profile}"${localAddr}${remoteAddr}`,
                     `}`
                 );
             });
@@ -430,7 +433,16 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                                 onClick={() => {
                                     const vpnUser = routerData?.username || (routerName ? routerName.toLowerCase().replace(/\s+/g, '') : 'vpn');
                                     const vpnPass = routerData?.password || 'secret';
-                                    const scriptContent = `# OpenVPN Setup Script for ${routerName}\n:if ([:len [/interface ovpn-client find where name="ovpn-out1"]] = 0) do={ /interface ovpn-client add name=ovpn-out1 connect-to=${apiHost} user=${vpnUser} password=${vpnPass} } else={ /interface ovpn-client set [/interface ovpn-client find where name="ovpn-out1"] connect-to=${apiHost} user=${vpnUser} password=${vpnPass} }\n:if ([:len [/ip hotspot walled-garden find where dst-host="${apiHost}"]] = 0) do={ /ip hotspot walled-garden add action=allow dst-host=${apiHost} }\n:if ([:len [/ip hotspot walled-garden ip find where dst-address="${apiHost}"]] = 0) do={ /ip hotspot walled-garden ip add action=accept dst-address=${apiHost} }\n`;
+                                    const scriptContent = [
+                                        `# OpenVPN Setup Script for ${routerName}`,
+                                        `:if ([:len [/interface ovpn-client find where name="ovpn-out1"]] = 0) do={`,
+                                        `  /interface ovpn-client add name=ovpn-out1 connect-to=${apiHost} user="${vpnUser}" password="${vpnPass}"`,
+                                        `} else={`,
+                                        `  /interface ovpn-client set [/interface ovpn-client find where name="ovpn-out1"] connect-to=${apiHost} user="${vpnUser}" password="${vpnPass}"`,
+                                        `}`,
+                                        `:if ([:len [/ip hotspot walled-garden find where dst-host="${apiHost}"]] = 0) do={ /ip hotspot walled-garden add action=allow dst-host="${apiHost}" comment="Billing Portal" }`,
+                                        `:if ([:len [/ip hotspot walled-garden ip find where dst-address="${apiHost}"]] = 0) do={ /ip hotspot walled-garden ip add action=accept dst-address="${apiHost}" comment="Billing Portal IP" }`,
+                                    ].join('\n');
                                     const blob = new Blob([scriptContent], { type: 'application/octet-stream' });
                                     const url = URL.createObjectURL(blob);
                                     const a = document.createElement('a');
