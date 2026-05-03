@@ -647,7 +647,7 @@ export class MikroTikService {
 
     async createPPPoEProfile(profile: Omit<BandwidthProfile, "id">): Promise<BandwidthProfile> {
         try {
-            const result = await this.apiRequest("/ppp/profile", "PUT", {
+            const result = await this.apiRequest("/ppp/profile/add", "POST", {
                 name: profile.name,
                 "rate-limit": profile.rateLimit,
                 comment: profile.comment || `HQInvestment ISP - ${profile.name}`,
@@ -662,7 +662,7 @@ export class MikroTikService {
 
     async createHotspotProfile(profile: Omit<BandwidthProfile, "id">): Promise<BandwidthProfile> {
         try {
-            const result = await this.apiRequest("/ip/hotspot/user/profile", "PUT", {
+            const result = await this.apiRequest("/ip/hotspot/user/profile/add", "POST", {
                 name: profile.name,
                 "rate-limit": profile.rateLimit,
                 "shared-users": profile.sharedUsers || 1,
@@ -681,7 +681,8 @@ export class MikroTikService {
         if (!existing?.id) {
             return this.createPPPoEProfile(profile);
         }
-        await this.apiRequest(`/ppp/profile/${existing.id}`, "PATCH", {
+        await this.apiRequest("/ppp/profile/set", "POST", {
+            ".id": existing.id,
             "rate-limit": profile.rateLimit,
             comment: profile.comment || existing.comment || `HQInvestment ISP - ${profile.name}`,
         });
@@ -694,7 +695,8 @@ export class MikroTikService {
         if (!existing?.id) {
             return this.createHotspotProfile(profile);
         }
-        await this.apiRequest(`/ip/hotspot/user/profile/${existing.id}`, "PATCH", {
+        await this.apiRequest("/ip/hotspot/user/profile/set", "POST", {
+            ".id": existing.id,
             "rate-limit": profile.rateLimit,
             "shared-users": profile.sharedUsers || 1,
             comment: profile.comment || existing.comment || `HQInvestment ISP - ${profile.name}`,
