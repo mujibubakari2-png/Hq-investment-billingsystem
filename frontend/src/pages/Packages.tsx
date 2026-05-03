@@ -32,8 +32,15 @@ export default function Packages() {
 
     const handleDelete = async () => {
         if (!deleteId) return;
-        try { await packagesApi.delete(deleteId); setDeleteId(null); fetchPackages(); }
-        catch (err) { console.error('Failed to delete package:', err); }
+        try {
+            await packagesApi.delete(deleteId);
+            setDeleteId(null);
+            fetchPackages();
+        } catch (err: any) {
+            console.error('Failed to delete package:', err);
+            alert(`Failed to delete package: ${err.message || 'It might be linked to existing subscriptions or vouchers.'}`);
+            setDeleteId(null);
+        }
     };
 
     const filtered = packages.filter(pkg => {
