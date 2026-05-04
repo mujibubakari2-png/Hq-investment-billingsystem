@@ -73,7 +73,8 @@ export async function sendEmail({
         if (error.code === 'EAUTH') {
             userFriendlyError = "Authentication failed. Please verify your SMTP_USER and SMTP_PASS (App Password).";
         } else if (error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT') {
-            userFriendlyError = `Could not connect to ${emailConfig.host}:${emailConfig.port}. Check your firewall or port settings.`;
+            const hostDisplay = emailConfig.host || env.SMTP_HOST || "SMTP server";
+            userFriendlyError = `Could not connect to ${hostDisplay}:${emailConfig.port}. Check your firewall or port settings.`;
         } else if (error.code === 'ENETUNREACH') {
             userFriendlyError = `Network unreachable. Try changing SMTP_PORT to 465 and setting SMTP_SECURE to true.`;
         }
