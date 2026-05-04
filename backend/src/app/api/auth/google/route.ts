@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
 
     try {
         const body = await req.json();
-        const { credential } = body;
+        const { credential, action } = body;
 
         if (!credential) return errorResponse("Google credential is required");
 
@@ -79,6 +79,10 @@ export async function POST(req: NextRequest) {
         });
 
         if (!user) {
+            if (action === "login") {
+                return errorResponse("user_not_found_needs_registration", 404);
+            }
+            
             // First-time Google sign-in → auto-register as a new tenant ADMIN
             // (not SUPER_ADMIN — that must be set manually in the database)
             const plan = await prisma.saasPlan.findFirst();

@@ -34,6 +34,10 @@ export default function Login() {
             authStore.login(token, user);
             navigate('/dashboard', { replace: true });
         } catch (err: any) {
+            if (err.message === 'user_not_found_needs_registration') {
+                navigate('/register', { replace: true });
+                return;
+            }
             setError(err.message || 'Google authentication failed. Please try again.');
             setLoading(false);
         }
