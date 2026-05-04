@@ -647,7 +647,8 @@ export class MikroTikService {
 
     async createPPPoEProfile(profile: Omit<BandwidthProfile, "id">): Promise<BandwidthProfile> {
         try {
-            const result = await this.apiRequest("/ppp/profile/add", "POST", {
+            // RouterOS REST API v7: use PUT on the collection to create a new resource
+            const result = await this.apiRequest("/ppp/profile", "PUT", {
                 name: profile.name,
                 "rate-limit": profile.rateLimit,
                 comment: profile.comment || `HQInvestment ISP - ${profile.name}`,
@@ -662,7 +663,8 @@ export class MikroTikService {
 
     async createHotspotProfile(profile: Omit<BandwidthProfile, "id">): Promise<BandwidthProfile> {
         try {
-            const result = await this.apiRequest("/ip/hotspot/user/profile/add", "POST", {
+            // RouterOS REST API v7: use PUT on the collection to create a new resource
+            const result = await this.apiRequest("/ip/hotspot/user/profile", "PUT", {
                 name: profile.name,
                 "rate-limit": profile.rateLimit,
                 "shared-users": profile.sharedUsers || 1,
@@ -681,8 +683,8 @@ export class MikroTikService {
         if (!existing?.id) {
             return this.createPPPoEProfile(profile);
         }
-        await this.apiRequest("/ppp/profile/set", "POST", {
-            ".id": existing.id,
+        // RouterOS REST API v7: PATCH on the specific resource ID (no .id in body)
+        await this.apiRequest(`/ppp/profile/${existing.id}`, "PATCH", {
             "rate-limit": profile.rateLimit,
             comment: profile.comment || existing.comment || `HQInvestment ISP - ${profile.name}`,
         });
@@ -695,8 +697,8 @@ export class MikroTikService {
         if (!existing?.id) {
             return this.createHotspotProfile(profile);
         }
-        await this.apiRequest("/ip/hotspot/user/profile/set", "POST", {
-            ".id": existing.id,
+        // RouterOS REST API v7: PATCH on the specific resource ID (no .id in body)
+        await this.apiRequest(`/ip/hotspot/user/profile/${existing.id}`, "PATCH", {
             "rate-limit": profile.rateLimit,
             "shared-users": profile.sharedUsers || 1,
             comment: profile.comment || existing.comment || `HQInvestment ISP - ${profile.name}`,
@@ -884,8 +886,10 @@ export class MikroTikService {
         serviceType: "pppoe" | "hotspot",
         sharedUsers: number = 1,
     ): Promise<BandwidthProfile> {
-        const uploadStr = `${uploadSpeed}${uploadUnit === "Mbps" ? "M" : uploadUnit === "Kbps" ? "k" : ""}`;
-        const downloadStr = `${downloadSpeed}${downloadUnit === "Mbps" ? "M" : downloadUnit === "Kbps" ? "k" : ""}`;
+        // MikroTik rate-limit unit suffixes: M=Mbps, k=Kbps, G=Gbps
+        const toMtUnit = (unit: string) => unit === "Mbps" ? "M" : unit === "Kbps" ? "k" : unit === "Gbps" ? "G" : "M";
+        const uploadStr = `${uploadSpeed}${toMtUnit(uploadUnit)}`;
+        const downloadStr = `${downloadSpeed}${toMtUnit(downloadUnit)}`;
         const rateLimit = `${uploadStr}/${downloadStr}`;
 
         if (serviceType === "pppoe") {
@@ -903,7 +907,8 @@ export async function getMikroTikService(routerId: string, tenantId?: string | n
     if (!router) throw new Error("Router not found");
 
     // Strict tenant isolation check
-    if (tenantId !== undefined && router.tenantId !== tenantId) {
+    // Allow bypass when tenantId is undefined (internal calls) OR null (SUPER_ADMIN)
+    if (tenantId !== undefined && tenantId !== null && router.tenantId !== tenantId) {
         throw new Error("Unauthorized: This router belongs to another tenant");
     }
 
