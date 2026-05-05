@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
         const requestedTenantId = body.tenantId || body.tenant_id;
         let tenantIdValue = isSuperAdmin ? (requestedTenantId ?? null) : userPayload.tenantId;
 
-        // Kama Super Admin anatengeneza user na hakumpa tenant, na sio Super Admin, mtengenezee Tenant mpya.
+        // If a Super Admin creates a non-Super Admin user without assigning a tenant, create a new Tenant for them.
         if (isSuperAdmin && !tenantIdValue && assignedRole !== "SUPER_ADMIN") {
             let plan = await prisma.saasPlan.findUnique({ where: { id: "free_trial" } });
             if (!plan) plan = await prisma.saasPlan.findFirst();
