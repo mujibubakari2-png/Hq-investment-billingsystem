@@ -25,9 +25,7 @@ export const emailConfig: any = {
     greetingTimeout: 10000
 };
 
-console.log(`[EMAIL] SMTP Configuration: Host=${emailConfig.host}, Port=${emailConfig.port}, Secure=${emailConfig.secure}, User=${emailConfig.auth.user ? "Set" : "Not Set"}`);
-
-const transporter = nodemailer.createTransport(emailConfig);
+console.log(`[EMAIL] SMTP Default Configuration: Host=${emailConfig.host}, Port=${emailConfig.port}, Secure=${emailConfig.secure}`);
 
 export async function sendEmail({
     to,
@@ -44,14 +42,39 @@ export async function sendEmail({
 
     console.log(`[EMAIL] Attempting to send email to ${to} (Host: ${emailConfig.host})`);
 
+    let currentPort = Number(env.SMTP_PORT) || 587;
+    let alternatePort = currentPort === 587 ? 465 : 587;
+    
+    let activeTransporter = nodemailer.createTransport({
+        ...emailConfig,
+        port: currentPort,
+        secure: currentPort === 465 || env.SMTP_SECURE === "true"
+    });
+
     try {
-        // Test connection before sending if we are using custom SMTP
+        // Test connection before sending
         if (env.SMTP_HOST && env.SMTP_HOST !== "smtp.ethereal.email") {
-            console.log(`[EMAIL] Verifying connection to ${emailConfig.host}...`);
-            await transporter.verify();
+            console.log(`[EMAIL] Verifying connection to ${emailConfig.host}:${currentPort}...`);
+            try {
+                await activeTransporter.verify();
+            } catch (verifyError: any) {
+                const networkErrors = ['ECONNREFUSED', 'ETIMEDOUT', 'ENETUNREACH'];
+                if (networkErrors.includes(verifyError.code)) {
+                    console.warn(`[EMAIL] Connection failed on port ${currentPort}. Retrying with fallback port ${alternatePort}...`);
+                    activeTransporter = nodemailer.createTransport({
+                        ...emailConfig,
+                        port: alternatePort,
+                        secure: alternatePort === 465
+                    });
+                    await activeTransporter.verify();
+                    currentPort = alternatePort;
+                } else {
+                    throw verifyError;
+                }
+            }
         }
 
-        const info = await transporter.sendMail({
+        const info = await activeTransporter.sendMail({
             from,
             to,
             subject,
@@ -59,21 +82,17 @@ export async function sendEmail({
             html,
         });
 
-        console.log(`[EMAIL] Email sent successfully: ${info.messageId}`);
+        console.log(`[EMAIL] Email sent successfully via port ${currentPort}: ${info.messageId}`);
         return { success: true, messageId: info.messageId };
     } catch (error: any) {
         console.error("[EMAIL] Failed to send email:", error.message);
         console.error("[EMAIL] Error Code:", error.code);
-        console.error("[EMAIL] Full Error:", JSON.stringify(error));
         
         let userFriendlyError = error.message;
         if (error.code === 'EAUTH') {
             userFriendlyError = "Authentication failed. Please verify your SMTP_USER and SMTP_PASS (App Password).";
-        } else if (error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT') {
-            const hostDisplay = emailConfig.host || env.SMTP_HOST || "SMTP server";
-            userFriendlyError = `Could not connect to ${hostDisplay}:${emailConfig.port}. Check your firewall or port settings.`;
-        } else if (error.code === 'ENETUNREACH') {
-            userFriendlyError = `Network unreachable. Try changing SMTP_PORT to 465 and setting SMTP_SECURE to true.`;
+        } else if (error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT' || error.code === 'ENETUNREACH') {
+            userFriendlyError = `Could not connect to ${emailConfig.host} on ports 587 or 465. Both are blocked. Check your firewall or DigitalOcean settings.`;
         }
 
         return { 
