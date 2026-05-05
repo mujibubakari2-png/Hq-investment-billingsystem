@@ -6,15 +6,12 @@ import { env } from "@/lib/env";
  * Handles OTP and system notifications using SMTP.
  */
 
-const isGmail = (env.SMTP_HOST || "").includes("gmail.com");
-
 export const emailConfig: any = {
-    // Note: Some services like Gmail require App Passwords, not regular account passwords
-    service: isGmail ? "gmail" : undefined,
-    host: !isGmail ? (env.SMTP_HOST || "smtp.ethereal.email") : undefined,
-    port: Number(env.SMTP_PORT) || (isGmail ? 465 : 587),
-    // 465 is ALWAYS secure, 587 is STARTTLS (secure: false)
-    secure: env.SMTP_SECURE || Number(env.SMTP_PORT) === 465,
+    // If SMTP_HOST is not provided, default to smtp.gmail.com
+    host: env.SMTP_HOST || "smtp.gmail.com",
+    port: Number(env.SMTP_PORT) || 587,
+    // Port 465 is always secure (SSL/TLS). Port 587 uses STARTTLS so secure MUST be false
+    secure: Number(env.SMTP_PORT) === 465 || env.SMTP_SECURE === "true",
     auth: {
         user: env.SMTP_USER,
         pass: env.SMTP_PASS,
