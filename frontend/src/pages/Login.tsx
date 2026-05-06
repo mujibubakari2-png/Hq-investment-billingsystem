@@ -107,9 +107,7 @@ export default function Login() {
                         <GoogleLogin
                             onSuccess={handleGoogleSuccess}
                             onError={handleGoogleError}
-                            width="100%"
-                            // useOneTap is intentionally disabled — it requires additional
-                            // cross-origin configuration and causes origin_mismatch in dev.
+                            width={350}
                         />
                     </div>
                 )}
