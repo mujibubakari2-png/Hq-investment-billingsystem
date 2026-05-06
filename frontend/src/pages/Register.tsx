@@ -201,6 +201,10 @@ export default function Register() {
                 phone: formData.phone,
                 password: formData.password,
                 otp: formData.otp.join(''),
+                companyName: formData.companyName,
+                city: formData.city,
+                country: formData.country,
+                planId: formData.planId,
             });
             alert(res.message || "Registration complete!");
             navigate('/login');

@@ -104,6 +104,11 @@ export const authApi = {
         password: string;
         fullName: string;
         phone?: string;
+        otp?: string;
+        companyName?: string;
+        planId?: string;
+        city?: string;
+        country?: string;
     }) =>
         post<{ message: string; token: string; user: { id: string; username: string; email: string; role: string; phone?: string; fullName?: string } }>('/auth/register', data),
 
