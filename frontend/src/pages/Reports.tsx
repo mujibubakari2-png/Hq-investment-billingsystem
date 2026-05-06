@@ -101,7 +101,7 @@ export default function Reports() {
                 {/* Revenue Chart */}
                 <div className="card card-body">
                     <h3 style={{ marginBottom: 16, fontWeight: 600 }}>Daily Revenue (TZS)</h3>
-                    <ResponsiveContainer width="100%" height={220} minWidth={0}>
+                    <ResponsiveContainer width="100%" height={220} minWidth={0} debounce={50}>
                         <AreaChart data={reportData.revenueChartData || []}>
                             <defs>
                                 <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
@@ -121,7 +121,7 @@ export default function Reports() {
                 {/* Subscriber Growth */}
                 <div className="card card-body">
                     <h3 style={{ marginBottom: 16, fontWeight: 600 }}>Subscriber Growth</h3>
-                    <ResponsiveContainer width="100%" height={220} minWidth={0}>
+                    <ResponsiveContainer width="100%" height={220} minWidth={0} debounce={50}>
                         <BarChart data={reportData.subscriberGrowthData || []}>
                             <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                             <XAxis dataKey="month" tick={{ fontSize: 11 }} />
@@ -138,7 +138,7 @@ export default function Reports() {
                 <div className="card card-body">
                     <h3 style={{ marginBottom: 16, fontWeight: 600 }}>Expense by Category</h3>
                     <div style={{ display: 'flex', gap: 20, alignItems: 'center' }}>
-                        <ResponsiveContainer width="60%" height={200} minWidth={0}>
+                        <ResponsiveContainer width="60%" height={200} minWidth={0} debounce={50}>
                             <PieChart>
                                 <Pie data={expensePieData} cx="50%" cy="50%" outerRadius={80} dataKey="value">
                                     {expensePieData.map((_, index) => (
