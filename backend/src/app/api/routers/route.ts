@@ -147,6 +147,36 @@ export async function POST(req: NextRequest) {
             ? await prisma.router.update({ where: { id: existing.id }, data: routerData })
             : await prisma.router.create({ data: routerData });
 
+        // Synchronize with RADIUS NAS table to manage RADIUS via VPN
+        const nasIp = router.wgTunnelIp || router.host;
+        const existingNas = await prisma.radiusNas.findFirst({
+            where: { tenantId: tenantIdValue, nasName: nasIp }
+        });
+
+        if (existingNas) {
+            await prisma.radiusNas.update({
+                where: { id: existingNas.id },
+                data: { secret: router.password || 'hqsecret', shortName: router.name }
+            });
+        } else {
+            // Also clean up old NAS entry if the IP changed
+            if (existing && existing.wgTunnelIp !== router.wgTunnelIp) {
+                await prisma.radiusNas.deleteMany({
+                    where: { tenantId: tenantIdValue, nasName: existing.wgTunnelIp || existing.host }
+                });
+            }
+            await prisma.radiusNas.create({
+                data: {
+                    nasName: nasIp,
+                    shortName: router.name,
+                    secret: router.password || 'hqsecret',
+                    type: "other",
+                    tenantId: tenantIdValue,
+                    description: "Auto-synced from Router"
+                }
+            });
+        }
+
         // Log the creation
         await prisma.routerLog.create({
             data: {

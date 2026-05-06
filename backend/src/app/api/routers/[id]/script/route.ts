@@ -23,7 +23,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
         const apiPort = router.apiPort || 80;
 
-        const script = `# HQInvestment ISP Billing System - Router Setup Script
+        let script = `# HQInvestment ISP Billing System - Router Setup Script
 # Generated for: ${router.name}
 # Date: ${new Date().toISOString()}
 
@@ -63,8 +63,53 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 :if ([:len [/ip firewall filter find where comment="Allow WireGuard VPN"]] = 0) do={
     /ip firewall filter add chain=input action=accept protocol=udp dst-port=51820 comment="Allow WireGuard VPN"
 }
+:if ([:len [/ip firewall filter find where comment="Allow RADIUS CoA"]] = 0) do={
+    /ip firewall filter add chain=input action=accept protocol=udp dst-port=3799 src-address=10.0.0.1 comment="Allow RADIUS CoA"
+}
+`;
 
-# 7. Success Notification
+        if (router.wgPrivateKey && router.wgPeerPublicKey && router.wgTunnelIp) {
+            const subnetPrefix = "10.0.0"; // Fallback, normally should be fetched from wgServerIp
+            const serverEndpoint = router.wgServerEndpoint || "vpn.billing-system.local";
+            const listenPort = router.wgListenPort || 51820;
+
+            script += `
+# 7. WireGuard VPN Interface
+:if ([:len [/interface wireguard find name="wg-kenge"]] = 0) do={
+    /interface wireguard add name=wg-kenge listen-port=${listenPort} private-key="${router.wgPrivateKey}" comment="Kenge VPN Interface"
+} else={
+    /interface wireguard set [find name="wg-kenge"] private-key="${router.wgPrivateKey}"
+}
+
+# 8. WireGuard IP Address
+:if ([:len [/ip address find interface="wg-kenge"]] = 0) do={
+    /ip address add address="${router.wgTunnelIp}/24" interface=wg-kenge network="${subnetPrefix}.0" comment="Kenge VPN Address"
+}
+
+# 9. WireGuard Peer (Server)
+:if ([:len [/interface wireguard peers find interface="wg-kenge"]] = 0) do={
+    /interface wireguard peers add interface=wg-kenge public-key="${router.wgPeerPublicKey}" allowed-address="0.0.0.0/0,::/0" endpoint-address="${serverEndpoint}" endpoint-port=51820 persistent-keepalive=25s comment="Kenge ISP Server"
+}
+
+# 10. VPN Routing
+:if ([:len [/ip route find gateway="wg-kenge"]] = 0) do={
+    /ip route add dst-address="${subnetPrefix}.0/24" gateway=wg-kenge comment="WireGuard route - Kenge"
+}
+`;
+        }
+
+        script += `
+# 11. RADIUS Configuration (Managed via VPN)
+:if ([:len [/radius find where comment="HQInvestment RADIUS"]] = 0) do={
+    /radius add address=10.0.0.1 secret="${router.password || 'hqsecret'}" service=hotspot,ppp timeout=3000ms comment="HQInvestment RADIUS"
+} else={
+    /radius set [find comment="HQInvestment RADIUS"] address=10.0.0.1 secret="${router.password || 'hqsecret'}"
+}
+:if ([:len [/radius incoming find]] = 0) do={
+    /radius incoming set accept=yes port=3799
+}
+
+# 12. Success Notification
 /log info "HQInvestment Configuration completed successfully!"
 /log info "Your router should now be reachable by the billing system."
 `;

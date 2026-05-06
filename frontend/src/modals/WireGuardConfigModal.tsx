@@ -219,11 +219,17 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
 :if ([:len [/ip firewall filter find where comment="Allow API/Winbox from VPN - Kenge"]] = 0) do={
     /ip firewall filter add place-before=0 chain=input action=accept protocol=tcp dst-port=${restPort},8291 src-address=${subnetAddress} comment="Allow API/Winbox from VPN - Kenge"
 }
+:if ([:len [/ip firewall filter find where comment="Allow RADIUS CoA from VPN - Kenge"]] = 0) do={
+    /ip firewall filter add place-before=0 chain=input action=accept protocol=udp dst-port=3799 src-address=${subnetAddress} comment="Allow RADIUS CoA from VPN - Kenge"
+}
 :if ([:len [/ip firewall filter find where comment="Allow established/related - Kenge"]] = 0) do={
     /ip firewall filter add place-before=0 chain=input action=accept connection-state=established,related comment="Allow established/related - Kenge"
 }
 :if ([:len [/ip firewall filter find where comment="Allow LAN to WAN forward - Kenge"]] = 0) do={
     /ip firewall filter add place-before=0 chain=forward action=accept in-interface=$lanBridge out-interface=$wanInterface comment="Allow LAN to WAN forward - Kenge"
+}
+:if ([:len [/ip firewall filter find where comment="Allow PPPoE to Internet - Kenge"]] = 0) do={
+    /ip firewall filter add place-before=0 chain=forward action=accept in-interface="all-ppp" out-interface=$wanInterface comment="Allow PPPoE to Internet - Kenge"
 }
 :if ([:len [/ip firewall filter find where comment="Allow established forward - Kenge"]] = 0) do={
     /ip firewall filter add place-before=0 chain=forward action=accept connection-state=established,related comment="Allow established forward - Kenge"
@@ -232,9 +238,18 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
 # ============================================
 # STEP 8: RADIUS & Walled Garden
 # ============================================
-:if ([:len [/radius find address="${apiHost}"]] = 0) do={
-    /radius add service=hotspot,ppp address="${apiHost}" secret="hqinvestment-radius-secret" authentication-port=1812 accounting-port=1813 timeout=3s
+:if ([:len [/radius find address="10.0.0.1"]] = 0) do={
+    /radius add service=hotspot,ppp address="10.0.0.1" secret="${router.password || 'hqsecret'}" authentication-port=1812 accounting-port=1813 timeout=3s comment="HQInvestment RADIUS"
+} else={
+    /radius set [find address="10.0.0.1"] secret="${router.password || 'hqsecret'}" service=hotspot,ppp comment="HQInvestment RADIUS"
 }
+:if ([:len [/radius incoming find]] = 0) do={
+    /radius incoming set accept=yes port=3799
+}
+:if ([:len [/ppp aaa find]] > 0) do={
+    /ppp aaa set use-radius=yes accounting=yes
+}
+
 
 # Walled Garden - allow billing portal (DNS-based and IP-based)
 :if ([:len [/ip hotspot walled-garden find dst-host="${apiHost}"]] = 0) do={

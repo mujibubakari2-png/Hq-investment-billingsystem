@@ -73,6 +73,36 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
         const router = await prisma.router.update({ where: { id }, data });
 
+        // Synchronize with RADIUS NAS table to manage RADIUS via VPN
+        const nasIp = router.wgTunnelIp || router.host;
+        const existingNas = await prisma.radiusNas.findFirst({
+            where: { tenantId: existingRouter.tenantId, nasName: nasIp }
+        });
+
+        if (existingNas) {
+            await prisma.radiusNas.update({
+                where: { id: existingNas.id },
+                data: { secret: router.password || 'hqsecret', shortName: router.name }
+            });
+        } else {
+            // Clean up old NAS entry if the IP changed
+            if (existingRouter.wgTunnelIp !== router.wgTunnelIp || existingRouter.host !== router.host) {
+                await prisma.radiusNas.deleteMany({
+                    where: { tenantId: existingRouter.tenantId, nasName: existingRouter.wgTunnelIp || existingRouter.host }
+                });
+            }
+            await prisma.radiusNas.create({
+                data: {
+                    nasName: nasIp,
+                    shortName: router.name,
+                    secret: router.password || 'hqsecret',
+                    type: "other",
+                    tenantId: existingRouter.tenantId,
+                    description: "Auto-synced from Router"
+                }
+            });
+        }
+
         // Log the update
         await prisma.routerLog.create({
             data: {
@@ -109,6 +139,9 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
             return errorResponse("Unauthorized to delete this router", 403);
         }
 
+        await prisma.radiusNas.deleteMany({
+            where: { tenantId: existingRouter.tenantId, nasName: existingRouter.wgTunnelIp || existingRouter.host }
+        });
         await prisma.router.delete({ where: { id } });
         return jsonResponse({ message: "Router deleted" });
     } catch {

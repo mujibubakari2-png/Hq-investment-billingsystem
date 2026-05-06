@@ -404,7 +404,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                         "dns-name": `${router.name.toLowerCase().replace(/\s+/g, '-')}.hotspot`,
                         "html-directory": "hotspot",
                         "login-by": "http-chap,http-pap,cookie,mac-cookie",
-                        "http-cookie-lifetime": "3d"
+                        "http-cookie-lifetime": "3d",
+                        "use-radius": "yes"
                     });
                 } catch (e: any) { if (!e.message?.includes("already")) console.warn("Hotspot profile note:", e.message); }
 
@@ -441,6 +442,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                         "use-encryption": "yes"
                     });
                 } catch (e: any) { if (!e.message?.includes("already")) console.warn("PPPoE profile note:", e.message); }
+
+                try {
+                    await service.apiRequestPublic("/ppp/aaa", "PATCH", {
+                        "use-radius": "yes",
+                        "accounting": "yes"
+                    });
+                } catch (e: any) { console.warn("PPP AAA note:", e.message); }
 
                 try {
                     await service.apiRequestPublic("/interface/pppoe-server/server", "PUT", {
@@ -563,6 +571,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                     { chain: "input", protocol: "icmp", "src-address": `${subnetPrefix}.0/24`, action: "accept", comment: "Allow ICMP from VPN - Kenge" },
                     { chain: "input", protocol: "tcp", "dst-port": String(restPort), "src-address": `${subnetPrefix}.0/24`, action: "accept", comment: "Allow REST API from VPN - Kenge" },
                     { chain: "input", protocol: "tcp", "dst-port": "8291", "src-address": `${subnetPrefix}.0/24`, action: "accept", comment: "Allow Winbox from VPN - Kenge" },
+                    { chain: "input", protocol: "udp", "dst-port": "3799", "src-address": `${subnetPrefix}.0/24`, action: "accept", comment: "Allow RADIUS CoA from VPN - Kenge" },
                     { chain: "input", protocol: "tcp", "dst-port": "80,443", action: "accept", comment: "Allow Web - Kenge" },
                     { chain: "input", protocol: "udp", "dst-port": "53,67", action: "accept", comment: "Allow DNS & DHCP - Kenge" },
                     { chain: "input", protocol: "icmp", action: "accept", comment: "Allow Ping - Kenge" },
@@ -571,6 +580,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                     { chain: "input", "in-interface": lanBridgeName, protocol: "udp", "dst-port": "67", action: "accept", comment: "Allow Hotspot DHCP - Kenge" },
                     { chain: "input", "in-interface": lanBridgeName, protocol: "udp", "dst-port": "53", action: "accept", comment: "Allow Hotspot DNS - Kenge" },
                     { chain: "forward", "in-interface": lanBridgeName, "out-interface": "ether1", action: "accept", comment: "Allow Hotspot to Internet - Kenge" },
+                    { chain: "forward", "in-interface": "all-ppp", "out-interface": "ether1", action: "accept", comment: "Allow PPPoE to Internet - Kenge" },
                     { chain: "forward", "in-interface": "ether1", "out-interface": lanBridgeName, "connection-state": "established,related", action: "accept", comment: "Allow Internet to Hotspot - Kenge" },
                     { chain: "forward", "in-interface": "wg-kenge", action: "accept", comment: "Allow WG traffic - Kenge" },
                     { chain: "forward", "out-interface": "wg-kenge", action: "accept", comment: "Allow WG return - Kenge" }
@@ -606,6 +616,39 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                         comment: "WireGuard route - Kenge"
                     });
                 } catch (e: any) { console.warn("Route note:", e.message); }
+
+                // ──────────────────────────────────────────────────────────
+                // STEP 7: RADIUS & CoA
+                // ──────────────────────────────────────────────────────────
+                console.log("[PUSH-CONFIG] Setting up RADIUS...");
+                try {
+                    // Remove old radius configs matching the server IP
+                    const oldRadius = await service.apiRequestPublic("/radius");
+                    if (Array.isArray(oldRadius)) {
+                        for (const r of oldRadius) {
+                            if (r.address === "10.0.0.1" || r.comment?.includes("HQInvestment")) {
+                                try { await service.apiRequestPublic(`/radius/${r[".id"]}`, "DELETE"); } catch {}
+                            }
+                        }
+                    }
+                } catch {}
+
+                try {
+                    await service.apiRequestPublic("/radius", "PUT", {
+                        address: "10.0.0.1",
+                        secret: router.password || 'hqsecret',
+                        service: "hotspot,ppp",
+                        timeout: "3000ms",
+                        comment: "HQInvestment RADIUS"
+                    });
+                } catch (e: any) { console.warn("Radius note:", e.message); }
+
+                try {
+                    await service.apiRequestPublic("/radius/incoming", "PATCH", {
+                        accept: "yes",
+                        port: "3799"
+                    });
+                } catch (e: any) { console.warn("Radius incoming note:", e.message); }
 
                 // Verification Step: Wait for tunnel to establish, then check real handshake
                 // We wait up to 15 seconds to allow Mikrotik to retry handshake if needed

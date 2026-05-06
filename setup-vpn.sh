@@ -34,6 +34,9 @@ sudo systemctl start wg-quick@wg0
 
 # 6. Configure Firewall
 sudo ufw allow 51820/udp
+sudo ufw allow in on wg0 comment 'Allow all traffic from WireGuard VPN'
+sudo ufw allow 1812/udp comment 'RADIUS Auth'
+sudo ufw allow 1813/udp comment 'RADIUS Acct'
 
 echo "✅ VPN Setup Finished!"
 echo "--------------------------------------------------"
