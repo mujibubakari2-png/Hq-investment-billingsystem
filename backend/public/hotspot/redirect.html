@@ -1,53 +1,77 @@
 <!DOCTYPE html>
-<html lang="sw">
+<html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>HQINVESTMENT WiFi – Inakuelekeza…</title>
-<link rel="icon" href="assets/img/favicon.ico" type="image/x-icon">
-<link rel="shortcut icon" href="assets/img/favicon.ico">
-<link rel="stylesheet" href="assets/css/style.css">
-<script>
-  window.onload = function() {
-    var dst = '$(link-orig)';
-    if (!dst || dst === '$(link-orig)' || dst === '') dst = 'http://www.google.com';
-    setTimeout(function(){ window.location.replace(dst); }, 2500);
-  };
-</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Redirecting... - BILLING_COMPANY_NAME</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, BILLING_PRIMARY_COLOR22, BILLING_ACCENT_COLOR22);
+            min-height: 100vh; display: flex; align-items: center; justify-content: center;
+        }
+        .card {
+            background: #fff; width: 90%; max-width: 400px;
+            border-radius: 24px; box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            overflow: hidden; text-align: center;
+        }
+        .header {
+            background: linear-gradient(135deg, BILLING_PRIMARY_COLOR, BILLING_ACCENT_COLOR);
+            padding: 30px 20px; color: #fff;
+        }
+        .status-icon {
+            width: 60px; height: 60px; background: rgba(255,255,255,0.2);
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            margin: 0 auto 15px; font-size: 30px;
+        }
+        .content { padding: 30px 24px; }
+        .progress-bar {
+            height: 8px; background: #f0f0f0; border-radius: 4px;
+            overflow: hidden; margin: 20px 0;
+        }
+        .progress-fill {
+            height: 100%; background: BILLING_ACCENT_COLOR; width: 0%;
+            transition: width 0.1s linear;
+        }
+        .btn-continue {
+            display: block; width: 100%; padding: 14px; margin-top: 10px;
+            background: BILLING_ACCENT_COLOR; color: #fff; text-decoration: none;
+            border-radius: 12px; font-weight: 700; font-size: 0.95rem;
+        }
+    </style>
+    <script>
+        window.onload = function() {
+            var dst = '$(link-orig)';
+            if (!dst || dst === '$(link-orig)' || dst === '') dst = 'http://www.google.com';
+            setTimeout(function(){ window.location.replace(dst); }, 2500);
+            
+            var p = 0;
+            var iv = setInterval(function(){
+                p += 4;
+                document.getElementById('prog').style.width = Math.min(p, 100) + '%';
+                if (p >= 100) clearInterval(iv);
+            }, 100);
+        };
+    </script>
 </head>
 <body>
-<div class="card">
-  <div class="card-header">
-    <div class="logo-wrap">
-      <svg viewBox="0 0 24 24"><path d="M1 6l11 8 11-8V5L12 13 1 5v1zm0 3v9a1 1 0 001 1h20a1 1 0 001-1V9l-11 8L1 9z"/></svg>
+    <div class="card">
+        <div class="header">
+            <div class="status-icon">🚀</div>
+            <h2>Success!</h2>
+            <p style="opacity: 0.8; font-size: 0.85rem; margin-top: 5px;">You are now online</p>
+        </div>
+        <div class="content">
+            <p style="font-size: 0.9rem; color: #666;">Redirecting you to your destination...</p>
+            <div class="progress-bar">
+                <div class="progress-fill" id="prog"></div>
+            </div>
+            <a href="$(link-orig)" class="btn-continue">Continue Now →</a>
+        </div>
     </div>
-    <h1>HQINVESTMENT WiFi</h1>
-    <p>Umeunganishwa kwa mafanikio!</p>
-  </div>
-  <div class="card-body">
-    <div class="status-box">
-      <div class="status-icon">🚀</div>
-      <h2>Karibu mtandaoni!</h2>
-      <p>Unakuelekeza kwenye tovuti yako…</p>
-    </div>
-    <div class="progress-wrap">
-      <div class="progress-bar">
-        <div class="progress-fill" id="prog" style="width:0%"></div>
-      </div>
-      <div class="progress-label">Inaendelea…</div>
-    </div>
-    <a href="$(link-orig)" class="btn btn-primary mt-12 d-block" style="text-decoration:none;">
-      Endelea Sasa →
-    </a>
-  </div>
-</div>
-<script>
-  var p = 0;
-  var iv = setInterval(function(){
-    p += 4;
-    document.getElementById('prog').style.width = Math.min(p, 100) + '%';
-    if (p >= 100) clearInterval(iv);
-  }, 100);
-</script>
 </body>
 </html>

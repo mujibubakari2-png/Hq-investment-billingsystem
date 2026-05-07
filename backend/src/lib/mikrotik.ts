@@ -714,7 +714,20 @@ export class MikroTikService {
     /**
      * Activate a customer's service after payment
      */
-    async activateService(username: string, password: string, profileName: string, serviceType: "pppoe" | "hotspot"): Promise<void> {
+    async activateService(username: string, password: string, profileName: string, serviceType: "pppoe" | "hotspot", expiresAt?: Date): Promise<void> {
+        let limitUptime: string | undefined = undefined;
+        if (expiresAt) {
+            const seconds = Math.floor((expiresAt.getTime() - Date.now()) / 1000);
+            if (seconds > 0) {
+                // Format as MikroTik duration: e.g. 1d05:20:00
+                const days = Math.floor(seconds / 86400);
+                const hours = Math.floor((seconds % 86400) / 3600);
+                const mins = Math.floor((seconds % 3600) / 60);
+                const secs = seconds % 60;
+                limitUptime = `${days > 0 ? days + 'd' : ''}${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+            }
+        }
+
         if (serviceType === "pppoe") {
             const existing = await this.findPPPoEUserByName(username);
             if (existing && existing.id) {
@@ -735,9 +748,9 @@ export class MikroTikService {
             const existing = await this.findHotspotUserByName(username);
             if (existing && existing.id) {
                 await this.enableHotspotUser(existing.id, username);
-                if (existing.profile !== profileName) {
-                    await this.updateHotspotUser(existing.id, { profile: profileName, name: username });
-                }
+                const updateData: any = { profile: profileName, name: username };
+                if (limitUptime) updateData.limitUptime = limitUptime;
+                await this.updateHotspotUser(existing.id, updateData);
             } else {
                 await this.createHotspotUser({
                     name: username,
@@ -745,6 +758,7 @@ export class MikroTikService {
                     profile: profileName,
                     server: "all",
                     disabled: false,
+                    limitUptime,
                 });
             }
         }

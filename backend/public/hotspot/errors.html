@@ -1,42 +1,67 @@
 <!DOCTYPE html>
-<html lang="sw">
+<html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>HQINVESTMENT WiFi – Makosa</title>
-<link rel="icon" href="assets/img/favicon.ico" type="image/x-icon">
-<link rel="shortcut icon" href="assets/img/favicon.ico">
-<link rel="stylesheet" href="assets/css/style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connection Errors - BILLING_COMPANY_NAME</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, BILLING_PRIMARY_COLOR22, BILLING_ACCENT_COLOR22);
+            min-height: 100vh; display: flex; align-items: center; justify-content: center;
+        }
+        .card {
+            background: #fff; width: 90%; max-width: 400px;
+            border-radius: 24px; box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            overflow: hidden; text-align: center;
+        }
+        .header {
+            background: linear-gradient(135deg, #e53935, #c62828);
+            padding: 30px 20px; color: #fff;
+        }
+        .status-icon {
+            width: 60px; height: 60px; background: rgba(255,255,255,0.2);
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            margin: 0 auto 15px; font-size: 30px;
+        }
+        .content { padding: 30px 24px; }
+        .alert {
+            background: #fee2e2; color: #ef4444; padding: 12px;
+            border-radius: 10px; margin-bottom: 10px; font-size: 0.85rem;
+            border: 1px solid #fca5a5; text-align: left; display: flex; gap: 10px;
+        }
+        .btn-back {
+            display: block; width: 100%; padding: 14px; margin-top: 25px;
+            background: #1a1a2e; color: #fff; text-decoration: none;
+            border-radius: 12px; font-weight: 700; font-size: 0.95rem;
+            transition: all 0.2s;
+        }
+    </style>
 </head>
 <body>
-<div class="card">
-  <div class="card-header">
-    <div class="logo-wrap">
-      <svg viewBox="0 0 24 24"><path d="M1 6l11 8 11-8V5L12 13 1 5v1zm0 3v9a1 1 0 001 1h20a1 1 0 001-1V9l-11 8L1 9z"/></svg>
+    <div class="card">
+        <div class="header">
+            <div class="status-icon">⚠</div>
+            <h2>Connection Errors</h2>
+            <p style="opacity: 0.8; font-size: 0.85rem; margin-top: 5px;">Please review the following issues</p>
+        </div>
+        <div class="content">
+            $(if error1)
+            <div class="alert"><span>⚠</span> <span>$(error1)</span></div>
+            $(endif)
+            $(if error2)
+            <div class="alert"><span>⚠</span> <span>$(error2)</span></div>
+            $(endif)
+            $(if error)
+            <div class="alert"><span>⚠</span> <span>$(error)</span></div>
+            $(endif)
+
+            <a href="$(link-login)" class="btn-back">← Try Again</a>
+        </div>
     </div>
-    <h1>HQINVESTMENT WiFi</h1>
-    <p>Makosa ya Muunganiko</p>
-  </div>
-  <div class="card-body">
-    $(if error1)
-    <div class="alert alert-error"><span>⚠</span><span>$(error1)</span></div>
-    $(endif)
-    $(if error2)
-    <div class="alert alert-error"><span>⚠</span><span>$(error2)</span></div>
-    $(endif)
-    $(if error3)
-    <div class="alert alert-error"><span>⚠</span><span>$(error3)</span></div>
-    $(endif)
-    $(if error)
-    <div class="alert alert-error"><span>⚠</span><span>$(error)</span></div>
-    $(endif)
-    <a href="$(link-login)" class="btn btn-primary mt-18 d-block" style="text-decoration:none;">
-      ← Jaribu Tena
-    </a>
-  </div>
-  <div class="card-footer">
-    <p>Msaada: <a href="faqs.html">Maswali ya Kawaida</a></p>
-  </div>
-</div>
 </body>
 </html>

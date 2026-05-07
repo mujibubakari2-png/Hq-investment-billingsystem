@@ -1,75 +1,127 @@
 <!DOCTYPE html>
-<html lang="sw">
-
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>HQINVESTMENT WiFi – Ingia (RADIUS)</title>
-  <link rel="icon" href="BILLING_API_URL/hotspot/assets/img/favicon.ico" type="image/x-icon">
-  <link rel="shortcut icon" href="BILLING_API_URL/hotspot/assets/img/favicon.ico">
-  <link rel="stylesheet" href="BILLING_API_URL/hotspot/assets/css/style.css">
-  <script src="BILLING_API_URL/hotspot/md5.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>BILLING_COMPANY_NAME - Login</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, BILLING_PRIMARY_COLOR22, BILLING_ACCENT_COLOR22);
+            min-height: 100vh; padding: 0;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .page { 
+            width: 100%; max-width: 400px; background: #fff; 
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            border-radius: 24px; overflow: hidden; margin: 20px;
+        }
+        @media (max-width: 480px) {
+            .page { border-radius: 16px; width: 90%; }
+        }
+
+        .header {
+            background: linear-gradient(135deg, BILLING_PRIMARY_COLOR, BILLING_ACCENT_COLOR);
+            padding: 30px 20px; text-align: center; color: #fff;
+        }
+        .header h1 { font-size: 1.4rem; font-weight: 700; margin-bottom: 8px; }
+        .header p { font-size: 0.9rem; opacity: 0.8; }
+
+        .content { padding: 30px 24px; }
+        .field-group { margin-bottom: 20px; }
+        .field-group label { display: block; font-size: 0.85rem; color: #666; margin-bottom: 8px; font-weight: 500; }
+        .field-input {
+            width: 100%; padding: 12px 16px; border: 1.5px solid #d1d5db; border-radius: 12px;
+            font-size: 0.95rem; font-family: 'Inter', sans-serif;
+            transition: border-color 0.2s;
+        }
+        .field-input:focus { outline: none; border-color: #6366f1; box-shadow: 0 0 0 3px #6366f115; }
+
+        .btn-primary {
+            width: 100%; padding: 14px; background: BILLING_ACCENT_COLOR; color: #fff;
+            border: none; border-radius: 12px; font-size: 1rem; font-weight: 700;
+            cursor: pointer; font-family: 'Inter', sans-serif;
+            transition: all 0.2s; margin-bottom: 16px;
+        }
+        .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+
+        .back-link {
+            display: block; text-align: center; color: BILLING_ACCENT_COLOR;
+            text-decoration: none; font-size: 0.85rem; font-weight: 600;
+        }
+        .back-link:hover { text-decoration: underline; }
+
+        .footer {
+            text-align: center; padding: 20px; font-size: 0.75rem; color: #bbb;
+            border-top: 1px solid #f0f0f0;
+        }
+    </style>
 </head>
-
 <body>
-  <div class="card">
-    <div class="card-header">
-      <div class="logo-wrap">
-        <svg viewBox="0 0 24 24">
-          <path d="M1 6l11 8 11-8V5L12 13 1 5v1zm0 3v9a1 1 0 001 1h20a1 1 0 001-1V9l-11 8L1 9z" />
-        </svg>
-      </div>
-      <h1>HQINVESTMENT WiFi</h1>
-      <p>Ingia kwa akaunti yako</p>
-    </div>
-    <div class="card-body">
-      $(if error)
-      <div class="alert alert-error"><span>⚠</span><span>$(error)</span></div>
-      $(endif)
 
-      <form method="POST" action="$(link-login-only)" onsubmit="return doLogin(this)">
-        <input type="hidden" name="dst" value="$(link-orig)">
-        <input type="hidden" name="popup" value="true">
-        <input type="hidden" name="mac" value="$(mac)">
-        <input type="hidden" name="chap-id" value="$(chap-id)">
-        <input type="hidden" name="chap-challenge" value="$(chap-challenge)">
-        <input type="hidden" name="chap-password" id="chap-password" value="">
-
-        <div class="field">
-          <label for="username">Jina la Mtumiaji</label>
-          <input type="text" id="username" name="username" value="$(username)" placeholder="HS-0712345678"
-            autocomplete="username" autofocus>
+    <div class="page">
+        <div class="header">
+            <h1>BILLING_COMPANY_NAME</h1>
+            <p>Enter your credentials to connect</p>
         </div>
 
-        <div class="field">
-          <label for="password">Nywila</label>
-          <input type="password" id="password" name="password" placeholder="••••••••" autocomplete="current-password">
+        <div class="content">
+            $(if error)
+            <div style="background: #fee2e2; color: #ef4444; padding: 12px; border-radius: 10px; margin-bottom: 20px; font-size: 0.85rem; text-align: center; border: 1px solid #fca5a5;">
+                $(error)
+            </div>
+            $(endif)
+
+            <form name="login" action="$(link-login-only)" method="post" onsubmit="return doLogin()">
+                <input type="hidden" name="dst" value="$(link-orig)" />
+                <input type="hidden" name="popup" value="true" />
+                
+                <div class="field-group">
+                    <label>Username / Voucher</label>
+                    <input type="text" class="field-input" name="username" value="$(username)" placeholder="Enter username" required />
+                </div>
+
+                <div class="field-group">
+                    <label>Password</label>
+                    <input type="password" class="field-input" name="password" placeholder="••••••••" />
+                </div>
+
+                <button type="submit" class="btn-primary">Connect Now</button>
+                
+                <a href="login.html" class="back-link">← Back to Payment Options</a>
+            </form>
         </div>
 
-        <button type="submit" class="btn btn-primary">🔒 Ingia</button>
-      </form>
+        <div class="footer">
+            Powered by BILLING_COMPANY_NAME &bull; MAC: $(mac)
+        </div>
+    </div>
 
-      <div class="divider"><span>au</span></div>
-      <a href="login.html" class="btn btn-secondary d-block" style="text-decoration:none;text-align:center;">
-        💳 Lipa kwa M-Pesa
-      </a>
-    </div>
-    <div class="card-footer">
-      <p><a href="faqs.html">Msaada</a> &nbsp;|&nbsp; <a href="tandc.html">Masharti</a></p>
-    </div>
-  </div>
-  <script>
-    function doLogin(form) {
-      if (typeof hexMD5 !== 'undefined' && form['chap-id'] && form['chap-id'].value !== '') {
-        var id = form['chap-id'].value;
-        var pw = form['password'].value;
-        var ch = form['chap-challenge'].value;
-        form['chap-password'].value = hexMD5(id + pw + ch);
-        form['password'].value = '';
-      }
-      return true;
-    }
-  </script>
+
+    <script src="md5.js"></script>
+    <script>
+        function doLogin() {
+            var f = document.forms['login'];
+            if (typeof hexMD5 !== 'undefined' && '$(chap-id)' !== '') {
+                var newpass = hexMD5('$(chap-id)' + f.password.value + '$(chap-challenge)');
+                var sendForm = document.createElement('form');
+                sendForm.method = 'post';
+                sendForm.action = '$(link-login-only)';
+                sendForm.innerHTML = '<input type="hidden" name="username" value="' + f.username.value + '" />' +
+                                     '<input type="hidden" name="password" value="' + newpass + '" />' +
+                                     '<input type="hidden" name="dst" value="' + f.dst.value + '" />' +
+                                     '<input type="hidden" name="popup" value="true" />' +
+                                     '<input type="hidden" name="mac" value="$(mac)" />';
+                document.body.appendChild(sendForm);
+                sendForm.submit();
+                return false;
+            }
+            return true;
+        }
+    </script>
 </body>
-
 </html>

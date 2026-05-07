@@ -3,6 +3,8 @@ import { randomUUID } from "node:crypto";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 import { getMikroTikService } from "@/lib/mikrotik";
+import { syncRadiusUser } from "@/lib/radius";
+
 
 /**
  * POST /api/hotspot/purchase
@@ -309,7 +311,21 @@ async function completeHotspotPurchase(
             where: { id: clientId },
             data: { status: "ACTIVE" },
         });
+
+        // 4. SYNC TO RADIUS (for High Protection)
+        const client = await tx.client.findUnique({ where: { id: clientId } });
+        if (client) {
+            await syncRadiusUser({
+                username: client.username,
+                password: client.phone || "123456",
+                tenantId: pkg.tenantId || null,
+                fullName: client.fullName,
+                expiresAt: expiresAt,
+                status: "Active"
+            });
+        }
     });
+
 
     // 4. Create hotspot user on MikroTik via RouterOS API
     if (routerId) {
@@ -319,7 +335,13 @@ async function completeHotspotPurchase(
             const client = await prisma.client.findUnique({ where: { id: clientId } });
             const password = client?.phone || "123456";
 
-            await mikrotik.activateService(client?.username || `HS-${clientId.slice(0, 8)}`, password, pkg.name, "hotspot");
+            await mikrotik.activateService(
+                client?.username || `HS-${clientId.slice(0, 8)}`, 
+                password, 
+                pkg.name, 
+                "hotspot",
+                expiresAt
+            );
 
             await prisma.routerLog.create({
                 data: {

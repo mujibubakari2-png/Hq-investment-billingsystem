@@ -1,380 +1,468 @@
 <!DOCTYPE html>
-<html lang="sw">
-
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>HQINVESTMENT WiFi – Ingia</title>
-  <meta name="description" content="Karibu kwenye mtandao wa HQINVESTMENT. Lipa na M-Pesa au ingia kwa akaunti yako.">
-  <link rel="icon" href="BILLING_API_URL/hotspot/assets/img/favicon.ico" type="image/x-icon">
-  <link rel="shortcut icon" href="BILLING_API_URL/hotspot/assets/img/favicon.ico">
-  <link rel="stylesheet" href="BILLING_API_URL/hotspot/assets/css/style.css">
-  <script src="BILLING_API_URL/hotspot/md5.js"></script>
-</head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>BILLING_COMPANY_NAME Hotspot</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(175deg, BILLING_ACCENT_COLOR18 0%, #f0f4f8 40%, #ffffff 100%);
+            min-height: 100vh; padding: 0;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .page { 
+            width: 100%; max-width: 480px; background: #fff; 
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            position: relative; overflow: hidden;
+        }
+        @media (min-width: 481px) {
+            .page { border-radius: 24px; min-height: auto; margin: 20px; }
+            body { background: linear-gradient(135deg, BILLING_PRIMARY_COLOR22, BILLING_ACCENT_COLOR22); }
+        }
+        @media (max-width: 480px) {
+            .page { min-height: 100vh; border-radius: 0; }
+            body { align-items: flex-start; }
+        }
 
+        /* ── Header ── */
+        .header {
+            background: linear-gradient(135deg, BILLING_PRIMARY_COLOR, BILLING_ACCENT_COLOR);
+            padding: 14px 12px 12px; text-align: center; color: #fff;
+            border-radius: 0 0 16px 16px;
+        }
+        .header-brand { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 8px; }
+        .header-brand svg { width: 24px; height: 24px; fill: #fff; }
+        .header-brand h1 { font-size: 1.2rem; font-weight: 700; letter-spacing: 0.5px; }
+        .networks-title { font-size: 0.75rem; font-weight: 600; margin-bottom: 6px; opacity: 0.9; }
+        .networks-row { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+        .network-badge {
+            background: rgba(255,255,255,0.2); border-radius: 8px; padding: 4px 10px;
+            font-size: 0.72rem; font-weight: 600; color: #fff;
+        }
+        .steps { display: flex; justify-content: center; gap: 10px; font-size: 0.75rem; margin-bottom: 8px; }
+        .steps span { opacity: 0.85; }
+        .steps .dot { opacity: 0.5; }
+        .support-bar {
+            background: BILLING_ACCENT_COLOR40; border-radius: 16px; padding: 6px 14px;
+            font-size: 0.75rem; display: inline-flex; align-items: center; gap: 6px;
+        }
+
+        /* ── Section Shared ── */
+        .section { padding: 10px 12px; }
+        .section-title {
+            font-size: 0.85rem; font-weight: 700; color: BILLING_PRIMARY_COLOR;
+            margin-bottom: 8px; display: flex; align-items: center; gap: 6px;
+        }
+        .section-card {
+            background: #f8fafb; border: 1px solid #e8ecf0; border-radius: 10px;
+            padding: 10px; margin-bottom: 8px;
+        }
+
+        /* ── Packages Grid ── */
+        .packages-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+        .pkg-card {
+            background: linear-gradient(135deg, BILLING_ACCENT_COLOR08, BILLING_ACCENT_COLOR15);
+            border: 1.5px solid BILLING_ACCENT_COLOR30; border-radius: 12px;
+            padding: 12px 8px; text-align: center; cursor: pointer;
+            transition: all 0.2s;
+        }
+        .pkg-card:hover { transform: translateY(-2px); box-shadow: 0 6px 20px BILLING_ACCENT_COLOR25; border-color: BILLING_ACCENT_COLOR; }
+        .pkg-name { font-size: 0.78rem; font-weight: 700; color: BILLING_ACCENT_COLOR; margin-bottom: 4px; text-transform: uppercase; }
+        .pkg-price { font-size: 1.3rem; font-weight: 700; color: BILLING_PRIMARY_COLOR; line-height: 1; }
+        .pkg-price small { font-size: 0.7rem; font-weight: 500; color: #888; }
+        .pkg-duration {
+            font-size: 0.72rem; color: #e74c3c; margin-top: 4px;
+            display: flex; align-items: center; justify-content: center; gap: 3px;
+        }
+
+        /* ── Input fields ── */
+        .field-group { margin-bottom: 8px; }
+        .field-group label { display: block; font-size: 0.75rem; color: #666; margin-bottom: 4px; font-weight: 500; }
+        .field-input {
+            width: 100%; padding: 8px 12px; border: 1.5px solid #d1d5db; border-radius: 8px;
+            font-size: 0.85rem; font-family: 'Inter', sans-serif;
+            transition: border-color 0.2s;
+        }
+        .field-input:focus { outline: none; border-color: BILLING_ACCENT_COLOR; box-shadow: 0 0 0 3px BILLING_ACCENT_COLOR15; }
+
+        /* ── Buttons ── */
+        .btn-primary {
+            width: 100%; padding: 10px; background: BILLING_ACCENT_COLOR; color: #fff;
+            border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 700;
+            cursor: pointer; font-family: 'Inter', sans-serif;
+            display: flex; align-items: center; justify-content: center; gap: 4px;
+            transition: all 0.2s;
+        }
+        .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+        .btn-accent {
+            width: 100%; padding: 10px; background: linear-gradient(135deg, #e53935, #c62828);
+            color: #fff; border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 700;
+            cursor: pointer; font-family: 'Inter', sans-serif;
+            display: flex; align-items: center; justify-content: center; gap: 4px;
+        }
+        .btn-connect {
+            padding: 8px 16px; background: BILLING_ACCENT_COLOR; color: #fff;
+            border: none; border-radius: 8px; font-size: 0.8rem; font-weight: 700;
+            cursor: pointer; white-space: nowrap;
+        }
+        .login-row { display: flex; gap: 8px; align-items: center; }
+        .login-row .field-input { flex: 1; margin-bottom: 0; }
+
+        /* ── Remember me / MAC ── */
+        .remember-row {
+            margin-top: 8px; display: flex; align-items: center; gap: 6px;
+            font-size: 0.78rem; color: #777;
+        }
+        .remember-row input[type="checkbox"] { width: 15px; height: 15px; accent-color: BILLING_ACCENT_COLOR; }
+        .mac-bar {
+            background: BILLING_ACCENT_COLOR10; border: 1px solid BILLING_ACCENT_COLOR25;
+            border-radius: 8px; padding: 8px 14px; margin-top: 10px;
+            font-size: 0.78rem; color: BILLING_PRIMARY_COLOR; display: flex; align-items: center; gap: 6px;
+        }
+
+        /* ── Footer ── */
+        .footer {
+            text-align: center; padding: 16px; font-size: 0.72rem; color: #bbb;
+            border-top: 1px solid #f0f0f0; margin-top: 8px;
+        }
+
+        .pkg-loading { text-align: center; padding: 20px; color: #888; font-size: 0.85rem; }
+        @media (max-width: 380px) {
+            .packages-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        /* ── Payment Overlay ── */
+        .payment-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
+            display: none; align-items: center; justify-content: center; z-index: 2000; padding: 20px;
+        }
+        .payment-box {
+            background: #fff; border-radius: 20px; width: 100%; max-width: 360px;
+            overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
+            animation: modalUp 0.3s ease-out;
+        }
+        @keyframes modalUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .payment-header {
+            background: linear-gradient(135deg, BILLING_PRIMARY_COLOR, BILLING_ACCENT_COLOR);
+            padding: 20px; color: #fff; text-align: center;
+        }
+        .payment-body { padding: 24px; }
+        .status-badge {
+            display: inline-block; padding: 4px 12px; border-radius: 20px;
+            font-size: 0.72rem; font-weight: 700; margin-bottom: 12px;
+            background: #f1f5f9; color: #64748b;
+        }
+        .status-loading { color: BILLING_ACCENT_COLOR; background: BILLING_ACCENT_COLOR15; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+    </style>
+</head>
 <body>
 
-  <div class="card">
-    <!-- Header -->
-    <div class="card-header">
-      <div class="logo-wrap">
-        <svg viewBox="0 0 24 24">
-          <path d="M1 6l11 8 11-8V5L12 13 1 5v1zm0 3v9a1 1 0 001 1h20a1 1 0 001-1V9l-11 8L1 9z" />
-        </svg>
-      </div>
-      <h1>HQINVESTMENT WiFi</h1>
-      <p>Lipa kwa M-Pesa au ingia kwa akaunti</p>
+    <!-- Payment Modal -->
+    <div class="payment-overlay" id="paymentOverlay">
+        <div class="payment-box">
+            <div class="payment-header">
+                <div style="font-size: 0.8rem; opacity: 0.9; margin-bottom: 4px;">Confirm Purchase</div>
+                <div id="selectedPkgName" style="font-size: 1.1rem; font-weight: 700;">Package Name</div>
+                <div id="selectedPkgPrice" style="font-size: 1.2rem; font-weight: 700; margin-top: 4px;">TSH 0</div>
+            </div>
+            <div class="payment-body" id="paymentInitial">
+                <div class="field-group">
+                    <label>Enter Mobile Money Number</label>
+                    <input type="tel" class="field-input" id="phoneInput" placeholder="0XXXXXXXXX" maxlength="10" />
+                    <div style="font-size: 0.68rem; color: #888; margin-top: 6px; line-height: 1.4;">
+                        Ensure your phone is ON and unlocked to receive the PIN prompt.
+                    </div>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn-primary" style="flex: 2;" onclick="initiatePurchase()" id="btnPay">Pay Now</button>
+                    <button class="btn-primary" style="flex: 1; background: #94a3b8;" onclick="closePayment()">Cancel</button>
+                </div>
+            </div>
+            <div class="payment-body" id="paymentWait" style="display: none; text-align: center; padding: 40px 24px;">
+                <div class="status-badge status-loading" id="pollStatus">Waiting for payment...</div>
+                <div style="font-size: 0.85rem; color: #475569; margin-bottom: 20px;" id="pollMessage">
+                    Please check your phone for the payment prompt and enter your PIN.
+                </div>
+                <div style="width: 40px; height: 40px; border: 3px solid BILLING_ACCENT_COLOR20; border-top-color: BILLING_ACCENT_COLOR; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto;"></div>
+                <button class="btn-primary" style="margin-top: 30px; background: #94a3b8;" onclick="closePayment()">Close</button>
+            </div>
+        </div>
     </div>
 
-    <!-- Body -->
-    <div class="card-body">
+    <style> @keyframes spin { to { transform: rotate(360deg); } } </style>
 
-      <!-- Error from MikroTik -->
-      $(if error)
-      <div class="alert alert-error" id="error-alert">
-        <span>⚠</span><span>$(error)</span>
-      </div>
-      $(endif)
-
-      <!-- Tab switcher -->
-      <div class="tab-wrap">
-        <button id="tab-login" class="btn btn-primary" onclick="showTab('login')">💳 Lipa / Jiunge</button>
-        <button id="tab-account" class="btn btn-secondary" onclick="showTab('account')">🔑 Nina Akaunti</button>
-      </div>
-
-      <!-- ══ TAB 1: PAY / REGISTER ══ -->
-      <div id="panel-login">
-
-        <!-- Package grid -->
-        <div class="packages">
-          <div class="packages-title">Chagua Kifurushi</div>
-          <div class="pkg-grid" id="pkg-grid">
-            <div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--text-muted);font-size:.84rem;">
-              <span class="spinner spinner-green"></span>
-              Inapakia vifurushi…
+    <div class="page">
+        <!-- Header -->
+        <div class="header">
+            <div class="header-brand">
+                <svg viewBox="0 0 24 24"><path d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9zm8 8l3 3 3-3a4.237 4.237 0 00-6 0zm-4-4l2 2a7.074 7.074 0 0110 0l2-2C15.14 9.14 8.87 9.14 5 13z"/></svg>
+                <h1>BILLING_COMPANY_NAME</h1>
             </div>
-          </div>
-        </div>
-
-        <!-- Phone number -->
-        <div class="field">
-          <label for="phone">Namba ya Simu (M-Pesa)</label>
-          <input type="tel" id="phone" name="phone" placeholder="0712345678" autocomplete="tel" inputmode="numeric"
-            maxlength="13">
-        </div>
-
-        <!-- Hidden fields -->
-        <input type="hidden" id="mac" value="$(mac)">
-        <input type="hidden" id="selected-pkg-id" value="">
-        <input type="hidden" id="chap-id-val" value="$(chap-id)">
-        <input type="hidden" id="chap-ch-val" value="$(chap-challenge)">
-
-        <!-- Pay button -->
-        <button class="btn btn-primary" id="pay-btn" onclick="startPayment()">
-          💳 Lipa Sasa
-        </button>
-
-        <!-- Payment status -->
-        <div id="payment-status" style="display:none;margin-top:16px;">
-          <div class="alert alert-info" id="pay-msg">
-            <span class="spinner"></span>
-            <span id="pay-msg-text">Subiri kukamilisha malipo…</span>
-          </div>
-          <div class="progress-wrap">
-            <div class="progress-bar">
-              <div class="progress-fill" id="prog" style="width:0%"></div>
+            <div class="networks-title">Supported Mobile Networks</div>
+            <div class="networks-row">
+                <span class="network-badge">M-Pesa</span>
+                <span class="network-badge">Airtel Money</span>
+                <span class="network-badge">T-Pesa</span>
+                <span class="network-badge">HaloPesa</span>
             </div>
-            <div class="progress-label" id="prog-label">0 / 60 sekunde</div>
-          </div>
+            <div class="steps">
+                <span>📦 Select</span> <span class="dot">•</span>
+                <span>💳 Pay</span> <span class="dot">•</span>
+                <span>🌐 Connect</span>
+            </div>
+            <div class="support-bar">📞 Support: BILLING_SUPPORT_PHONE</div>
         </div>
 
-      </div><!-- end panel-login -->
+        <!-- Packages -->
+        <div class="section">
+            <div class="section-title">📦 Packages</div>
+            <div id="packagesContainer" class="packages-grid">
+                <div class="pkg-loading">⏳ Loading packages...</div>
+            </div>
+        </div>
 
-      <!-- ══ TAB 2: EXISTING ACCOUNT ══ -->
-      <div id="panel-account" style="display:none;">
-        <form method="POST" action="$(link-login-only)" onsubmit="return doLogin(this)">
-          <input type="hidden" name="dst" value="$(link-orig)">
-          <input type="hidden" name="popup" value="true">
-          <input type="hidden" name="mac" value="$(mac)">
-          <input type="hidden" name="chap-id" value="$(chap-id)">
-          <input type="hidden" name="chap-challenge" value="$(chap-challenge)">
-          <input type="hidden" name="chap-password" id="chap-password" value="">
+        <!-- Redeem Voucher -->
+        <div class="section">
+            <div class="section-title">🎟️ Redeem Voucher</div>
+            <div class="section-card">
+                <form name="voucher_form" action="$(link-login-only)" method="post" onsubmit="return doVoucher();">
+                    <input type="hidden" name="dst" value="$(link-orig)" />
+                    <div class="login-row">
+                        <input type="text" class="field-input" name="username" id="voucher-code" placeholder="Voucher code" />
+                        <button type="submit" class="btn-connect" style="background: #e53935;">Redeem</button>
+                    </div>
+                </form>
+            </div>
+        </div>
 
-          <div class="field">
-            <label for="username">Jina la Mtumiaji</label>
-            <input type="text" id="username" name="username" value="$(username)" placeholder="HS-0712345678"
-              autocomplete="username" autofocus>
-          </div>
+        <!-- Reconnect -->
+        <div class="section">
+            <div class="section-title">🔄 Reconnect</div>
+            <div class="section-card">
+                <label style="font-size: 0.78rem; color: #666; margin-bottom: 6px; display: block;">Enter Transaction reference</label>
+                <div class="login-row">
+                    <input type="text" class="field-input" id="zenopay-ref" placeholder="Transaction reference (HP...)" />
+                </div>
+                <button class="btn-accent" style="margin-top: 10px;" onclick="doReconnect()">
+                    💳 Reconnect
+                </button>
+            </div>
+        </div>
 
-          <div class="field">
-            <label for="password">Nywila</label>
-            <input type="password" id="password" name="password" placeholder="••••••••" autocomplete="current-password">
-          </div>
+        <!-- Manual Login -->
+        <div class="section">
+            <div class="section-title">📶 Manual Login</div>
+            <div class="section-card">
+                $(if error)
+                <div style="background: #fee2e2; color: #ef4444; padding: 10px; border-radius: 6px; margin-bottom: 15px; font-size: 0.85rem; text-align: center; border: 1px solid #fca5a5;">
+                    $(error)
+                </div>
+                $(endif)
+                <form name="login" action="$(link-login-only)" method="post" onsubmit="return doLogin()">
+                    <input type="hidden" name="dst" value="$(link-orig)" />
+                    <input type="hidden" name="popup" value="true" />
+                    <input type="hidden" name="mac" value="$(mac)" />
+                    <div class="login-row">
+                        <input type="text" class="field-input" name="username" value="$(username)" placeholder="Username" />
+                        <input type="password" class="field-input" name="password" placeholder="••••" />
+                        <button type="submit" class="btn-connect">Connect</button>
+                    </div>
+                </form>
+                <div class="remember-row">
+                    <input type="checkbox" id="remember" checked />
+                    <label for="remember">Remember me (Auto-reconnect while subscribed)</label>
+                </div>
+                <div class="mac-bar">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="BILLING_PRIMARY_COLOR"><path d="M20 18c1.1 0 1.99-.9 1.99-2L22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z"/></svg>
+                    MAC: <strong>$(mac)</strong>
+                </div>
+            </div>
+        </div>
 
-          <button type="submit" class="btn btn-primary">🔒 Ingia</button>
-        </form>
-
-        <div class="divider"><span>au</span></div>
-        <button class="btn btn-secondary" onclick="showTab('login')">💳 Lipa kwa M-Pesa</button>
-      </div>
-
-    </div><!-- end card-body -->
-
-    <!-- Footer -->
-    <div class="card-footer">
-      <p>
-        Msaada: <a href="tel:+255000000000">+255 000 000 000</a>
-        &nbsp;|&nbsp;
-        <a href="tandc.html">Masharti</a>
-        &nbsp;|&nbsp;
-        <a href="faqs.html">Maswali</a>
-      </p>
-      <p class="mt-4">&copy; 2025 HQINVESTMENT ISP</p>
+        <!-- Footer -->
+        <div class="footer">
+            Powered by BILLING_COMPANY_NAME
+        </div>
     </div>
-  </div><!-- end card -->
 
-  <script>
-    /* ── API BASE DETECTION ─────────────────────────────────────────────────
-       Priority:
-       1. URL param  ?server=https://...  (overrides all)
-       2. URL param  ?api=https://...
-       3. Auto-detect from window.location if served from billing server
-       4. Hardcoded placeholder (replaced when zip is downloaded)
-       ─────────────────────────────────────────────────────────────────────── */
-    var API_BASE = (function () {
-      var params = new URLSearchParams(window.location.search);
+    <script src="md5.js"></script>
+    <script>
+        var API_BASE = 'BILLING_API_URL';
+        var ROUTER_ID = 'BILLING_ROUTER_ID';
+        if (ROUTER_ID === 'BILLING_ROUTER_ID') ROUTER_ID = '';
+        
+        var ACCENT = 'BILLING_ACCENT_COLOR';
+        var PRIMARY = 'BILLING_PRIMARY_COLOR';
+        var currentPkg = null;
+        var pollInterval = null;
 
-      // 1-2: URL params
-      var fromParam = params.get('server') || params.get('api');
-      if (fromParam && fromParam.startsWith('http')) return fromParam.replace(/\/$/, '');
-
-      // 3: If this page is served from the billing server itself (not MikroTik)
-      var h = window.location.hostname;
-      var isPublicHost = h && h !== 'localhost' && !h.match(/^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/);
-      if (isPublicHost) return window.location.protocol + '//' + window.location.host;
-
-      // 4: Hardcoded (replaced by download script / RouterDetailModal)
-      return 'BILLING_API_URL';
-    })();
-
-    var ROUTER_ID = '';
-    var selectedPkg = null;
-    var paymentRef = null;
-    var pollTimer = null;
-    var pollCount = 0;
-    var MAX_POLL = 60;
-
-    /* ── URL PARAMS ──────────────────────────────────────── */
-    (function () {
-      var p = new URLSearchParams(window.location.search);
-      ROUTER_ID = p.get('routerId') || p.get('router_id') || '';
-    })();
-
-    /* ── CHAP LOGIN ──────────────────────────────────────── */
-    function doLogin(form) {
-      if (typeof hexMD5 !== 'undefined' && form['chap-id'] && form['chap-id'].value !== '') {
-        var id = form['chap-id'].value;
-        var pw = form['password'].value;
-        var ch = form['chap-challenge'].value;
-        form['chap-password'].value = hexMD5(id + pw + ch);
-        form['password'].value = '';
-      }
-      return true;
-    }
-
-    /* ── TAB SWITCHER ────────────────────────────────────── */
-    function showTab(tab) {
-      var isLogin = tab === 'login';
-      document.getElementById('panel-login').style.display = isLogin ? '' : 'none';
-      document.getElementById('panel-account').style.display = isLogin ? 'none' : '';
-      document.getElementById('tab-login').className = 'btn ' + (isLogin ? 'btn-primary' : 'btn-secondary');
-      document.getElementById('tab-account').className = 'btn ' + (isLogin ? 'btn-secondary' : 'btn-primary');
-    }
-
-    /* ── LOAD PACKAGES ───────────────────────────────────── */
-    function loadPackages() {
-      var url = API_BASE + '/api/hotspot/packages?' +
-        (ROUTER_ID ? 'routerId=' + ROUTER_ID : '');
-      fetch(url)
-        .then(function (r) { return r.json(); })
-        .then(function (data) {
-          var list = data.data || data || [];
-          renderPackages(Array.isArray(list) ? list : []);
-        })
-        .catch(function () {
-          document.getElementById('pkg-grid').innerHTML =
-            '<div style="grid-column:1/-1;text-align:center;padding:14px;color:var(--error);font-size:.82rem;">' +
-            '⚠ Hitilafu ya kupakia vifurushi. Jaribu tena.</div>';
-        });
-    }
-
-    function renderPackages(list) {
-      if (!list || list.length === 0) {
-        document.getElementById('pkg-grid').innerHTML =
-          '<div style="grid-column:1/-1;text-align:center;padding:14px;color:var(--text-muted);font-size:.82rem;">' +
-          'Hakuna vifurushi vilivyopatikana.</div>';
-        return;
-      }
-      var units = { MINUTES: 'Min', HOURS: 'Saa', DAYS: 'Siku', MONTHS: 'Miezi' };
-      var html = '';
-      list.forEach(function (p, i) {
-        var speed = p.downloadSpeed ? (p.downloadSpeed + (p.downloadUnit || 'Mbps')) : '';
-        var dur = p.duration + ' ' + (units[p.durationUnit] || p.durationUnit);
-        html += '<label class="pkg-card' + (i === 0 ? ' selected' : '') + '" id="pkg-' + p.id +
-          '" onclick="selectPkg(\'' + p.id + '\')">' +
-          '<input type="radio" name="pkg" value="' + p.id + '"' + (i === 0 ? ' checked' : '') + '>' +
-          '<div class="pkg-name">' + escHtml(p.name) + '</div>' +
-          (speed ? '<div class="pkg-speed">' + escHtml(speed) + '</div>' : '') +
-          '<div class="pkg-price">TSH ' + Number(p.price).toLocaleString() + '</div>' +
-          '<div class="pkg-dur">' + escHtml(dur) + '</div>' +
-          '</label>';
-        if (i === 0) {
-          selectedPkg = p;
-          document.getElementById('selected-pkg-id').value = p.id;
+        function renderPackages(packages) {
+            var c = document.getElementById('packagesContainer');
+            if (!packages || packages.length === 0) { c.innerHTML = '<div class="pkg-loading">No packages available</div>'; return; }
+            c.innerHTML = packages.map(function(p) {
+                var validity = p.validity || (p.duration ? p.duration + ' ' + (p.durationUnit || '') : '');
+                return '<div class="pkg-card" onclick=\'showPayment(' + JSON.stringify(p).replace(/"/g, "&quot;").replace(/'/g, "&#39;") + ')\'>' +
+                    '<div class="pkg-name">' + p.name + '</div>' +
+                    '<div class="pkg-price"><small>TSH</small> ' + Number(p.price).toLocaleString() + '</div>' +
+                    '<div class="pkg-duration" style="margin-bottom:6px">⏱ ' + validity + '</div>' +
+                    '<button style="width:100%; border:none; padding:6px; background:' + ACCENT + '; color:#fff; border-radius:6px; font-weight:700; font-size:0.75rem; cursor:pointer;">Buy</button>' +
+                '</div>';
+            }).join('');
         }
-      });
-      document.getElementById('pkg-grid').innerHTML = html;
-    }
 
-    function selectPkg(id) {
-      document.querySelectorAll('.pkg-card').forEach(function (el) {
-        el.classList.remove('selected');
-      });
-      var el = document.getElementById('pkg-' + id);
-      if (el) el.classList.add('selected');
-      document.getElementById('selected-pkg-id').value = id;
-    }
+        function showPayment(pkg) {
+            currentPkg = pkg;
+            document.getElementById('selectedPkgName').innerText = pkg.name;
+            document.getElementById('selectedPkgPrice').innerText = 'TSH ' + Number(pkg.price).toLocaleString();
+            document.getElementById('paymentInitial').style.display = 'block';
+            document.getElementById('paymentWait').style.display = 'none';
+            document.getElementById('paymentOverlay').style.display = 'flex';
+        }
 
-    /* ── PAYMENT ─────────────────────────────────────────── */
-    function startPayment() {
-      var phone = document.getElementById('phone').value.trim();
-      var pkgId = document.getElementById('selected-pkg-id').value;
-      var mac = document.getElementById('mac').value;
-      clearAlert();
+        function closePayment() {
+            document.getElementById('paymentOverlay').style.display = 'none';
+            if (pollInterval) clearInterval(pollInterval);
+        }
 
-      if (!phone) { showAlert('Tafadhali ingiza namba ya simu.'); return; }
-      if (!pkgId) { showAlert('Tafadhali chagua kifurushi.'); return; }
+        function initiatePurchase() {
+            var phone = document.getElementById('phoneInput').value;
+            if (!phone || phone.length < 10) { alert('Please enter a valid phone number'); return; }
+            
+            var btn = document.getElementById('btnPay');
+            btn.disabled = true;
+            btn.innerText = 'Processing...';
 
-      var btn = document.getElementById('pay-btn');
-      btn.disabled = true;
-      btn.innerHTML = '<span class="spinner"></span> Inawasiliana…';
+            fetch(API_BASE + '/api/hotspot/purchase', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    packageId: currentPkg.id,
+                    phone: phone,
+                    macAddress: '$(mac)',
+                    routerId: ROUTER_ID
+                })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                if (d.error) { throw new Error(d.error); }
+                document.getElementById('paymentInitial').style.display = 'none';
+                document.getElementById('paymentWait').style.display = 'block';
+                startPolling(d.reference);
+            })
+            .catch(function(err) {
+                alert(err.message || 'Failed to initiate purchase');
+                btn.disabled = false;
+                btn.innerText = 'Pay Now';
+            });
+        }
 
-      fetch(API_BASE + '/api/hotspot/purchase', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ packageId: pkgId, phone: phone, macAddress: mac, routerId: ROUTER_ID })
-      })
-        .then(function (r) { return r.json(); })
-        .then(function (d) {
-          if (d.reference || d.success) {
-            paymentRef = d.reference;
-            document.getElementById('payment-status').style.display = '';
-            btn.style.display = 'none';
-            startPolling();
-          } else {
-            showAlert(d.message || d.error || 'Imeshindwa kuanzisha malipo.');
-            btn.disabled = false;
-            btn.innerHTML = '💳 Lipa Sasa';
-          }
-        })
-        .catch(function () {
-          showAlert('Hitilafu ya mtandao. Hakikisha uko kwenye WiFi kisha jaribu tena.');
-          btn.disabled = false;
-          btn.innerHTML = '💳 Lipa Sasa';
-        });
-    }
+        function startPolling(ref) {
+            if (pollInterval) clearInterval(pollInterval);
+            pollInterval = setInterval(function() {
+                fetch(API_BASE + '/api/hotspot/status?reference=' + ref)
+                .then(function(r) { return r.json(); })
+                .then(function(d) {
+                    if (d.status === 'COMPLETED') {
+                        clearInterval(pollInterval);
+                        document.getElementById('pollStatus').innerText = 'PAID! Connecting...';
+                        document.getElementById('pollStatus').style.background = '#22c55e';
+                        document.getElementById('pollStatus').style.color = '#fff';
+                        document.getElementById('pollMessage').innerText = 'Your payment was successful. Getting you online now!';
+                        
+                        setTimeout(function() {
+                            connectUser(d.username, d.password);
+                        }, 2000);
+                    } else if (d.status === 'FAILED') {
+                        clearInterval(pollInterval);
+                        alert('Payment failed or cancelled. Please try again.');
+                        closePayment();
+                    }
+                });
+            }, 3000);
+        }
 
-    /* ── POLL PAYMENT STATUS ─────────────────────────────── */
-    function startPolling() {
-      pollCount = 0;
-      pollTimer = setInterval(function () {
-        pollCount++;
-        var pct = Math.min(pollCount / MAX_POLL * 100, 99);
-        document.getElementById('prog').style.width = pct + '%';
-        document.getElementById('prog-label').textContent = pollCount + ' / ' + MAX_POLL + ' sekunde';
+        function connectUser(user, pass) {
+            var f = document.forms['login'];
+            f.username.value = user;
+            f.password.value = pass;
+            doLogin();
+        }
 
-        fetch(API_BASE + '/api/hotspot/status?reference=' + encodeURIComponent(paymentRef))
-          .then(function (r) { return r.json(); })
-          .then(function (d) {
-            if (d.status === 'COMPLETED') {
-              clearInterval(pollTimer);
-              document.getElementById('prog').style.width = '100%';
-              document.getElementById('pay-msg').className = 'alert alert-success';
-              document.getElementById('pay-msg-text').textContent = '✅ Malipo yamekamilika! Inakuunganisha…';
-              if (d.username) {
-                setTimeout(function () {
-                  var chapId = document.getElementById('chap-id-val').value;
-                  var chapCh = document.getElementById('chap-ch-val').value;
-                  var pwd = d.password || d.username;
-                  var base = '$(link-login-only)';
-                  var dst = '$(link-orig)';
-                  var url;
-                  if (chapId && chapCh && !chapId.includes('$(')) {
-                    url = base + '?username=' + encodeURIComponent(d.username) +
-                      '&chap-id=' + encodeURIComponent(chapId) +
-                      '&chap-challenge=' + encodeURIComponent(chapCh) +
-                      '&chap-password=' + encodeURIComponent(chapPassword(chapId, pwd, chapCh)) +
-                      '&dst=' + encodeURIComponent(dst);
-                  } else {
-                    url = base + '?username=' + encodeURIComponent(d.username) +
-                      '&password=' + encodeURIComponent(pwd) +
-                      '&dst=' + encodeURIComponent(dst);
-                  }
-                  window.location.href = url;
-                }, 1800);
-              }
-            } else if (d.status === 'FAILED') {
-              clearInterval(pollTimer);
-              document.getElementById('payment-status').style.display = 'none';
-              var btn = document.getElementById('pay-btn');
-              btn.style.display = '';
-              btn.disabled = false;
-              btn.innerHTML = '💳 Lipa Sasa';
-              showAlert('Malipo yameshindwa. Tafadhali jaribu tena.');
+        function doLogin() {
+            var f = document.forms['login'];
+            if (typeof hexMD5 !== 'undefined' && '$(chap-id)' !== '') {
+                var newpass = hexMD5('$(chap-id)' + f.password.value + '$(chap-challenge)');
+                var sendForm = document.createElement('form');
+                sendForm.method = 'post';
+                sendForm.action = '$(link-login-only)';
+                sendForm.innerHTML = '<input type="hidden" name="username" value="' + f.username.value + '" />' +
+                                     '<input type="hidden" name="password" value="' + newpass + '" />' +
+                                     '<input type="hidden" name="dst" value="' + f.dst.value + '" />' +
+                                     '<input type="hidden" name="popup" value="true" />' +
+                                     '<input type="hidden" name="mac" value="' + (f.mac ? f.mac.value : '$(mac)') + '" />';
+                document.body.appendChild(sendForm);
+                sendForm.submit();
+                return false;
             }
-          })
-          .catch(function () { });
-
-        if (pollCount >= MAX_POLL) {
-          clearInterval(pollTimer);
-          document.getElementById('pay-msg').className = 'alert alert-error';
-          document.getElementById('pay-msg-text').textContent = '⏰ Muda umekwisha. Jaribu tena.';
-          var btn = document.getElementById('pay-btn');
-          btn.style.display = '';
-          btn.disabled = false;
-          btn.innerHTML = '💳 Lipa Sasa';
+            f.submit();
+            return false;
         }
-      }, 1000);
-    }
 
-    /* ── UTILS ───────────────────────────────────────────── */
-    function showAlert(msg) {
-      var el = document.getElementById('error-alert');
-      if (!el) {
-        el = document.createElement('div');
-        el.className = 'alert alert-error';
-        el.id = 'error-alert';
-        document.querySelector('.card-body').prepend(el);
-      }
-      el.innerHTML = '<span>⚠</span><span>' + escHtml(msg) + '</span>';
-      el.style.display = '';
-      el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }
+        function doVoucher() {
+            var code = document.getElementById('voucher-code').value;
+            if (!code) { alert('Please enter a voucher code'); return false; }
+            
+            var btn = document.forms['voucher_form'].querySelector('button');
+            btn.disabled = true;
+            btn.innerText = 'Checking...';
 
-    function clearAlert() {
-      var el = document.getElementById('error-alert');
-      if (el) el.style.display = 'none';
-    }
+            fetch(API_BASE + '/api/hotspot/voucher/redeem', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    code: code,
+                    macAddress: '$(mac)',
+                    routerId: ROUTER_ID
+                })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                if (d.error) { throw new Error(d.error); }
+                alert('Voucher valid! Connecting...');
+                connectUser(d.username, d.password || '');
+            })
+            .catch(function(err) {
+                alert(err.message || 'Failed to redeem voucher');
+                btn.disabled = false;
+                btn.innerText = 'Redeem';
+            });
 
-    function escHtml(s) {
-      return String(s)
-        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    }
+            return false;
+        }
 
-    /* ── INIT ────────────────────────────────────────────── */
-    loadPackages();
-  </script>
+        function doReconnect() {
+            var ref = document.getElementById('zenopay-ref').value;
+            if (!ref) { alert('Please enter your reference'); return; }
+            startPolling(ref);
+        }
+
+        // Init
+        (function() {
+            if (!API_BASE || API_BASE === 'BILLING_API_URL') return;
+            fetch(API_BASE + '/api/hotspot/packages?routerId=' + ROUTER_ID)
+                .then(function(r) { return r.json(); })
+                .then(function(d) {
+                    var pkgs = Array.isArray(d) ? d : (d.data || []);
+                    renderPackages(pkgs);
+                })
+                .catch(function(err) { console.log('Package fetch failed:', err); });
+        })();
+    </script>
 </body>
-
 </html>
