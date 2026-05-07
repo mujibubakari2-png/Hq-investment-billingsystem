@@ -259,6 +259,7 @@ async function completeHotspotPurchase(
         downloadSpeed: number;
         downloadUnit: string;
         routerId: string | null;
+        tenantId: string | null;
     },
     routerId: string | null | undefined
 ) {
