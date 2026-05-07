@@ -58,11 +58,11 @@
 </div>
 <script>
 function doLogin(form) {
-  var id = form['chap-id'].value;
-  var pw = form['password'].value;
-  var ch = form['chap-challenge'].value;
-  if (id && ch && typeof chapPassword === 'function') {
-    form['chap-password'].value = chapPassword(id, pw, ch);
+  if (typeof hexMD5 !== 'undefined' && form['chap-id'] && form['chap-id'].value !== '') {
+    var id = form['chap-id'].value;
+    var pw = form['password'].value;
+    var ch = form['chap-challenge'].value;
+    form['chap-password'].value = hexMD5(id + pw + ch);
     form['password'].value = '';
   }
   return true;
