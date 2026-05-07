@@ -4,13 +4,15 @@
   This file is read by MikroTik to configure hotspot behaviour.
 -->
 <hotspot>
-  <name>HQINVESTMENT WiFi</name>
+  <name>BILLING_COMPANY_NAME WiFi</name>
   <version>2.0</version>
   <login-page>login.html</login-page>
   <logout-page>logout.html</logout-page>
   <status-page>status.html</status-page>
   <error-page>error.html</error-page>
+  <errors-page>errors.html</errors-page>
   <redirect-page>redirect.html</redirect-page>
+  <rlogin-page>rlogin.html</rlogin-page>
   <advertisement-page>radvert.html</advertisement-page>
   <terms-page>tandc.html</terms-page>
   <faq-page>faqs.html</faq-page>
@@ -28,7 +30,7 @@
     <country>Tanzania</country>
   </payment>
   <support>
-    <phone>+255000000000</phone>
+    <phone>BILLING_SUPPORT_PHONE</phone>
     <email>support@hqinvestment.co.tz</email>
   </support>
 </hotspot>

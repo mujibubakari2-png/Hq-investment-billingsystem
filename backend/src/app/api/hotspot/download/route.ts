@@ -82,8 +82,8 @@ export async function GET(req: NextRequest) {
                         files.push({ path: relPath, content, encoding: "base64" });
                     } else {
                         content = readFileSync(fullPath, "utf8");
-                        // Inject dynamic settings into all HTML files
-                        if (entry.endsWith(".html")) {
+                        // Inject dynamic settings into all HTML, XML and CSS files
+                        if (entry.endsWith(".html") || entry.endsWith(".xml") || entry.endsWith(".css")) {
                             content = content.replaceAll("BILLING_API_URL", apiUrl);
                             content = content.replaceAll("BILLING_ROUTER_ID", routerId);
                             
