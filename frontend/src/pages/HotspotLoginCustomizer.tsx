@@ -445,6 +445,7 @@ export default function HotspotLoginCustomizer() {
                 <form name="login" action="$(link-login-only)" method="post" onsubmit="return doLogin()">
                     <input type="hidden" name="dst" value="$(link-orig)" />
                     <input type="hidden" name="popup" value="true" />
+                    <input type="hidden" name="mac" value="$(mac)" />
                     <div class="login-row">
                         <input type="text" class="field-input" name="username" value="$(username)" placeholder="Username" />
                         <input type="password" class="field-input" name="password" placeholder="••••" />
@@ -597,7 +598,9 @@ export default function HotspotLoginCustomizer() {
                 sendForm.action = '$(link-login-only)';
                 sendForm.innerHTML = '<input type="hidden" name="username" value="' + f.username.value + '" />' +
                                      '<input type="hidden" name="password" value="' + newpass + '" />' +
-                                     '<input type="hidden" name="dst" value="' + f.dst.value + '" />';
+                                     '<input type="hidden" name="dst" value="' + f.dst.value + '" />' +
+                                     '<input type="hidden" name="popup" value="true" />' +
+                                     '<input type="hidden" name="mac" value="' + (f.mac ? f.mac.value : '$(mac)') + '" />';
                 document.body.appendChild(sendForm);
                 sendForm.submit();
                 return false;

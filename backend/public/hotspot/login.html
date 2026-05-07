@@ -95,6 +95,7 @@
         <form method="POST" action="$(link-login-only)" onsubmit="return doLogin(this)">
           <input type="hidden" name="dst" value="$(link-orig)">
           <input type="hidden" name="popup" value="true">
+          <input type="hidden" name="mac" value="$(mac)">
           <input type="hidden" name="chap-id" value="$(chap-id)">
           <input type="hidden" name="chap-challenge" value="$(chap-challenge)">
           <input type="hidden" name="chap-password" id="chap-password" value="">
