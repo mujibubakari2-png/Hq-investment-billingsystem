@@ -1,105 +1,135 @@
 <!DOCTYPE html>
-<html lang="sw">
+<html lang="en">
 
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>HQINVESTMENT WiFi – Ingia (RADIUS)</t <met a name="description"
-      content="Karibu kwenye mtandao wa HQINVESTMENT. Lipa na M-Pesa au ingia kwa akaunti yako.">
-    <link rel="icon" href="assets/img/favicon.ico" type="image/x-icon">
-    <link rel="shortcut icon" href="assets/img/favicon.ico">
-    <link rel="stylesheet" href="assets/css/style.css">
-    <script src="md5.js"></script>
+  <title>BILLING_COMPANY_NAME - Account Login</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(135deg, BILLING_PRIMARY_COLOR22, BILLING_ACCENT_COLOR22);
+      min-height: 100vh; display: flex; align-items: center; justify-content: center;
+      padding: 15px;
+    }
+    .card {
+      background: #fff; width: 100%; max-width: 440px;
+      border-radius: 24px; box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+      overflow: hidden;
+    }
+    .header {
+      background: linear-gradient(135deg, BILLING_PRIMARY_COLOR, BILLING_ACCENT_COLOR);
+      padding: 30px 20px; text-align: center; color: #fff;
+    }
+    .header h1 { font-size: 1.3rem; font-weight: 700; margin-bottom: 5px; }
+    .header p { font-size: 0.85rem; opacity: 0.9; }
+    
+    .content { padding: 30px 24px; }
+    
+    /* Tabs */
+    .tabs { display: flex; gap: 10px; margin-bottom: 25px; }
+    .tab {
+      flex: 1; padding: 10px; text-align: center; border-radius: 12px;
+      font-size: 0.85rem; font-weight: 600; text-decoration: none;
+      transition: all 0.2s;
+    }
+    .tab-active { background: BILLING_PRIMARY_COLOR; color: #fff; }
+    .tab-inactive { background: #f1f5f9; color: #64748b; }
+    
+    /* Form */
+    .field { margin-bottom: 18px; }
+    label { display: block; font-size: 0.75rem; color: #666; font-weight: 600; margin-bottom: 6px; text-transform: uppercase; }
+    input {
+      width: 100%; padding: 12px 16px; border: 1.5px solid #e2e8f0; border-radius: 12px;
+      font-size: 1rem; outline: none; transition: border-color 0.2s;
+    }
+    input:focus { border-color: BILLING_PRIMARY_COLOR; }
+    
+    .btn-login {
+      display: block; width: 100%; padding: 14px; background: BILLING_PRIMARY_COLOR;
+      color: #fff; border: none; border-radius: 12px; font-weight: 700; font-size: 1rem;
+      cursor: pointer; transition: all 0.2s; margin-top: 10px;
+    }
+    .btn-login:hover { opacity: 0.9; transform: translateY(-1px); }
+    
+    .alert {
+      background: #fee2e2; color: #ef4444; padding: 12px; border-radius: 10px;
+      font-size: 0.85rem; margin-bottom: 20px; text-align: center; border: 1px solid #fca5a5;
+    }
+    
+    .footer {
+      text-align: center; padding: 20px; font-size: 0.75rem; color: #94a3b8;
+      border-top: 1px solid #f1f5f9;
+    }
+    .footer a { color: BILLING_PRIMARY_COLOR; text-decoration: none; font-weight: 600; }
+  </style>
 </head>
 
 <body>
-
   <div class="card">
-    <!-- Header -->
-    <div class="card-header">
-      <div class="logo-wrap">
-        <svg viewBox="0 0 24 24">
-          <path d="M1 6l11 8 11-8V5L12 13 1 5v1zm0 3v9a1 1 0 001 1h20a1 1 0 001-1V9l-11 8L1 9z" />
-        </svg>
-      </div>
-      <h1>HQINVESTMENT WiFi</h1>
-      <p>Lipa kwa M-Pesa au ingia kwa akaunti</p>
+    <div class="header">
+      <h1>BILLING_COMPANY_NAME</h1>
+      <p>Sign in to your account</p>
     </div>
-
-    <!-- Body -->
-    <div class="card-body">
-
-      <!-- Error from MikroTik -->
+    
+    <div class="content">
       $(if error)
-      <div class="alert alert-error" id="error-alert">
-        <span>⚠</span><span>$(error)</span>
-      </div>
+      <div class="alert">$(error)</div>
       $(endif)
-
-      <!-- Tab switcher -->
-      <div class="tab-wrap">
-        <a href="login.html" class="btn btn-secondary" style="text-decoration:none;">💳 Lipa / Jiunge</a>
-        <button class="btn btn-primary">🔑 Nina Akaunti</button>
+      
+      <div class="tabs">
+        <a href="login.html" class="tab tab-inactive">Buy Package</a>
+        <div class="tab tab-active">I have Account</div>
       </div>
-
-      <!-- ══ LOGIN FORM ══ -->
-      <div id="panel-account">
-        <form method="POST" action="$(link-login-only)" onsubmit="return doLogin(this)">
-          <input type="hidden" name="dst" value="$(link-orig)">
-          <input type="hidden" name="popup" value="true">
-          <input type="hidden" name="mac" value="$(mac)">
-          <input type="hidden" name="chap-id" value="$(chap-id)">
-          <input type="hidden" name="chap-challenge" value="$(chap-challenge)">
-          <input type="hidden" name="chap-password" id="chap-password" value="">
-
-          <div class="field">
-            <label for="username">Jina la Mtumiaji</label>
-            <input type="text" id="username" name="username" value="$(username)" placeholder="HS-0712345678"
-              autocomplete="username" autofocus>
-          </div>
-
-          <div class="field">
-            <label for="password">Nywila</label>
-            <input type="password" id="password" name="password" placeholder="••••••••" autocomplete="current-password">
-          </div>
-
-          <button type="submit" class="btn btn-primary">🔒 Ingia</button>
-        </form>
-
-        <div class="divider"><span>au</span></div>
-        <a href="login.html" class="btn btn-secondary" style="text-decoration:none;">💳 Lipa kwa M-Pesa</a>
-      </div>
-
-    </div><!-- end card-body -->
-
-    <!-- Footer -->
-    <div class="card-footer">
-      <p>
-        Msaada: <a href="tel:+255000000000">+255 000 000 000</a>
-        &nbsp;|&nbsp;
-        <a href="tandc.html">Masharti</a>
-        &nbsp;|&nbsp;
-        <a href="faqs.html">Maswali</a>
-      </p>
-      <p class="mt-4">&copy; 2025 HQINVESTMENT ISP</p>
+      
+      <form name="login" action="$(link-login-only)" method="post" onsubmit="return doLogin()">
+        <input type="hidden" name="dst" value="$(link-orig)" />
+        <input type="hidden" name="popup" value="true" />
+        <input type="hidden" name="mac" value="$(mac)" />
+        
+        <div class="field">
+          <label>Username</label>
+          <input type="text" name="username" value="$(username)" placeholder="Username" autofocus />
+        </div>
+        
+        <div class="field">
+          <label>Password</label>
+          <input type="password" name="password" placeholder="••••••••" />
+        </div>
+        
+        <button type="submit" class="btn-login">Connect Now</button>
+      </form>
     </div>
-  </div><!-- end card -->
+    
+    <div class="footer">
+      <p>Need help? <a href="tel:BILLING_SUPPORT_PHONE">BILLING_SUPPORT_PHONE</a></p>
+      <p style="margin-top: 8px;">&copy; 2025 BILLING_COMPANY_NAME</p>
+    </div>
+  </div>
 
+  <script src="md5.js"></script>
   <script>
-    /* ── CHAP LOGIN ──────────────────────────────────────── */
-    dc.html">Masharti</a></p>
-    </div >
-  </div >
-      <script>
-        function doLogin(form) {
-      if (typeof hexMD5 !== 'undefined' && form['chap-id'] && form['chap-id'].value !== '') {
-        var id = form['chap-id'].value;
-        var pw = form['password'].value;
-        var ch = form['chap-challenge'].value;
-        form['chap-password'].value = hexMD5(id + pw + ch);
-        form['password'].value = '';
+    function doLogin() {
+      var f = document.forms['login'];
+      if (typeof hexMD5 !== 'undefined' && '$(chap-id)' !== '') {
+        var newpass = hexMD5('$(chap-id)' + f.password.value + '$(chap-challenge)');
+        var sendForm = document.createElement('form');
+        sendForm.method = 'post';
+        sendForm.action = '$(link-login-only)';
+        sendForm.innerHTML = '<input type="hidden" name="username" value="' + f.username.value + '" />' +
+                             '<input type="hidden" name="password" value="' + newpass + '" />' +
+                             '<input type="hidden" name="dst" value="' + f.dst.value + '" />' +
+                             '<input type="hidden" name="popup" value="true" />' +
+                             '<input type="hidden" name="mac" value="' + (f.mac ? f.mac.value : '$(mac)') + '" />';
+        document.body.appendChild(sendForm);
+        sendForm.submit();
+        return false;
       }
-        return true;
+      return true;
     }
   </script>
 </body>

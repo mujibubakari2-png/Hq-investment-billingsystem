@@ -6,12 +6,12 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 :root {
-  --primary:       BILLING_PRIMARY_COLOR;
-  --primary-dark:  BILLING_PRIMARY_COLOR;
-  --primary-light: BILLING_PRIMARY_COLOR22;
+  --primary:       #16a34a;
+  --primary-dark:  #15803d;
+  --primary-light: rgba(22, 163, 74, 0.14);
   --secondary:     #1e293b;
-  --accent:        BILLING_ACCENT_COLOR;
-  --bg:            BILLING_PRIMARY_COLOR08;
+  --accent:        #f59e0b;
+  --bg:            #f8fafc;
   --card:          #ffffff;
   --text:          #1e293b;
   --text-muted:    #64748b;
@@ -30,7 +30,7 @@ html { font-size: 16px; -webkit-text-size-adjust: 100%; }
 
 body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  background: linear-gradient(145deg, BILLING_PRIMARY_COLOR 0%, BILLING_ACCENT_COLOR 100%);
+  background: linear-gradient(145deg, #16a34a 0%, #064e3b 100%);
   min-height: 100vh;
   min-height: 100dvh;
   display: flex;
@@ -63,7 +63,7 @@ body {
 
 /* ── HEADER ────────────────────────────────────────── */
 .card-header {
-  background: linear-gradient(135deg, BILLING_PRIMARY_COLOR, BILLING_ACCENT_COLOR);
+  background: linear-gradient(135deg, #16a34a, #065f46);
   padding: 24px 20px 20px;
   text-align: center;
   position: relative;
