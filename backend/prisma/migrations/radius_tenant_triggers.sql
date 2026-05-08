@@ -14,9 +14,11 @@ CREATE OR REPLACE FUNCTION assign_radacct_tenant()
 RETURNS TRIGGER AS $$
 BEGIN
     -- Step 1: Try to find tenant from routers table (primary mapping)
+    -- Check both host (Public IP) and wgTunnelIp (WireGuard IP)
     SELECT r."tenantId" INTO NEW."tenantId"
     FROM routers r
-    WHERE r.host = NEW.nasipaddress
+    WHERE (r.host = NEW.nasipaddress OR r."wgTunnelIp" = NEW.nasipaddress)
+      AND r."tenantId" IS NOT NULL
     LIMIT 1;
 
     -- Step 2: Fallback to radius_nas table if router not found
@@ -24,6 +26,7 @@ BEGIN
         SELECT rn."tenantId" INTO NEW."tenantId"
         FROM radius_nas rn
         WHERE rn."nasName" = NEW.nasipaddress
+          AND rn."tenantId" IS NOT NULL
         LIMIT 1;
     END IF;
 

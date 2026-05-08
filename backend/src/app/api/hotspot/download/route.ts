@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
         const routerId = searchParams.get("routerId") || "";
 
         let hotspotDir = join(process.cwd(), "public", "hotspot");
-        
+
         // Comprehensive path discovery
         const pathsToTry = [
             join(process.cwd(), "public", "hotspot"),
@@ -41,9 +41,9 @@ export async function GET(req: NextRequest) {
 
         if (!found) {
             console.error("[HOTSPOT DOWNLOAD] Directory not found in any of:", pathsToTry);
-            return Response.json({ 
-                error: "Template directory not found on server", 
-                checkedPaths: pathsToTry 
+            return Response.json({
+                error: "Template directory not found on server",
+                checkedPaths: pathsToTry
             }, { status: 500 });
         }
 
@@ -55,8 +55,8 @@ export async function GET(req: NextRequest) {
         if (routerId) {
             const router = await prisma.router.findUnique({
                 where: { id: routerId },
-                select: { 
-                    password: true, 
+                select: {
+                    password: true,
                     name: true,
                     hotspotSettings: true,
                     tenant: {
@@ -69,9 +69,9 @@ export async function GET(req: NextRequest) {
             });
             if (router) {
                 routerSecret = router.password || "hqsecret";
-                routerName = router.name;
+                routerName = router.name.trim().replace(/^-+|-+$/g, '');
                 hotspotSettings = router.hotspotSettings;
-                
+
                 // Fallbacks if no specific hotspot settings
                 if (!hotspotSettings) {
                     hotspotSettings = {
@@ -107,7 +107,7 @@ export async function GET(req: NextRequest) {
                         if (entry.endsWith(".html") || entry.endsWith(".xml") || entry.endsWith(".css")) {
                             content = content.replaceAll("BILLING_API_URL", apiUrl);
                             content = content.replaceAll("BILLING_ROUTER_ID", routerId);
-                            
+
                             if (hotspotSettings) {
                                 content = content.replaceAll("BILLING_COMPANY_NAME", hotspotSettings.companyName || "HQINVESTMENT");
                                 content = content.replaceAll("BILLING_SUPPORT_PHONE", hotspotSettings.customerCareNumber || "+255 000 000 000");
@@ -172,9 +172,9 @@ add name=hs-hq interface=bridge-local profile=hq_hotspot disabled=no
 
     } catch (e: any) {
         console.error("Hotspot download error:", e);
-        return Response.json({ 
-            error: "Failed to package hotspot files", 
-            details: e.message || String(e) 
+        return Response.json({
+            error: "Failed to package hotspot files",
+            details: e.message || String(e)
         }, { status: 500 });
     }
 }

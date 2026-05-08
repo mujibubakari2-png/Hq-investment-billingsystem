@@ -129,6 +129,7 @@ export async function POST(req: NextRequest) {
                     expiresAt,
                     onlineStatus: "ONLINE",
                     syncStatus: "PENDING",
+                    tenantId: pkg.tenantId,
                 },
             });
 
@@ -158,6 +159,7 @@ export async function POST(req: NextRequest) {
                         details: `Payment confirmed: ${AccountReference} | ${TransactionId || "N/A"} | ${PhoneNumber || "N/A"} | TSH ${Amount}`,
                         status: "success",
                         username: transaction.client.username,
+                        tenantId: pkg.tenantId,
                     },
                 });
             } catch (logErr: any) {

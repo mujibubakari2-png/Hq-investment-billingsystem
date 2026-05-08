@@ -55,6 +55,20 @@ export async function GET(req: NextRequest) {
             console.error("[DASHBOARD SYNC ERROR]: Failed to map RADIUS sessions to tenants", e);
         }
 
+        // Debug: Log if there are still unmapped radacct records for this user's tenant potential
+        if (process.env.NODE_ENV !== "production") {
+            const unmappedCount = await prisma.radAcct.count({ where: { tenantId: null } });
+            if (unmappedCount > 0) {
+                const sampleUnmapped = await prisma.radAcct.findMany({
+                    where: { tenantId: null },
+                    select: { nasipaddress: true },
+                    distinct: ['nasipaddress'],
+                    take: 5
+                });
+                console.warn(`[DASHBOARD DEBUG]: Found ${unmappedCount} unmapped RADIUS records. Sample NAS IPs: ${sampleUnmapped.map(u => u.nasipaddress).join(', ')}`);
+            }
+        }
+
         // Fixed: Use timezone-aware boundaries (Africa/Dar_es_Salaam) to match frontend display
         const todayStart = new Date(getStartOfTodayTZ());
         const monthStart = new Date(getStartOfMonthTZ());

@@ -124,6 +124,7 @@ export async function POST(req: NextRequest) {
                     serviceType: "HOTSPOT",
                     status: "ACTIVE",
                     macAddress: macAddress || null,
+                    tenantId: pkg.tenantId,
                 },
             });
             clientId = newClient.id;
@@ -143,6 +144,7 @@ export async function POST(req: NextRequest) {
                 status: "PENDING",
                 reference,
                 expiryDate: null,
+                tenantId: pkg.tenantId,
             },
         });
 

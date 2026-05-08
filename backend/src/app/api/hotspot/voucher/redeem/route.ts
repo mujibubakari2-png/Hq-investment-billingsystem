@@ -76,6 +76,7 @@ export async function POST(req: NextRequest) {
                     serviceType: "HOTSPOT",
                     status: "ACTIVE",
                     macAddress: macAddress || null,
+                    tenantId: pkg.tenantId,
                 },
             });
         }
@@ -103,6 +104,7 @@ export async function POST(req: NextRequest) {
                     expiresAt,
                     onlineStatus: "ONLINE",
                     syncStatus: "PENDING",
+                    tenantId: pkg.tenantId,
                 },
             }),
             // 3. Update client
@@ -145,6 +147,7 @@ export async function POST(req: NextRequest) {
                         details: `Voucher redeemed: ${code} | MAC: ${macAddress || "N/A"}`,
                         status: "success",
                         username: client.username,
+                        tenantId: pkg.tenantId,
                     },
                 });
             } catch (logErr: any) {
