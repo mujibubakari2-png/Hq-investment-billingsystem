@@ -90,6 +90,13 @@ export async function POST(req: NextRequest) {
                     { phone: phone },
                     ...(macAddress ? [{ macAddress }] : []),
                 ],
+                // Only remember the client if they have an active, unexpired subscription
+                subscriptions: {
+                    some: {
+                        status: "ACTIVE",
+                        expiresAt: { gt: new Date() }
+                    }
+                }
             },
         });
 

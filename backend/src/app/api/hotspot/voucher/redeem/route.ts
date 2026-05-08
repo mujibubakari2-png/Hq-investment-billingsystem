@@ -61,7 +61,15 @@ export async function POST(req: NextRequest) {
         let client = null;
         if (macAddress) {
             client = await prisma.client.findFirst({
-                where: { macAddress },
+                where: { 
+                    macAddress,
+                    subscriptions: {
+                        some: {
+                            status: "ACTIVE",
+                            expiresAt: { gt: new Date() }
+                        }
+                    }
+                },
             });
         }
 
