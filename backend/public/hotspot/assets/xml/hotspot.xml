@@ -11,7 +11,6 @@
   <status-page>status.html</status-page>
   <error-page>error.html</error-page>
   <errors-page>errors.html</errors-page>
-  <redirect-page>redirect.html</redirect-page>
   <rlogin-page>rlogin.html</rlogin-page>
   <advertisement-page>radvert.html</advertisement-page>
   <terms-page>tandc.html</terms-page>
