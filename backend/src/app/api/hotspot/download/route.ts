@@ -21,9 +21,30 @@ export async function GET(req: NextRequest) {
         const routerId = searchParams.get("routerId") || "";
 
         let hotspotDir = join(process.cwd(), "public", "hotspot");
-        // Fallback for monorepo root process.cwd()
-        if (!existsSync(hotspotDir)) {
-            hotspotDir = join(process.cwd(), "backend", "public", "hotspot");
+        
+        // Comprehensive path discovery
+        const pathsToTry = [
+            join(process.cwd(), "public", "hotspot"),
+            join(process.cwd(), "backend", "public", "hotspot"),
+            join(process.cwd(), "..", "public", "hotspot"), // if running from backend/src/...
+            "/var/www/Hq-investment-billingsystem/backend/public/hotspot", // Hardcoded absolute path for Droplet fallback
+        ];
+
+        let found = false;
+        for (const p of pathsToTry) {
+            if (existsSync(p)) {
+                hotspotDir = p;
+                found = true;
+                break;
+            }
+        }
+
+        if (!found) {
+            console.error("[HOTSPOT DOWNLOAD] Directory not found in any of:", pathsToTry);
+            return Response.json({ 
+                error: "Template directory not found on server", 
+                checkedPaths: pathsToTry 
+            }, { status: 500 });
         }
 
         // Fetch router details if ID is provided
@@ -151,6 +172,9 @@ add name=hs-hq interface=bridge-local profile=hq_hotspot disabled=no
 
     } catch (e: any) {
         console.error("Hotspot download error:", e);
-        return Response.json({ error: "Failed to package hotspot files" }, { status: 500 });
+        return Response.json({ 
+            error: "Failed to package hotspot files", 
+            details: e.message || String(e) 
+        }, { status: 500 });
     }
 }
