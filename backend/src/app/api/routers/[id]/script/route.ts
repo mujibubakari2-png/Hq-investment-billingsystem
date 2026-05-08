@@ -98,12 +98,15 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 `;
         }
 
+        // 11. RADIUS Configuration (Managed via VPN)
+        const srcAddrPart = router.wgTunnelIp ? `src-address=${router.wgTunnelIp}` : "";
+
         script += `
 # 11. RADIUS Configuration (Managed via VPN)
 :if ([:len [/radius find where comment="HQInvestment RADIUS"]] = 0) do={
-    /radius add address=10.0.0.1 secret="${router.password || 'hqsecret'}" service=hotspot,ppp timeout=3000ms comment="HQInvestment RADIUS"
+    /radius add address=10.0.0.1 secret="${router.password || 'hqsecret'}" service=hotspot,ppp timeout=3000ms ${srcAddrPart} comment="HQInvestment RADIUS"
 } else={
-    /radius set [find comment="HQInvestment RADIUS"] address=10.0.0.1 secret="${router.password || 'hqsecret'}"
+    /radius set [find comment="HQInvestment RADIUS"] address=10.0.0.1 secret="${router.password || 'hqsecret'}" ${srcAddrPart}
 }
 :if ([:len [/radius incoming find]] = 0) do={
     /radius incoming set accept=yes port=3799
@@ -114,10 +117,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 /log info "Your router should now be reachable by the billing system."
 `;
 
+        const safeFilename = router.name.trim().toLowerCase().replace(/\s+/g, '-');
         return new Response(script, {
             headers: {
                 "Content-Type": "text/plain",
-                "Content-Disposition": `attachment; filename="setup-${router.name}.rsc"`,
+                "Content-Disposition": `attachment; filename="setup-${safeFilename}.rsc"`,
             },
         });
     } catch (e: any) {

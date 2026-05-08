@@ -101,8 +101,8 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
     const restPort = router.apiPort || (router.port === 8728 || router.port === 8729 ? 80 : router.port) || 80;
 
     // Build MikroTik server script with CORRECT syntax
-    const safeRouterName = config.routerName.replace(/\s+/g, '-');
-    const safeRouterNameLower = config.routerName.toLowerCase().replace(/\s+/g, '-');
+    const safeRouterName = config.routerName.trim().replace(/\s+/g, '-');
+    const safeRouterNameLower = config.routerName.trim().toLowerCase().replace(/\s+/g, '-');
 
     const apiHost = new URL(PUBLIC_API_BASE).hostname;
 
@@ -239,9 +239,9 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
 # STEP 8: RADIUS & Walled Garden
 # ============================================
 :if ([:len [/radius find address="10.0.0.1"]] = 0) do={
-    /radius add service=hotspot,ppp address="10.0.0.1" secret="${router.password || 'hqsecret'}" authentication-port=1812 accounting-port=1813 timeout=3s comment="HQInvestment RADIUS"
+    /radius add service=hotspot,ppp address="10.0.0.1" secret="${router.password || 'hqsecret'}" authentication-port=1812 accounting-port=1813 timeout=3s src-address=${config.routerTunnelIp} comment="HQInvestment RADIUS"
 } else={
-    /radius set [find address="10.0.0.1"] secret="${router.password || 'hqsecret'}" service=hotspot,ppp comment="HQInvestment RADIUS"
+    /radius set [find address="10.0.0.1"] secret="${router.password || 'hqsecret'}" service=hotspot,ppp src-address=${config.routerTunnelIp} comment="HQInvestment RADIUS"
 }
 :if ([:len [/radius incoming find]] = 0) do={
     /radius incoming set accept=yes port=3799
