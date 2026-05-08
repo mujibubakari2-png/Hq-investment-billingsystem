@@ -371,7 +371,6 @@ export class MikroTikService {
                 service: user.service || "pppoe",
                 profile: user.profile || "default",
                 disabled: user.disabled ? "true" : "false",
-                comment: sanitizeComment(user.comment || `Managed by HQInvestment ISP Billing`),
             });
 
             await this.log("create_pppoe_user", `Created PPPoE user: ${user.name}`, "success", user.name);
@@ -477,7 +476,6 @@ export class MikroTikService {
                 profile: user.profile || "default",
                 server: user.server || "all",
                 disabled: user.disabled ? "true" : "false",
-                comment: sanitizeComment(user.comment || `Managed by HQInvestment ISP Billing`),
             };
             if (user.macAddress) payload["mac-address"] = user.macAddress;
             if (user.limitUptime) payload["limit-uptime"] = user.limitUptime;
@@ -651,7 +649,6 @@ export class MikroTikService {
             const result = await this.apiRequest("/ppp/profile", "PUT", {
                 name: profile.name,
                 "rate-limit": profile.rateLimit,
-                comment: profile.comment || `HQInvestment ISP - ${profile.name}`,
             });
             await this.log("create_pppoe_profile", `Created PPPoE profile: ${profile.name} (${profile.rateLimit})`, "success");
             return { ...profile, id: result?.[".id"] || result?.ret };
@@ -668,7 +665,6 @@ export class MikroTikService {
                 name: profile.name,
                 "rate-limit": profile.rateLimit,
                 "shared-users": profile.sharedUsers || 1,
-                comment: profile.comment || `HQInvestment ISP - ${profile.name}`,
             });
             await this.log("create_hotspot_profile", `Created Hotspot profile: ${profile.name} (${profile.rateLimit})`, "success");
             return { ...profile, id: result?.[".id"] || result?.ret };
@@ -686,7 +682,6 @@ export class MikroTikService {
         // RouterOS REST API v7: PATCH on the specific resource ID (no .id in body)
         await this.apiRequest(`/ppp/profile/${existing.id}`, "PATCH", {
             "rate-limit": profile.rateLimit,
-            comment: profile.comment || existing.comment || `HQInvestment ISP - ${profile.name}`,
         });
         await this.log("update_pppoe_profile", `Updated PPPoE profile: ${profile.name} (${profile.rateLimit})`, "success");
         return { ...profile, id: existing.id };
@@ -701,7 +696,6 @@ export class MikroTikService {
         await this.apiRequest(`/ip/hotspot/user/profile/${existing.id}`, "PATCH", {
             "rate-limit": profile.rateLimit,
             "shared-users": profile.sharedUsers || 1,
-            comment: profile.comment || existing.comment || `HQInvestment ISP - ${profile.name}`,
         });
         await this.log("update_hotspot_profile", `Updated Hotspot profile: ${profile.name} (${profile.rateLimit})`, "success");
         return { ...profile, id: existing.id };
@@ -808,7 +802,6 @@ export class MikroTikService {
                 profile: user.profile || "default",
                 "local-address": user.localAddress || undefined,
                 "remote-address": user.remoteAddress || undefined,
-                comment: `VPN User managed by HQInvestment`,
             });
             await this.log("create_vpn_user", `Created VPN user: ${user.name} (${user.service})`, "success", user.name);
         } catch (err: any) {
@@ -863,7 +856,6 @@ export class MikroTikService {
                 interface: iface,
                 "public-key": peer.publicKey,
                 "allowed-address": peer.allowedAddress,
-                comment: peer.comment || "Managed by HQInvestment",
             });
             await this.log("create_wg_peer", `Created WireGuard peer: ${peer.comment} on ${iface}`, "success");
         } catch (err: any) {
