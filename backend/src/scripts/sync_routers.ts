@@ -33,7 +33,7 @@ async function syncAllRouters() {
         console.log(`- Active sessions: ${sessions.length}`);
       }
 
-    } catch (error) {
+    } catch (error: any) {
       console.error(`❌ Failed to sync router ${router.name}:`, error.message);
     }
   }
