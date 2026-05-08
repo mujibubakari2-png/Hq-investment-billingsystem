@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
-import { getMikroTikService } from "@/lib/mikrotik";
+import { getMikroTikService, sanitizeMikroTikName } from "@/lib/mikrotik";
 import { syncRadiusUser } from "@/lib/radius";
 
 /**
@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
 
         if (!client) {
             // Create a temporary client for the voucher
-            const username = `V-${code}`;
+            const username = sanitizeMikroTikName(`V-${code}`);
             client = await prisma.client.create({
                 data: {
                     username,

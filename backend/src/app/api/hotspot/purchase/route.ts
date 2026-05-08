@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { randomUUID } from "node:crypto";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
-import { getMikroTikService } from "@/lib/mikrotik";
+import { getMikroTikService, sanitizeMikroTikName } from "@/lib/mikrotik";
 import { syncRadiusUser } from "@/lib/radius";
 
 
@@ -113,7 +113,7 @@ export async function POST(req: NextRequest) {
             }
         } else {
             // Generate a username from phone (e.g., HS-0621085215)
-            const username = `HS-${cleanPhone.slice(-10)}`;
+            const username = sanitizeMikroTikName(`HS-${cleanPhone.slice(-10)}`);
 
             // Check if username already exists, add suffix if needed
             let finalUsername = username;

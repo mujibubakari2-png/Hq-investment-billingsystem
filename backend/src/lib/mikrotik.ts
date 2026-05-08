@@ -106,6 +106,18 @@ function sanitizeComment(comment: string): string {
     return comment.replace(/[;|&$`\{}[\]]/g, "").substring(0, MAX_COMMENT_LENGTH);
 }
 
+/**
+ * Sanitizes a name for MikroTik usage (Profiles, Users, etc.)
+ * Removes leading/trailing punctuation and replaces internal spaces with hyphens.
+ */
+export function sanitizeMikroTikName(name: string): string {
+    if (!name) return "unnamed";
+    return name.trim()
+        .replace(/^[^\w\d]+|[^\w\d]+$/g, "") // Remove leading/trailing non-alphanumeric chars (like trailing hyphens)
+        .replace(/\s+/g, "-")                // Replace internal spaces with hyphens
+        .toLowerCase();
+}
+
 // ── MikroTik API Service Class ──────────────────────────────────────────────
 
 export class MikroTikService {
@@ -898,10 +910,12 @@ export class MikroTikService {
         const downloadStr = `${downloadSpeed}${toMtUnit(downloadUnit)}`;
         const rateLimit = `${uploadStr}/${downloadStr}`;
 
+        const cleanName = sanitizeMikroTikName(packageName);
+
         if (serviceType === "pppoe") {
-            return this.upsertPPPoEProfile({ name: packageName, rateLimit, comment: `Auto-synced from package` });
+            return this.upsertPPPoEProfile({ name: cleanName, rateLimit, comment: `Auto-synced from package` });
         } else {
-            return this.upsertHotspotProfile({ name: packageName, rateLimit, sharedUsers, comment: `Auto-synced from package` });
+            return this.upsertHotspotProfile({ name: cleanName, rateLimit, sharedUsers, comment: `Auto-synced from package` });
         }
     }
 }
