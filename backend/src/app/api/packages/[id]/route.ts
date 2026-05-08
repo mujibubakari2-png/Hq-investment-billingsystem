@@ -96,8 +96,15 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
         const { id } = await params;
-        await prisma.package.delete({ where: { id } });
-        return jsonResponse({ message: "Package deleted" });
+        
+        // Manual cascade delete to handle foreign key constraints
+        await prisma.$transaction([
+            prisma.subscription.deleteMany({ where: { packageId: id } }),
+            prisma.voucher.deleteMany({ where: { packageId: id } }),
+            prisma.package.delete({ where: { id } })
+        ]);
+
+        return jsonResponse({ message: "Package deleted successfully" });
     } catch (err: any) {
         return errorResponse(`Failed to delete package: ${err.message}`, 500);
     }

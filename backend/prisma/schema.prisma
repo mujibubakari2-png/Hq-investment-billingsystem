@@ -119,7 +119,7 @@ model Subscription {
   updatedAt    DateTime           @updatedAt
   tenantId     String?
   client       Client             @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  package      Package            @relation(fields: [packageId], references: [id])
+  package      Package            @relation(fields: [packageId], references: [id], onDelete: Cascade)
   router       Router?            @relation(fields: [routerId], references: [id])
   tenant       Tenant?            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -261,7 +261,7 @@ model Voucher {
   updatedAt   DateTime      @updatedAt
   tenantId    String?
   createdBy   User          @relation(fields: [createdById], references: [id])
-  package     Package       @relation(fields: [packageId], references: [id])
+  package     Package       @relation(fields: [packageId], references: [id], onDelete: Cascade)
   router      Router?       @relation(fields: [routerId], references: [id])
   tenant      Tenant?       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
