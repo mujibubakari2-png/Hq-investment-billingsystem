@@ -23,14 +23,16 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
         const apiPort = router.apiPort || 80;
 
+        const cleanName = router.name.trim().replace(/^-+|-+$/g, '');
+        
         let script = `# HQInvestment ISP Billing System - Router Setup Script
-# Generated for: ${router.name}
+# Generated for: ${cleanName}
 # Date: ${new Date().toISOString()}
 
 /log info "Starting HQInvestment Auto-Configuration..."
 
 # 1. Set System Identity
-/system identity set name="${router.name}"
+/system identity set name="${cleanName}"
 
 # 2. Enable REST API (WWW-SSL is preferred, WWW is fallback)
 /ip service set www-ssl disabled=no port=443
@@ -117,7 +119,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 /log info "Your router should now be reachable by the billing system."
 `;
 
-        const safeFilename = router.name.trim().toLowerCase().replace(/\s+/g, '-');
+        const safeFilename = router.name
+            .trim()
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-') // Replace any non-alphanumeric with a single dash
+            .replace(/^-+|-+$/g, '');   // Remove leading/trailing dashes
         return new Response(script, {
             headers: {
                 "Content-Type": "text/plain",
