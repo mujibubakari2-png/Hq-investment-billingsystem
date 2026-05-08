@@ -208,15 +208,10 @@ export async function POST(req: NextRequest) {
         }
 
         if (!isRealPayment) {
-            // Demo mode: Auto-complete the transaction after 5 seconds if no real API key configured
-            checkoutRequestId = `DEMO-${Date.now()}`;
-            setTimeout(async () => {
-                try {
-                    await completeHotspotPurchase(transaction.id, reference, clientId, pkg, routerId || pkg.routerId);
-                } catch (err) {
-                    console.error("Demo auto-complete error:", err);
-                }
-            }, 5000);
+            // If no real payment provider is configured, we should notify the user or log it
+            // but NEVER auto-complete the purchase for free in a production environment.
+            console.warn(`[PAYMENT WARNING] No payment provider configured for tenant. Purchase will remain PENDING.`);
+            checkoutRequestId = `PENDING-${Date.now()}`;
         }
 
         return jsonResponse({

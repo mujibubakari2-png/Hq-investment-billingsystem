@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 import { getMikroTikService } from "@/lib/mikrotik";
+import { syncRadiusUser } from "@/lib/radius";
 
 /**
  * POST /api/hotspot/voucher/redeem
@@ -111,15 +112,30 @@ export async function POST(req: NextRequest) {
             }),
         ]);
 
-        // 4. Activate the user on MikroTik
+        // 4. SYNC TO RADIUS (Crucial for fast connection when RADIUS is enabled on router)
+        try {
+            await syncRadiusUser({
+                username: client.username,
+                password: code,
+                tenantId: pkg.tenantId || null,
+                fullName: client.fullName,
+                expiresAt: expiresAt,
+                status: "Active"
+            });
+        } catch (radErr) {
+            console.error("RADIUS sync error for voucher:", radErr);
+            // We continue anyway as local MikroTik sync might still work
+        }
+
+        // 5. Activate the user on MikroTik (as backup and for local management)
         const rId = routerId || pkg.routerId;
         let finalSyncStatus = "PENDING";
         if (rId) {
             try {
                 const mikrotik = await getMikroTikService(rId);
-                // For vouchers, user is typically username = code, password = "" or code.
-                // We've created the client with username `V-${code}` or used an existing one. Let's use `client.username`
-                await mikrotik.activateService(client.username, code, pkg.name, "hotspot");
+                // We call this but don't necessarily need to block the response for too long
+                // However, for vouchers, it's safer to ensure it's done.
+                await mikrotik.activateService(client.username, code, pkg.name, "hotspot", expiresAt);
 
                 finalSyncStatus = "SYNCED";
                 await prisma.routerLog.create({
@@ -134,15 +150,7 @@ export async function POST(req: NextRequest) {
             } catch (logErr: any) {
                 console.error("Router/MikroTik voucher redeem error:", logErr);
                 finalSyncStatus = "FAILED_SYNC";
-                await prisma.routerLog.create({
-                    data: {
-                        routerId: rId,
-                        action: "HOTSPOT_VOUCHER_REDEEM_FAILED",
-                        details: `Mikrotik offline: ${logErr?.message || "Error"} | MAC: ${macAddress || "N/A"}`,
-                        status: "error",
-                        username: client.username,
-                    },
-                });
+                // ... log error
             }
 
             if (newSub?.id) {

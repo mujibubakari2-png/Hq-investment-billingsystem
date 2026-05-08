@@ -30,6 +30,31 @@ export async function GET(req: NextRequest) {
             routerFilter.routerId = routerId;
         }
 
+        // ── RADIUS Accounting Cleanup (Multi-tenancy fix) ──
+        // Ensure all radacct records have a tenantId by mapping nasipaddress to our Router table.
+        // This is done on-the-fly to ensure dashboard stats are accurate.
+        try {
+            const routers = await prisma.router.findMany({
+                where: { tenantId: { not: null } },
+                select: { host: true, tenantId: true, wgTunnelIp: true }
+            });
+            
+            for (const router of routers) {
+                const possibleIps = [router.host, router.wgTunnelIp].filter(Boolean) as string[];
+                if (possibleIps.length > 0) {
+                    await prisma.radAcct.updateMany({
+                        where: {
+                            nasipaddress: { in: possibleIps },
+                            tenantId: null
+                        },
+                        data: { tenantId: router.tenantId }
+                    });
+                }
+            }
+        } catch (e) {
+            console.error("[DASHBOARD SYNC ERROR]: Failed to map RADIUS sessions to tenants", e);
+        }
+
         // Fixed: Use timezone-aware boundaries (Africa/Dar_es_Salaam) to match frontend display
         const todayStart = new Date(getStartOfTodayTZ());
         const monthStart = new Date(getStartOfMonthTZ());
