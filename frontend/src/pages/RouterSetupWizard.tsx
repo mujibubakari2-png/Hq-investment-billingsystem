@@ -25,6 +25,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import LockIcon from '@mui/icons-material/Lock';
 import { routersApi, vpnApi } from '../api/client';
 import { PUBLIC_API_BASE } from '../utils/config';
+import { sanitizeMikroTikName } from '../utils/mikrotikUtils';
 
 const steps = [
     { label: 'Download', sub: 'OVPN Script', icon: <DownloadIcon /> },
@@ -464,7 +465,7 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                             </p>
                             <button className="btn"
                                 onClick={() => {
-                                    const vpnUser = routerData?.username || (routerName ? routerName.toLowerCase().replace(/\s+/g, '') : 'vpn');
+                                    const vpnUser = routerData?.username || (routerName ? sanitizeMikroTikName(routerName) : 'vpn');
                                     const vpnPass = routerData?.password || 'secret';
                                     const scriptContent = [
                                         `# OpenVPN Setup Script for ${routerName}`,
@@ -480,7 +481,8 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                                     const url = URL.createObjectURL(blob);
                                     const a = document.createElement('a');
                                     a.href = url;
-                                    a.download = `${routerName.replace(/\s+/g, '_')}_ovpn_setup.rsc`;
+                                    const safeName = sanitizeMikroTikName(routerName);
+                                    a.download = `${safeName}_ovpn_setup.rsc`;
                                     document.body.appendChild(a);
                                     a.click();
                                     document.body.removeChild(a);

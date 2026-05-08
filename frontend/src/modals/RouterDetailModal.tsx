@@ -13,6 +13,7 @@ import WireGuardConfigModal from './WireGuardConfigModal';
 import { PUBLIC_API_BASE } from '../utils/config';
 import type { Router } from '../types';
 import { formatDateTime } from '../utils/formatters';
+import { sanitizeMikroTikName } from '../utils/mikrotikUtils';
 
 interface RouterDetailModalProps {
     router: Router;
@@ -26,7 +27,7 @@ export default function RouterDetailModal({ router, onClose, onDelete }: RouterD
 
     const downloadScript = () => {
         const routerIdCode = `MYR-${router.id.padStart(3, '0')}VBHBC`;
-        const safeRouterName = router.name.replace(/[^a-zA-Z0-9_-]/g, '-').replace(/-+/g, '-').toLowerCase();
+        const safeRouterName = sanitizeMikroTikName(router.name);
         const displayRouterName = router.name.replace(/"/g, '\\"');
 
         // Extract the actual backend/RADIUS IP or domain from PUBLIC_API_BASE
