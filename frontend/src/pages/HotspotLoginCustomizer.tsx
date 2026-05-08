@@ -777,10 +777,8 @@ export default function HotspotLoginCustomizer() {
             // Override specific files with customized ones
             zip.file("favicon.ico", "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAIElEQVQ4T2NkYGD4z8DAwMgAQUZUg9gwGkRDCXgEaQAAa/EIA1x7s7EAAAAASUVORK5CYII=", { base64: true });
             zip.file("login.html", generateHtml());
-            zip.file("alogin.html", `<html><body><script>window.location='login.html';</script></body></html>`);
-            zip.file("redirect.html", `<html><body><script>window.location='login.html';</script></body></html>`);
-            zip.file("status.html", `<html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Status</title><style>body{font-family:sans-serif;background:#f3f4f6;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;} .card{background:#fff;padding:30px;border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,0.1);text-align:center;width:90%;max-width:350px;} h2{color:#1a1a2e;margin-top:0;} p{color:#666;font-size:0.9rem;} .btn{display:inline-block;background:#ef4444;color:#fff;padding:10px 20px;text-decoration:none;border-radius:6px;margin-top:20px;font-weight:bold;}</style></head><body><div class="card"><h2>You are connected!</h2><p><strong>Username:</strong> $(username)</p><p><strong>IP:</strong> $(ip)</p>$(if session-time-left)<p><strong>Time left:</strong> $(session-time-left)</p>$(endif)<a href="$(link-logout)" class="btn">Log Out</a></div></body></html>`);
-            zip.file("logout.html", `<html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Logged Out</title><style>body{font-family:sans-serif;background:#f3f4f6;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;} .card{background:#fff;padding:30px;border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,0.1);text-align:center;width:90%;max-width:350px;} h2{color:#1a1a2e;margin-top:0;} p{color:#666;font-size:0.9rem;} .btn{display:inline-block;background:#6366f1;color:#fff;padding:10px 20px;text-decoration:none;border-radius:6px;margin-top:20px;font-weight:bold;}</style></head><body><div class="card"><h2>Logged Out</h2><p>You have successfully logged out.</p><p><strong>Session time:</strong> $(uptime)</p><a href="$(link-login)" class="btn">Log In Again</a></div></body></html>`);
+
+
             zip.file("api.json", `{
    "captive": $(if logged-in == 'yes')false$(else)true$(endif),
    "user-portal-url": "$(link-login-only)",
