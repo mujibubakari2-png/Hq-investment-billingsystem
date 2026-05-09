@@ -240,9 +240,9 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
 # ============================================
 # RADIUS server = WireGuard tunnel IP of the billing server (dynamic per tenant)
 :if ([:len [/radius find address="${config.serverTunnelIp}"]] = 0) do={
-    /radius add service=hotspot,ppp address="${config.serverTunnelIp}" secret="${router.router.password || 'hqinvestment_radius_secret'}" authentication-port=1812 accounting-port=1813 timeout=3s src-address=${config.routerTunnelIp} comment="HQInvestment RADIUS"
+    /radius add service=hotspot,ppp address="${config.serverTunnelIp}" secret="${router.password || 'hqinvestment_radius_secret'}" authentication-port=1812 accounting-port=1813 timeout=3s src-address=${config.routerTunnelIp} comment="HQInvestment RADIUS"
 } else={
-    /radius set [find address="${config.serverTunnelIp}"] secret="${router.router.password || 'hqinvestment_radius_secret'}" service=hotspot,ppp src-address=${config.routerTunnelIp} comment="HQInvestment RADIUS"
+    /radius set [find address="${config.serverTunnelIp}"] secret="${router.password || 'hqinvestment_radius_secret'}" service=hotspot,ppp src-address=${config.routerTunnelIp} comment="HQInvestment RADIUS"
 }
 :if ([:len [/radius incoming find]] = 0) do={
     /radius incoming set accept=yes port=3799
