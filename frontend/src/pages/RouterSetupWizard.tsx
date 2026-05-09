@@ -191,7 +191,7 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
 
     const apiHost = PUBLIC_API_BASE && PUBLIC_API_BASE.startsWith('http')
         ? new URL(PUBLIC_API_BASE).hostname
-        : '';
+        : (PUBLIC_API_BASE || window.location.hostname || '127.0.0.1').replace(/^https?:\/\//, '');
 
     const [radiusAddress, setRadiusAddress] = useState(''); // Will be set from server WireGuard tunnel IP
     const [radiusSecret, setRadiusSecret] = useState('hqinvestment_radius_secret');
@@ -481,9 +481,9 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                                     const scriptContent = [
                                         `# OpenVPN Setup Script for ${routerName}`,
                                         `:if ([:len [/interface ovpn-client find where name="ovpn-out1"]] = 0) do={`,
-                                        `  /interface ovpn-client add name=ovpn-out1 connect-to=${apiHost} user="${vpnUser}" password="${vpnPass}"`,
+                                        `  /interface ovpn-client add name=ovpn-out1 connect-to="${apiHost}" user="${vpnUser}" password="${vpnPass}"`,
                                         `} else={`,
-                                        `  /interface ovpn-client set [/interface ovpn-client find where name="ovpn-out1"] connect-to=${apiHost} user="${vpnUser}" password="${vpnPass}"`,
+                                        `  /interface ovpn-client set [/interface ovpn-client find where name="ovpn-out1"] connect-to="${apiHost}" user="${vpnUser}" password="${vpnPass}"`,
                                         `}`,
                                         `:if ([:len [/ip hotspot walled-garden find where dst-host="${apiHost}"]] = 0) do={ /ip hotspot walled-garden add action=allow dst-host="${apiHost}" comment="Billing Portal" }`,
                                         `:if ([:len [/ip hotspot walled-garden ip find where dst-address="${apiHost}"]] = 0) do={ /ip hotspot walled-garden ip add action=accept dst-address="${apiHost}" comment="Billing Portal IP" }`,
