@@ -1,13 +1,13 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: kenge-db
+    container_name: hqinvestment-db
     restart: always
     environment:
-      POSTGRES_USER: kenge_user
+      POSTGRES_USER: hqinvestment_user
       # IMPORTANT: Change this to a secure password before production deployment!
-      POSTGRES_PASSWORD: kenge_password_replace_me
-      POSTGRES_DB: kenge_isp
+      POSTGRES_PASSWORD: hqinvestment_password_replace_me
+      POSTGRES_DB: hqinvestment_isp
     ports:
       - "127.0.0.1:5432:5432"
     volumes:

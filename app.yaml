@@ -1,4 +1,4 @@
-name: kenge-isp-billing
+name: hqinvestment-isp-billing
 region: nyc
 services:
 - name: backend

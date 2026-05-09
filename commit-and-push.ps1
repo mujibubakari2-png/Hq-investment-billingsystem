@@ -1,5 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# Kenge ISP — Commit & Push Script (PowerShell)
+# HQInvestment ISP — Commit & Push Script (PowerShell)
 # Run this from the project root:  .\commit-and-push.ps1
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -7,7 +7,7 @@ Set-Location $PSScriptRoot
 
 Write-Host ""
 Write-Host "==================================================" -ForegroundColor Cyan
-Write-Host "  Kenge ISP — Git Commit & Push" -ForegroundColor Cyan
+Write-Host "  HQInvestment ISP — Git Commit & Push" -ForegroundColor Cyan
 Write-Host "==================================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -54,7 +54,7 @@ if ($LASTEXITCODE -eq 0) {
     Write-Host ""
     Write-Host "  Then in MikroTik → RADIUS:" -ForegroundColor White
     Write-Host "  Address : 10.0.0.1 (WireGuard IP)" -ForegroundColor Yellow
-    Write-Host "  Secret  : kenge_radius_secret" -ForegroundColor Yellow
+    Write-Host "  Secret  : hqinvestment_radius_secret" -ForegroundColor Yellow
     Write-Host "  Auth    : 1812   Acct: 1813" -ForegroundColor Yellow
     Write-Host "─────────────────────────────────────────────────" -ForegroundColor DarkGray
 } else {
