@@ -194,7 +194,7 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
         : '';
 
     const [radiusAddress, setRadiusAddress] = useState(''); // Will be set from server WireGuard tunnel IP
-    const [radiusSecret, setRadiusSecret] = useState('kenge_radius_secret');
+    const [radiusSecret, setRadiusSecret] = useState('hqinvestment_radius_secret');
 
     // Fetch the server WireGuard tunnel IP to use as RADIUS address default
     useEffect(() => {

@@ -2,7 +2,7 @@ import { PrismaClient } from "../src/generated/prisma";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
 
-const connectionString = "postgresql://enterprisedb:Muu%4066487125@localhost:5444/kenge_isp";
+const connectionString = "postgresql://enterprisedb:Muu%4066487125@localhost:5444/hqinvestment_isp";
 const pool = new Pool({ connectionString });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });

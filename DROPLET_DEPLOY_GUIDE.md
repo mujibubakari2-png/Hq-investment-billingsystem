@@ -1,6 +1,6 @@
 # DigitalOcean Droplet Deployment Guide
 
-This guide explains how to deploy the Kenge ISP Billing System to a **DigitalOcean Droplet** (VPS). This gives you full control and is often cheaper than App Platform for large databases.
+This guide explains how to deploy the HQInvestment ISP Billing System to a **DigitalOcean Droplet** (VPS). This gives you full control and is often cheaper than App Platform for large databases.
 
 ## Step 1: Create a Droplet
 1. Go to DigitalOcean and create a new **Droplet**.
@@ -17,8 +17,8 @@ ssh root@your_droplet_ip
 Once inside, run the setup script I provided:
 ```bash
 # Clone your repo first (you'll need to add your SSH key to GitHub/GitLab)
-git clone <your-repo-url> kenge
-cd kenge
+git clone <your-repo-url> hqinvestment
+cd hqinvestment
 
 # Run the setup script
 chmod +x droplet-setup.sh
@@ -43,7 +43,7 @@ cp .env.example .env
 nano .env
 ```
 Set the `DATABASE_URL` to:
-`postgresql://kenge_user:your_password@localhost:5432/kenge_isp`
+`postgresql://hqinvestment_user:your_password@localhost:5432/hqinvestment_isp`
 
 Also set `JWT_SECRET` and `GOOGLE_CLIENT_ID`.
 
@@ -72,8 +72,8 @@ pm2 startup
 ## Step 8: Configure Nginx
 Copy the provided Nginx config to the system:
 ```bash
-sudo cp nginx.conf /etc/nginx/sites-available/kenge
-sudo ln -s /etc/nginx/sites-available/kenge /etc/nginx/sites-enabled/
+sudo cp nginx.conf /etc/nginx/sites-available/hqinvestment
+sudo ln -s /etc/nginx/sites-available/hqinvestment /etc/nginx/sites-enabled/
 sudo nginx -t
 sudo systemctl restart nginx
 ```
@@ -93,7 +93,7 @@ sudo certbot --nginx -d your-domain.com
 ```bash
 docker compose ps
 ```
-Make sure the kenge-db container is running. If not, start it:
+Make sure the hqinvestment-db container is running. If not, start it:
 ```bash
 docker compose up -d
 ```
@@ -101,7 +101,7 @@ docker compose up -d
 2. **Check DATABASE_URL
 Verify your backend/.env has the correct DATABASE_URL:
 ```
-DATABASE_URL="postgresql://kenge_user:your_password@localhost:5432/kenge_isp"
+DATABASE_URL="postgresql://hqinvestment_user:your_password@localhost:5432/hqinvestment_isp"
 ```
 
 3. **Try Running Migrations Manually

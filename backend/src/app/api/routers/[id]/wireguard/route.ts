@@ -265,15 +265,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 console.log(`[PUSH-CONFIG] Starting unified config for router: ${router.name}`);
 
                 // ──────────────────────────────────────────────────────────
-                // STEP 0: CLEANUP OLD KENGE RULES & CONFIGS (NO DUPLICATES!)
+                // STEP 0: CLEANUP OLD HQINVESTMENT RULES & CONFIGS (NO DUPLICATES!)
                 // ──────────────────────────────────────────────────────────
-                console.log("[PUSH-CONFIG] Cleaning up old Kenge configs...");
+                console.log("[PUSH-CONFIG] Cleaning up old HQInvestment configs...");
 
                 try {
                     const oldFilterRules = await service.apiRequestPublic("/ip/firewall/filter");
                     if (Array.isArray(oldFilterRules)) {
                         for (const rule of oldFilterRules) {
-                            if (rule.comment?.includes("Kenge")) {
+                            if (rule.comment?.includes("HQInvestment")) {
                                 try {
                                     await service.apiRequestPublic(`/ip/firewall/filter/${rule[".id"]}`, "DELETE");
                                 } catch { }
@@ -286,7 +286,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                     const oldNatRules = await service.apiRequestPublic("/ip/firewall/nat");
                     if (Array.isArray(oldNatRules)) {
                         for (const rule of oldNatRules) {
-                            if (rule.comment?.includes("Kenge")) {
+                            if (rule.comment?.includes("HQInvestment")) {
                                 try {
                                     await service.apiRequestPublic(`/ip/firewall/nat/${rule[".id"]}`, "DELETE");
                                 } catch { }
@@ -299,7 +299,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                     const oldRoutes = await service.apiRequestPublic("/ip/route");
                     if (Array.isArray(oldRoutes)) {
                         for (const route of oldRoutes) {
-                            if (route.comment?.includes("Kenge")) {
+                            if (route.comment?.includes("HQInvestment")) {
                                 try {
                                     await service.apiRequestPublic(`/ip/route/${route[".id"]}`, "DELETE");
                                 } catch { }
@@ -312,7 +312,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                     const oldAddresses = await service.apiRequestPublic("/ip/address");
                     if (Array.isArray(oldAddresses)) {
                         for (const addr of oldAddresses) {
-                            if (addr.comment?.includes("Kenge")) {
+                            if (addr.comment?.includes("HQInvestment")) {
                                 try {
                                     await service.apiRequestPublic(`/ip/address/${addr[".id"]}`, "DELETE");
                                 } catch { }
@@ -388,7 +388,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                     try {
                         await service.apiRequestPublic("/interface/bridge", "PUT", {
                             name: lanBridgeName,
-                            comment: "Kenge LAN Bridge - Hotspot & PPPoE"
+                            comment: "HQInvestment LAN Bridge - Hotspot & PPPoE"
                         });
                     } catch (e: any) { if (!e.message?.includes("already")) console.warn("Bridge note:", e.message); }
                     // Note: We deliberately DO NOT forcefully add ether2 to the bridge here.
@@ -463,7 +463,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                     await service.apiRequestPublic("/ip/address", "PUT", {
                         address: "192.168.88.1/24",
                         interface: lanBridgeName,
-                        comment: "Kenge Hotspot LAN"
+                        comment: "HQInvestment Hotspot LAN"
                     });
                 } catch (e: any) { if (!e.message?.includes("already")) console.warn("HS IP note:", e.message); }
 
@@ -500,18 +500,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
                 try {
                     await service.apiRequestPublic("/interface/wireguard", "PUT", {
-                        name: "wg-kenge",
+                        name: "wg-hq",
                         "listen-port": String(listenPort),
                         "private-key": router.wgPrivateKey,
                         disabled: "no",
-                        comment: "Kenge VPN Interface"
+                        comment: "HQInvestment VPN Interface"
                     });
                 } catch (e: any) {
                     if (!e.message?.includes("already")) {
                         try {
                             const wgInterfaces = await service.apiRequestPublic("/interface/wireguard");
                             if (Array.isArray(wgInterfaces)) {
-                                const existing = wgInterfaces.find((i: any) => i.name === "wg-kenge");
+                                const existing = wgInterfaces.find((i: any) => i.name === "wg-hq");
                                 if (existing?.[".id"]) {
                                     await service.apiRequestPublic("/interface/wireguard", "PATCH", {
                                         ".id": existing[".id"],
@@ -528,9 +528,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 try {
                     await service.apiRequestPublic("/ip/address", "PUT", {
                         address: `${tunnelIp}/24`,
-                        interface: "wg-kenge",
+                        interface: "wg-hq",
                         network: `${subnetPrefix}.0`,
-                        comment: "Kenge VPN Address"
+                        comment: "HQInvestment VPN Address"
                     });
                 } catch (e: any) { if (!e.message?.includes("already")) console.warn("WG IP note:", e.message); }
 
@@ -538,7 +538,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                     const oldPeers = await service.apiRequestPublic("/interface/wireguard/peers");
                     if (Array.isArray(oldPeers)) {
                         for (const peer of oldPeers) {
-                            if (peer.comment?.includes("Kenge") || peer.interface === "wg-kenge") {
+                            if (peer.comment?.includes("HQInvestment") || peer.interface === "wg-hq") {
                                 try {
                                     await service.apiRequestPublic(`/interface/wireguard/peers/${peer[".id"]}`, "DELETE");
                                 } catch { }
@@ -549,13 +549,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
                 try {
                     await service.apiRequestPublic("/interface/wireguard/peers", "PUT", {
-                        interface: "wg-kenge",
+                        interface: "wg-hq",
                         "public-key": router.wgPeerPublicKey,
                         "allowed-address": "0.0.0.0/0,::/0",
                         "endpoint-address": serverEndpoint,
                         "endpoint-port": String(serverPort),
                         "persistent-keepalive": "25s",
-                        comment: "Kenge ISP Server",
+                        comment: "HQInvestment ISP Server",
                     });
                 } catch (e: any) { console.warn("Peer note:", e.message); }
 
@@ -567,23 +567,23 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 const restPort = router.apiPort || (router.port === 8728 || router.port === 8729 ? 80 : router.port) || 80;
 
                 const firewallRules = [
-                    { chain: "input", protocol: "udp", "dst-port": String(listenPort), action: "accept", comment: "Allow WireGuard - Kenge" },
-                    { chain: "input", protocol: "icmp", "src-address": `${subnetPrefix}.0/24`, action: "accept", comment: "Allow ICMP from VPN - Kenge" },
-                    { chain: "input", protocol: "tcp", "dst-port": String(restPort), "src-address": `${subnetPrefix}.0/24`, action: "accept", comment: "Allow REST API from VPN - Kenge" },
-                    { chain: "input", protocol: "tcp", "dst-port": "8291", "src-address": `${subnetPrefix}.0/24`, action: "accept", comment: "Allow Winbox from VPN - Kenge" },
-                    { chain: "input", protocol: "udp", "dst-port": "3799", "src-address": `${subnetPrefix}.0/24`, action: "accept", comment: "Allow RADIUS CoA from VPN - Kenge" },
-                    { chain: "input", protocol: "tcp", "dst-port": "80,443", action: "accept", comment: "Allow Web - Kenge" },
-                    { chain: "input", protocol: "udp", "dst-port": "53,67", action: "accept", comment: "Allow DNS & DHCP - Kenge" },
-                    { chain: "input", protocol: "icmp", action: "accept", comment: "Allow Ping - Kenge" },
-                    { chain: "input", "connection-state": "established,related", action: "accept", comment: "Allow Established - Kenge" },
-                    { chain: "input", "in-interface": lanBridgeName, protocol: "tcp", "dst-port": "80,443", action: "accept", comment: "Allow Hotspot HTTP/HTTPS - Kenge" },
-                    { chain: "input", "in-interface": lanBridgeName, protocol: "udp", "dst-port": "67", action: "accept", comment: "Allow Hotspot DHCP - Kenge" },
-                    { chain: "input", "in-interface": lanBridgeName, protocol: "udp", "dst-port": "53", action: "accept", comment: "Allow Hotspot DNS - Kenge" },
-                    { chain: "forward", "in-interface": lanBridgeName, "out-interface": "ether1", action: "accept", comment: "Allow Hotspot to Internet - Kenge" },
-                    { chain: "forward", "in-interface": "all-ppp", "out-interface": "ether1", action: "accept", comment: "Allow PPPoE to Internet - Kenge" },
-                    { chain: "forward", "in-interface": "ether1", "out-interface": lanBridgeName, "connection-state": "established,related", action: "accept", comment: "Allow Internet to Hotspot - Kenge" },
-                    { chain: "forward", "in-interface": "wg-kenge", action: "accept", comment: "Allow WG traffic - Kenge" },
-                    { chain: "forward", "out-interface": "wg-kenge", action: "accept", comment: "Allow WG return - Kenge" }
+                    { chain: "input", protocol: "udp", "dst-port": String(listenPort), action: "accept", comment: "Allow WireGuard - HQInvestment" },
+                    { chain: "input", protocol: "icmp", "src-address": `${subnetPrefix}.0/24`, action: "accept", comment: "Allow ICMP from VPN - HQInvestment" },
+                    { chain: "input", protocol: "tcp", "dst-port": String(restPort), "src-address": `${subnetPrefix}.0/24`, action: "accept", comment: "Allow REST API from VPN - HQInvestment" },
+                    { chain: "input", protocol: "tcp", "dst-port": "8291", "src-address": `${subnetPrefix}.0/24`, action: "accept", comment: "Allow Winbox from VPN - HQInvestment" },
+                    { chain: "input", protocol: "udp", "dst-port": "3799", "src-address": `${subnetPrefix}.0/24`, action: "accept", comment: "Allow RADIUS CoA from VPN - HQInvestment" },
+                    { chain: "input", protocol: "tcp", "dst-port": "80,443", action: "accept", comment: "Allow Web - HQInvestment" },
+                    { chain: "input", protocol: "udp", "dst-port": "53,67", action: "accept", comment: "Allow DNS & DHCP - HQInvestment" },
+                    { chain: "input", protocol: "icmp", action: "accept", comment: "Allow Ping - HQInvestment" },
+                    { chain: "input", "connection-state": "established,related", action: "accept", comment: "Allow Established - HQInvestment" },
+                    { chain: "input", "in-interface": lanBridgeName, protocol: "tcp", "dst-port": "80,443", action: "accept", comment: "Allow Hotspot HTTP/HTTPS - HQInvestment" },
+                    { chain: "input", "in-interface": lanBridgeName, protocol: "udp", "dst-port": "67", action: "accept", comment: "Allow Hotspot DHCP - HQInvestment" },
+                    { chain: "input", "in-interface": lanBridgeName, protocol: "udp", "dst-port": "53", action: "accept", comment: "Allow Hotspot DNS - HQInvestment" },
+                    { chain: "forward", "in-interface": lanBridgeName, "out-interface": "ether1", action: "accept", comment: "Allow Hotspot to Internet - HQInvestment" },
+                    { chain: "forward", "in-interface": "all-ppp", "out-interface": "ether1", action: "accept", comment: "Allow PPPoE to Internet - HQInvestment" },
+                    { chain: "forward", "in-interface": "ether1", "out-interface": lanBridgeName, "connection-state": "established,related", action: "accept", comment: "Allow Internet to Hotspot - HQInvestment" },
+                    { chain: "forward", "in-interface": "wg-hq", action: "accept", comment: "Allow WG traffic - HQInvestment" },
+                    { chain: "forward", "out-interface": "wg-hq", action: "accept", comment: "Allow WG return - HQInvestment" }
                 ];
 
                 // Reverse the array so that by putting them at index 0, they end up in the correct order at the very top.
@@ -603,7 +603,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 try {
                     await service.apiRequestPublic("/ip/firewall/nat", "PUT", {
                         chain: "srcnat", "out-interface": "ether1",
-                        action: "masquerade", comment: "NAT for Internet - Kenge", "place-before": "0"
+                        action: "masquerade", comment: "NAT for Internet - HQInvestment", "place-before": "0"
                     });
                 } catch (e: any) { console.warn("NAT note:", e.message); }
 
@@ -612,8 +612,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 // ──────────────────────────────────────────────────────────
                 try {
                     await service.apiRequestPublic("/ip/route", "PUT", {
-                        "dst-address": `${subnetPrefix}.0/24`, gateway: "wg-kenge",
-                        comment: "WireGuard route - Kenge"
+                        "dst-address": `${subnetPrefix}.0/24`, gateway: "wg-hq",
+                        comment: "WireGuard route - HQInvestment"
                     });
                 } catch (e: any) { console.warn("Route note:", e.message); }
 
@@ -626,7 +626,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                     const oldRadius = await service.apiRequestPublic("/radius");
                     if (Array.isArray(oldRadius)) {
                         for (const r of oldRadius) {
-                            if (r.comment?.includes("HQInvestment") || r.comment?.includes("Kenge RADIUS")) {
+                            if (r.comment?.includes("HQInvestment") || r.comment?.includes("HQInvestment RADIUS")) {
                                 try { await service.apiRequestPublic(`/radius/${r[".id"]}`, "DELETE"); } catch {}
                             }
                         }
@@ -636,13 +636,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 try {
                     await service.apiRequestPublic("/radius", "PUT", {
                         address: wgServerIp,
-                        secret: process.env.RADIUS_NAS_SECRET || router.password || 'kenge_radius_secret',
+                        secret: process.env.RADIUS_NAS_SECRET || router.password || 'hqinvestment_radius_secret',
                         service: "hotspot,ppp",
                         "authentication-port": "1812",
                         "accounting-port": "1813",
                         timeout: "3000ms",
                         "src-address": tunnelIp,
-                        comment: "Kenge RADIUS"
+                        comment: "HQInvestment RADIUS"
                     });
                 } catch (e: any) { console.warn("Radius note:", e.message); }
 

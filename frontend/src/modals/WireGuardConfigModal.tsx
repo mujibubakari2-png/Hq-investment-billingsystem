@@ -107,7 +107,7 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
     const apiHost = new URL(PUBLIC_API_BASE).hostname;
 
     const serverConfig = `# ============================================
-# Kenge Complete Router Setup Script
+# HQInvestment Complete Router Setup Script
 # ============================================
 # Router: ${config.routerName}
 # Device ID: ${config.routerId}
@@ -135,7 +135,7 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
     :set lanBridge "bridge";
 } else={
     :if ([:len [/interface bridge find name=$lanBridge]] = 0) do={
-        /interface bridge add name=$lanBridge comment="Kenge LAN Bridge - Hotspot & PPPoE"
+        /interface bridge add name=$lanBridge comment="HQInvestment LAN Bridge - Hotspot & PPPoE"
     }
 }
 
@@ -143,7 +143,7 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
 # STEP 3: IP Pools & LAN Address
 # ============================================
 :if ([:len [/ip address find address="192.168.10.1/24"]] = 0) do={
-    /ip address add address=192.168.10.1/24 interface=$lanBridge comment="Kenge Hotspot LAN"
+    /ip address add address=192.168.10.1/24 interface=$lanBridge comment="HQInvestment Hotspot LAN"
 }
 :if ([:len [/ip pool find name="hs-pool-${safeRouterName}"]] = 0) do={
     /ip pool add name="hs-pool-${safeRouterName}" ranges=192.168.10.2-192.168.10.254
@@ -181,25 +181,25 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
 # ============================================
 # STEP 6: WireGuard VPN Configuration
 # ============================================
-:if ([:len [/interface wireguard find name="wg-kenge"]] = 0) do={
-    /interface wireguard add name="wg-kenge" listen-port=${config.listenPort} private-key="${config.routerPrivateKey}" comment="Kenge VPN Interface"
+:if ([:len [/interface wireguard find name="wg-hq"]] = 0) do={
+    /interface wireguard add name="wg-hq" listen-port=${config.listenPort} private-key="${config.routerPrivateKey}" comment="HQInvestment VPN Interface"
 } else={
-    /interface wireguard set [find name="wg-kenge"] listen-port=${config.listenPort} private-key="${config.routerPrivateKey}"
+    /interface wireguard set [find name="wg-hq"] listen-port=${config.listenPort} private-key="${config.routerPrivateKey}"
 }
-:if ([:len [/interface wireguard peers find interface="wg-kenge" public-key="${serverPubKey}"]] = 0) do={
-    /interface wireguard peers add interface="wg-kenge" public-key="${serverPubKey}" endpoint-address=${config.serverEndpoint} endpoint-port=${config.serverPort} allowed-address=0.0.0.0/0 persistent-keepalive=25s comment="Kenge ISP Server"
+:if ([:len [/interface wireguard peers find interface="wg-hq" public-key="${serverPubKey}"]] = 0) do={
+    /interface wireguard peers add interface="wg-hq" public-key="${serverPubKey}" endpoint-address=${config.serverEndpoint} endpoint-port=${config.serverPort} allowed-address=0.0.0.0/0 persistent-keepalive=25s comment="HQInvestment ISP Server"
 } else={
-    /interface wireguard peers set [find interface="wg-kenge" public-key="${serverPubKey}"] endpoint-address=${config.serverEndpoint} endpoint-port=${config.serverPort} allowed-address=0.0.0.0/0 persistent-keepalive=25s
+    /interface wireguard peers set [find interface="wg-hq" public-key="${serverPubKey}"] endpoint-address=${config.serverEndpoint} endpoint-port=${config.serverPort} allowed-address=0.0.0.0/0 persistent-keepalive=25s
 }
-:if ([:len [/ip address find address="${config.routerTunnelIp}/24" interface="wg-kenge"]] = 0) do={
-    /ip address add address=${config.routerTunnelIp}/24 interface="wg-kenge" comment="Kenge VPN Address"
+:if ([:len [/ip address find address="${config.routerTunnelIp}/24" interface="wg-hq"]] = 0) do={
+    /ip address add address=${config.routerTunnelIp}/24 interface="wg-hq" comment="HQInvestment VPN Address"
 }
 
 # ============================================
 # STEP 7: Firewall & NAT
 # ============================================
 :if ([:len [/ip firewall nat find action=masquerade chain=srcnat out-interface=$wanInterface]] = 0) do={
-    /ip firewall nat add chain=srcnat out-interface=$wanInterface action=masquerade comment="NAT for Internet - Kenge"
+    /ip firewall nat add chain=srcnat out-interface=$wanInterface action=masquerade comment="NAT for Internet - HQInvestment"
 }
 
 # Add WireGuard to interface lists so default firewall trusts it
@@ -208,31 +208,31 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
 :if ([:len [/interface list member find list=WAN interface=$wanInterface]] = 0) do={
     /interface list member add list=WAN interface=$wanInterface
 }
-:if ([:len [/interface list member find list=LAN interface="wg-kenge"]] = 0) do={
-    /interface list member add list=LAN interface="wg-kenge"
+:if ([:len [/interface list member find list=LAN interface="wg-hq"]] = 0) do={
+    /interface list member add list=LAN interface="wg-hq"
 }
 
 # Firewall rules - placed at TOP to run before any drop rules
-:if ([:len [/ip firewall filter find where comment="Allow WireGuard - Kenge"]] = 0) do={
-    /ip firewall filter add place-before=0 chain=input action=accept protocol=udp dst-port=${config.listenPort} comment="Allow WireGuard - Kenge"
+:if ([:len [/ip firewall filter find where comment="Allow WireGuard - HQInvestment"]] = 0) do={
+    /ip firewall filter add place-before=0 chain=input action=accept protocol=udp dst-port=${config.listenPort} comment="Allow WireGuard - HQInvestment"
 }
-:if ([:len [/ip firewall filter find where comment="Allow API/Winbox from VPN - Kenge"]] = 0) do={
-    /ip firewall filter add place-before=0 chain=input action=accept protocol=tcp dst-port=${restPort},8291 src-address=${subnetAddress} comment="Allow API/Winbox from VPN - Kenge"
+:if ([:len [/ip firewall filter find where comment="Allow API/Winbox from VPN - HQInvestment"]] = 0) do={
+    /ip firewall filter add place-before=0 chain=input action=accept protocol=tcp dst-port=${restPort},8291 src-address=${subnetAddress} comment="Allow API/Winbox from VPN - HQInvestment"
 }
-:if ([:len [/ip firewall filter find where comment="Allow RADIUS CoA from VPN - Kenge"]] = 0) do={
-    /ip firewall filter add place-before=0 chain=input action=accept protocol=udp dst-port=3799 src-address=${subnetAddress} comment="Allow RADIUS CoA from VPN - Kenge"
+:if ([:len [/ip firewall filter find where comment="Allow RADIUS CoA from VPN - HQInvestment"]] = 0) do={
+    /ip firewall filter add place-before=0 chain=input action=accept protocol=udp dst-port=3799 src-address=${subnetAddress} comment="Allow RADIUS CoA from VPN - HQInvestment"
 }
-:if ([:len [/ip firewall filter find where comment="Allow established/related - Kenge"]] = 0) do={
-    /ip firewall filter add place-before=0 chain=input action=accept connection-state=established,related comment="Allow established/related - Kenge"
+:if ([:len [/ip firewall filter find where comment="Allow established/related - HQInvestment"]] = 0) do={
+    /ip firewall filter add place-before=0 chain=input action=accept connection-state=established,related comment="Allow established/related - HQInvestment"
 }
-:if ([:len [/ip firewall filter find where comment="Allow LAN to WAN forward - Kenge"]] = 0) do={
-    /ip firewall filter add place-before=0 chain=forward action=accept in-interface=$lanBridge out-interface=$wanInterface comment="Allow LAN to WAN forward - Kenge"
+:if ([:len [/ip firewall filter find where comment="Allow LAN to WAN forward - HQInvestment"]] = 0) do={
+    /ip firewall filter add place-before=0 chain=forward action=accept in-interface=$lanBridge out-interface=$wanInterface comment="Allow LAN to WAN forward - HQInvestment"
 }
-:if ([:len [/ip firewall filter find where comment="Allow PPPoE to Internet - Kenge"]] = 0) do={
-    /ip firewall filter add place-before=0 chain=forward action=accept in-interface="all-ppp" out-interface=$wanInterface comment="Allow PPPoE to Internet - Kenge"
+:if ([:len [/ip firewall filter find where comment="Allow PPPoE to Internet - HQInvestment"]] = 0) do={
+    /ip firewall filter add place-before=0 chain=forward action=accept in-interface="all-ppp" out-interface=$wanInterface comment="Allow PPPoE to Internet - HQInvestment"
 }
-:if ([:len [/ip firewall filter find where comment="Allow established forward - Kenge"]] = 0) do={
-    /ip firewall filter add place-before=0 chain=forward action=accept connection-state=established,related comment="Allow established forward - Kenge"
+:if ([:len [/ip firewall filter find where comment="Allow established forward - HQInvestment"]] = 0) do={
+    /ip firewall filter add place-before=0 chain=forward action=accept connection-state=established,related comment="Allow established forward - HQInvestment"
 }
 
 # ============================================
@@ -240,9 +240,9 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
 # ============================================
 # RADIUS server = WireGuard tunnel IP of the billing server (dynamic per tenant)
 :if ([:len [/radius find address="${config.serverTunnelIp}"]] = 0) do={
-    /radius add service=hotspot,ppp address="${config.serverTunnelIp}" secret="${router.radiusSecret || router.password || 'kenge_radius_secret'}" authentication-port=1812 accounting-port=1813 timeout=3s src-address=${config.routerTunnelIp} comment="Kenge RADIUS"
+    /radius add service=hotspot,ppp address="${config.serverTunnelIp}" secret="${router.router.password || 'hqinvestment_radius_secret'}" authentication-port=1812 accounting-port=1813 timeout=3s src-address=${config.routerTunnelIp} comment="HQInvestment RADIUS"
 } else={
-    /radius set [find address="${config.serverTunnelIp}"] secret="${router.radiusSecret || router.password || 'kenge_radius_secret'}" service=hotspot,ppp src-address=${config.routerTunnelIp} comment="Kenge RADIUS"
+    /radius set [find address="${config.serverTunnelIp}"] secret="${router.router.password || 'hqinvestment_radius_secret'}" service=hotspot,ppp src-address=${config.routerTunnelIp} comment="HQInvestment RADIUS"
 }
 :if ([:len [/radius incoming find]] = 0) do={
     /radius incoming set accept=yes port=3799
@@ -289,7 +289,7 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
 # - Router VPN IP  : ${config.routerTunnelIp}
 # - Server VPN IP  : ${config.serverTunnelIp}   ← RADIUS address
 # - Server Endpoint: ${config.serverEndpoint}:${config.serverPort}
-# - Interface      : wg-kenge
+# - Interface      : wg-hq
 # - Listen Port    : ${config.listenPort}
 # - RADIUS Server  : ${config.serverTunnelIp} (via WireGuard tunnel)
 # - Billing Portal : ${apiHost}
@@ -297,13 +297,13 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
 
     // Client config for the HQInvestment ISP server
     const clientConfig = `# ═══════════════════════════════════════════════════════════════
-# WireGuard Client Config — Kenge ISP Server
+# WireGuard Client Config — HQInvestment ISP Server
 # For Router: ${config.routerName} (${config.routerId})
-# Keys are PERSISTENT — install this on the Kenge VPN server
+# Keys are PERSISTENT — install this on the HQInvestment VPN server
 # ═══════════════════════════════════════════════════════════════
 
 [Interface]
-# Kenge ISP Server side
+# HQInvestment ISP Server side
 PrivateKey = <SERVER_PRIVATE_KEY>
 Address = ${config.serverTunnelIp}/24
 DNS = 8.8.8.8, 1.1.1.1
@@ -378,7 +378,7 @@ PersistentKeepalive = 25`;
     };
 
     const activeConfig = activeTab === 'server' ? serverConfig : clientConfig;
-    const activeLabel = activeTab === 'server' ? 'Server (MikroTik)' : 'Client (Kenge)';
+    const activeLabel = activeTab === 'server' ? 'Server (MikroTik)' : 'Client (HQInvestment)';
 
     return (
         <div className="modal-overlay" onClick={onClose}>
@@ -497,7 +497,7 @@ PersistentKeepalive = 25`;
                             borderBottom: activeTab === 'client' ? '2px solid #15803d' : '2px solid transparent',
                         }}
                     >
-                        🌐 Client Config (Kenge Server)
+                        🌐 Client Config (HQInvestment Server)
                     </button>
                 </div>
 
@@ -546,7 +546,7 @@ PersistentKeepalive = 25`;
                                 <strong>Option 2:</strong> Copy and paste this script into MikroTik Terminal, then click "I Pasted It — Activate".<br />
                                 The system will switch to the WireGuard tunnel IP ({config.routerTunnelIp}) for all future API connections.
                             </>
-                            : 'Install this config on your Kenge VPN server to complete the tunnel. Replace <SERVER_PRIVATE_KEY> with your actual server private key.'
+                            : 'Install this config on your HQInvestment VPN server to complete the tunnel. Replace <SERVER_PRIVATE_KEY> with your actual server private key.'
                         }
                     </div>
                 </div>

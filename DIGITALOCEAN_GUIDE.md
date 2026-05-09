@@ -1,6 +1,6 @@
 # DigitalOcean Deployment Guide
 
-This guide explains how to deploy the Kenge ISP Billing System to DigitalOcean using the App Platform.
+This guide explains how to deploy the HQInvestment ISP Billing System to DigitalOcean using the App Platform.
 
 ## Prerequisites
 1. A DigitalOcean account.

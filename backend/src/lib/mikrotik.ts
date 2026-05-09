@@ -848,13 +848,13 @@ export class MikroTikService {
             if (!iface) {
                 const interfaces = await this.apiRequest("/interface/wireguard");
                 if (interfaces && interfaces.length > 0) {
-                    // Try to find wg-kenge first, then wireguard1, then the first one
-                    const kenge = interfaces.find((i: any) => i.name === "wg-kenge");
+                    // Try to find wg-hq first, then wireguard1, then the first one
+                    const hq = interfaces.find((i: any) => i.name === "wg-hq");
                     const wg1 = interfaces.find((i: any) => i.name === "wireguard1");
-                    iface = kenge?.name || wg1?.name || interfaces[0].name;
+                    iface = hq?.name || wg1?.name || interfaces[0].name;
                 } else {
                     // Create one if none exists
-                    iface = "wg-kenge";
+                    iface = "wg-hq";
                     await this.apiRequest("/interface/wireguard", "PUT", {
                         name: iface,
                         comment: "Auto-created by HQInvestment",

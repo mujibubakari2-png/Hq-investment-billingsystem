@@ -21,7 +21,7 @@ const pool = new Pool({
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 10000,
     statement_timeout: 30000,
-    application_name: "kenge_isp_seed",
+    application_name: "hqinvestment_isp_seed",
     ssl: connectionString.includes('localhost') || connectionString.includes('127.0.0.1') ? false : { rejectUnauthorized: false }
 });
 

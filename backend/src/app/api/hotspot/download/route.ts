@@ -50,7 +50,7 @@ export async function GET(req: NextRequest) {
 
         // Fetch router details if ID is provided
         // Default secret from env — never hardcode a value like 'hqsecret'
-        let routerSecret = process.env.RADIUS_NAS_SECRET || "kenge_radius_secret";
+        let routerSecret = process.env.RADIUS_NAS_SECRET || "hqinvestment_radius_secret";
         let routerName = "Generic";
         let hotspotSettings: any = null;
 
@@ -70,7 +70,7 @@ export async function GET(req: NextRequest) {
                 }
             });
             if (router) {
-                routerSecret = router.password || process.env.RADIUS_NAS_SECRET || "kenge_radius_secret";
+                routerSecret = router.password || process.env.RADIUS_NAS_SECRET || "hqinvestment_radius_secret";
                 routerName = sanitizeMikroTikName(router.name);
                 hotspotSettings = router.hotspotSettings;
 
@@ -149,7 +149,7 @@ set [find default=yes] html-directory=hotspot login-by=http-chap,http-pap,cookie
 add name=hq_hotspot html-directory=hotspot login-by=http-chap,http-pap,cookie,mac-cookie use-radius=yes dns-name=${dnsName}
 
 /radius
-add address=${domain} secret="${routerSecret}" service=hotspot,ppp authentication-port=1812 accounting-port=1813 timeout=3s comment="Kenge RADIUS"
+add address=${domain} secret="${routerSecret}" service=hotspot,ppp authentication-port=1812 accounting-port=1813 timeout=3s comment="HQInvestment RADIUS"
 
 /ip hotspot walled-garden
 add dst-host=${domain} action=allow

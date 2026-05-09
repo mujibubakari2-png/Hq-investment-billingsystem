@@ -4,7 +4,7 @@ import { parse } from "url";
 import * as dotenv from 'dotenv';
 dotenv.config();
 
-const connectionString = process.env.DATABASE_URL || "postgresql://postgres:postgres@localhost:5432/kenge_isp";
+const connectionString = process.env.DATABASE_URL || "postgresql://postgres:postgres@localhost:5432/hqinvestment_isp";
 const adapter = new PrismaPg({ connectionString });
 const prisma = new PrismaClient({ adapter });
 

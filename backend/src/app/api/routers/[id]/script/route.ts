@@ -79,25 +79,25 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
             script += `
 # 7. WireGuard VPN Interface
-:if ([:len [/interface wireguard find name="wg-kenge"]] = 0) do={
-    /interface wireguard add name=wg-kenge listen-port=${listenPort} private-key="${router.wgPrivateKey}" comment="Kenge VPN Interface"
+:if ([:len [/interface wireguard find name="wg-hq"]] = 0) do={
+    /interface wireguard add name=wg-hq listen-port=${listenPort} private-key="${router.wgPrivateKey}" comment="HQInvestment VPN Interface"
 } else={
-    /interface wireguard set [find name="wg-kenge"] private-key="${router.wgPrivateKey}"
+    /interface wireguard set [find name="wg-hq"] private-key="${router.wgPrivateKey}"
 }
 
 # 8. WireGuard IP Address
-:if ([:len [/ip address find interface="wg-kenge"]] = 0) do={
-    /ip address add address="${router.wgTunnelIp}/24" interface=wg-kenge network="${subnetPrefix}.0" comment="Kenge VPN Address"
+:if ([:len [/ip address find interface="wg-hq"]] = 0) do={
+    /ip address add address="${router.wgTunnelIp}/24" interface=wg-hq network="${subnetPrefix}.0" comment="HQInvestment VPN Address"
 }
 
 # 9. WireGuard Peer (Server)
-:if ([:len [/interface wireguard peers find interface="wg-kenge"]] = 0) do={
-    /interface wireguard peers add interface=wg-kenge public-key="${router.wgPeerPublicKey}" allowed-address="0.0.0.0/0,::/0" endpoint-address="${serverEndpoint}" endpoint-port=51820 persistent-keepalive=25s comment="Kenge ISP Server"
+:if ([:len [/interface wireguard peers find interface="wg-hq"]] = 0) do={
+    /interface wireguard peers add interface=wg-hq public-key="${router.wgPeerPublicKey}" allowed-address="0.0.0.0/0,::/0" endpoint-address="${serverEndpoint}" endpoint-port=51820 persistent-keepalive=25s comment="HQInvestment ISP Server"
 }
 
 # 10. VPN Routing
-:if ([:len [/ip route find gateway="wg-kenge"]] = 0) do={
-    /ip route add dst-address="${subnetPrefix}.0/24" gateway=wg-kenge comment="WireGuard route - Kenge"
+:if ([:len [/ip route find gateway="wg-hq"]] = 0) do={
+    /ip route add dst-address="${subnetPrefix}.0/24" gateway=wg-hq comment="WireGuard route - HQInvestment"
 }
 `;
         }
@@ -107,10 +107,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
         script += `
 # 11. RADIUS Configuration (Managed via WireGuard VPN)
-:if ([:len [/radius find where comment="Kenge RADIUS"]] = 0) do={
-    /radius add address=${wgServerIp} secret="${router.radiusSecret || router.password || 'kenge_radius_secret'}" service=hotspot,ppp timeout=3000ms ${srcAddrPart} authentication-port=1812 accounting-port=1813 comment="Kenge RADIUS"
+:if ([:len [/radius find where comment="HQInvestment RADIUS"]] = 0) do={
+    /radius add address=${wgServerIp} secret="${router.password || process.env.RADIUS_NAS_SECRET || 'hqinvestment_radius_secret'}" service=hotspot,ppp timeout=3000ms ${srcAddrPart} authentication-port=1812 accounting-port=1813 comment="HQInvestment RADIUS"
 } else={
-    /radius set [find comment="Kenge RADIUS"] address=${wgServerIp} secret="${router.radiusSecret || router.password || 'kenge_radius_secret'}" ${srcAddrPart}
+    /radius set [find comment="HQInvestment RADIUS"] address=${wgServerIp} secret="${router.password || process.env.RADIUS_NAS_SECRET || 'hqinvestment_radius_secret'}" ${srcAddrPart}
 }
 :if ([:len [/radius incoming find]] = 0) do={
     /radius incoming set accept=yes port=3799

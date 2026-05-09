@@ -29,7 +29,7 @@ async function testConnection() {
             idleTimeoutMillis: 5000,
             connectionTimeoutMillis: 5000,
             statement_timeout: 10000,
-            application_name: "kenge_isp_test",
+            application_name: "hqinvestment_isp_test",
             ssl: connectionString.includes('localhost') || connectionString.includes('127.0.0.1') ? false : { rejectUnauthorized: false }
         });
 

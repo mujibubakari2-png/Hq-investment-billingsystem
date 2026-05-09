@@ -127,11 +127,11 @@ export default function MikrotikScriptModal({ router, onClose }: MikrotikScriptM
 :if ([:len [/ip firewall filter find where comment="Allow LAN to WAN"]] = 0) do={ /ip firewall filter add chain=forward in-interface=$lanBridge out-interface=$wanInterface action=accept comment="Allow LAN to WAN" }
 :if ([:len [/ip firewall filter find where comment="Allow established forward"]] = 0) do={ /ip firewall filter add chain=forward connection-state=established,related action=accept comment="Allow established forward" }
 
-# ── 9. RADIUS Client (Kenge ISP Billing) ─────────────────────────────────────
+# ── 9. RADIUS Client (HQInvestment ISP Billing) ─────────────────────────────────────
 :if ([:len [/radius find where address="${apiHost}"]] = 0) do={
-    /radius add service=hotspot,ppp address="${apiHost}" secret="${router.password || 'kenge_radius_secret'}" authentication-port=1812 accounting-port=1813 timeout=3s comment="Kenge RADIUS"
+    /radius add service=hotspot,ppp address="${apiHost}" secret="${router.password || 'hqinvestment_radius_secret'}" authentication-port=1812 accounting-port=1813 timeout=3s comment="HQInvestment RADIUS"
 } else={
-    /radius set [/radius find where address="${apiHost}"] service=hotspot,ppp secret="${router.password || 'kenge_radius_secret'}" authentication-port=1812 accounting-port=1813 timeout=3s comment="Kenge RADIUS"
+    /radius set [/radius find where address="${apiHost}"] service=hotspot,ppp secret="${router.password || 'hqinvestment_radius_secret'}" authentication-port=1812 accounting-port=1813 timeout=3s comment="HQInvestment RADIUS"
 }
 
 # ── 10. Walled Garden (Allow billing portal & Mgmt) ───────────

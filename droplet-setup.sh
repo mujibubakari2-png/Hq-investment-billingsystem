@@ -3,7 +3,7 @@
 # Exit on error
 set -e
 
-echo "🚀 Starting Droplet Setup for Kenge ISP Billing System..."
+echo "🚀 Starting Droplet Setup for HQInvestment ISP Billing System..."
 
 # 1. Update and install basic dependencies
 sudo apt-get update

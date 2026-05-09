@@ -1,7 +1,7 @@
 const pkg = require('pg');
 const { Pool } = pkg;
 
-const connectionString = "postgresql://enterprisedb:Muu@66487125@localhost:5444/kenge_isp?schema=public";
+const connectionString = "postgresql://enterprisedb:Muu@66487125@localhost:5444/hqinvestment_isp?schema=public";
 const pool = new Pool({ connectionString });
 
 async function clearData() {
