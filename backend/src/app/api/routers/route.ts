@@ -156,7 +156,7 @@ export async function POST(req: NextRequest) {
         if (existingNas) {
             await prisma.radiusNas.update({
                 where: { id: existingNas.id },
-                data: { secret: router.password || 'hqsecret', shortName: router.name }
+                data: { secret: router.password || process.env.RADIUS_NAS_SECRET || 'kenge_radius_secret', shortName: router.name }
             });
         } else {
             // Also clean up old NAS entry if the IP changed
@@ -169,7 +169,7 @@ export async function POST(req: NextRequest) {
                 data: {
                     nasName: nasIp,
                     shortName: router.name,
-                    secret: router.password || 'hqsecret',
+                    secret: router.password || process.env.RADIUS_NAS_SECRET || 'kenge_radius_secret',
                     type: "other",
                     tenantId: tenantIdValue,
                     description: "Auto-synced from Router"

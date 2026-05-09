@@ -171,7 +171,11 @@ export async function POST(req: NextRequest) {
         let provider = defaultGw ? defaultGw.name.toUpperCase() : "M-PESA";
         let gatewayId = defaultGw ? defaultGw.id : null;
 
-        const callbackUrl = `${process.env.APP_URL || "http://localhost:3001"}/api/hotspot/callback`;
+        // Build callback URL — prefer APP_URL env var, fallback to request host
+        const requestHost = req.headers.get("host") || "localhost:3000";
+        const requestProto = req.headers.get("x-forwarded-proto") || "http";
+        const baseUrl = process.env.APP_URL || `${requestProto}://${requestHost}`;
+        const callbackUrl = `${baseUrl}/api/hotspot/callback`;
         let checkoutRequestId: string | null = null;
         let isRealPayment = false;
 

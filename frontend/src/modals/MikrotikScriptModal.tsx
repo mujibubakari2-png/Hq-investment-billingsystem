@@ -65,13 +65,13 @@ export default function MikrotikScriptModal({ router, onClose }: MikrotikScriptM
 
 # ── 3. Hotspot Server Setup ───────────────────────────────────
 :if ([:len [/ip hotspot profile find name="hsprof-${safeRouterName}"]] = 0) do={
-    /ip hotspot profile add name="hsprof-${safeRouterName}" hotspot-address=10.116.0.2 dns-name="${safeRouterName}.hotspot" \\
+    /ip hotspot profile add name="hsprof-${safeRouterName}" hotspot-address=192.168.88.1 dns-name="${safeRouterName}.hotspot" \\
         html-directory=hotspot login-by=http-chap,http-pap,cookie,mac-cookie \\
         http-cookie-lifetime=3d use-radius=yes radius-accounting=yes
 }
 
 :if ([:len [/ip pool find name="hs-pool-${safeRouterName}"]] = 0) do={
-    /ip pool add name="hs-pool-${safeRouterName}" ranges=10.116.0.3-10.116.0.254
+    /ip pool add name="hs-pool-${safeRouterName}" ranges=192.168.88.10-192.168.88.254
 }
 
 :if ([:len [/ip hotspot find name="hotspot-${safeRouterName}"]] = 0) do={
@@ -85,11 +85,11 @@ export default function MikrotikScriptModal({ router, onClose }: MikrotikScriptM
 
 # ── 4. PPPoE Server Setup ─────────────────────────────────────
 :if ([:len [/ip pool find name="pppoe-pool-${safeRouterName}"]] = 0) do={
-    /ip pool add name="pppoe-pool-${safeRouterName}" ranges=10.116.0.3-10.116.0.254
+    /ip pool add name="pppoe-pool-${safeRouterName}" ranges=192.168.88.10-192.168.88.254
 }
 
 :if ([:len [/ppp profile find name="pppoe-profile-${safeRouterName}"]] = 0) do={
-    /ppp profile add name="pppoe-profile-${safeRouterName}" local-address=10.116.0.2 remote-address="pppoe-pool-${safeRouterName}" dns-server=8.8.8.8,1.1.1.1 use-encryption=yes use-radius=yes
+    /ppp profile add name="pppoe-profile-${safeRouterName}" local-address=192.168.88.1 remote-address="pppoe-pool-${safeRouterName}" dns-server=8.8.8.8,1.1.1.1 use-encryption=yes use-radius=yes
 }
 
 :if ([:len [/interface pppoe-server server find service-name="pppoe-svc-${safeRouterName}"]] = 0) do={
@@ -97,12 +97,12 @@ export default function MikrotikScriptModal({ router, onClose }: MikrotikScriptM
 }
 
 # ── 5. DHCP Server ───────────────────────────────────────────
-:if ([:len [/ip address find address="10.116.0.2/24"]] = 0) do={
-    /ip address add address=10.116.0.2/24 interface=$lanBridge
+:if ([:len [/ip address find address="192.168.88.1/24"]] = 0) do={
+    /ip address add address=192.168.88.1/24 interface=$lanBridge
 }
 
-:if ([:len [/ip dhcp-server network find address="10.116.0.0/24"]] = 0) do={
-    /ip dhcp-server network add address=10.116.0.0/24 gateway=10.116.0.2 dns-server=10.116.0.2,8.8.8.8
+:if ([:len [/ip dhcp-server network find address="192.168.88.0/24"]] = 0) do={
+    /ip dhcp-server network add address=192.168.88.0/24 gateway=192.168.88.1 dns-server=8.8.8.8,1.1.1.1
 }
 
 :if ([:len [/ip dhcp-server find interface=$lanBridge]] = 0) do={
@@ -127,11 +127,11 @@ export default function MikrotikScriptModal({ router, onClose }: MikrotikScriptM
 :if ([:len [/ip firewall filter find where comment="Allow LAN to WAN"]] = 0) do={ /ip firewall filter add chain=forward in-interface=$lanBridge out-interface=$wanInterface action=accept comment="Allow LAN to WAN" }
 :if ([:len [/ip firewall filter find where comment="Allow established forward"]] = 0) do={ /ip firewall filter add chain=forward connection-state=established,related action=accept comment="Allow established forward" }
 
-# ── 9. RADIUS Client (HQInvestment ISP Billing) ───────────────────────
+# ── 9. RADIUS Client (Kenge ISP Billing) ─────────────────────────────────────
 :if ([:len [/radius find where address="${apiHost}"]] = 0) do={
-    /radius add service=hotspot,ppp address="${apiHost}" secret="hqinvestment-radius-secret" authentication-port=1812 accounting-port=1813 timeout=3s
+    /radius add service=hotspot,ppp address="${apiHost}" secret="${router.password || 'kenge_radius_secret'}" authentication-port=1812 accounting-port=1813 timeout=3s comment="Kenge RADIUS"
 } else={
-    /radius set [/radius find where address="${apiHost}"] service=hotspot,ppp secret="hqinvestment-radius-secret" authentication-port=1812 accounting-port=1813 timeout=3s
+    /radius set [/radius find where address="${apiHost}"] service=hotspot,ppp secret="${router.password || 'kenge_radius_secret'}" authentication-port=1812 accounting-port=1813 timeout=3s comment="Kenge RADIUS"
 }
 
 # ── 10. Walled Garden (Allow billing portal & Mgmt) ───────────

@@ -22,12 +22,16 @@ export async function POST(req: NextRequest) {
             process.env.HARAKAPAY_WEBHOOK_SECRET ||
             process.env.MPESA_WEBHOOK_SECRET ||
             process.env.PAYMENT_WEBHOOK_SECRET;
-        if (!webhookSecret) {
-            return errorResponse("Webhook secret is not configured", 500);
-        }
-        const providedSecret = req.headers.get("x-webhook-secret");
-        if (providedSecret !== webhookSecret) {
-            return errorResponse("Unauthorized webhook", 401);
+
+        // Only enforce secret validation if a secret is actually configured
+        if (webhookSecret) {
+            const providedSecret = req.headers.get("x-webhook-secret");
+            if (providedSecret !== webhookSecret) {
+                return errorResponse("Unauthorized webhook", 401);
+            }
+        } else {
+            // No secret configured: allow but warn — set HOTSPOT_WEBHOOK_SECRET in .env
+            console.warn("[HOTSPOT CALLBACK] ⚠️ No webhook secret configured. Set HOTSPOT_WEBHOOK_SECRET in .env to secure this endpoint.")
         }
 
         const body = await req.json();

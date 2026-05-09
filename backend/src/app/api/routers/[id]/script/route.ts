@@ -21,6 +21,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
             return errorResponse("Unauthorized", 403);
         }
 
+        // WireGuard server tunnel IP — from env var or default (never hardcode)
+        const wgServerIp = process.env.WG_SERVER_IP || process.env.WIREGUARD_SERVER_IP || "10.0.0.1";
         const apiPort = router.apiPort || 80;
 
         const cleanName = router.name.trim().replace(/^-+|-+$/g, '');
@@ -66,13 +68,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     /ip firewall filter add chain=input action=accept protocol=udp dst-port=51820 comment="Allow WireGuard VPN"
 }
 :if ([:len [/ip firewall filter find where comment="Allow RADIUS CoA"]] = 0) do={
-    /ip firewall filter add chain=input action=accept protocol=udp dst-port=3799 src-address=10.0.0.1 comment="Allow RADIUS CoA"
+    /ip firewall filter add chain=input action=accept protocol=udp dst-port=3799 src-address=${wgServerIp} comment="Allow RADIUS CoA"
 }
 `;
 
         if (router.wgPrivateKey && router.wgPeerPublicKey && router.wgTunnelIp) {
-            const subnetPrefix = "10.0.0"; // Fallback, normally should be fetched from wgServerIp
-            const serverEndpoint = router.wgServerEndpoint || "vpn.billing-system.local";
+            const subnetPrefix = router.wgTunnelIp.split('.').slice(0, 3).join('.');
+            const serverEndpoint = router.wgServerEndpoint || wgServerIp;
             const listenPort = router.wgListenPort || 51820;
 
             script += `
@@ -104,11 +106,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         const srcAddrPart = router.wgTunnelIp ? `src-address=${router.wgTunnelIp}` : "";
 
         script += `
-# 11. RADIUS Configuration (Managed via VPN)
-:if ([:len [/radius find where comment="HQInvestment RADIUS"]] = 0) do={
-    /radius add address=10.0.0.1 secret="${router.password || 'hqsecret'}" service=hotspot,ppp timeout=3000ms ${srcAddrPart} comment="HQInvestment RADIUS"
+# 11. RADIUS Configuration (Managed via WireGuard VPN)
+:if ([:len [/radius find where comment="Kenge RADIUS"]] = 0) do={
+    /radius add address=${wgServerIp} secret="${router.radiusSecret || router.password || 'kenge_radius_secret'}" service=hotspot,ppp timeout=3000ms ${srcAddrPart} authentication-port=1812 accounting-port=1813 comment="Kenge RADIUS"
 } else={
-    /radius set [find comment="HQInvestment RADIUS"] address=10.0.0.1 secret="${router.password || 'hqsecret'}" ${srcAddrPart}
+    /radius set [find comment="Kenge RADIUS"] address=${wgServerIp} secret="${router.radiusSecret || router.password || 'kenge_radius_secret'}" ${srcAddrPart}
 }
 :if ([:len [/radius incoming find]] = 0) do={
     /radius incoming set accept=yes port=3799

@@ -82,6 +82,30 @@ else
     echo "ℹ️  WireGuard not installed — skipping VPN check (direct-connect routers will still work)"
 fi
 
+# ── 4b. Ensure FreeRADIUS is running (needed for MikroTik RADIUS auth) ───────
+echo "📡 Checking FreeRADIUS status..."
+if command -v freeradius &> /dev/null || command -v radiusd &> /dev/null; then
+    if systemctl is-active --quiet freeradius; then
+        echo "✅ FreeRADIUS is running (UDP 1812/1813)"
+    else
+        echo "⚠️  FreeRADIUS is NOT running — attempting restart..."
+        sudo systemctl restart freeradius 2>/dev/null
+        sleep 2
+        if systemctl is-active --quiet freeradius; then
+            echo "✅ FreeRADIUS restarted successfully"
+        else
+            echo "❌ WARNING: FreeRADIUS failed to start!"
+            echo "   MikroTik hotspot will show 'RADIUS server not responding'"
+            echo "   Fix: sudo bash $BACKEND_DIR/scripts/setup-freeradius.sh"
+            echo "   Debug: sudo freeradius -X"
+        fi
+    fi
+else
+    echo "❌ WARNING: FreeRADIUS is NOT installed!"
+    echo "   MikroTik hotspot will show 'RADIUS server not responding'"
+    echo "   Fix: sudo bash $BACKEND_DIR/scripts/setup-freeradius.sh"
+fi
+
 # ── 5. Apply Prisma migrations safely ────────────────────────────────────────
 echo "🔧 Applying database migrations (prisma migrate deploy)..."
 if pnpm exec prisma migrate deploy; then

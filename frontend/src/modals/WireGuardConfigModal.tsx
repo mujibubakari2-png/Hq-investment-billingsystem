@@ -142,27 +142,27 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
 # ============================================
 # STEP 3: IP Pools & LAN Address
 # ============================================
-:if ([:len [/ip address find address="10.116.0.2/24"]] = 0) do={
-    /ip address add address=10.116.0.2/24 interface=$lanBridge comment="Kenge Hotspot LAN"
+:if ([:len [/ip address find address="192.168.10.1/24"]] = 0) do={
+    /ip address add address=192.168.10.1/24 interface=$lanBridge comment="Kenge Hotspot LAN"
 }
 :if ([:len [/ip pool find name="hs-pool-${safeRouterName}"]] = 0) do={
-    /ip pool add name="hs-pool-${safeRouterName}" ranges=10.116.0.3-10.116.0.254
+    /ip pool add name="hs-pool-${safeRouterName}" ranges=192.168.10.2-192.168.10.254
 }
 :if ([:len [/ip pool find name="pppoe-pool-${safeRouterName}"]] = 0) do={
-    /ip pool add name="pppoe-pool-${safeRouterName}" ranges=10.116.0.3-10.116.0.254
+    /ip pool add name="pppoe-pool-${safeRouterName}" ranges=192.168.10.2-192.168.10.254
 }
 
 # ============================================
 # STEP 4: DHCP Server & Hotspot Setup
 # ============================================
-:if ([:len [/ip dhcp-server network find address="10.116.0.0/24"]] = 0) do={
-    /ip dhcp-server network add address=10.116.0.0/24 gateway=10.116.0.2 dns-server=10.116.0.2,8.8.8.8
+:if ([:len [/ip dhcp-server network find address="192.168.10.0/24"]] = 0) do={
+    /ip dhcp-server network add address=192.168.10.0/24 gateway=192.168.10.1 dns-server=8.8.8.8,1.1.1.1
 }
 :if ([:len [/ip dhcp-server find interface=$lanBridge]] = 0) do={
     /ip dhcp-server add address-pool="hs-pool-${safeRouterName}" disabled=no interface=$lanBridge name="dhcp-${safeRouterName}"
 }
 :if ([:len [/ip hotspot profile find name="hsprof-${safeRouterNameLower}"]] = 0) do={
-    /ip hotspot profile add hotspot-address=10.116.0.2 dns-name="${safeRouterNameLower}.hotspot" html-directory=hotspot login-by=http-chap,http-pap,cookie,mac-cookie http-cookie-lifetime=3d name="hsprof-${safeRouterNameLower}" use-radius=yes radius-accounting=yes
+    /ip hotspot profile add hotspot-address=192.168.10.1 dns-name="${safeRouterNameLower}.hotspot" html-directory=hotspot login-by=http-chap,http-pap,cookie,mac-cookie http-cookie-lifetime=3d name="hsprof-${safeRouterNameLower}" use-radius=yes radius-accounting=yes
 }
 :if ([:len [/ip hotspot find name="hotspot-${safeRouterName}"]] = 0) do={
     /ip hotspot add address-pool="hs-pool-${safeRouterName}" disabled=no interface=$lanBridge name="hotspot-${safeRouterName}" profile="hsprof-${safeRouterNameLower}"
@@ -172,7 +172,7 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
 # STEP 5: PPPoE Server Setup
 # ============================================
 :if ([:len [/ppp profile find name="pppoe-profile-${safeRouterName}"]] = 0) do={
-    /ppp profile add name="pppoe-profile-${safeRouterName}" local-address=10.116.0.2 remote-address="pppoe-pool-${safeRouterName}" dns-server=8.8.8.8,1.1.1.1 use-encryption=yes use-radius=yes
+    /ppp profile add name="pppoe-profile-${safeRouterName}" local-address=192.168.10.1 remote-address="pppoe-pool-${safeRouterName}" dns-server=8.8.8.8,1.1.1.1 use-encryption=yes use-radius=yes
 }
 :if ([:len [/interface pppoe-server server find service-name="pppoe-svc-${safeRouterName}"]] = 0) do={
     /interface pppoe-server server add disabled=no interface=$lanBridge default-profile="pppoe-profile-${safeRouterName}" service-name="pppoe-svc-${safeRouterName}"
@@ -238,10 +238,11 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
 # ============================================
 # STEP 8: RADIUS & Walled Garden
 # ============================================
-:if ([:len [/radius find address="10.0.0.1"]] = 0) do={
-    /radius add service=hotspot,ppp address="10.0.0.1" secret="${router.password || 'hqsecret'}" authentication-port=1812 accounting-port=1813 timeout=3s src-address=${config.routerTunnelIp} comment="HQInvestment RADIUS"
+# RADIUS server = WireGuard tunnel IP of the billing server (dynamic per tenant)
+:if ([:len [/radius find address="${config.serverTunnelIp}"]] = 0) do={
+    /radius add service=hotspot,ppp address="${config.serverTunnelIp}" secret="${router.radiusSecret || router.password || 'kenge_radius_secret'}" authentication-port=1812 accounting-port=1813 timeout=3s src-address=${config.routerTunnelIp} comment="Kenge RADIUS"
 } else={
-    /radius set [find address="10.0.0.1"] secret="${router.password || 'hqsecret'}" service=hotspot,ppp src-address=${config.routerTunnelIp} comment="HQInvestment RADIUS"
+    /radius set [find address="${config.serverTunnelIp}"] secret="${router.radiusSecret || router.password || 'kenge_radius_secret'}" service=hotspot,ppp src-address=${config.routerTunnelIp} comment="Kenge RADIUS"
 }
 :if ([:len [/radius incoming find]] = 0) do={
     /radius incoming set accept=yes port=3799
@@ -285,12 +286,13 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
 # Configuration Complete!
 # ============================================
 # VPN Configuration:
-# - Router VPN IP : ${config.routerTunnelIp}
-# - Server VPN IP : ${config.serverTunnelIp}
+# - Router VPN IP  : ${config.routerTunnelIp}
+# - Server VPN IP  : ${config.serverTunnelIp}   ← RADIUS address
 # - Server Endpoint: ${config.serverEndpoint}:${config.serverPort}
 # - Interface      : wg-kenge
 # - Listen Port    : ${config.listenPort}
-# - RADIUS Server  : ${apiHost}
+# - RADIUS Server  : ${config.serverTunnelIp} (via WireGuard tunnel)
+# - Billing Portal : ${apiHost}
 # ============================================`;
 
     // Client config for the HQInvestment ISP server
@@ -303,7 +305,7 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
 [Interface]
 # Kenge ISP Server side
 PrivateKey = <SERVER_PRIVATE_KEY>
-Address = 10.0.0.1/24
+Address = ${config.serverTunnelIp}/24
 DNS = 8.8.8.8, 1.1.1.1
 
 [Peer]
@@ -506,7 +508,7 @@ PersistentKeepalive = 25`;
                 }}>
                     <div>
                         <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 2 }}>Tunnel Address</div>
-                        <div style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '0.85rem' }}>{activeTab === 'server' ? config.routerTunnelIp : "10.0.0.1"}/24</div>
+                        <div style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '0.85rem' }}>{activeTab === 'server' ? config.routerTunnelIp : config.serverTunnelIp}/24</div>
                     </div>
                     <div>
                         <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 2 }}>Listen Port</div>

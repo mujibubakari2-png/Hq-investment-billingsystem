@@ -180,21 +180,32 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
     const [vpnDns, setVpnDns] = useState('8.8.8.8');
     const [ipsecSecret, setIpsecSecret] = useState('MyISPVpnKey2024!');
 
-    // PPPoE & Hotspot IP Settings
-    const [pppoeLocalAddress, setPppoeLocalAddress] = useState('10.116.0.2');
-    const [pppoePoolStart, setPppoePoolStart] = useState('10.116.0.3');
-    const [pppoePoolEnd, setPppoePoolEnd] = useState('10.116.0.254');
+    // PPPoE & Hotspot IP Settings (use standard private ranges, NOT the Droplet private IP)
+    const [pppoeLocalAddress, setPppoeLocalAddress] = useState('192.168.10.1');
+    const [pppoePoolStart, setPppoePoolStart] = useState('192.168.10.2');
+    const [pppoePoolEnd, setPppoePoolEnd] = useState('192.168.10.254');
 
-    const [hotspotLocalAddress, setHotspotLocalAddress] = useState('10.116.0.2');
-    const [hotspotPoolStart, setHotspotPoolStart] = useState('10.116.0.3');
-    const [hotspotPoolEnd, setHotspotPoolEnd] = useState('10.116.0.254');
+    const [hotspotLocalAddress, setHotspotLocalAddress] = useState('192.168.10.1');
+    const [hotspotPoolStart, setHotspotPoolStart] = useState('192.168.10.2');
+    const [hotspotPoolEnd, setHotspotPoolEnd] = useState('192.168.10.254');
 
     const apiHost = PUBLIC_API_BASE && PUBLIC_API_BASE.startsWith('http')
         ? new URL(PUBLIC_API_BASE).hostname
         : '';
 
-    const [radiusAddress, setRadiusAddress] = useState('10.0.0.1'); // Default to VPN IP for security and reliability
-    const [radiusSecret, setRadiusSecret] = useState('hqinvestment-radius-secret');
+    const [radiusAddress, setRadiusAddress] = useState(''); // Will be set from server WireGuard tunnel IP
+    const [radiusSecret, setRadiusSecret] = useState('kenge_radius_secret');
+
+    // Fetch the server WireGuard tunnel IP to use as RADIUS address default
+    useEffect(() => {
+        if (!routerId || radiusAddress) return;
+        routersApi.wireguard?.getConfig?.(routerId)
+            .then((cfg: any) => {
+                if (cfg?.serverTunnelIp) setRadiusAddress(cfg.serverTunnelIp);
+                else setRadiusAddress('10.0.0.1');
+            })
+            .catch(() => setRadiusAddress('10.0.0.1'));
+    }, [routerId]);
 
     const addVpnSecret = () => {
         if (!vpnForm.username || !vpnForm.password) {
@@ -580,9 +591,9 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
 
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, maxWidth: 750, margin: '0 auto' }}>
                             {[
-                                { key: 'pppoe' as const, label: 'PPPoE Server Only', desc: 'Configure PPPoE server for client connections', icon: <DnsIcon style={{ fontSize: 40, color: 'var(--text-secondary)', marginBottom: 12 }} />, detail: 'radiax_pppoe bridge    10.116.0.x network\nradiax-pppoe service' },
-                                { key: 'hotspot' as const, label: 'Hotspot Only', desc: 'Configure WiFi hotspot with login portal', icon: <WifiIcon style={{ fontSize: 40, color: 'var(--text-secondary)', marginBottom: 12 }} />, detail: 'radiax_hotspot bridge    10.116.0.x network\nlogin.spot portal' },
-                                { key: 'both' as const, label: 'Both Services', desc: 'Configure both PPPoE and Hotspot', icon: <DeviceHubIcon style={{ fontSize: 40, color: 'var(--text-secondary)', marginBottom: 12 }} />, detail: 'radiax_bridge    PPPoE: 10.116.0.x\nHotspot: 10.116.0.x' },
+                                { key: 'pppoe' as const, label: 'PPPoE Server Only', desc: 'Configure PPPoE server for client connections', icon: <DnsIcon style={{ fontSize: 40, color: 'var(--text-secondary)', marginBottom: 12 }} />, detail: 'PPPoE bridge\n192.168.88.x network\nPPPoE service' },
+                                { key: 'hotspot' as const, label: 'Hotspot Only', desc: 'Configure WiFi hotspot with login portal', icon: <WifiIcon style={{ fontSize: 40, color: 'var(--text-secondary)', marginBottom: 12 }} />, detail: 'Hotspot bridge\n192.168.88.x network\nlogin portal' },
+                                { key: 'both' as const, label: 'Both Services', desc: 'Configure both PPPoE and Hotspot', icon: <DeviceHubIcon style={{ fontSize: 40, color: 'var(--text-secondary)', marginBottom: 12 }} />, detail: 'Shared bridge\nPPPoE: 192.168.88.x\nHotspot: 192.168.88.x' },
                             ].map(svc => (
                                 <div key={svc.key} onClick={() => setServiceType(svc.key)} style={{
                                     border: serviceType === svc.key ? '2px solid #0d9488' : '1px solid var(--border)',
@@ -615,16 +626,16 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                                         <div style={{ fontWeight: 600, fontSize: '0.85rem', marginBottom: 12, color: '#0d9488' }}>PPPoE Network Settings</div>
                                         <div className="form-group">
                                             <label className="form-label">Local Gateway Address</label>
-                                            <input className="form-input" value={pppoeLocalAddress} onChange={e => setPppoeLocalAddress(e.target.value)} placeholder="10.116.0.2" />
+                                            <input className="form-input" value={pppoeLocalAddress} onChange={e => setPppoeLocalAddress(e.target.value)} placeholder="192.168.88.1" />
                                         </div>
                                         <div className="grid-2 gap-10">
                                             <div className="form-group">
                                                 <label className="form-label">Pool Start</label>
-                                                <input className="form-input" value={pppoePoolStart} onChange={e => setPppoePoolStart(e.target.value)} placeholder="10.116.0.3" />
+                                                <input className="form-input" value={pppoePoolStart} onChange={e => setPppoePoolStart(e.target.value)} placeholder="192.168.88.10" />
                                             </div>
                                             <div className="form-group">
                                                 <label className="form-label">Pool End</label>
-                                                <input className="form-input" value={pppoePoolEnd} onChange={e => setPppoePoolEnd(e.target.value)} placeholder="10.116.0.254" />
+                                                <input className="form-input" value={pppoePoolEnd} onChange={e => setPppoePoolEnd(e.target.value)} placeholder="192.168.88.254" />
                                             </div>
                                         </div>
                                     </div>
@@ -636,16 +647,16 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                                         <div style={{ fontWeight: 600, fontSize: '0.85rem', marginBottom: 12, color: '#0d9488' }}>Hotspot Network Settings</div>
                                         <div className="form-group">
                                             <label className="form-label">Hotspot Gateway Address</label>
-                                            <input className="form-input" value={hotspotLocalAddress} onChange={e => setHotspotLocalAddress(e.target.value)} placeholder="10.116.0.2" />
+                                            <input className="form-input" value={hotspotLocalAddress} onChange={e => setHotspotLocalAddress(e.target.value)} placeholder="192.168.88.1" />
                                         </div>
                                         <div className="grid-2 gap-10">
                                             <div className="form-group">
                                                 <label className="form-label">Pool Start</label>
-                                                <input className="form-input" value={hotspotPoolStart} onChange={e => setHotspotPoolStart(e.target.value)} placeholder="10.116.0.3" />
+                                                <input className="form-input" value={hotspotPoolStart} onChange={e => setHotspotPoolStart(e.target.value)} placeholder="192.168.88.10" />
                                             </div>
                                             <div className="form-group">
                                                 <label className="form-label">Pool End</label>
-                                                <input className="form-input" value={hotspotPoolEnd} onChange={e => setHotspotPoolEnd(e.target.value)} placeholder="10.116.0.254" />
+                                                <input className="form-input" value={hotspotPoolEnd} onChange={e => setHotspotPoolEnd(e.target.value)} placeholder="192.168.88.254" />
                                             </div>
                                         </div>
                                     </div>

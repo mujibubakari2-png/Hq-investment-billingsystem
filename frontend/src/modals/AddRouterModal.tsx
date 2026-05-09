@@ -323,7 +323,7 @@ export default function AddRouterModal({ onClose, onSave, initialData }: AddRout
                                         <input
                                             type="text"
                                             className="form-input"
-                                            placeholder="e.g., 10.116.0.2"
+                                            placeholder="e.g., 192.168.88.1 or router public IP"
                                             value={host}
                                             onChange={e => setHost(e.target.value)}
                                             style={{ height: 44, fontSize: '0.9rem' }}

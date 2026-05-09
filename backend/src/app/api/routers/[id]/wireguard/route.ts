@@ -400,7 +400,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 try {
                     await service.apiRequestPublic("/ip/hotspot/profile", "PUT", {
                         name: hotspotProfileName,
-                        "hotspot-address": "10.116.0.2",
+                        "hotspot-address": "192.168.88.1",
                         "dns-name": `${router.name.toLowerCase().replace(/\s+/g, '-')}.hotspot`,
                         "html-directory": "hotspot",
                         "login-by": "http-chap,http-pap,cookie,mac-cookie",
@@ -412,7 +412,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 try {
                     await service.apiRequestPublic("/ip/pool", "PUT", {
                         name: `hs-pool-${router.name}`,
-                        ranges: "10.116.0.3-10.116.0.254"
+                        ranges: "192.168.88.10-192.168.88.254"
                     });
                 } catch (e: any) { if (!e.message?.includes("already")) console.warn("HS pool note:", e.message); }
 
@@ -429,14 +429,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 try {
                     await service.apiRequestPublic("/ip/pool", "PUT", {
                         name: `pppoe-pool-${router.name}`,
-                        ranges: "10.116.0.3-10.116.0.254"
+                        ranges: "192.168.88.10-192.168.88.254"
                     });
                 } catch (e: any) { if (!e.message?.includes("already")) console.warn("PPPoE pool note:", e.message); }
 
                 try {
                     await service.apiRequestPublic("/ppp/profile", "PUT", {
                         name: `pppoe-profile-${router.name}`,
-                        "local-address": "10.116.0.2",
+                        "local-address": "192.168.88.1",
                         "remote-address": `pppoe-pool-${router.name}`,
                         "dns-server": "8.8.8.8,1.1.1.1",
                         "use-encryption": "yes"
@@ -461,7 +461,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
                 try {
                     await service.apiRequestPublic("/ip/address", "PUT", {
-                        address: "10.116.0.2/24",
+                        address: "192.168.88.1/24",
                         interface: lanBridgeName,
                         comment: "Kenge Hotspot LAN"
                     });
@@ -469,9 +469,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
                 try {
                     await service.apiRequestPublic("/ip/dhcp-server/network", "PUT", {
-                        address: "10.116.0.0/24",
-                        gateway: "10.116.0.2",
-                        "dns-server": "10.116.0.2"
+                        address: "192.168.88.0/24",
+                        gateway: "192.168.88.1",
+                        "dns-server": "8.8.8.8,1.1.1.1"
                     });
                 } catch (e: any) { if (!e.message?.includes("already")) console.warn("DHCP network note:", e.message); }
 
@@ -622,11 +622,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 // ──────────────────────────────────────────────────────────
                 console.log("[PUSH-CONFIG] Setting up RADIUS...");
                 try {
-                    // Remove old radius configs matching the server IP
+                    // Remove old radius configs matching old server IPs
                     const oldRadius = await service.apiRequestPublic("/radius");
                     if (Array.isArray(oldRadius)) {
                         for (const r of oldRadius) {
-                            if (r.address === "10.0.0.1" || r.comment?.includes("HQInvestment")) {
+                            if (r.comment?.includes("HQInvestment") || r.comment?.includes("Kenge RADIUS")) {
                                 try { await service.apiRequestPublic(`/radius/${r[".id"]}`, "DELETE"); } catch {}
                             }
                         }
@@ -635,11 +635,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
                 try {
                     await service.apiRequestPublic("/radius", "PUT", {
-                        address: "10.0.0.1",
-                        secret: router.password || 'hqsecret',
+                        address: wgServerIp,
+                        secret: process.env.RADIUS_NAS_SECRET || router.password || 'kenge_radius_secret',
                         service: "hotspot,ppp",
+                        "authentication-port": "1812",
+                        "accounting-port": "1813",
                         timeout: "3000ms",
-                        comment: "HQInvestment RADIUS"
+                        "src-address": tunnelIp,
+                        comment: "Kenge RADIUS"
                     });
                 } catch (e: any) { console.warn("Radius note:", e.message); }
 

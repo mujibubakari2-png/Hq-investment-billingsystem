@@ -398,6 +398,7 @@ model Tenant {
   paymentChannels  PaymentChannel[]
   radaccts         RadAcct[]
   radchecks        RadCheck[]
+  radPostAuths     RadPostAuth[]
   radiusNas        RadiusNas[]
   radiusUsers      RadiusUser[]
   routerLogs       RouterLog[]
@@ -588,6 +589,20 @@ model RadAcct {
   @@index([tenantId, acctstarttime])
   @@index([nasipaddress, acctstoptime])
   @@map("radacct")
+}
+
+model RadPostAuth {
+  id       BigInt   @id @default(autoincrement())
+  username String   @db.VarChar(64)
+  pass     String   @db.VarChar(64)
+  reply    String   @db.VarChar(32)
+  authdate DateTime @default(now()) @db.Timestamptz()
+  tenantId String?
+  tenant   Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([username])
+  @@index([tenantId])
+  @@map("radpostauth")
 }
 
 model RateLimit {
