@@ -68,10 +68,12 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
     if (loading) {
         return (
             <div className="modal-overlay" onClick={onClose}>
-                <div className="modal" style={{ maxWidth: 500, padding: 40, textAlign: 'center' }} onClick={e => e.stopPropagation()}>
-                    <SyncIcon style={{ fontSize: 48, color: '#15803d', animation: 'spin 1s linear infinite' }} />
-                    <p style={{ marginTop: 16, fontWeight: 600 }}>Loading WireGuard Configuration...</p>
-                    <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>Generating persistent keys for {router.name}</p>
+                <div className="modal" style={{ maxWidth: 500 }} onClick={e => e.stopPropagation()}>
+                    <div className="modal-body" style={{ textAlign: 'center', padding: 40 }}>
+                        <SyncIcon style={{ fontSize: 48, color: '#15803d', animation: 'spin 1s linear infinite' }} />
+                        <p style={{ marginTop: 16, fontWeight: 600 }}>Loading WireGuard Configuration...</p>
+                        <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>Generating persistent keys for {router.name}</p>
+                    </div>
                 </div>
             </div>
         );
@@ -80,8 +82,8 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
     if (error || !config) {
         return (
             <div className="modal-overlay" onClick={onClose}>
-                <div className="modal" style={{ maxWidth: 500, padding: 30 }} onClick={e => e.stopPropagation()}>
-                    <div style={{ textAlign: 'center' }}>
+                <div className="modal" style={{ maxWidth: 500 }} onClick={e => e.stopPropagation()}>
+                    <div className="modal-body" style={{ textAlign: 'center', padding: 30 }}>
                         <WarningAmberIcon style={{ fontSize: 48, color: '#dc2626' }} />
                         <p style={{ fontWeight: 600, marginTop: 12, color: '#dc2626' }}>Failed to Load Config</p>
                         <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{error}</p>
@@ -384,7 +386,7 @@ PersistentKeepalive = 25`;
 
     return (
         <div className="modal-overlay" onClick={onClose}>
-            <div className="modal" style={{ maxWidth: 780, maxHeight: '94vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
+            <div className="modal" style={{ maxWidth: 780 }} onClick={e => e.stopPropagation()}>
                 {/* Header */}
                 <div style={{
                     background: 'linear-gradient(135deg, #15803d 0%, #22c55e 100%)', color: '#fff',

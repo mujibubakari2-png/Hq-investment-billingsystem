@@ -57,13 +57,7 @@ export default function AddRouterModal({ onClose, onSave, initialData }: AddRout
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             zIndex: 1100, backdropFilter: 'blur(4px)', background: 'var(--bg-modal-overlay)'
         }}>
-            <div className="modal" style={{
-                maxWidth: 600, width: '95%', maxHeight: '92vh', overflow: 'auto',
-                borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-lg)',
-                background: 'var(--bg-card)', border: '1px solid var(--border)',
-                backdropFilter: 'var(--glass-blur)',
-                display: 'flex', flexDirection: 'column'
-            }} onClick={e => e.stopPropagation()}>
+            <div className="modal" style={{ maxWidth: 600 }} onClick={e => e.stopPropagation()}>
 
                 {/* Header */}
                 <div style={{

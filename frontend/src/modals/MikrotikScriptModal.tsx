@@ -185,7 +185,7 @@ export default function MikrotikScriptModal({ router, onClose }: MikrotikScriptM
 
     return (
         <div className="modal-overlay" onClick={onClose}>
-            <div className="modal" style={{ maxWidth: 750, maxHeight: '92vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
+            <div className="modal" style={{ maxWidth: 750 }} onClick={e => e.stopPropagation()}>
                 {/* Header */}
                 <div style={{
                     background: 'linear-gradient(135deg, #4338ca 0%, #6366f1 100%)', color: '#fff',

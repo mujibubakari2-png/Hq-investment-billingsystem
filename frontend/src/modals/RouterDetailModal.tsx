@@ -189,7 +189,7 @@ export default function RouterDetailModal({ router, onClose, onDelete }: RouterD
 
     return (
         <div className="modal-overlay" onClick={onClose}>
-            <div className="modal" style={{ maxWidth: 520, maxHeight: '90vh', overflow: 'auto' }} onClick={e => e.stopPropagation()}>
+            <div className="modal" style={{ maxWidth: 520 }} onClick={e => e.stopPropagation()}>
                 {/* Green Header */}
                 <div style={{
                     background: '#16a34a', color: '#fff', padding: '14px 20px',
