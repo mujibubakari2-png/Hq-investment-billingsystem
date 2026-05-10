@@ -175,9 +175,11 @@ table {
 }
 
 .page-content {
-  padding: 16px;
+  padding: 20px;
   min-height: calc(100vh - var(--header-height));
   width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
   overflow-x: hidden;
 }
 
@@ -1016,14 +1018,15 @@ table {
   align-items: center;
   justify-content: center;
   animation: fadeIn 0.2s ease;
+  padding: 16px;
 }
 
 .modal {
   background: var(--bg-card);
   border-radius: var(--radius-xl);
-  width: 90%;
-  max-width: 680px;
-  max-height: 90vh;
+  width: 100%;
+  max-width: 600px;
+  max-height: calc(100vh - 32px);
   display: flex;
   flex-direction: column;
   animation: slideUp 0.3s ease;
@@ -1319,7 +1322,7 @@ table {
     width: 100%;
   }
 
-  .modal { width: min(95vw, 560px); max-height: 95vh; margin: 8px; }
+  .modal { width: 100% !important; max-width: 100% !important; max-height: calc(100vh - 32px) !important; margin: 0 !important; }
 
   .pagination {
     flex-direction: column;
