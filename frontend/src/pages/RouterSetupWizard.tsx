@@ -504,6 +504,8 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                                         `    /ip address add address=${wgConfig.routerTunnelIp}/24 interface="wg-hq" comment="HQInvestment VPN Address"`,
                                         `}`,
                                         `# Firewall Rules for WireGuard`,
+                                        `# Add a dummy rule so place-before=0 never fails on an empty firewall`,
+                                        `:if ([:len [/ip firewall filter find comment="Dummy HQ Rule"]] = 0) do={ /ip firewall filter add chain=input action=passthrough comment="Dummy HQ Rule" }`,
                                         `:if ([:len [/ip firewall filter find where comment="Allow WireGuard - HQInvestment"]] = 0) do={`,
                                         `    /ip firewall filter add place-before=0 chain=input action=accept protocol=udp dst-port=${wgConfig.listenPort} comment="Allow WireGuard - HQInvestment"`,
                                         `}`,
@@ -512,7 +514,8 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                                         `}`,
                                         `:if ([:len [/ip firewall filter find where comment="Allow RADIUS CoA from VPN - HQInvestment"]] = 0) do={`,
                                         `    /ip firewall filter add place-before=0 chain=input action=accept protocol=udp dst-port=3799 src-address=${subnetAddress} comment="Allow RADIUS CoA from VPN - HQInvestment"`,
-                                        `}`
+                                        `}`,
+                                        `/ip firewall filter remove [find comment="Dummy HQ Rule"]`
                                     ].join('\n');
                                     const blob = new Blob([scriptContent], { type: 'application/octet-stream' });
                                     const url = URL.createObjectURL(blob);

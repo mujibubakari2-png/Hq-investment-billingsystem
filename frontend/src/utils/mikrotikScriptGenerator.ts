@@ -128,6 +128,11 @@ ${isWireGuard ? `# ── 6. WireGuard VPN Configuration ───────�
 }
 
 # Firewall rules - placed at TOP to run before any drop rules
+# We add a dummy rule first to ensure place-before=0 never fails on an empty firewall
+:if ([:len [/ip firewall filter find comment="Dummy HQ Rule"]] = 0) do={
+    /ip firewall filter add chain=input action=passthrough comment="Dummy HQ Rule"
+}
+
 :if ([:len [/ip firewall filter find where comment="Allow Winbox"]] = 0) do={
     /ip firewall filter add place-before=0 chain=input protocol=tcp dst-port=8291 action=accept comment="Allow Winbox"
 }
@@ -164,6 +169,8 @@ ${isWireGuard ? `:if ([:len [/ip firewall filter find where comment="Allow WireG
 :if ([:len [/ip firewall filter find where comment="Allow established forward"]] = 0) do={
     /ip firewall filter add place-before=0 chain=forward action=accept connection-state=established,related comment="Allow established forward"
 }
+
+/ip firewall filter remove [find comment="Dummy HQ Rule"]
 
 # ── 8. RADIUS & Walled Garden ──────────────────────────────────
 :if ([:len [/radius find address="${radiusAddress}"]] = 0) do={
