@@ -192,7 +192,7 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
 # STEP 5: PPPoE Server Setup
 # ============================================
 :if ([:len [/ppp profile find name="pppoe-profile-${safeRouterName}"]] = 0) do={
-    /ppp profile add name="pppoe-profile-${safeRouterName}" local-address=192.168.10.1 remote-address="pppoe-pool-${safeRouterName}" dns-server=8.8.8.8,1.1.1.1 use-encryption=yes use-radius=yes
+    /ppp profile add name="pppoe-profile-${safeRouterName}" local-address=192.168.10.1 remote-address="pppoe-pool-${safeRouterName}" dns-server=8.8.8.8,1.1.1.1 use-encryption=yes
 }
 :if ([:len [/interface pppoe-server server find service-name="pppoe-svc-${safeRouterName}"]] = 0) do={
     /interface pppoe-server server add disabled=no interface=$lanBridge default-profile="pppoe-profile-${safeRouterName}" service-name="pppoe-svc-${safeRouterName}"

@@ -83,8 +83,7 @@ export default function MikrotikScriptModal({ router, onClose }: MikrotikScriptM
 
 :if ([:len [/ip hotspot find name="hotspot-${safeRouterName}"]] = 0) do={
     :if ([:len [/ip hotspot find interface=$lanBridge]] = 0) do={
-        /ip hotspot add name="hotspot-${safeRouterName}" interface=$lanBridge address-pool="hs-pool-${safeRouterName}" \\
-            profile="hsprof-${safeRouterName}" disabled=no
+        /ip hotspot add name="hotspot-${safeRouterName}" interface=$lanBridge address-pool="hs-pool-${safeRouterName}" profile="hsprof-${safeRouterName}" disabled=no
     } else={
         /ip hotspot set [find interface=$lanBridge] profile="hsprof-${safeRouterName}"
     }
@@ -96,7 +95,7 @@ export default function MikrotikScriptModal({ router, onClose }: MikrotikScriptM
 }
 
 :if ([:len [/ppp profile find name="pppoe-profile-${safeRouterName}"]] = 0) do={
-    /ppp profile add name="pppoe-profile-${safeRouterName}" local-address=192.168.88.1 remote-address="pppoe-pool-${safeRouterName}" dns-server=8.8.8.8,1.1.1.1 use-encryption=yes use-radius=yes
+    /ppp profile add name="pppoe-profile-${safeRouterName}" local-address=192.168.88.1 remote-address="pppoe-pool-${safeRouterName}" dns-server=8.8.8.8,1.1.1.1 use-encryption=yes
 }
 
 :if ([:len [/interface pppoe-server server find service-name="pppoe-svc-${safeRouterName}"]] = 0) do={
