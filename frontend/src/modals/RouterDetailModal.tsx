@@ -160,10 +160,13 @@ export default function RouterDetailModal({ router, onClose, onDelete }: RouterD
     /ip hotspot walled-garden ip add action=accept dst-port=8291 protocol=tcp comment="Allow Winbox Management"
 }
 :if ([:len [/ip hotspot walled-garden ip find where comment="Allow API Management"]] = 0) do={
-    /ip hotspot walled-garden ip add action=accept dst-port=8728,8729 protocol=tcp comment="Allow API Management"
+    /ip hotspot walled-garden ip add action=accept dst-port=8728-8729 protocol=tcp comment="Allow API Management"
 }
-:if ([:len [/ip hotspot walled-garden ip find where comment="Allow Web Management"]] = 0) do={
-    /ip hotspot walled-garden ip add action=accept dst-port=80,443 protocol=tcp comment="Allow Web Management"
+:if ([:len [/ip hotspot walled-garden ip find where comment="Allow Web Management (HTTP)"]] = 0) do={
+    /ip hotspot walled-garden ip add action=accept dst-port=80 protocol=tcp comment="Allow Web Management (HTTP)"
+}
+:if ([:len [/ip hotspot walled-garden ip find where comment="Allow Web Management (HTTPS)"]] = 0) do={
+    /ip hotspot walled-garden ip add action=accept dst-port=443 protocol=tcp comment="Allow Web Management (HTTPS)"
 }
 
 # ── 11. System Scheduler (Auto-sync with HQInvestment) ───────────────────
