@@ -195,16 +195,22 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
 
     const [radiusAddress, setRadiusAddress] = useState(''); // Will be set from server WireGuard tunnel IP
     const [radiusSecret, setRadiusSecret] = useState('hqinvestment_radius_secret');
+    const [wgConfig, setWgConfig] = useState<any>(null);
 
-    // Fetch the server WireGuard tunnel IP to use as RADIUS address default
+    // Fetch the server WireGuard tunnel IP to use as RADIUS address default and for initial setup
     useEffect(() => {
-        if (!routerId || radiusAddress) return;
+        if (!routerId) return;
         routersApi.wireguard?.getConfig?.(routerId)
             .then((cfg: any) => {
-                if (cfg?.serverTunnelIp) setRadiusAddress(cfg.serverTunnelIp);
-                else setRadiusAddress('10.0.0.1');
+                setWgConfig(cfg);
+                if (!radiusAddress) {
+                    if (cfg?.serverTunnelIp) setRadiusAddress(cfg.serverTunnelIp);
+                    else setRadiusAddress('10.0.0.1');
+                }
             })
-            .catch(() => setRadiusAddress('10.0.0.1'));
+            .catch(() => {
+                if (!radiusAddress) setRadiusAddress('10.0.0.1');
+            });
     }, [routerId]);
 
     const addVpnSecret = () => {
@@ -354,10 +360,11 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                 `} else={`,
                 `  /ip dhcp-server network set [/ip dhcp-server network find where address="${hotspotNetwork}"] gateway=${hotspotLocalAddress} dns-server=${hotspotLocalAddress}`,
                 `}`,
-                `:if ([:len [/ip dhcp-server find where name="dhcp-hotspot"]] = 0) do={`,
-                `  /ip dhcp-server add name=dhcp-hotspot interface=$targetBridge address-pool=hotspot-pool authoritative=after-2sec-delay disabled=no`,
+                `:local existingDhcp [/ip dhcp-server find where interface=$targetBridge];`,
+                `:if ([:len $existingDhcp] > 0) do={`,
+                `  /ip dhcp-server set $existingDhcp name=dhcp-hotspot address-pool=hotspot-pool authoritative=after-2sec-delay disabled=no`,
                 `} else={`,
-                `  /ip dhcp-server set [/ip dhcp-server find where name="dhcp-hotspot"] interface=$targetBridge address-pool=hotspot-pool authoritative=after-2sec-delay disabled=no`,
+                `  /ip dhcp-server add name=dhcp-hotspot interface=$targetBridge address-pool=hotspot-pool authoritative=after-2sec-delay disabled=no`,
                 `}`,
                 `:if ([:len [/ip hotspot profile find where name="hq-hotspot"]] = 0) do={`,
                 `  /ip hotspot profile add name=hq-hotspot hotspot-address=${hotspotLocalAddress} dns-name=login.spot login-by=http-chap,http-pap,cookie,mac html-directory=hotspot http-cookie-lifetime=3d use-radius=yes`,
@@ -462,8 +469,8 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                 return (
                     <div style={{ textAlign: 'center', padding: '30px 0' }}>
                         <DownloadIcon style={{ fontSize: 56, color: 'var(--text-secondary)', marginBottom: 16 }} />
-                        <h2 style={{ marginBottom: 6 }}>Download OpenVPN Configuration</h2>
-                        <p style={{ color: 'var(--text-secondary)', marginBottom: 30 }}>Download and import the OpenVPN configuration script</p>
+                        <h2 style={{ marginBottom: 6 }}>Download Initial VPN Setup</h2>
+                        <p style={{ color: 'var(--text-secondary)', marginBottom: 30 }}>Download and import the VPN configuration script</p>
 
                         <div style={{
                             maxWidth: 500, margin: '0 auto', padding: 30,
@@ -471,37 +478,55 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                             background: 'var(--bg-surface)',
                         }}>
                             <InsertDriveFileIcon style={{ fontSize: 48, color: 'var(--text-secondary)', marginBottom: 12 }} />
-                            <h3 style={{ marginBottom: 4 }}>OpenVPN Setup Script</h3>
+                            <h3 style={{ marginBottom: 4 }}>WireGuard Setup Script</h3>
                             <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: 20 }}>
-                                Configure VPN connection and register your router
+                                Configure WireGuard VPN to connect and register your router
                             </p>
                             <button className="btn"
+                                disabled={!wgConfig}
                                 onClick={() => {
-                                    const vpnUser = routerData?.username || (routerName ? sanitizeMikroTikName(routerName) : 'vpn');
-                                    const vpnPass = routerData?.password || 'secret';
+                                    if (!wgConfig) return;
+                                    const subnetPrefix = wgConfig.routerTunnelIp.split('.').slice(0, 3).join('.');
+                                    const subnetAddress = `${subnetPrefix}.0/24`;
                                     const scriptContent = [
-                                        `# OpenVPN Setup Script for ${routerName}`,
-                                        `:if ([:len [/interface ovpn-client find where name="ovpn-out1"]] = 0) do={`,
-                                        `  /interface ovpn-client add name=ovpn-out1 connect-to="${apiHost}" user="${vpnUser}" password="${vpnPass}"`,
+                                        `# WireGuard VPN Setup Script for ${routerName}`,
+                                        `:if ([:len [/interface wireguard find name="wg-hq"]] = 0) do={`,
+                                        `    /interface wireguard add name="wg-hq" listen-port=${wgConfig.listenPort} private-key="${wgConfig.routerPrivateKey}" comment="HQInvestment VPN Interface"`,
                                         `} else={`,
-                                        `  /interface ovpn-client set [/interface ovpn-client find where name="ovpn-out1"] connect-to="${apiHost}" user="${vpnUser}" password="${vpnPass}"`,
+                                        `    /interface wireguard set [find name="wg-hq"] listen-port=${wgConfig.listenPort} private-key="${wgConfig.routerPrivateKey}"`,
                                         `}`,
-                                        `:if ([:len [/ip hotspot walled-garden find where dst-host="${apiHost}"]] = 0) do={ /ip hotspot walled-garden add action=allow dst-host="${apiHost}" comment="Billing Portal" }`,
-                                        `:if ([:len [/ip hotspot walled-garden ip find where dst-address="${apiHost}"]] = 0) do={ /ip hotspot walled-garden ip add action=accept dst-address="${apiHost}" comment="Billing Portal IP" }`,
+                                        `:if ([:len [/interface wireguard peers find interface="wg-hq" public-key="${wgConfig.serverPublicKey}"]] = 0) do={`,
+                                        `    /interface wireguard peers add interface="wg-hq" public-key="${wgConfig.serverPublicKey}" endpoint-address=${wgConfig.serverEndpoint} endpoint-port=${wgConfig.serverPort} allowed-address=0.0.0.0/0 persistent-keepalive=25s comment="HQInvestment ISP Server"`,
+                                        `} else={`,
+                                        `    /interface wireguard peers set [find interface="wg-hq" public-key="${wgConfig.serverPublicKey}"] endpoint-address=${wgConfig.serverEndpoint} endpoint-port=${wgConfig.serverPort} allowed-address=0.0.0.0/0 persistent-keepalive=25s`,
+                                        `}`,
+                                        `:if ([:len [/ip address find address="${wgConfig.routerTunnelIp}/24" interface="wg-hq"]] = 0) do={`,
+                                        `    /ip address add address=${wgConfig.routerTunnelIp}/24 interface="wg-hq" comment="HQInvestment VPN Address"`,
+                                        `}`,
+                                        `# Firewall Rules for WireGuard`,
+                                        `:if ([:len [/ip firewall filter find where comment="Allow WireGuard - HQInvestment"]] = 0) do={`,
+                                        `    /ip firewall filter add place-before=0 chain=input action=accept protocol=udp dst-port=${wgConfig.listenPort} comment="Allow WireGuard - HQInvestment"`,
+                                        `}`,
+                                        `:if ([:len [/ip firewall filter find where comment="Allow API/Winbox from VPN - HQInvestment"]] = 0) do={`,
+                                        `    /ip firewall filter add place-before=0 chain=input action=accept protocol=tcp dst-port=80,8291 src-address=${subnetAddress} comment="Allow API/Winbox from VPN - HQInvestment"`,
+                                        `}`,
+                                        `:if ([:len [/ip firewall filter find where comment="Allow RADIUS CoA from VPN - HQInvestment"]] = 0) do={`,
+                                        `    /ip firewall filter add place-before=0 chain=input action=accept protocol=udp dst-port=3799 src-address=${subnetAddress} comment="Allow RADIUS CoA from VPN - HQInvestment"`,
+                                        `}`
                                     ].join('\n');
                                     const blob = new Blob([scriptContent], { type: 'application/octet-stream' });
                                     const url = URL.createObjectURL(blob);
                                     const a = document.createElement('a');
                                     a.href = url;
                                     const safeName = sanitizeMikroTikName(routerName);
-                                    a.download = `${safeName}_ovpn_setup.rsc`;
+                                    a.download = `${safeName}_ovpn_setup.rsc`; // Kept ovpn_setup.rsc to avoid breaking workflows
                                     document.body.appendChild(a);
                                     a.click();
                                     document.body.removeChild(a);
                                     URL.revokeObjectURL(url);
                                 }}
-                                style={{ background: '#16a34a', color: '#fff', fontWeight: 600, padding: '10px 24px', borderRadius: 'var(--radius-sm)' }}>
-                                <FileDownloadIcon fontSize="small" /> Download {routerName}_ovpn_setup.rsc
+                                style={{ background: wgConfig ? '#16a34a' : '#9ca3af', color: '#fff', fontWeight: 600, padding: '10px 24px', borderRadius: 'var(--radius-sm)' }}>
+                                <FileDownloadIcon fontSize="small" /> {wgConfig ? `Download ${sanitizeMikroTikName(routerName)}_ovpn_setup.rsc` : 'Loading VPN Config...'}
                             </button>
                         </div>
 
@@ -518,8 +543,8 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                                 <li>Download the RSC file using the button above</li>
                                 <li>Connect to your MikroTik router via Winbox</li>
                                 <li>Go to <strong>Files</strong> and drag the RSC file to upload it</li>
-                                <li>Open <strong>Terminal</strong> and run: <code style={{ background: '#e2e8f0', padding: '2px 6px', borderRadius: 4 }}>/import {routerName}_ovpn_setup.rsc</code></li>
-                                <li>Wait for the import to complete (2-3 minutes)</li>
+                                <li>Open <strong>Terminal</strong> and run: <code style={{ background: '#e2e8f0', padding: '2px 6px', borderRadius: 4 }}>/import {sanitizeMikroTikName(routerName)}_ovpn_setup.rsc</code></li>
+                                <li>Wait for the import to complete</li>
                                 <li>Click "Next" when the script has finished</li>
                             </ol>
                         </div>

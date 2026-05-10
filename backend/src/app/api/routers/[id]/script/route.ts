@@ -87,25 +87,25 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
             script += `
 # 7. WireGuard VPN Interface
-:if ([:len [/interface wireguard find name="wg-kenge"]] = 0) do={
-    /interface wireguard add name=wg-kenge listen-port=${listenPort} private-key="${router.wgPrivateKey}" comment="Kenge VPN Interface"
+:if ([:len [/interface wireguard find name="wg-hq"]] = 0) do={
+    /interface wireguard add name=wg-hq listen-port=${listenPort} private-key="${router.wgPrivateKey}" comment="HQInvestment VPN Interface"
 } else={
-    /interface wireguard set [find name="wg-kenge"] private-key="${router.wgPrivateKey}"
+    /interface wireguard set [find name="wg-hq"] private-key="${router.wgPrivateKey}"
 }
 
 # 8. WireGuard IP Address
-:if ([:len [/ip address find interface="wg-kenge"]] = 0) do={
-    /ip address add address="${router.wgTunnelIp}/24" interface=wg-kenge network="${subnetPrefix}.0" comment="Kenge VPN Address"
+:if ([:len [/ip address find interface="wg-hq"]] = 0) do={
+    /ip address add address="${router.wgTunnelIp}/24" interface=wg-hq network="${subnetPrefix}.0" comment="HQInvestment VPN Address"
 }
 
 # 9. WireGuard Peer (Server)
-:if ([:len [/interface wireguard peers find interface="wg-kenge"]] = 0) do={
-    /interface wireguard peers add interface=wg-kenge public-key="${router.wgPeerPublicKey}" allowed-address="0.0.0.0/0,::/0" endpoint-address="${serverEndpoint}" endpoint-port=51820 persistent-keepalive=25s comment="Kenge ISP Server"
+:if ([:len [/interface wireguard peers find interface="wg-hq"]] = 0) do={
+    /interface wireguard peers add interface=wg-hq public-key="${router.wgPeerPublicKey}" allowed-address="0.0.0.0/0,::/0" endpoint-address="${serverEndpoint}" endpoint-port=51820 persistent-keepalive=25s comment="HQInvestment ISP Server"
 }
 
 # 10. VPN Routing
-:if ([:len [/ip route find gateway="wg-kenge"]] = 0) do={
-    /ip route add dst-address="${subnetPrefix}.0/24" gateway=wg-kenge comment="WireGuard route - Kenge"
+:if ([:len [/ip route find gateway="wg-hq"]] = 0) do={
+    /ip route add dst-address="${subnetPrefix}.0/24" gateway=wg-hq comment="WireGuard route - HQInvestment"
 }
 `;
         }

@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { generateMikrotikScript } from '../utils/mikrotikScriptGenerator';
+import { sanitizeMikroTikName } from '../utils/mikrotikUtils';
 import CloseIcon from '@mui/icons-material/Close';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import DownloadIcon from '@mui/icons-material/Download';
@@ -15,18 +17,6 @@ interface MikrotikScriptModalProps {
 export default function MikrotikScriptModal({ router, onClose }: MikrotikScriptModalProps) {
     const [copied, setCopied] = useState(false);
 
-    // Sanitize router name for use in RouterOS scripts (remove special chars that could break scripts)
-    const sanitizeForScript = (name: string): string => {
-        return name
-            .trim()
-            .replace(/\s+/g, '-')            // spaces → dash
-            .replace(/[^a-zA-Z0-9\-]/g, '')  // remove all special chars except hyphens
-            .replace(/-+/g, '-')             // collapse multiple dashes
-            .replace(/^-+|-+$/g, '')         // trim leading/trailing dashes
-            .toLowerCase()
-            || 'unnamed';                    // fallback if result is empty
-    };
-
     // Generate router ID code - handle both numeric IDs and UUIDs
     const generateRouterIdCode = (id: string): string => {
         // If it's a numeric ID, pad it; if it's a UUID, use first 8 chars
@@ -40,141 +30,21 @@ export default function MikrotikScriptModal({ router, onClose }: MikrotikScriptM
     };
 
     const routerIdCode = generateRouterIdCode(router.id);
-    const safeRouterName = sanitizeForScript(router.name);
-    const displayRouterName = router.name.replace(/"/g, '\\"'); // Escape quotes for display
 
     // Extract the actual backend/RADIUS IP or domain from PUBLIC_API_BASE
     const apiHost = PUBLIC_API_BASE && PUBLIC_API_BASE.startsWith('http')
         ? new URL(PUBLIC_API_BASE).hostname
         : (PUBLIC_API_BASE || window.location.hostname || '127.0.0.1').replace(/^https?:\/\//, '');
 
-    const mikrotikScript = `# ═══════════════════════════════════════════════════════════════
-# HQINVESTMENT ISP Billing - MikroTik Auto-Configuration Script
-# Router: ${router.name}
-# ID: ${routerIdCode}
-# Generated: ${new Date().toISOString().split('T')[0]}
-# ═══════════════════════════════════════════════════════════════
-
-:global lanBridge "bridge-lan";
-:global wanInterface "ether1";
-
-# ── 1. System Identity ────────────────────────────────────────
-/system identity set name="${displayRouterName}"
-
-# ── 2. Bridge Setup ─────────────────────────────────────────────
-# Check if any bridge exists, use the first one found
-:local existingBridges [/interface bridge find];
-:if ([:len $existingBridges] > 0) do={
-    :set lanBridge [/interface bridge get ($existingBridges->0) name];
-} else={
-    :if ([:len [/interface bridge find name=$lanBridge]] = 0) do={
-        /interface bridge add name=$lanBridge comment="LAN Bridge - Hotspot & PPPoE"
-    }
-}
-
-# ── 3. Hotspot Server Setup ───────────────────────────────────
-:if ([:len [/ip hotspot profile find name="hsprof-${safeRouterName}"]] = 0) do={
-    /ip hotspot profile add name="hsprof-${safeRouterName}" hotspot-address=192.168.88.1 dns-name="${safeRouterName}.hotspot" html-directory=hotspot login-by=http-chap,http-pap,cookie,mac http-cookie-lifetime=3d use-radius=yes
-}
-
-:if ([:len [/ip pool find name="hs-pool-${safeRouterName}"]] = 0) do={
-    /ip pool add name="hs-pool-${safeRouterName}" ranges=192.168.88.10-192.168.88.254
-}
-
-:if ([:len [/ip hotspot find name="hotspot-${safeRouterName}"]] = 0) do={
-    :if ([:len [/ip hotspot find interface=$lanBridge]] = 0) do={
-        /ip hotspot add name="hotspot-${safeRouterName}" interface=$lanBridge address-pool="hs-pool-${safeRouterName}" profile="hsprof-${safeRouterName}" disabled=no
-    } else={
-        /ip hotspot set [find interface=$lanBridge] profile="hsprof-${safeRouterName}"
-    }
-}
-
-# ── 4. PPPoE Server Setup ─────────────────────────────────────
-:if ([:len [/ip pool find name="pppoe-pool-${safeRouterName}"]] = 0) do={
-    /ip pool add name="pppoe-pool-${safeRouterName}" ranges=192.168.88.10-192.168.88.254
-}
-
-:if ([:len [/ppp profile find name="pppoe-profile-${safeRouterName}"]] = 0) do={
-    /ppp profile add name="pppoe-profile-${safeRouterName}" local-address=192.168.88.1 remote-address="pppoe-pool-${safeRouterName}" dns-server=8.8.8.8,1.1.1.1 use-encryption=yes
-}
-
-:if ([:len [/interface pppoe-server server find service-name="pppoe-svc-${safeRouterName}"]] = 0) do={
-    /interface pppoe-server server add service-name="pppoe-svc-${safeRouterName}" interface=$lanBridge default-profile="pppoe-profile-${safeRouterName}" disabled=no
-}
-
-# ── 5. DHCP Server ───────────────────────────────────────────
-:if ([:len [/ip address find address="192.168.88.1/24"]] = 0) do={
-    /ip address add address=192.168.88.1/24 interface=$lanBridge
-}
-
-:if ([:len [/ip dhcp-server network find address="192.168.88.0/24"]] = 0) do={
-    /ip dhcp-server network add address=192.168.88.0/24 gateway=192.168.88.1 dns-server=8.8.8.8,1.1.1.1
-}
-
-:if ([:len [/ip dhcp-server find interface=$lanBridge]] = 0) do={
-    /ip dhcp-server add name="dhcp-${safeRouterName}" interface=$lanBridge address-pool="hs-pool-${safeRouterName}" disabled=no
-}
-
-# ── 6. NAT (Masquerade) ──────────────────────────────────────
-:if ([:len [/ip firewall nat find action=masquerade]] = 0) do={
-    /ip firewall nat add chain=srcnat out-interface=$wanInterface action=masquerade comment="Masquerade for internet"
-}
-
-# ── 7. DNS Settings ──────────────────────────────────────────
-/ip dns set servers=8.8.8.8,1.1.1.1 allow-remote-requests=yes
-
-# ── 8. Firewall Rules ────────────────────────────────────────
-:if ([:len [/ip firewall filter find where comment="Allow Winbox"]] = 0) do={ /ip firewall filter add place-before=0 chain=input protocol=tcp dst-port=8291 action=accept comment="Allow Winbox" }
-:if ([:len [/ip firewall filter find where comment="Allow Web"]] = 0) do={ /ip firewall filter add place-before=0 chain=input protocol=tcp dst-port=80,443 action=accept comment="Allow Web" }
-:if ([:len [/ip firewall filter find where comment="Allow API"]] = 0) do={ /ip firewall filter add place-before=0 chain=input protocol=tcp dst-port=8728,8729 action=accept comment="Allow API" }
-:if ([:len [/ip firewall filter find where comment="Allow DNS & DHCP"]] = 0) do={ /ip firewall filter add place-before=0 chain=input protocol=udp dst-port=53,67 action=accept comment="Allow DNS & DHCP" }
-:if ([:len [/ip firewall filter find where comment="Allow Ping"]] = 0) do={ /ip firewall filter add place-before=0 chain=input protocol=icmp action=accept comment="Allow Ping" }
-:if ([:len [/ip firewall filter find where comment="Allow established input"]] = 0) do={ /ip firewall filter add place-before=0 chain=input connection-state=established,related action=accept comment="Allow established input" }
-:if ([:len [/ip firewall filter find where comment="Allow LAN to WAN"]] = 0) do={ /ip firewall filter add chain=forward in-interface=$lanBridge out-interface=$wanInterface action=accept comment="Allow LAN to WAN" }
-:if ([:len [/ip firewall filter find where comment="Allow established forward"]] = 0) do={ /ip firewall filter add chain=forward connection-state=established,related action=accept comment="Allow established forward" }
-
-# ── 9. RADIUS Client (HQInvestment ISP Billing) ─────────────────────────────────────
-:if ([:len [/radius find where address="${apiHost}"]] = 0) do={
-    /radius add service=hotspot,ppp address="${apiHost}" secret="${router.password || 'hqinvestment_radius_secret'}" authentication-port=1812 accounting-port=1813 timeout=3s comment="HQInvestment RADIUS"
-} else={
-    /radius set [/radius find where address="${apiHost}"] service=hotspot,ppp secret="${router.password || 'hqinvestment_radius_secret'}" authentication-port=1812 accounting-port=1813 timeout=3s comment="HQInvestment RADIUS"
-}
-
-# ── 10. Walled Garden (Allow billing portal & Mgmt) ───────────
-:if ([:len [/ip hotspot walled-garden find where dst-host="${apiHost}"]] = 0) do={
-    /ip hotspot walled-garden add dst-host="${apiHost}" action=allow comment="Billing Portal"
-}
-:if ([:len [/ip hotspot walled-garden ip find where dst-address="${apiHost}"]] = 0) do={
-    /ip hotspot walled-garden ip add dst-address="${apiHost}" action=accept comment="Billing Portal IP"
-}
-:if ([:len [/ip hotspot walled-garden ip find where comment="Allow Winbox Management"]] = 0) do={
-    /ip hotspot walled-garden ip add action=accept dst-port=8291 protocol=tcp comment="Allow Winbox Management"
-}
-:if ([:len [/ip hotspot walled-garden ip find where comment="Allow API Management"]] = 0) do={
-    /ip hotspot walled-garden ip add action=accept dst-port=8728-8729 protocol=tcp comment="Allow API Management"
-}
-:if ([:len [/ip hotspot walled-garden ip find where comment="Allow Web Management (HTTP)"]] = 0) do={
-    /ip hotspot walled-garden ip add action=accept dst-port=80 protocol=tcp comment="Allow Web Management (HTTP)"
-}
-:if ([:len [/ip hotspot walled-garden ip find where comment="Allow Web Management (HTTPS)"]] = 0) do={
-    /ip hotspot walled-garden ip add action=accept dst-port=443 protocol=tcp comment="Allow Web Management (HTTPS)"
-}
-
-# ── 11. System Scheduler (Auto-sync with HQInvestment) ───────────────────
-:if ([:len [/system scheduler find name="billing-sync"]] > 0) do={ /system scheduler remove [find name="billing-sync"] }
-:local syncUrl "${PUBLIC_API_BASE}/api/sync/${router.id}"
-:local syncScript "/tool fetch url=$syncUrl keep-result=no"
-/system scheduler add name="billing-sync" interval=5m on-event=$syncScript start-time=00:00:00 comment="HQInvestment Auto-Sync"
-
-# ── 12. Logging ──────────────────────────────────────────────
-:if ([:len [/system logging find topics=hotspot]] = 0) do={ /system logging add topics=hotspot action=memory }
-:if ([:len [/system logging find topics=radius]] = 0) do={ /system logging add topics=radius action=memory }
-:if ([:len [/system logging find topics=pppoe]] = 0) do={ /system logging add topics=pppoe action=memory }
-
-# ═══════════════════════════════════════════════════════════════
-# ✅ Script Complete! Router "${router.name}" is configured.
-# Both Hotspot & PPPoE servers are set up.
-# ═══════════════════════════════════════════════════════════════`;
+    const mikrotikScript = generateMikrotikScript({
+        routerName: router.name,
+        routerUsername: router.username,
+        routerPassword: router.password,
+        routerId: routerIdCode,
+        apiHost,
+        publicApiBase: PUBLIC_API_BASE || 'http://127.0.0.1',
+        isWireGuard: false
+    });
 
     const handleCopy = () => {
         navigator.clipboard.writeText(mikrotikScript);
@@ -187,7 +57,7 @@ export default function MikrotikScriptModal({ router, onClose }: MikrotikScriptM
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `mikrotik-script-${sanitizeForScript(router.name)}.rsc`;
+        a.download = `mikrotik-script-${sanitizeMikroTikName(router.name)}.rsc`;
         a.click();
         URL.revokeObjectURL(url);
     };
