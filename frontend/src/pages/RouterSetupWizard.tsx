@@ -408,15 +408,13 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
             if (vpnMode === 'hybrid' || vpnMode === 'wireguard') {
                 const wgAddress = wgConfig?.routerTunnelIp || '';
                 const dropletIp = apiHost;
-                if (!wgAddress) {
-                    lines.push('# WARNING: Router VPN tunnel IP not available — WireGuard config skipped');
+                if (!wgAddress || !wgConfig?.serverPublicKey) {
+                    lines.push('# WARNING: Router VPN tunnel IP or Server Public Key not available — WireGuard config skipped');
                 } else {
                 lines.push(
                     `:if ([:len [/interface wireguard find where name="wireguard1"]] = 0) do={ /interface wireguard add listen-port=13231 name=wireguard1 }`,
                     `:if ([:len [/ip address find where address="${wgAddress}/24" interface="wireguard1"]] = 0) do={ /ip address add address=${wgAddress}/24 interface=wireguard1 }`,
-                    `# !!! IMPORTANT: Replace <SERVER_PUBLIC_KEY> below with your actual WireGuard server public key !!!`,
-                    `# Run 'wg show' on your VPN server and copy the public key value.`,
-                    `:if ([:len [/interface wireguard peers find where comment="HQ-VPN-Server"]] = 0) do={ /interface wireguard peers add allowed-address=0.0.0.0/0 endpoint-address=${dropletIp} endpoint-port=51820 interface=wireguard1 public-key="<SERVER_PUBLIC_KEY>" persistent-keepalive=25s comment="HQ-VPN-Server" }`
+                    `:if ([:len [/interface wireguard peers find where comment="HQ-VPN-Server"]] = 0) do={ /interface wireguard peers add allowed-address=0.0.0.0/0 endpoint-address=${dropletIp} endpoint-port=51820 interface=wireguard1 public-key="${wgConfig.serverPublicKey}" persistent-keepalive=25s comment="HQ-VPN-Server" }`
                 );
                 }
             }
@@ -449,10 +447,7 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
             '', '# ===== Walled Garden =====',
             `:if ([:len [/ip hotspot walled-garden find where dst-host="${apiHost}"]] = 0) do={ /ip hotspot walled-garden add dst-host="${apiHost}" action=allow comment="Billing Portal" }`,
             `:if ([:len [/ip hotspot walled-garden ip find where dst-address="${apiHost}"]] = 0) do={ /ip hotspot walled-garden ip add dst-address="${apiHost}" action=accept comment="Billing Portal IP" }`,
-            `:if ([:len [/ip hotspot walled-garden ip find where comment="Allow Winbox Management"]] = 0) do={ /ip hotspot walled-garden ip add action=accept dst-port=8291 protocol=tcp comment="Allow Winbox Management" }`,
-            `:if ([:len [/ip hotspot walled-garden ip find where comment="Allow API Management"]] = 0) do={ /ip hotspot walled-garden ip add action=accept dst-port=8728-8729 protocol=tcp comment="Allow API Management" }`,
-            `:if ([:len [/ip hotspot walled-garden ip find where comment="Allow Web Management (HTTP)"]] = 0) do={ /ip hotspot walled-garden ip add action=accept dst-port=80 protocol=tcp comment="Allow Web Management (HTTP)" }`,
-            `:if ([:len [/ip hotspot walled-garden ip find where comment="Allow Web Management (HTTPS)"]] = 0) do={ /ip hotspot walled-garden ip add action=accept dst-port=443 protocol=tcp comment="Allow Web Management (HTTPS)" }`,
+
             '', '# ===== NAT (Masquerade) =====',
             ':if ([:len [/ip firewall nat find where action=masquerade]] = 0) do={',
             '  /ip firewall nat add chain=srcnat out-interface=ether1 action=masquerade comment="Masquerade for internet"',

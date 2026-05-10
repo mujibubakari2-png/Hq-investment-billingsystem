@@ -168,9 +168,7 @@ ${isWireGuard ? `:if ([:len [/ip firewall filter find where comment="Allow WireG
 :if ([:len [/ip firewall filter find where comment="Allow established input"]] = 0) do={
     /ip firewall filter add place-before=0 chain=input connection-state=established,related action=accept comment="Allow established input"
 }
-:if ([:len [/ip firewall filter find where comment="Allow LAN to WAN"]] = 0) do={
-    /ip firewall filter add place-before=0 chain=forward action=accept in-interface=$lanBridge out-interface=$wanInterface comment="Allow LAN to WAN"
-}
+
 :if ([:len [/ip firewall filter find where comment="Allow PPPoE to Internet"]] = 0) do={
     /ip firewall filter add place-before=0 chain=forward action=accept in-interface="all-ppp" out-interface=$wanInterface comment="Allow PPPoE to Internet"
 }
@@ -196,19 +194,7 @@ ${isWireGuard ? `:if ([:len [/ip firewall filter find where comment="Allow WireG
 :if ([:len [/ip hotspot walled-garden ip find dst-address="${apiHost}"]] = 0) do={
     /ip hotspot walled-garden ip add dst-address="${apiHost}" action=accept comment="Billing Portal IP"
 }
-# Management ports - idempotent
-:if ([:len [/ip hotspot walled-garden ip find where comment="Allow Winbox Management"]] = 0) do={
-    /ip hotspot walled-garden ip add action=accept dst-port=8291 protocol=tcp comment="Allow Winbox Management"
-}
-:if ([:len [/ip hotspot walled-garden ip find where comment="Allow API Management"]] = 0) do={
-    /ip hotspot walled-garden ip add action=accept dst-port=8728-8729 protocol=tcp comment="Allow API Management"
-}
-:if ([:len [/ip hotspot walled-garden ip find where comment="Allow Web Management (HTTP)"]] = 0) do={
-    /ip hotspot walled-garden ip add action=accept dst-port=80 protocol=tcp comment="Allow Web Management (HTTP)"
-}
-:if ([:len [/ip hotspot walled-garden ip find where comment="Allow Web Management (HTTPS)"]] = 0) do={
-    /ip hotspot walled-garden ip add action=accept dst-port=443 protocol=tcp comment="Allow Web Management (HTTPS)"
-}
+
 
 # ── 9. System Scheduler (Auto-sync with HQInvestment) ────────
 :if ([:len [/system scheduler find name="billing-sync"]] > 0) do={ /system scheduler remove [find name="billing-sync"] }
