@@ -1029,7 +1029,14 @@ TROUBLESHOOTING:
 - Check that the M-Pesa integration endpoints are accessible
 - Verify that JavaScript is enabled on client devices`);
         const content = await zip.generateAsync({ type: "blob" });
-        saveAs(content, `hotspot-${(selectedRouter?.name || 'template').replace(/\s+/g, '-').toLowerCase()}.zip`);
+        const safeZipName = (selectedRouter?.name || 'template')
+            .trim()
+            .replace(/\s+/g, '-')
+            .replace(/[^a-zA-Z0-9\-]/g, '')
+            .replace(/-+/g, '-')
+            .replace(/^-+|-+$/g, '')
+            .toLowerCase();
+        saveAs(content, `hotspot-${safeZipName}.zip`);
         
         } catch (err: any) {
             console.error("Download zip error:", err);

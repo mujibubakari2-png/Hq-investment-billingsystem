@@ -1124,7 +1124,7 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                                         const url = URL.createObjectURL(blob);
                                         const a = document.createElement('a');
                                         a.href = url;
-                                        a.download = `${routerName.replace(/\s+/g, '_')}_config.rsc`;
+                                        a.download = `${sanitizeMikroTikName(routerName)}_config.rsc`;
                                         document.body.appendChild(a);
                                         a.click();
                                         document.body.removeChild(a);

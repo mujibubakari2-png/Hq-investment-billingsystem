@@ -47,7 +47,13 @@ export default function RouterDetailModal({ router, onClose, onDelete }: RouterD
 
 # ── 1. System Identity & User ────────────────────────────────────────
 /system identity set name="${displayRouterName}"
-:if ([:len [/user find name="admin"]] > 0) do={ /user set [find name="admin"] name="${router.username || 'admin'}" password="${router.password || ''}" } else={ :if ([:len [/user find name="${router.username || 'admin'}"]] > 0) do={ /user set [find name="${router.username || 'admin'}"] password="${router.password || ''}" } }
+:if ([:len [/user find name="admin"]] > 0) do={
+    /user set [find name="admin"] name="${router.username || 'admin'}" password="${router.password || ''}"
+} else={
+    :if ([:len [/user find name="${router.username || 'admin'}"]] > 0) do={
+        /user set [find name="${router.username || 'admin'}"] password="${router.password || ''}"
+    }
+}
 
 # ── 2. Bridge Setup ─────────────────────────────────────────────
 # Check if any bridge exists, use the first one found
@@ -162,7 +168,9 @@ export default function RouterDetailModal({ router, onClose, onDelete }: RouterD
 
 # ── 11. System Scheduler (Auto-sync with HQInvestment) ───────────────────
 :if ([:len [/system scheduler find name="billing-sync"]] > 0) do={ /system scheduler remove [find name="billing-sync"] }
-/system scheduler add name="billing-sync" interval=5m on-event="/tool fetch url=${PUBLIC_API_BASE}/api/sync/${router.id}" start-time=startup
+:local syncUrl "${PUBLIC_API_BASE}/api/sync/${router.id}"
+:local syncScript "/tool fetch url=$syncUrl keep-result=no"
+/system scheduler add name="billing-sync" interval=5m on-event=$syncScript start-time=00:00:00 comment="HQInvestment Auto-Sync"
 
 # ── 12. Logging ──────────────────────────────────────────────
 :if ([:len [/system logging find topics=hotspot]] = 0) do={ /system logging add topics=hotspot action=memory }

@@ -25,7 +25,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         const wgServerIp = process.env.WG_SERVER_IP || process.env.WIREGUARD_SERVER_IP || "10.0.0.1";
         const apiPort = router.apiPort || 80;
 
-        const cleanName = router.name.trim().replace(/^-+|-+$/g, '');
+        const cleanName = router.name
+            .trim()
+            .replace(/\s+/g, '-')           // spaces → dash
+            .replace(/[^a-zA-Z0-9\-]/g, '') // remove special chars
+            .replace(/-+/g, '-')            // collapse multiple dashes
+            .replace(/^-+|-+$/g, '');       // trim leading/trailing dashes
         
         let script = `# HQInvestment ISP Billing System - Router Setup Script
 # Generated for: ${cleanName}

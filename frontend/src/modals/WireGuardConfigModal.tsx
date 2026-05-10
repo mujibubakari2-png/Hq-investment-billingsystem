@@ -102,9 +102,19 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
 
     const restPort = router.apiPort || (router.port === 8728 || router.port === 8729 ? 80 : router.port) || 80;
 
+    // Helper: sanitize name for use in filenames and RouterOS identifiers
+    // Removes special characters, collapses multiple dashes, trims leading/trailing dashes
+    const sanitizeName = (name: string) =>
+        name
+            .trim()
+            .replace(/\s+/g, '-')            // spaces → dash
+            .replace(/[^a-zA-Z0-9\-]/g, '')  // remove special chars (dots, underscores, etc.)
+            .replace(/-+/g, '-')             // collapse multiple dashes → single dash
+            .replace(/^-+|-+$/g, '');        // trim leading/trailing dashes
+
     // Build MikroTik server script with CORRECT syntax
-    const safeRouterName = config.routerName.trim().replace(/\s+/g, '-');
-    const safeRouterNameLower = config.routerName.trim().toLowerCase().replace(/\s+/g, '-');
+    const safeRouterName = sanitizeName(config.routerName);
+    const safeRouterNameLower = sanitizeName(config.routerName.toLowerCase());
 
     const apiHost = PUBLIC_API_BASE && PUBLIC_API_BASE.startsWith('http')
         ? new URL(PUBLIC_API_BASE).hostname
@@ -126,7 +136,13 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
 # STEP 1: Set Router Identity, User & Clean DNS
 # ============================================
 /system identity set name="${config.routerName}"
-:if ([:len [/user find name="admin"]] > 0) do={ /user set [find name="admin"] name="${router.username || 'admin'}" password="${router.password || ''}" } else={ :if ([:len [/user find name="${router.username || 'admin'}"]] > 0) do={ /user set [find name="${router.username || 'admin'}"] password="${router.password || ''}" } }
+:if ([:len [/user find name="admin"]] > 0) do={
+    /user set [find name="admin"] name="${router.username || 'admin'}" password="${router.password || ''}"
+} else={
+    :if ([:len [/user find name="${router.username || 'admin'}"]] > 0) do={
+        /user set [find name="${router.username || 'admin'}"] password="${router.password || ''}"
+    }
+}
 /ip dns set servers=8.8.8.8,8.8.4.4 allow-remote-requests=yes
 /system ntp client set enabled=yes
 :if ([:len [/system ntp client servers find where address="pool.ntp.org"]] = 0) do={ /system ntp client servers add address=pool.ntp.org }
@@ -284,7 +300,9 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
 # STEP 10: System Scheduler (Auto-sync)
 # ============================================
 :if ([:len [/system scheduler find name="billing-sync"]] > 0) do={ /system scheduler remove [find name="billing-sync"] }
-/system scheduler add name="billing-sync" interval=5m on-event="/tool fetch url=${PUBLIC_API_BASE}/api/sync/${config.routerId}" start-time=startup
+:local syncUrl "${PUBLIC_API_BASE}/api/sync/${config.routerId}"
+:local syncScript "/tool fetch url=$syncUrl keep-result=no"
+/system scheduler add name="billing-sync" interval=5m on-event=$syncScript start-time=00:00:00 comment="HQInvestment Auto-Sync"
 
 # ============================================
 # Configuration Complete!
@@ -568,8 +586,8 @@ PersistentKeepalive = 25`;
                         onClick={() => handleDownload(
                             activeConfig,
                             activeTab === 'server'
-                                ? `wg-server-${router.name.toLowerCase().replace(/\s+/g, '-')}.rsc`
-                                : `wg-client-${router.name.toLowerCase().replace(/\s+/g, '-')}.conf`
+                                ? `wg-server-${sanitizeName(router.name.toLowerCase())}.rsc`
+                                : `wg-client-${sanitizeName(router.name.toLowerCase())}.conf`
                         )}
                     >
                         <DownloadIcon style={{ fontSize: 16 }} />
