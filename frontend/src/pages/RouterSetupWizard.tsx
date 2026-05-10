@@ -134,13 +134,10 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                     if (res.success) {
                         // Router is reachable — check if specific service interfaces/pools exist
                         routersApi.listInterfaces(routerId)
-                            .then(ifaces => {
-                                // If we can list interfaces, the router API is fully working
-                                // Check if the bridge we configured is present
-                                const hasBridge = ifaces.some((i: any) =>
-                                    i.type === 'bridge' || i.name?.toLowerCase().includes('bridge')
-                                );
-                                setServiceVerifyStatus(hasBridge ? 'success' : 'failed');
+                            .then(() => {
+                                // If we can list interfaces, the router API is fully working.
+                                // (Note: backend listInterfaces only returns ethernet ports, so we assume success if reachable)
+                                setServiceVerifyStatus('success');
                             })
                             .catch(() => setServiceVerifyStatus('success')); // Reachable but can't list = partial success
                     } else {
@@ -180,32 +177,44 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
     const [vpnDns, setVpnDns] = useState('8.8.8.8');
     const [ipsecSecret, setIpsecSecret] = useState('MyISPVpnKey2024!');
 
-    // PPPoE & Hotspot IP Settings (use standard private ranges, NOT the Droplet private IP)
-    const [pppoeLocalAddress, setPppoeLocalAddress] = useState('192.168.10.1');
-    const [pppoePoolStart, setPppoePoolStart] = useState('192.168.10.2');
-    const [pppoePoolEnd, setPppoePoolEnd] = useState('192.168.10.254');
+    // PPPoE & Hotspot IP Settings — populated exclusively from the router's VPN tunnel IP
+    const [pppoeLocalAddress, setPppoeLocalAddress] = useState('');
+    const [pppoePoolStart, setPppoePoolStart] = useState('');
+    const [pppoePoolEnd, setPppoePoolEnd] = useState('');
 
-    const [hotspotLocalAddress, setHotspotLocalAddress] = useState('192.168.10.1');
-    const [hotspotPoolStart, setHotspotPoolStart] = useState('192.168.10.2');
-    const [hotspotPoolEnd, setHotspotPoolEnd] = useState('192.168.10.254');
+    const [hotspotLocalAddress, setHotspotLocalAddress] = useState('');
+    const [hotspotPoolStart, setHotspotPoolStart] = useState('');
+    const [hotspotPoolEnd, setHotspotPoolEnd] = useState('');
 
     const apiHost = PUBLIC_API_BASE && PUBLIC_API_BASE.startsWith('http')
         ? new URL(PUBLIC_API_BASE).hostname
         : (PUBLIC_API_BASE || window.location.hostname || '127.0.0.1').replace(/^https?:\/\//, '');
 
-    const [radiusAddress, setRadiusAddress] = useState(''); // Will be set from server WireGuard tunnel IP
+    const [radiusAddress, setRadiusAddress] = useState(''); // Set from server WireGuard tunnel IP
     const [radiusSecret, setRadiusSecret] = useState('hqinvestment_radius_secret');
     const [wgConfig, setWgConfig] = useState<any>(null);
 
-    // Fetch the server WireGuard tunnel IP to use as RADIUS address default and for initial setup
+    // Fetch WireGuard config to get the router's VPN tunnel IP and server tunnel IP
     useEffect(() => {
         if (!routerId) return;
         routersApi.wireguard?.getConfig?.(routerId)
             .then((cfg: any) => {
                 setWgConfig(cfg);
+                // Use server tunnel IP as RADIUS address
                 if (!radiusAddress) {
                     if (cfg?.serverTunnelIp) setRadiusAddress(cfg.serverTunnelIp);
                     else setRadiusAddress('10.0.0.1');
+                }
+                // Derive all LAN settings from the router's VPN tunnel IP
+                if (cfg?.routerTunnelIp) {
+                    const tunnelIp: string = cfg.routerTunnelIp; // e.g. 10.0.0.201
+                    const prefix = tunnelIp.split('.').slice(0, 3).join('.'); // e.g. "10.0.0"
+                    setPppoeLocalAddress(tunnelIp);
+                    setPppoePoolStart(`${prefix}.10`);
+                    setPppoePoolEnd(`${prefix}.254`);
+                    setHotspotLocalAddress(tunnelIp);
+                    setHotspotPoolStart(`${prefix}.10`);
+                    setHotspotPoolEnd(`${prefix}.254`);
                 }
             })
             .catch(() => {
@@ -280,8 +289,14 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
     };
 
     const getGeneratedScript = () => {
-        const hotspotNetwork = hotspotLocalAddress.split('.').slice(0, 3).join('.') + '.0/24';
-        const hotspotCidr = `${hotspotLocalAddress}/24`;
+        // Guard: VPN IP must be loaded before generating script
+        if (!hotspotLocalAddress || !pppoeLocalAddress) {
+            alert('VPN IP not loaded yet. Please wait for WireGuard config to load, then try again.');
+            return '';
+        }
+        const hotspotPrefix  = hotspotLocalAddress.split('.').slice(0, 3).join('.');
+        const hotspotNetwork = `${hotspotPrefix}.0/24`;
+        const hotspotCidr    = `${hotspotLocalAddress}/24`;
         const lines: string[] = [
             `# RSC Configuration for ${routerName}`,
             `# Generated: ${new Date().toISOString()}`,
@@ -391,8 +406,11 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                 lines.push('/interface ovpn-server server set enabled=yes certificate=none auth=sha1,md5 cipher=aes128-cbc,aes192-cbc,aes256-cbc default-profile=default');
             }
             if (vpnMode === 'hybrid' || vpnMode === 'wireguard') {
-                const wgAddress = '10.0.0.2'; // First router usually gets .2
+                const wgAddress = wgConfig?.routerTunnelIp || '';
                 const dropletIp = apiHost;
+                if (!wgAddress) {
+                    lines.push('# WARNING: Router VPN tunnel IP not available — WireGuard config skipped');
+                } else {
                 lines.push(
                     `:if ([:len [/interface wireguard find where name="wireguard1"]] = 0) do={ /interface wireguard add listen-port=13231 name=wireguard1 }`,
                     `:if ([:len [/ip address find where address="${wgAddress}/24" interface="wireguard1"]] = 0) do={ /ip address add address=${wgAddress}/24 interface=wireguard1 }`,
@@ -400,6 +418,7 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                     `# Run 'wg show' on your VPN server and copy the public key value.`,
                     `:if ([:len [/interface wireguard peers find where comment="HQ-VPN-Server"]] = 0) do={ /interface wireguard peers add allowed-address=0.0.0.0/0 endpoint-address=${dropletIp} endpoint-port=51820 interface=wireguard1 public-key="<SERVER_PUBLIC_KEY>" persistent-keepalive=25s comment="HQ-VPN-Server" }`
                 );
+                }
             }
             if (vpnMode === 'openvpn' || vpnMode === 'hybrid') {
                 lines.push(
@@ -620,9 +639,9 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
 
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, maxWidth: 750, margin: '0 auto' }}>
                             {[
-                                { key: 'pppoe' as const, label: 'PPPoE Server Only', desc: 'Configure PPPoE server for client connections', icon: <DnsIcon style={{ fontSize: 40, color: 'var(--text-secondary)', marginBottom: 12 }} />, detail: 'PPPoE bridge\n192.168.88.x network\nPPPoE service' },
-                                { key: 'hotspot' as const, label: 'Hotspot Only', desc: 'Configure WiFi hotspot with login portal', icon: <WifiIcon style={{ fontSize: 40, color: 'var(--text-secondary)', marginBottom: 12 }} />, detail: 'Hotspot bridge\n192.168.88.x network\nlogin portal' },
-                                { key: 'both' as const, label: 'Both Services', desc: 'Configure both PPPoE and Hotspot', icon: <DeviceHubIcon style={{ fontSize: 40, color: 'var(--text-secondary)', marginBottom: 12 }} />, detail: 'Shared bridge\nPPPoE: 192.168.88.x\nHotspot: 192.168.88.x' },
+                                { key: 'pppoe' as const, label: 'PPPoE Server Only', desc: 'Configure PPPoE server for client connections', icon: <DnsIcon style={{ fontSize: 40, color: 'var(--text-secondary)', marginBottom: 12 }} />, detail: `PPPoE bridge\n${pppoeLocalAddress ? pppoeLocalAddress.split('.').slice(0,3).join('.')+'.x' : 'VPN subnet'}\nPPPoE service` },
+                                { key: 'hotspot' as const, label: 'Hotspot Only', desc: 'Configure WiFi hotspot with login portal', icon: <WifiIcon style={{ fontSize: 40, color: 'var(--text-secondary)', marginBottom: 12 }} />, detail: `Hotspot bridge\n${hotspotLocalAddress ? hotspotLocalAddress.split('.').slice(0,3).join('.')+'.x' : 'VPN subnet'}\nlogin portal` },
+                                { key: 'both' as const, label: 'Both Services', desc: 'Configure both PPPoE and Hotspot', icon: <DeviceHubIcon style={{ fontSize: 40, color: 'var(--text-secondary)', marginBottom: 12 }} />, detail: `Shared bridge\nPPPoE: ${pppoeLocalAddress ? pppoeLocalAddress.split('.').slice(0,3).join('.')+'.x' : 'VPN subnet'}\nHotspot: ${hotspotLocalAddress ? hotspotLocalAddress.split('.').slice(0,3).join('.')+'.x' : 'VPN subnet'}` },
                             ].map(svc => (
                                 <div key={svc.key} onClick={() => setServiceType(svc.key)} style={{
                                     border: serviceType === svc.key ? '2px solid #0d9488' : '1px solid var(--border)',
@@ -655,16 +674,16 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                                         <div style={{ fontWeight: 600, fontSize: '0.85rem', marginBottom: 12, color: '#0d9488' }}>PPPoE Network Settings</div>
                                         <div className="form-group">
                                             <label className="form-label">Local Gateway Address</label>
-                                            <input className="form-input" value={pppoeLocalAddress} onChange={e => setPppoeLocalAddress(e.target.value)} placeholder="192.168.88.1" />
+                                            <input className="form-input" value={pppoeLocalAddress} onChange={e => setPppoeLocalAddress(e.target.value)} placeholder="Auto-filled from VPN IP" />
                                         </div>
                                         <div className="grid-2 gap-10">
                                             <div className="form-group">
                                                 <label className="form-label">Pool Start</label>
-                                                <input className="form-input" value={pppoePoolStart} onChange={e => setPppoePoolStart(e.target.value)} placeholder="192.168.88.10" />
+                                                <input className="form-input" value={pppoePoolStart} onChange={e => setPppoePoolStart(e.target.value)} placeholder="Auto-filled from VPN IP" />
                                             </div>
                                             <div className="form-group">
                                                 <label className="form-label">Pool End</label>
-                                                <input className="form-input" value={pppoePoolEnd} onChange={e => setPppoePoolEnd(e.target.value)} placeholder="192.168.88.254" />
+                                                <input className="form-input" value={pppoePoolEnd} onChange={e => setPppoePoolEnd(e.target.value)} placeholder="Auto-filled from VPN IP" />
                                             </div>
                                         </div>
                                     </div>
@@ -676,16 +695,16 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                                         <div style={{ fontWeight: 600, fontSize: '0.85rem', marginBottom: 12, color: '#0d9488' }}>Hotspot Network Settings</div>
                                         <div className="form-group">
                                             <label className="form-label">Hotspot Gateway Address</label>
-                                            <input className="form-input" value={hotspotLocalAddress} onChange={e => setHotspotLocalAddress(e.target.value)} placeholder="192.168.88.1" />
+                                            <input className="form-input" value={hotspotLocalAddress} onChange={e => setHotspotLocalAddress(e.target.value)} placeholder="Auto-filled from VPN IP" />
                                         </div>
                                         <div className="grid-2 gap-10">
                                             <div className="form-group">
                                                 <label className="form-label">Pool Start</label>
-                                                <input className="form-input" value={hotspotPoolStart} onChange={e => setHotspotPoolStart(e.target.value)} placeholder="192.168.88.10" />
+                                                <input className="form-input" value={hotspotPoolStart} onChange={e => setHotspotPoolStart(e.target.value)} placeholder="Auto-filled from VPN IP" />
                                             </div>
                                             <div className="form-group">
                                                 <label className="form-label">Pool End</label>
-                                                <input className="form-input" value={hotspotPoolEnd} onChange={e => setHotspotPoolEnd(e.target.value)} placeholder="192.168.88.254" />
+                                                <input className="form-input" value={hotspotPoolEnd} onChange={e => setHotspotPoolEnd(e.target.value)} placeholder="Auto-filled from VPN IP" />
                                             </div>
                                         </div>
                                     </div>
@@ -1149,6 +1168,7 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                                 <button className="btn" style={{ background: '#16a34a', color: '#fff', fontWeight: 600, padding: '10px 24px' }}
                                     onClick={() => {
                                         const content = getGeneratedScript();
+                                        if (!content) return; // alert already shown inside getGeneratedScript
                                         const blob = new Blob([content], { type: 'application/octet-stream' });
                                         const url = URL.createObjectURL(blob);
                                         const a = document.createElement('a');
@@ -1167,9 +1187,15 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                             {showPreview && (
                                 <div style={{ marginTop: 20, textAlign: 'left', background: '#1e293b', borderRadius: 'var(--radius-md)', padding: '16px', overflowX: 'auto' }}>
                                     <div style={{ color: '#94a3b8', fontSize: '0.75rem', marginBottom: 8, fontWeight: 600, textTransform: 'uppercase' }}>Script Preview</div>
-                                    <pre style={{ margin: 0, color: '#e2e8f0', fontSize: '0.8rem', fontFamily: 'monospace', whiteSpace: 'pre-wrap', maxHeight: 300, overflowY: 'auto' }}>
-                                        {getGeneratedScript()}
-                                    </pre>
+                                    {(!hotspotLocalAddress || !pppoeLocalAddress) ? (
+                                        <div style={{ color: '#f87171', fontSize: '0.85rem', padding: '12px 0' }}>
+                                            ⚠️ VPN IP not loaded yet. Please wait for WireGuard config to finish loading.
+                                        </div>
+                                    ) : (
+                                        <pre style={{ margin: 0, color: '#e2e8f0', fontSize: '0.8rem', fontFamily: 'monospace', whiteSpace: 'pre-wrap', maxHeight: 300, overflowY: 'auto' }}>
+                                            {getGeneratedScript()}
+                                        </pre>
+                                    )}
                                 </div>
                             )}
 

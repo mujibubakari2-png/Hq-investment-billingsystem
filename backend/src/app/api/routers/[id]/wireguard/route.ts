@@ -250,6 +250,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         if (!tunnelIp || !tunnelIp.startsWith(`${subnetPrefix}.`)) {
             tunnelIp = `${subnetPrefix}.200`; // Fallback
         }
+
+        // Derive LAN gateway from the router's VPN tunnel IP
+        const lanGateway   = tunnelIp;                                         // e.g. 10.0.0.201
+        const lanPrefix2   = tunnelIp.split('.').slice(0, 3).join('.');        // e.g. "10.0.0"
+        const lanCidr      = `${lanGateway}/24`;                               // e.g. "10.0.0.201/24"
+        const lanNetwork   = `${lanPrefix2}.0/24`;                             // e.g. "10.0.0.0/24"
+        const lanPoolStart = `${lanPrefix2}.10`;
+        const lanPoolEnd   = `${lanPrefix2}.254`;
         const listenPort = router.wgListenPort || 51820;
 
         // Use request host as fallback if no endpoint is configured (match GET logic)
@@ -404,7 +412,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 try {
                     await service.apiRequestPublic("/ip/hotspot/profile", "PUT", {
                         name: hotspotProfileName,
-                        "hotspot-address": "192.168.88.1",
+                        "hotspot-address": lanGateway,
                         "dns-name": `${safeRouterNameLower}.hotspot`,
                         "html-directory": "hotspot",
                         "login-by": "http-chap,http-pap,cookie,mac-cookie",
@@ -416,7 +424,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 try {
                     await service.apiRequestPublic("/ip/pool", "PUT", {
                         name: `hs-pool-${safeRouterName}`,
-                        ranges: "192.168.88.10-192.168.88.254"
+                        ranges: `${lanPoolStart}-${lanPoolEnd}`
                     });
                 } catch (e: any) { if (!e.message?.includes("already")) console.warn("HS pool note:", e.message); }
 
@@ -433,14 +441,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 try {
                     await service.apiRequestPublic("/ip/pool", "PUT", {
                         name: `pppoe-pool-${safeRouterName}`,
-                        ranges: "192.168.88.10-192.168.88.254"
+                        ranges: `${lanPoolStart}-${lanPoolEnd}`
                     });
                 } catch (e: any) { if (!e.message?.includes("already")) console.warn("PPPoE pool note:", e.message); }
 
                 try {
                     await service.apiRequestPublic("/ppp/profile", "PUT", {
                         name: `pppoe-profile-${safeRouterName}`,
-                        "local-address": "192.168.88.1",
+                        "local-address": lanGateway,
                         "remote-address": `pppoe-pool-${safeRouterName}`,
                         "dns-server": "8.8.8.8,1.1.1.1",
                         "use-encryption": "yes"
@@ -465,7 +473,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
                 try {
                     await service.apiRequestPublic("/ip/address", "PUT", {
-                        address: "192.168.88.1/24",
+                        address: lanCidr,
                         interface: lanBridgeName,
                         comment: "HQInvestment Hotspot LAN"
                     });
@@ -473,8 +481,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
                 try {
                     await service.apiRequestPublic("/ip/dhcp-server/network", "PUT", {
-                        address: "192.168.88.0/24",
-                        gateway: "192.168.88.1",
+                        address: lanNetwork,
+                        gateway: lanGateway,
                         "dns-server": "8.8.8.8,1.1.1.1"
                     });
                 } catch (e: any) { if (!e.message?.includes("already")) console.warn("DHCP network note:", e.message); }

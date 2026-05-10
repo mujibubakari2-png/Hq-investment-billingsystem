@@ -33,6 +33,14 @@ export function generateMikrotikScript(params: MikrotikScriptParams): string {
     const subnetAddress = isWireGuard && routerTunnelIp ? `${routerTunnelIp.split('.').slice(0, 3).join('.')}.0/24` : '';
     const radiusAddress = isWireGuard && serverTunnelIp ? serverTunnelIp : apiHost;
 
+    // LAN gateway = router's VPN tunnel IP (REQUIRED — must be provided by caller)
+    const lanGateway   = routerTunnelIp ?? '';
+    const lanPrefix    = lanGateway.split('.').slice(0, 3).join('.');  // e.g. "10.0.0"
+    const lanCidr      = lanGateway ? `${lanGateway}/24`  : '';        // e.g. "10.0.0.201/24"
+    const lanNetwork   = lanPrefix  ? `${lanPrefix}.0/24` : '';        // e.g. "10.0.0.0/24"
+    const lanPoolStart = lanPrefix  ? `${lanPrefix}.10`   : '';
+    const lanPoolEnd   = lanPrefix  ? `${lanPrefix}.254`  : '';
+
     const script = `# ═══════════════════════════════════════════════════════════════
 # HQINVESTMENT ISP Billing - MikroTik Auto-Configuration Script
 # Router: ${routerName}
@@ -67,19 +75,19 @@ ${isWireGuard ? `# VPN IP: ${routerTunnelIp}\n` : ''}# Generated: ${new Date().t
 }
 
 # ── 3. IP Pools & LAN Address ───────────────────────────────────
-:if ([:len [/ip address find address="192.168.88.1/24"]] = 0) do={
-    /ip address add address=192.168.88.1/24 interface=$lanBridge comment="HQInvestment Hotspot LAN"
+:if ([:len [/ip address find address="${lanCidr}"]] = 0) do={
+    /ip address add address=${lanCidr} interface=$lanBridge comment="HQInvestment Hotspot LAN"
 }
 :if ([:len [/ip pool find name="hs-pool-${safeRouterName}"]] = 0) do={
-    /ip pool add name="hs-pool-${safeRouterName}" ranges=192.168.88.10-192.168.88.254
+    /ip pool add name="hs-pool-${safeRouterName}" ranges=${lanPoolStart}-${lanPoolEnd}
 }
 :if ([:len [/ip pool find name="pppoe-pool-${safeRouterName}"]] = 0) do={
-    /ip pool add name="pppoe-pool-${safeRouterName}" ranges=192.168.88.10-192.168.88.254
+    /ip pool add name="pppoe-pool-${safeRouterName}" ranges=${lanPoolStart}-${lanPoolEnd}
 }
 
 # ── 4. DHCP Server & Hotspot Setup ─────────────────────────────
-:if ([:len [/ip dhcp-server network find address="192.168.88.0/24"]] = 0) do={
-    /ip dhcp-server network add address=192.168.88.0/24 gateway=192.168.88.1 dns-server=8.8.8.8,1.1.1.1
+:if ([:len [/ip dhcp-server network find address="${lanNetwork}"]] = 0) do={
+    /ip dhcp-server network add address=${lanNetwork} gateway=${lanGateway} dns-server=8.8.8.8,1.1.1.1
 }
 :local existingDhcp [/ip dhcp-server find where interface=$lanBridge];
 :if ([:len $existingDhcp] > 0) do={
@@ -89,7 +97,7 @@ ${isWireGuard ? `# VPN IP: ${routerTunnelIp}\n` : ''}# Generated: ${new Date().t
 }
 
 :if ([:len [/ip hotspot profile find name="hsprof-${safeRouterNameLower}"]] = 0) do={
-    /ip hotspot profile add name="hsprof-${safeRouterNameLower}" hotspot-address=192.168.88.1 dns-name="${safeRouterNameLower}.hotspot" html-directory=hotspot login-by=http-chap,http-pap,cookie,mac http-cookie-lifetime=3d use-radius=yes
+    /ip hotspot profile add name="hsprof-${safeRouterNameLower}" hotspot-address=${lanGateway} dns-name="${safeRouterNameLower}.hotspot" html-directory=hotspot login-by=http-chap,http-pap,cookie,mac http-cookie-lifetime=3d use-radius=yes
 }
 :if ([:len [/ip hotspot find name="hotspot-${safeRouterName}"]] = 0) do={
     :if ([:len [/ip hotspot find interface=$lanBridge]] = 0) do={
@@ -101,7 +109,7 @@ ${isWireGuard ? `# VPN IP: ${routerTunnelIp}\n` : ''}# Generated: ${new Date().t
 
 # ── 5. PPPoE Server Setup ─────────────────────────────────────
 :if ([:len [/ppp profile find name="pppoe-profile-${safeRouterName}"]] = 0) do={
-    /ppp profile add name="pppoe-profile-${safeRouterName}" local-address=192.168.88.1 remote-address="pppoe-pool-${safeRouterName}" dns-server=8.8.8.8,1.1.1.1 use-encryption=yes
+    /ppp profile add name="pppoe-profile-${safeRouterName}" local-address=${lanGateway} remote-address="pppoe-pool-${safeRouterName}" dns-server=8.8.8.8,1.1.1.1 use-encryption=yes
 }
 :if ([:len [/interface pppoe-server server find service-name="pppoe-svc-${safeRouterName}"]] = 0) do={
     /interface pppoe-server server add service-name="pppoe-svc-${safeRouterName}" interface=$lanBridge default-profile="pppoe-profile-${safeRouterName}" disabled=no
