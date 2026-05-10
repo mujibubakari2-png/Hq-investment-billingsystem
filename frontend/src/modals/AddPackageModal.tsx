@@ -40,7 +40,7 @@ export default function AddPackageModal({ onClose, onSave }: AddPackageModalProp
 
     return (
         <div className="modal-overlay" onClick={onClose}>
-            <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
+            <div className="modal" style={{ maxWidth: 700 }} onClick={e => e.stopPropagation()}>
                 <div className="modal-header">
                     <div className="modal-header-left">
                         <div className="modal-header-icon">
