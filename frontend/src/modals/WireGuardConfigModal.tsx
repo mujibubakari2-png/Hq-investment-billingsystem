@@ -264,12 +264,8 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
 } else={
     /radius set [find address="${config.serverTunnelIp}"] secret="${router.password || 'hqinvestment_radius_secret'}" service=hotspot,ppp src-address=${config.routerTunnelIp} comment="HQInvestment RADIUS"
 }
-:if ([:len [/radius incoming find]] = 0) do={
-    /radius incoming set accept=yes port=3799
-}
-:if ([:len [/ppp aaa find]] > 0) do={
-    /ppp aaa set use-radius=yes accounting=yes
-}
+/radius incoming set accept=yes port=3799
+/ppp aaa set use-radius=yes accounting=yes
 
 
 # Walled Garden - allow billing portal (DNS-based and IP-based)

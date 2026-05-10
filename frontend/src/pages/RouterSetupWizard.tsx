@@ -419,7 +419,7 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
             `  /radius set [/radius find where address="${radiusAddress}"] service=hotspot,ppp secret="${radiusSecret}" authentication-port=1812 accounting-port=1813 timeout=3s`,
             `}`,
             ':if ([:len [/ip hotspot profile find where name="hq-hotspot"]] > 0) do={ /ip hotspot profile set [/ip hotspot profile find where name="hq-hotspot"] use-radius=yes }',
-            ':if ([:len [/ppp profile find where name="radiax-pppoe"]] > 0) do={ /ppp profile set [/ppp profile find where name="radiax-pppoe"] use-radius=yes }',
+            '/ppp aaa set use-radius=yes accounting=yes',
             '', '# ===== Walled Garden =====',
             `:if ([:len [/ip hotspot walled-garden find where dst-host="${apiHost}"]] = 0) do={ /ip hotspot walled-garden add dst-host="${apiHost}" action=allow comment="Billing Portal" }`,
             `:if ([:len [/ip hotspot walled-garden ip find where dst-address="${apiHost}"]] = 0) do={ /ip hotspot walled-garden ip add dst-address="${apiHost}" action=accept comment="Billing Portal IP" }`,
