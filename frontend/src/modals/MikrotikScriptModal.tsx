@@ -37,7 +37,9 @@ export default function MikrotikScriptModal({ router, onClose }: MikrotikScriptM
     const displayRouterName = router.name.replace(/"/g, '\\"'); // Escape quotes for display
 
     // Extract the actual backend/RADIUS IP or domain from PUBLIC_API_BASE
-    const apiHost = new URL(PUBLIC_API_BASE).hostname;
+    const apiHost = PUBLIC_API_BASE && PUBLIC_API_BASE.startsWith('http')
+        ? new URL(PUBLIC_API_BASE).hostname
+        : (PUBLIC_API_BASE || window.location.hostname || '127.0.0.1').replace(/^https?:\/\//, '');
 
     const mikrotikScript = `# ═══════════════════════════════════════════════════════════════
 # HQINVESTMENT ISP Billing - MikroTik Auto-Configuration Script

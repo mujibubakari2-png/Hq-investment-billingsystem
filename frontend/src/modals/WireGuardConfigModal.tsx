@@ -104,7 +104,9 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
     const safeRouterName = config.routerName.trim().replace(/\s+/g, '-');
     const safeRouterNameLower = config.routerName.trim().toLowerCase().replace(/\s+/g, '-');
 
-    const apiHost = new URL(PUBLIC_API_BASE).hostname;
+    const apiHost = PUBLIC_API_BASE && PUBLIC_API_BASE.startsWith('http')
+        ? new URL(PUBLIC_API_BASE).hostname
+        : (PUBLIC_API_BASE || window.location.hostname || '127.0.0.1').replace(/^https?:\/\//, '');
 
     const serverConfig = `# ============================================
 # HQInvestment Complete Router Setup Script
