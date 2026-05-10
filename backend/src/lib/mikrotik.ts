@@ -108,14 +108,19 @@ function sanitizeComment(comment: string): string {
 
 /**
  * Sanitizes a name for MikroTik usage (Profiles, Users, etc.)
- * Removes leading/trailing punctuation and replaces internal spaces with hyphens.
+ * Removes leading/trailing punctuation, replaces spaces with hyphens,
+ * removes all other special characters, collapses multiple dashes,
+ * and trims any leading/trailing dashes from the result.
  */
 export function sanitizeMikroTikName(name: string): string {
     if (!name) return "unnamed";
     return name.trim()
-        .replace(/^[^\w\d]+|[^\w\d]+$/g, "") // Remove leading/trailing non-alphanumeric chars (like trailing hyphens)
-        .replace(/\s+/g, "-")                // Replace internal spaces with hyphens
-        .toLowerCase();
+        .replace(/\s+/g, "-")               // Replace spaces with hyphens
+        .replace(/[^a-zA-Z0-9\-]/g, "")    // Remove all non-alphanumeric chars except hyphens
+        .replace(/-+/g, "-")               // Collapse multiple consecutive hyphens
+        .replace(/^-+|-+$/g, "")           // Trim leading/trailing hyphens
+        .toLowerCase()
+        || "unnamed";                       // Fallback if result is empty
 }
 
 // ── MikroTik API Service Class ──────────────────────────────────────────────

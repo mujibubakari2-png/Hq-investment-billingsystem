@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
-import { getMikroTikService } from "@/lib/mikrotik";
+import { getMikroTikService, sanitizeMikroTikName } from "@/lib/mikrotik";
 import { wireguardManager } from "@/lib/wireguard";
 import { exec } from "child_process";
 import { promisify } from "util";
@@ -395,13 +395,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                     // Doing so breaks existing DHCP servers on ether2 and drops the network.
                 }
 
-                const hotspotProfileName = `hsprof-${router.name.toLowerCase().replace(/\s+/g, '-')}`;
+                // Sanitize name for RouterOS identifiers using shared lib function
+                const safeRouterName      = sanitizeMikroTikName(router.name);
+                const safeRouterNameLower = sanitizeMikroTikName(router.name.toLowerCase());
+
+                const hotspotProfileName = `hsprof-${safeRouterNameLower}`;
 
                 try {
                     await service.apiRequestPublic("/ip/hotspot/profile", "PUT", {
                         name: hotspotProfileName,
                         "hotspot-address": "192.168.88.1",
-                        "dns-name": `${router.name.toLowerCase().replace(/\s+/g, '-')}.hotspot`,
+                        "dns-name": `${safeRouterNameLower}.hotspot`,
                         "html-directory": "hotspot",
                         "login-by": "http-chap,http-pap,cookie,mac-cookie",
                         "http-cookie-lifetime": "3d",
@@ -411,16 +415,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
                 try {
                     await service.apiRequestPublic("/ip/pool", "PUT", {
-                        name: `hs-pool-${router.name}`,
+                        name: `hs-pool-${safeRouterName}`,
                         ranges: "192.168.88.10-192.168.88.254"
                     });
                 } catch (e: any) { if (!e.message?.includes("already")) console.warn("HS pool note:", e.message); }
 
                 try {
                     await service.apiRequestPublic("/ip/hotspot", "PUT", {
-                        name: `hotspot-${router.name}`,
+                        name: `hotspot-${safeRouterName}`,
                         interface: lanBridgeName,
-                        "address-pool": `hs-pool-${router.name}`,
+                        "address-pool": `hs-pool-${safeRouterName}`,
                         profile: hotspotProfileName,
                         disabled: "no"
                     });
@@ -428,16 +432,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
                 try {
                     await service.apiRequestPublic("/ip/pool", "PUT", {
-                        name: `pppoe-pool-${router.name}`,
+                        name: `pppoe-pool-${safeRouterName}`,
                         ranges: "192.168.88.10-192.168.88.254"
                     });
                 } catch (e: any) { if (!e.message?.includes("already")) console.warn("PPPoE pool note:", e.message); }
 
                 try {
                     await service.apiRequestPublic("/ppp/profile", "PUT", {
-                        name: `pppoe-profile-${router.name}`,
+                        name: `pppoe-profile-${safeRouterName}`,
                         "local-address": "192.168.88.1",
-                        "remote-address": `pppoe-pool-${router.name}`,
+                        "remote-address": `pppoe-pool-${safeRouterName}`,
                         "dns-server": "8.8.8.8,1.1.1.1",
                         "use-encryption": "yes"
                     });
@@ -452,9 +456,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
                 try {
                     await service.apiRequestPublic("/interface/pppoe-server/server", "PUT", {
-                        "service-name": `pppoe-svc-${router.name}`,
+                        "service-name": `pppoe-svc-${safeRouterName}`,
                         interface: lanBridgeName,
-                        "default-profile": `pppoe-profile-${router.name}`,
+                        "default-profile": `pppoe-profile-${safeRouterName}`,
                         disabled: "no"
                     });
                 } catch (e: any) { if (!e.message?.includes("already")) console.warn("PPPoE server note:", e.message); }
@@ -477,9 +481,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
                 try {
                     await service.apiRequestPublic("/ip/dhcp-server", "PUT", {
-                        name: `dhcp-${router.name}`,
+                        name: `dhcp-${safeRouterName}`,
                         interface: lanBridgeName,
-                        "address-pool": `hs-pool-${router.name}`,
+                        "address-pool": `hs-pool-${safeRouterName}`,
                         disabled: "no"
                     });
                 } catch (e: any) { if (!e.message?.includes("already")) console.warn("DHCP server note:", e.message); }

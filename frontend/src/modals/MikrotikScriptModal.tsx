@@ -17,7 +17,14 @@ export default function MikrotikScriptModal({ router, onClose }: MikrotikScriptM
 
     // Sanitize router name for use in RouterOS scripts (remove special chars that could break scripts)
     const sanitizeForScript = (name: string): string => {
-        return name.replace(/[^a-zA-Z0-9_-]/g, '-').replace(/-+/g, '-').toLowerCase();
+        return name
+            .trim()
+            .replace(/\s+/g, '-')            // spaces → dash
+            .replace(/[^a-zA-Z0-9\-]/g, '')  // remove all special chars except hyphens
+            .replace(/-+/g, '-')             // collapse multiple dashes
+            .replace(/^-+|-+$/g, '')         // trim leading/trailing dashes
+            .toLowerCase()
+            || 'unnamed';                    // fallback if result is empty
     };
 
     // Generate router ID code - handle both numeric IDs and UUIDs
@@ -155,7 +162,9 @@ export default function MikrotikScriptModal({ router, onClose }: MikrotikScriptM
 
 # ── 11. System Scheduler (Auto-sync with HQInvestment) ───────────────────
 :if ([:len [/system scheduler find name="billing-sync"]] > 0) do={ /system scheduler remove [find name="billing-sync"] }
-/system scheduler add name="billing-sync" interval=5m on-event="/tool fetch url=${PUBLIC_API_BASE}/api/sync/${router.id}" start-time=startup
+:local syncUrl "${PUBLIC_API_BASE}/api/sync/${router.id}"
+:local syncScript "/tool fetch url=$syncUrl keep-result=no"
+/system scheduler add name="billing-sync" interval=5m on-event=$syncScript start-time=00:00:00 comment="HQInvestment Auto-Sync"
 
 # ── 12. Logging ──────────────────────────────────────────────
 :if ([:len [/system logging find topics=hotspot]] = 0) do={ /system logging add topics=hotspot action=memory }
@@ -178,7 +187,7 @@ export default function MikrotikScriptModal({ router, onClose }: MikrotikScriptM
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `mikrotik-script-${router.name.toLowerCase().replace(/\s+/g, '-')}.rsc`;
+        a.download = `mikrotik-script-${sanitizeForScript(router.name)}.rsc`;
         a.click();
         URL.revokeObjectURL(url);
     };
