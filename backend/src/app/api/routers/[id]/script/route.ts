@@ -15,23 +15,17 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
         const { id } = await params;
         const router = await prisma.router.findUnique({ where: { id } });
-        
+
         if (!router) return errorResponse("Router not found", 404);
         if (userPayload.role !== "SUPER_ADMIN" && router.tenantId !== userPayload.tenantId) {
             return errorResponse("Unauthorized", 403);
         }
 
-        // WireGuard server tunnel IP — from env var or default (never hardcode)
-        const wgServerIp = process.env.WG_SERVER_IP || process.env.WIREGUARD_SERVER_IP || "10.0.0.1";
         const apiPort = router.apiPort || 80;
+        const serverUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || "";
 
-        const cleanName = router.name
-            .trim()
-            .replace(/\s+/g, '-')           // spaces → dash
-            .replace(/[^a-zA-Z0-9\-]/g, '') // remove special chars
-            .replace(/-+/g, '-')            // collapse multiple dashes
-            .replace(/^-+|-+$/g, '');       // trim leading/trailing dashes
-        
+        const cleanName = router.name.trim().replace(/^-+|-+$/g, '');
+
         let script = `# HQInvestment ISP Billing System - Router Setup Script
 # Generated for: ${cleanName}
 # Date: ${new Date().toISOString()}
@@ -73,55 +67,83 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     /ip firewall filter add chain=input action=accept protocol=udp dst-port=51820 comment="Allow WireGuard VPN"
 }
 :if ([:len [/ip firewall filter find where comment="Allow RADIUS CoA"]] = 0) do={
-    /ip firewall filter add chain=input action=accept protocol=udp dst-port=3799 src-address=${wgServerIp} comment="Allow RADIUS CoA"
+    /ip firewall filter add chain=input action=accept protocol=udp dst-port=3799 src-address=10.0.0.1 comment="Allow RADIUS CoA"
 }
 `;
 
         if (router.wgPrivateKey && router.wgPeerPublicKey && router.wgTunnelIp) {
-            const subnetPrefix = router.wgTunnelIp.split('.').slice(0, 3).join('.');
-            const serverEndpoint = router.wgServerEndpoint || wgServerIp;
+            const subnetPrefix = "10.0.0"; // Fallback, normally should be fetched from wgServerIp
+
+            // Try to resolve server endpoint from APP_URL if not explicitly set
+            let resolvedEndpoint = router.wgServerEndpoint;
+            if (!resolvedEndpoint && serverUrl) {
+                try {
+                    const url = new URL(serverUrl);
+                    resolvedEndpoint = url.hostname;
+                } catch (e) { }
+            }
+            const serverEndpoint = resolvedEndpoint || "YOUR_SERVER_IP";
             const listenPort = router.wgListenPort || 51820;
 
             script += `
 # 7. WireGuard VPN Interface
-:if ([:len [/interface wireguard find name="wg-hq"]] = 0) do={
-    /interface wireguard add name=wg-hq listen-port=${listenPort} private-key="${router.wgPrivateKey}" comment="HQInvestment VPN Interface"
+:if ([:len [/interface wireguard find name="wg-kenge"]] = 0) do={
+    /interface wireguard add name=wg-kenge listen-port=${listenPort} private-key="${router.wgPrivateKey}" comment="Kenge VPN Interface"
 } else={
-    /interface wireguard set [find name="wg-hq"] private-key="${router.wgPrivateKey}"
+    /interface wireguard set [find name="wg-kenge"] private-key="${router.wgPrivateKey}"
 }
 
 # 8. WireGuard IP Address
-:if ([:len [/ip address find interface="wg-hq"]] = 0) do={
-    /ip address add address="${router.wgTunnelIp}/24" interface=wg-hq network="${subnetPrefix}.0" comment="HQInvestment VPN Address"
+:if ([:len [/ip address find interface="wg-kenge"]] = 0) do={
+    /ip address add address="${router.wgTunnelIp}/24" interface=wg-kenge network="${subnetPrefix}.0" comment="Kenge VPN Address"
 }
 
 # 9. WireGuard Peer (Server)
-:if ([:len [/interface wireguard peers find interface="wg-hq"]] = 0) do={
-    /interface wireguard peers add interface=wg-hq public-key="${router.wgPeerPublicKey}" allowed-address="0.0.0.0/0,::/0" endpoint-address="${serverEndpoint}" endpoint-port=51820 persistent-keepalive=25s comment="HQInvestment ISP Server"
+:if ([:len [/interface wireguard peers find interface="wg-kenge"]] = 0) do={
+    /interface wireguard peers add interface=wg-kenge public-key="${router.wgPeerPublicKey}" allowed-address="0.0.0.0/0,::/0" endpoint-address="${serverEndpoint}" endpoint-port=51820 persistent-keepalive=25s comment="Kenge ISP Server"
 }
 
 # 10. VPN Routing
-:if ([:len [/ip route find gateway="wg-hq"]] = 0) do={
-    /ip route add dst-address="${subnetPrefix}.0/24" gateway=wg-hq comment="WireGuard route - HQInvestment"
+:if ([:len [/ip route find gateway="wg-kenge"]] = 0) do={
+    /ip route add dst-address="${subnetPrefix}.0/24" gateway=wg-kenge comment="WireGuard route - Kenge"
 }
 `;
         }
 
-        // 11. RADIUS Configuration (Managed via VPN)
+        // 11. RADIUS Configuration (Managed via VPN or Public IP)
+        const vpnIp = "10.0.0.1";
+        let publicIp = "";
+
+        try {
+            if (serverUrl) {
+                const url = new URL(serverUrl);
+                publicIp = url.hostname;
+            }
+        } catch (e) {
+            console.error("Failed to parse APP_URL for RADIUS address:", e);
+        }
+
+        const requestHost = req.nextUrl.hostname;
+        const radiusAddr = router.wgTunnelIp ? vpnIp : (publicIp || requestHost || "YOUR_SERVER_IP");
         const srcAddrPart = router.wgTunnelIp ? `src-address=${router.wgTunnelIp}` : "";
 
         script += `
-# 11. RADIUS Configuration (Managed via WireGuard VPN)
+# 11. RADIUS Configuration
 :if ([:len [/radius find where comment="HQInvestment RADIUS"]] = 0) do={
-    /radius add address=${wgServerIp} secret="${router.password || process.env.RADIUS_NAS_SECRET || 'hqinvestment_radius_secret'}" service=hotspot,ppp timeout=3000ms ${srcAddrPart} authentication-port=1812 accounting-port=1813 comment="HQInvestment RADIUS"
+    /radius add address=${radiusAddr} secret="${router.password || 'hqsecret'}" service=hotspot,ppp timeout=3000ms ${srcAddrPart} comment="HQInvestment RADIUS"
 } else={
-    /radius set [find comment="HQInvestment RADIUS"] address=${wgServerIp} secret="${router.password || process.env.RADIUS_NAS_SECRET || 'hqinvestment_radius_secret'}" ${srcAddrPart}
+    /radius set [find comment="HQInvestment RADIUS"] address=${radiusAddr} secret="${router.password || 'hqsecret'}" ${srcAddrPart}
 }
 :if ([:len [/radius incoming find]] = 0) do={
     /radius incoming set accept=yes port=3799
 }
 
-# 12. Success Notification
+# 12. Enable RADIUS for Hotspot and PPP Services
+/ip hotspot profile set [find default=yes] use-radius=yes
+/ppp profile set [find name=default] use-radius=yes
+/log info "RADIUS services enabled for Hotspot and PPP"
+
+# 13. Success Notification
 /log info "HQInvestment Configuration completed successfully!"
 /log info "Your router should now be reachable by the billing system."
 `;
