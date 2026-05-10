@@ -182,7 +182,7 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
     /ip dhcp-server add address-pool="hs-pool-${safeRouterName}" disabled=no interface=$lanBridge name="dhcp-${safeRouterName}"
 }
 :if ([:len [/ip hotspot profile find name="hsprof-${safeRouterNameLower}"]] = 0) do={
-    /ip hotspot profile add hotspot-address=192.168.10.1 dns-name="${safeRouterNameLower}.hotspot" html-directory=hotspot login-by=http-chap,http-pap,cookie,mac-cookie http-cookie-lifetime=3d name="hsprof-${safeRouterNameLower}" use-radius=yes radius-accounting=yes
+    /ip hotspot profile add hotspot-address=192.168.10.1 dns-name="${safeRouterNameLower}.hotspot" html-directory=hotspot login-by=http-chap,http-pap,cookie,mac http-cookie-lifetime=3d name="hsprof-${safeRouterNameLower}" use-radius=yes
 }
 :if ([:len [/ip hotspot find name="hotspot-${safeRouterName}"]] = 0) do={
     /ip hotspot add address-pool="hs-pool-${safeRouterName}" disabled=no interface=$lanBridge name="hotspot-${safeRouterName}" profile="hsprof-${safeRouterNameLower}"

@@ -74,9 +74,7 @@ export default function MikrotikScriptModal({ router, onClose }: MikrotikScriptM
 
 # ── 3. Hotspot Server Setup ───────────────────────────────────
 :if ([:len [/ip hotspot profile find name="hsprof-${safeRouterName}"]] = 0) do={
-    /ip hotspot profile add name="hsprof-${safeRouterName}" hotspot-address=192.168.88.1 dns-name="${safeRouterName}.hotspot" \\
-        html-directory=hotspot login-by=http-chap,http-pap,cookie,mac-cookie \\
-        http-cookie-lifetime=3d use-radius=yes radius-accounting=yes
+    /ip hotspot profile add name="hsprof-${safeRouterName}" hotspot-address=192.168.88.1 dns-name="${safeRouterName}.hotspot" html-directory=hotspot login-by=http-chap,http-pap,cookie,mac http-cookie-lifetime=3d use-radius=yes
 }
 
 :if ([:len [/ip pool find name="hs-pool-${safeRouterName}"]] = 0) do={
