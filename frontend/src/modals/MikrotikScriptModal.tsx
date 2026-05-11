@@ -6,7 +6,7 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import DownloadIcon from '@mui/icons-material/Download';
 import DescriptionIcon from '@mui/icons-material/Description';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import { PUBLIC_API_BASE, getPublicApiBase } from '../utils/config';
+import { getPublicApiBase } from '../utils/config';
 import type { Router } from '../types';
 
 interface MikrotikScriptModalProps {

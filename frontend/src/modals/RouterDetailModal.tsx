@@ -10,7 +10,7 @@ import LoginIcon from '@mui/icons-material/Login';
 import DeleteIcon from '@mui/icons-material/Delete';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import WireGuardConfigModal from './WireGuardConfigModal';
-import { PUBLIC_API_BASE, getPublicApiBase } from '../utils/config';
+import { getPublicApiBase } from '../utils/config';
 import type { Router } from '../types';
 import { formatDateTime } from '../utils/formatters';
 import { sanitizeMikroTikName } from '../utils/mikrotikUtils';

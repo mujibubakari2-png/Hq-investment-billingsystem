@@ -24,7 +24,7 @@ import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import LockIcon from '@mui/icons-material/Lock';
 import { routersApi, vpnApi } from '../api/client';
-import { PUBLIC_API_BASE, getPublicApiBase } from '../utils/config';
+import { getPublicApiBase } from '../utils/config';
 import { sanitizeMikroTikName } from '../utils/mikrotikUtils';
 
 const steps = [
