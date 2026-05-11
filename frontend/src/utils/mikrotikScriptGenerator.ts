@@ -92,10 +92,10 @@ ${isWireGuard ? `# VPN IP: ${routerTunnelIp}\n` : ''}# Generated: ${new Date().t
 }
 :if ($foundLanBridge = 0) do={
     :if ([:len [/interface bridge find name=$lanBridge]] = 0) do={
-        /interface bridge add name=$lanBridge protocol-mode=none stp=no comment="LAN Bridge - Hotspot & PPPoE"
+        /interface bridge add name=$lanBridge protocol-mode=none comment="LAN Bridge - Hotspot & PPPoE"
     } else={
         # Disable STP on existing bridge to prevent client delays
-        /interface bridge set [find name=$lanBridge] protocol-mode=none stp=no
+        /interface bridge set [find name=$lanBridge] protocol-mode=none
     }
 }
 
