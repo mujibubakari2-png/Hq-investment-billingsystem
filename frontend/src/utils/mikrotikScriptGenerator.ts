@@ -31,7 +31,11 @@ export function generateMikrotikScript(params: MikrotikScriptParams): string {
     const safeRouterName = sanitizeName(routerName);
     const safeRouterNameLower = safeRouterName.toLowerCase();
     
+    // subnetAddress: the VPN management subnet (used for firewall src-address restrictions)
     const subnetAddress = isWireGuard && routerTunnelIp ? `${routerTunnelIp.split('.').slice(0, 3).join('.')}.0/24` : '';
+    // serverSubnet: the server-side VPN subnet — WireGuard peer allowed-address should be this,
+    // NOT the router's LAN subnet. Allowing 0.0.0.0/0 would route all client traffic through the VPN.
+    const serverSubnet  = isWireGuard && serverTunnelIp ? `${serverTunnelIp.split('.').slice(0, 3).join('.')}.0/24` : (subnetAddress || '0.0.0.0/0');
     const radiusAddress = isWireGuard && serverTunnelIp ? serverTunnelIp : apiHost;
 
     // LAN gateway = router's VPN tunnel IP (REQUIRED — must be provided by caller)
@@ -128,12 +132,16 @@ ${isWireGuard ? `# VPN IP: ${routerTunnelIp}\n` : ''}# Generated: ${new Date().t
 # ── 6. Hotspot Server ────────────────────────────────────────────
 # IMPORTANT: hotspot is created AFTER IP address is assigned.
 # login-by does NOT include 'mac' — MAC-only login bypasses password auth.
+# SECURITY: login-by does NOT include 'mac' — MAC-only login bypasses password/voucher auth!
+# mac-cookie is kept for session continuity only (requires prior login to set the cookie).
 :if ([:len [/ip hotspot profile find name="hsprof-${safeRouterNameLower}"]] = 0) do={
-    /ip hotspot profile add name="hsprof-${safeRouterNameLower}" hotspot-address=${lanGateway} dns-name="${safeRouterNameLower}.hotspot" html-directory=hotspot login-by=http-chap,http-pap,cookie,mac-cookie http-cookie-lifetime=3d use-radius=yes
+    /ip hotspot profile add name="hsprof-${safeRouterNameLower}" hotspot-address=${lanGateway} dns-name="${safeRouterNameLower}.hotspot" html-directory=hotspot login-by=http-chap,http-pap,cookie http-cookie-lifetime=3d use-radius=yes
+} else={
+    /ip hotspot profile set [find name="hsprof-${safeRouterNameLower}"] login-by=http-chap,http-pap,cookie use-radius=yes
 }
-# Enforce use-radius=yes on ALL hotspot profiles (in case old ones exist)
-:foreach prof in=[/ip hotspot profile find where use-radius!=yes] do={
-    /ip hotspot profile set $prof use-radius=yes
+# Enforce use-radius=yes AND remove 'mac' from login-by on ALL hotspot profiles (in case old ones exist)
+:foreach prof in=[/ip hotspot profile find] do={
+    /ip hotspot profile set $prof use-radius=yes login-by=http-chap,http-pap,cookie
 }
 :if ([:len [/ip hotspot find name="hotspot-${safeRouterName}"]] = 0) do={
     :if ([:len [/ip hotspot find interface=$lanBridge]] = 0) do={
@@ -150,7 +158,9 @@ ${isWireGuard ? `# VPN IP: ${routerTunnelIp}\n` : ''}# Generated: ${new Date().t
     /ppp profile add name="pppoe-profile-${safeRouterName}" local-address=${lanGateway} remote-address="pppoe-pool-${safeRouterName}" dns-server=8.8.8.8,1.1.1.1 use-encryption=yes
 }
 :if ([:len [/interface pppoe-server server find service-name="pppoe-svc-${safeRouterName}"]] = 0) do={
-    /interface pppoe-server server add service-name="pppoe-svc-${safeRouterName}" interface=$lanBridge default-profile="pppoe-profile-${safeRouterName}" one-session-per-host=yes disabled=no
+    /interface pppoe-server server add service-name="pppoe-svc-${safeRouterName}" interface=$lanBridge default-profile="pppoe-profile-${safeRouterName}" authentication=pap,chap,mschap1,mschap2 one-session-per-host=yes disabled=no
+} else={
+    /interface pppoe-server server set [find service-name="pppoe-svc-${safeRouterName}"] one-session-per-host=yes authentication=pap,chap,mschap1,mschap2
 }
 
 ${isWireGuard ? `# ── 8. WireGuard VPN Configuration ─────────────────────────────
@@ -159,10 +169,13 @@ ${isWireGuard ? `# ── 8. WireGuard VPN Configuration ───────�
 } else={
     /interface wireguard set [find name="wg-hq"] listen-port=${listenPort} private-key="${routerPrivateKey}"
 }
+# SECURITY: allowed-address = server VPN subnet ONLY (not 0.0.0.0/0 and not the router's LAN subnet).
+# Using 0.0.0.0/0 would route ALL client traffic through the VPN tunnel — breaking internet access.
+# Using the LAN subnet would cause routing loops. Only the server's management subnet is needed.
 :if ([:len [/interface wireguard peers find interface="wg-hq" public-key="${serverPubKey}"]] = 0) do={
-    /interface wireguard peers add interface="wg-hq" public-key="${serverPubKey}" ${presharedKey ? `preshared-key="${presharedKey}" ` : ''}endpoint-address=${serverEndpoint} endpoint-port=${serverPort} allowed-address=${subnetAddress} persistent-keepalive=25s comment="HQInvestment ISP Server"
+    /interface wireguard peers add interface="wg-hq" public-key="${serverPubKey}" ${presharedKey ? `preshared-key="${presharedKey}" ` : ''}endpoint-address=${serverEndpoint} endpoint-port=${serverPort} allowed-address=${serverSubnet} persistent-keepalive=25s comment="HQInvestment ISP Server"
 } else={
-    /interface wireguard peers set [find interface="wg-hq" public-key="${serverPubKey}"] endpoint-address=${serverEndpoint} endpoint-port=${serverPort} allowed-address=${subnetAddress} persistent-keepalive=25s
+    /interface wireguard peers set [find interface="wg-hq" public-key="${serverPubKey}"] endpoint-address=${serverEndpoint} endpoint-port=${serverPort} allowed-address=${serverSubnet} persistent-keepalive=25s
 }
 :if ([:len [/ip address find address="${routerTunnelIp}/24" interface="wg-hq"]] = 0) do={
     /ip address add address=${routerTunnelIp}/24 interface="wg-hq" comment="HQInvestment VPN Address"
@@ -214,12 +227,29 @@ ${isWireGuard ? `:if ([:len [/ip firewall filter find where comment="Allow WireG
     /ip firewall filter add place-before=0 chain=forward action=accept connection-state=established,related comment="Allow established forward"
 }
 
+# SECURITY: Remove any legacy "Allow LAN to WAN" or "Allow all forward" rules that bypass Hotspot auth.
+# These rules are the #1 cause of unauthenticated internet access on misconfigured routers.
+:foreach r in=[/ip firewall filter find where (comment="Allow LAN to WAN" or comment="Allow LAN-WAN" or comment="allow lan to wan" or comment~"bypass")] do={
+    /ip firewall filter remove $r
+}
+
 /ip firewall filter remove [find comment="Dummy HQ Rule"]
 
 # Block all other unsolicited WAN input (must be AFTER all accept rules above)
 :if ([:len [/ip firewall filter find where comment="Drop WAN input - HQInvestment"]] = 0) do={
     /ip firewall filter add chain=input in-interface=$wanInterface action=drop comment="Drop WAN input - HQInvestment"
 }
+
+# SECURITY: Block unauthenticated LAN/bridge clients from bypassing Hotspot portal.
+# The Hotspot engine intercepts HTTP and redirects to the login page for unauthenticated clients.
+# However, non-HTTP traffic (DNS queries to external servers, direct IP access) must also be blocked.
+# This forward drop rule ensures that ONLY traffic explicitly accepted above passes through.
+:if ([:len [/ip firewall filter find where comment="Drop unauthenticated LAN forward - HQInvestment"]] = 0) do={
+    /ip firewall filter add chain=forward in-interface=$lanBridge out-interface=$wanInterface action=drop comment="Drop unauthenticated LAN forward - HQInvestment"
+}
+# NOTE: Hotspot and PPPoE authenticated sessions create dynamic accept rules automatically in RouterOS.
+# The hotspot engine adds entries to /ip firewall filter (dynamic) for authenticated users.
+# PPPoE sessions create virtual ppp interfaces (all-ppp) which are allowed by the rule above.
 
 # ── 8. RADIUS & Walled Garden ──────────────────────────────────
 :if ([:len [/radius find address="${radiusAddress}"]] = 0) do={

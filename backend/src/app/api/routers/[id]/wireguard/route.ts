@@ -430,29 +430,39 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 const hotspotProfileName = `hsprof-${safeRouterNameLower}`;
 
                 try {
+                    // SECURITY: Do NOT include 'mac' or 'mac-cookie' in login-by.
+                    // 'mac' login allows any device to get internet without a voucher by spoofing a known MAC.
+                    // 'cookie' is safe — it only works AFTER a successful login (sets an auth cookie).
                     await service.apiRequestPublic("/ip/hotspot/profile", "PUT", {
                         name: hotspotProfileName,
                         "hotspot-address": lanGateway,
                         "dns-name": `${safeRouterNameLower}.hotspot`,
                         "html-directory": "hotspot",
-                        "login-by": "http-chap,http-pap,cookie,mac-cookie",
+                        "login-by": "http-chap,http-pap,cookie",
                         "http-cookie-lifetime": "3d",
                         "use-radius": "yes"
                     });
                 } catch (e: any) { if (!e.message?.includes("already")) console.warn("Hotspot profile note:", e.message); }
 
-                // Ensure use-radius=yes on ANY existing hotspot profile (not just the one we created)
+                // SECURITY: Enforce use-radius=yes AND remove 'mac' from login-by on ALL existing profiles.
+                // A previously misconfigured profile with login-by=mac allows unauthenticated internet access.
                 try {
                     const existingProfiles = await service.apiRequestPublic("/ip/hotspot/profile");
                     if (Array.isArray(existingProfiles)) {
                         for (const prof of existingProfiles) {
-                            if (prof["use-radius"] !== "yes") {
-                                await service.apiRequestPublic(`/ip/hotspot/profile/${prof[".id"]}`, "PATCH", { "use-radius": "yes" });
-                                console.log(`[PUSH-CONFIG] Enforced use-radius=yes on profile: ${prof.name}`);
+                            const needsUpdate =
+                                prof["use-radius"] !== "yes" ||
+                                (prof["login-by"] || "").includes("mac");
+                            if (needsUpdate) {
+                                await service.apiRequestPublic(`/ip/hotspot/profile/${prof[".id"]}`, "PATCH", {
+                                    "use-radius": "yes",
+                                    "login-by": "http-chap,http-pap,cookie"
+                                });
+                                console.log(`[PUSH-CONFIG] Secured hotspot profile: ${prof.name} (use-radius=yes, removed mac login-by)`);
                             }
                         }
                     }
-                } catch (e: any) { console.warn("Hotspot profile radius enforce note:", e.message); }
+                } catch (e: any) { console.warn("Hotspot profile security enforce note:", e.message); }
 
                 // Use separate pool ranges for Hotspot and PPPoE to prevent IP collisions
                 // Hotspot clients: .10 – .149  |  PPPoE clients: .150 – .250
@@ -657,6 +667,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                     { chain: "forward", "out-interface": "wg-hq", action: "accept", comment: "Allow WG return - HQInvestment" },
                     // ── DROP RULES: must come LAST (lowest priority) ──
                     { chain: "input", "in-interface": "ether1", action: "drop", comment: "Drop WAN input - HQInvestment" },
+                    // SECURITY: Block unauthenticated LAN/bridge clients from reaching WAN.
+                    // The Hotspot engine creates DYNAMIC accept rules for authenticated users, so
+                    // authenticated clients are NOT affected by this drop rule.
+                    // PPPoE clients use the all-ppp forward rule above and are also unaffected.
+                    { chain: "forward", "in-interface": lanBridgeName, "out-interface": "ether1", action: "drop", comment: "Drop unauthenticated LAN forward - HQInvestment" },
                 ];
 
                 // Reverse the array so that by putting them at index 0, they end up in the correct order at the very top.
