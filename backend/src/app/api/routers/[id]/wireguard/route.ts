@@ -251,11 +251,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             tunnelIp = `${subnetPrefix}.200`; // Fallback
         }
 
-        // Derive LAN gateway from the router's VPN tunnel IP
-        const lanGateway   = tunnelIp;                                         // e.g. 10.0.0.201
-        const lanPrefix2   = tunnelIp.split('.').slice(0, 3).join('.');        // e.g. "10.0.0"
-        const lanCidr      = `${lanGateway}/24`;                               // e.g. "10.0.0.201/24"
-        const lanNetwork   = `${lanPrefix2}.0/24`;                             // e.g. "10.0.0.0/24"
+        // IMPORTANT: LAN gateway MUST NOT overlap with the WireGuard VPN subnet!
+        // If VPN is 10.0.0.x, we must use a different subnet for LAN like 10.10.0.x
+        const tunnelParts = tunnelIp.split('.');
+        const lanPrefix2   = `${tunnelParts[0]}.10.${tunnelParts[2] || '0'}`; // e.g. "10.10.0"
+        const lanGateway   = `${lanPrefix2}.1`;                                // e.g. "10.10.0.1"
+        const lanCidr      = `${lanGateway}/24`;                               // e.g. "10.10.0.1/24"
+        const lanNetwork   = `${lanPrefix2}.0/24`;                             // e.g. "10.10.0.0/24"
         const lanPoolStart = `${lanPrefix2}.10`;
         const lanPoolEnd   = `${lanPrefix2}.254`;
         const listenPort = router.wgListenPort || 51820;

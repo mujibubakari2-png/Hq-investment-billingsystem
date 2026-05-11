@@ -206,16 +206,21 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                     if (cfg?.serverTunnelIp) setRadiusAddress(cfg.serverTunnelIp);
                     else setRadiusAddress('10.0.0.1');
                 }
-                // Derive all LAN settings from the router's VPN tunnel IP
+                // IMPORTANT: LAN subnet MUST NOT overlap with the WireGuard VPN subnet!
+                // If VPN is 10.0.0.x, we must use a different subnet for Hotspot/PPPoE like 10.10.0.x.
                 if (cfg?.routerTunnelIp) {
                     const tunnelIp: string = cfg.routerTunnelIp; // e.g. 10.0.0.201
-                    const prefix = tunnelIp.split('.').slice(0, 3).join('.'); // e.g. "10.0.0"
-                    setPppoeLocalAddress(tunnelIp);
-                    setPppoePoolStart(`${prefix}.10`);
-                    setPppoePoolEnd(`${prefix}.254`);
-                    setHotspotLocalAddress(tunnelIp);
-                    setHotspotPoolStart(`${prefix}.10`);
-                    setHotspotPoolEnd(`${prefix}.254`);
+                    const parts = tunnelIp.split('.');
+                    // Change the second octet to 10 to guarantee a different subnet from the VPN
+                    const lanPrefix = `${parts[0]}.10.${parts[2] || '0'}`; // e.g. "10.10.0"
+                    const lanIp = `${lanPrefix}.1`; // e.g. "10.10.0.1"
+
+                    setPppoeLocalAddress(lanIp);
+                    setPppoePoolStart(`${lanPrefix}.10`);
+                    setPppoePoolEnd(`${lanPrefix}.254`);
+                    setHotspotLocalAddress(lanIp);
+                    setHotspotPoolStart(`${lanPrefix}.10`);
+                    setHotspotPoolEnd(`${lanPrefix}.254`);
                 }
             })
             .catch(() => {

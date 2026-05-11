@@ -38,11 +38,16 @@ export function generateMikrotikScript(params: MikrotikScriptParams): string {
     const serverSubnet  = isWireGuard && serverTunnelIp ? `${serverTunnelIp.split('.').slice(0, 3).join('.')}.0/24` : (subnetAddress || '0.0.0.0/0');
     const radiusAddress = isWireGuard && serverTunnelIp ? serverTunnelIp : apiHost;
 
-    // LAN gateway = router's VPN tunnel IP (REQUIRED — must be provided by caller)
-    const lanGateway    = routerTunnelIp ?? '';
-    const lanPrefix     = lanGateway.split('.').slice(0, 3).join('.');  // e.g. "10.0.0"
-    const lanCidr       = lanGateway ? `${lanGateway}/24`  : '';        // e.g. "10.0.0.201/24"
-    const lanNetwork    = lanPrefix  ? `${lanPrefix}.0/24` : '';        // e.g. "10.0.0.0/24"
+    // IMPORTANT: LAN gateway MUST NOT overlap with the VPN tunnel IP.
+    // If VPN is 10.0.0.x, LAN should be 10.10.0.1.
+    let lanGateway = '';
+    if (routerTunnelIp) {
+        const parts = routerTunnelIp.split('.');
+        lanGateway = `${parts[0]}.10.${parts[2] || '0'}.1`;
+    }
+    const lanPrefix     = lanGateway ? lanGateway.split('.').slice(0, 3).join('.') : '';  // e.g. "10.10.0"
+    const lanCidr       = lanGateway ? `${lanGateway}/24`  : '';        // e.g. "10.10.0.1/24"
+    const lanNetwork    = lanPrefix  ? `${lanPrefix}.0/24` : '';        // e.g. "10.10.0.0/24"
     // Separate pools: Hotspot .10-.149 | PPPoE .150-.250 (prevents IP collision)
     const hsPoolStart   = lanPrefix  ? `${lanPrefix}.10`   : '';
     const hsPoolEnd     = lanPrefix  ? `${lanPrefix}.149`  : '';
