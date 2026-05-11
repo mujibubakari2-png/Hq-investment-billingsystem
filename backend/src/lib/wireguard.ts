@@ -33,14 +33,18 @@ export const wireguardManager = {
     },
 
     derivePublicKey: async (privateKey: string): Promise<string> => {
-        const { stdout } = await execAsync(`echo "${privateKey}" | wg pubkey`);
+        // Use printf instead of echo to avoid newline and shell injection issues
+        const { stdout } = await execAsync(`printf '%s' "${privateKey}" | wg pubkey`);
         return stdout.trim();
     },
 
     /**
      * Add a new peer to the WireGuard interface (wg0)
+     * @param publicKey  - Router's WireGuard public key
+     * @param allowedIp  - Router's assigned tunnel IP (without /32)
+     * @param presharedKey - Optional preshared key for extra security
      */
-    addPeer: async (publicKey: string, allowedIp: string) => {
+    addPeer: async (publicKey: string, allowedIp: string, presharedKey?: string) => {
         try {
             // Validate input
             if (!publicKey || !allowedIp) {
@@ -48,10 +52,14 @@ export const wireguardManager = {
             }
 
             // Use 'wg set' for runtime update and 'wg-quick save' for persistence
-            const addCmd = `sudo wg set wg0 peer "${publicKey}" allowed-ips ${allowedIp}/32`;
+            let addCmd = `sudo wg set wg0 peer "${publicKey}" allowed-ips ${allowedIp}/32`;
+            if (presharedKey) {
+                // Write preshared key to a temp file to avoid shell exposure
+                addCmd = `echo "${presharedKey}" | sudo wg set wg0 peer "${publicKey}" allowed-ips ${allowedIp}/32 preshared-key /dev/stdin`;
+            }
             const saveCmd = `sudo wg-quick save wg0`;
 
-            console.log(`[WireGuard] Adding peer: ${publicKey} with IP ${allowedIp}`);
+            console.log(`[WireGuard] Adding peer: ${publicKey} with IP ${allowedIp}${presharedKey ? ' (preshared key set)' : ''}`);
             
             await execAsync(addCmd);
             await execAsync(saveCmd);

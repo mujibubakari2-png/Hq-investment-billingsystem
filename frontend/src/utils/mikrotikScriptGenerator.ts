@@ -11,6 +11,7 @@ export interface MikrotikScriptParams {
     listenPort?: number;
     routerPrivateKey?: string;
     serverPubKey?: string;
+    presharedKey?: string;
     serverEndpoint?: string;
     serverPort?: number;
     routerTunnelIp?: string;
@@ -20,8 +21,8 @@ export interface MikrotikScriptParams {
 export function generateMikrotikScript(params: MikrotikScriptParams): string {
     const {
         routerName, routerUsername, routerPassword, routerId, apiHost, publicApiBase,
-        isWireGuard, listenPort, routerPrivateKey, serverPubKey, serverEndpoint,
-        serverPort, routerTunnelIp, serverTunnelIp
+        isWireGuard, listenPort, routerPrivateKey, serverPubKey, presharedKey,
+        serverEndpoint, serverPort, routerTunnelIp, serverTunnelIp
     } = params;
 
     const sanitizeName = (name: string) => 
@@ -34,12 +35,15 @@ export function generateMikrotikScript(params: MikrotikScriptParams): string {
     const radiusAddress = isWireGuard && serverTunnelIp ? serverTunnelIp : apiHost;
 
     // LAN gateway = router's VPN tunnel IP (REQUIRED — must be provided by caller)
-    const lanGateway   = routerTunnelIp ?? '';
-    const lanPrefix    = lanGateway.split('.').slice(0, 3).join('.');  // e.g. "10.0.0"
-    const lanCidr      = lanGateway ? `${lanGateway}/24`  : '';        // e.g. "10.0.0.201/24"
-    const lanNetwork   = lanPrefix  ? `${lanPrefix}.0/24` : '';        // e.g. "10.0.0.0/24"
-    const lanPoolStart = lanPrefix  ? `${lanPrefix}.10`   : '';
-    const lanPoolEnd   = lanPrefix  ? `${lanPrefix}.254`  : '';
+    const lanGateway    = routerTunnelIp ?? '';
+    const lanPrefix     = lanGateway.split('.').slice(0, 3).join('.');  // e.g. "10.0.0"
+    const lanCidr       = lanGateway ? `${lanGateway}/24`  : '';        // e.g. "10.0.0.201/24"
+    const lanNetwork    = lanPrefix  ? `${lanPrefix}.0/24` : '';        // e.g. "10.0.0.0/24"
+    // Separate pools: Hotspot .10-.149 | PPPoE .150-.250 (prevents IP collision)
+    const hsPoolStart   = lanPrefix  ? `${lanPrefix}.10`   : '';
+    const hsPoolEnd     = lanPrefix  ? `${lanPrefix}.149`  : '';
+    const ppoePoolStart = lanPrefix  ? `${lanPrefix}.150`  : '';
+    const ppoePoolEnd   = lanPrefix  ? `${lanPrefix}.250`  : '';
 
     const script = `# ═══════════════════════════════════════════════════════════════
 # HQINVESTMENT ISP Billing - MikroTik Auto-Configuration Script
@@ -65,39 +69,71 @@ ${isWireGuard ? `# VPN IP: ${routerTunnelIp}\n` : ''}# Generated: ${new Date().t
 :if ([:len [/system ntp client servers find where address="pool.ntp.org"]] = 0) do={ /system ntp client servers add address=pool.ntp.org }
 
 # ── 2. Bridge Setup ─────────────────────────────────────────────
+# Use the first LAN bridge found, but skip bridges that look like WAN bridges.
+# If no bridge exists, create bridge-lan with STP disabled.
+# (STP disabled = no 30-second port-up delay for new clients)
 :local existingBridges [/interface bridge find];
+:local foundLanBridge 0;
 :if ([:len $existingBridges] > 0) do={
-    :set lanBridge [/interface bridge get ($existingBridges->0) name];
-} else={
+    :foreach b in=$existingBridges do={
+        :local bName [/interface bridge get $b name];
+        # Skip bridges named "wan" or "ether1" type names — use only LAN bridges
+        :if ($bName != "wan-bridge" && $bName != "wan") do={
+            :if ($foundLanBridge = 0) do={
+                :set lanBridge $bName;
+                :set foundLanBridge 1;
+            }
+        }
+    }
+}
+:if ($foundLanBridge = 0) do={
     :if ([:len [/interface bridge find name=$lanBridge]] = 0) do={
-        /interface bridge add name=$lanBridge comment="LAN Bridge - Hotspot & PPPoE"
+        /interface bridge add name=$lanBridge protocol-mode=none stp=no comment="LAN Bridge - Hotspot & PPPoE"
+    } else={
+        # Disable STP on existing bridge to prevent client delays
+        /interface bridge set [find name=$lanBridge] protocol-mode=none stp=no
     }
 }
 
-# ── 3. IP Pools & LAN Address ───────────────────────────────────
-:if ([:len [/ip address find address="${lanCidr}"]] = 0) do={
+# ── 3. IP Address on Bridge (MUST come before Hotspot creation) ─
+# RouterOS requires the hotspot-address to exist on the interface
+# before /ip hotspot can be created. Set IP first.
+:if ([:len [/ip address find address="${lanCidr}" interface=$lanBridge]] = 0) do={
     /ip address add address=${lanCidr} interface=$lanBridge comment="HQInvestment Hotspot LAN"
 }
+
+# ── 4. IP Pools ──────────────────────────────────────────────────
+# Hotspot clients: .10-.149  |  PPPoE clients: .150-.250
+# Separate ranges prevent IP collisions between the two services
 :if ([:len [/ip pool find name="hs-pool-${safeRouterName}"]] = 0) do={
-    /ip pool add name="hs-pool-${safeRouterName}" ranges=${lanPoolStart}-${lanPoolEnd}
+    /ip pool add name="hs-pool-${safeRouterName}" ranges=${hsPoolStart}-${hsPoolEnd}
 }
 :if ([:len [/ip pool find name="pppoe-pool-${safeRouterName}"]] = 0) do={
-    /ip pool add name="pppoe-pool-${safeRouterName}" ranges=${lanPoolStart}-${lanPoolEnd}
+    /ip pool add name="pppoe-pool-${safeRouterName}" ranges=${ppoePoolStart}-${ppoePoolEnd}
 }
 
-# ── 4. DHCP Server & Hotspot Setup ─────────────────────────────
+# ── 5. DHCP Server (Hotspot clients only) ────────────────────────
+# DHCP only serves from the hotspot pool (.10-.149).
+# PPPoE clients get IPs via PPP negotiation, not DHCP.
 :if ([:len [/ip dhcp-server network find address="${lanNetwork}"]] = 0) do={
     /ip dhcp-server network add address=${lanNetwork} gateway=${lanGateway} dns-server=8.8.8.8,1.1.1.1
 }
 :local existingDhcp [/ip dhcp-server find where interface=$lanBridge];
 :if ([:len $existingDhcp] > 0) do={
-    /ip dhcp-server set $existingDhcp name="dhcp-${safeRouterName}" address-pool="hs-pool-${safeRouterName}" disabled=no
+    /ip dhcp-server set $existingDhcp name="dhcp-${safeRouterName}" address-pool="hs-pool-${safeRouterName}" lease-time=1h disabled=no
 } else={
-    /ip dhcp-server add name="dhcp-${safeRouterName}" interface=$lanBridge address-pool="hs-pool-${safeRouterName}" disabled=no
+    /ip dhcp-server add name="dhcp-${safeRouterName}" interface=$lanBridge address-pool="hs-pool-${safeRouterName}" lease-time=1h disabled=no
 }
 
+# ── 6. Hotspot Server ────────────────────────────────────────────
+# IMPORTANT: hotspot is created AFTER IP address is assigned.
+# login-by does NOT include 'mac' — MAC-only login bypasses password auth.
 :if ([:len [/ip hotspot profile find name="hsprof-${safeRouterNameLower}"]] = 0) do={
-    /ip hotspot profile add name="hsprof-${safeRouterNameLower}" hotspot-address=${lanGateway} dns-name="${safeRouterNameLower}.hotspot" html-directory=hotspot login-by=http-chap,http-pap,cookie,mac http-cookie-lifetime=3d use-radius=yes
+    /ip hotspot profile add name="hsprof-${safeRouterNameLower}" hotspot-address=${lanGateway} dns-name="${safeRouterNameLower}.hotspot" html-directory=hotspot login-by=http-chap,http-pap,cookie,mac-cookie http-cookie-lifetime=3d use-radius=yes
+}
+# Enforce use-radius=yes on ALL hotspot profiles (in case old ones exist)
+:foreach prof in=[/ip hotspot profile find where use-radius!=yes] do={
+    /ip hotspot profile set $prof use-radius=yes
 }
 :if ([:len [/ip hotspot find name="hotspot-${safeRouterName}"]] = 0) do={
     :if ([:len [/ip hotspot find interface=$lanBridge]] = 0) do={
@@ -107,30 +143,32 @@ ${isWireGuard ? `# VPN IP: ${routerTunnelIp}\n` : ''}# Generated: ${new Date().t
     }
 }
 
-# ── 5. PPPoE Server Setup ─────────────────────────────────────
+# ── 7. PPPoE Server ──────────────────────────────────────────────
+# PPPoE runs on the SAME bridge but uses its own IP pool (.150-.250).
+# one-session-per-host prevents a single MAC from opening multiple sessions.
 :if ([:len [/ppp profile find name="pppoe-profile-${safeRouterName}"]] = 0) do={
     /ppp profile add name="pppoe-profile-${safeRouterName}" local-address=${lanGateway} remote-address="pppoe-pool-${safeRouterName}" dns-server=8.8.8.8,1.1.1.1 use-encryption=yes
 }
 :if ([:len [/interface pppoe-server server find service-name="pppoe-svc-${safeRouterName}"]] = 0) do={
-    /interface pppoe-server server add service-name="pppoe-svc-${safeRouterName}" interface=$lanBridge default-profile="pppoe-profile-${safeRouterName}" disabled=no
+    /interface pppoe-server server add service-name="pppoe-svc-${safeRouterName}" interface=$lanBridge default-profile="pppoe-profile-${safeRouterName}" one-session-per-host=yes disabled=no
 }
 
-${isWireGuard ? `# ── 6. WireGuard VPN Configuration ─────────────────────────────
+${isWireGuard ? `# ── 8. WireGuard VPN Configuration ─────────────────────────────
 :if ([:len [/interface wireguard find name="wg-hq"]] = 0) do={
     /interface wireguard add name="wg-hq" listen-port=${listenPort} private-key="${routerPrivateKey}" comment="HQInvestment VPN Interface"
 } else={
     /interface wireguard set [find name="wg-hq"] listen-port=${listenPort} private-key="${routerPrivateKey}"
 }
 :if ([:len [/interface wireguard peers find interface="wg-hq" public-key="${serverPubKey}"]] = 0) do={
-    /interface wireguard peers add interface="wg-hq" public-key="${serverPubKey}" endpoint-address=${serverEndpoint} endpoint-port=${serverPort} allowed-address=0.0.0.0/0 persistent-keepalive=25s comment="HQInvestment ISP Server"
+    /interface wireguard peers add interface="wg-hq" public-key="${serverPubKey}" ${presharedKey ? `preshared-key="${presharedKey}" ` : ''}endpoint-address=${serverEndpoint} endpoint-port=${serverPort} allowed-address=${subnetAddress} persistent-keepalive=25s comment="HQInvestment ISP Server"
 } else={
-    /interface wireguard peers set [find interface="wg-hq" public-key="${serverPubKey}"] endpoint-address=${serverEndpoint} endpoint-port=${serverPort} allowed-address=0.0.0.0/0 persistent-keepalive=25s
+    /interface wireguard peers set [find interface="wg-hq" public-key="${serverPubKey}"] endpoint-address=${serverEndpoint} endpoint-port=${serverPort} allowed-address=${subnetAddress} persistent-keepalive=25s
 }
 :if ([:len [/ip address find address="${routerTunnelIp}/24" interface="wg-hq"]] = 0) do={
     /ip address add address=${routerTunnelIp}/24 interface="wg-hq" comment="HQInvestment VPN Address"
 }
 ` : ''}
-# ── 7. Firewall & NAT ────────────────────────────────────────
+# ── 9. Firewall & NAT ────────────────────────────────────────────
 :if ([:len [/ip firewall nat find action=masquerade chain=srcnat out-interface=$wanInterface]] = 0) do={
     /ip firewall nat add chain=srcnat out-interface=$wanInterface action=masquerade comment="Masquerade for internet"
 }
@@ -142,16 +180,16 @@ ${isWireGuard ? `# ── 6. WireGuard VPN Configuration ───────�
 }
 
 :if ([:len [/ip firewall filter find where comment="Allow Winbox"]] = 0) do={
-    /ip firewall filter add place-before=0 chain=input protocol=tcp dst-port=8291 action=accept comment="Allow Winbox"
+    /ip firewall filter add place-before=0 chain=input protocol=tcp dst-port=8291 ${isWireGuard ? `src-address=${subnetAddress} ` : ''}action=accept comment="Allow Winbox"
 }
 :if ([:len [/ip firewall filter find where comment="Allow Web"]] = 0) do={
-    /ip firewall filter add place-before=0 chain=input protocol=tcp dst-port=80,443 action=accept comment="Allow Web"
+    /ip firewall filter add place-before=0 chain=input protocol=tcp dst-port=80,443 ${isWireGuard ? `src-address=${subnetAddress} ` : ''}action=accept comment="Allow Web"
 }
 :if ([:len [/ip firewall filter find where comment="Allow API"]] = 0) do={
-    /ip firewall filter add place-before=0 chain=input protocol=tcp dst-port=8728,8729 action=accept comment="Allow API"
+    /ip firewall filter add place-before=0 chain=input protocol=tcp dst-port=8728,8729 ${isWireGuard ? `src-address=${subnetAddress} ` : ''}action=accept comment="Allow API"
 }
 :if ([:len [/ip firewall filter find where comment="Allow DNS & DHCP"]] = 0) do={
-    /ip firewall filter add place-before=0 chain=input protocol=udp dst-port=53,67 action=accept comment="Allow DNS & DHCP"
+    /ip firewall filter add place-before=0 chain=input in-interface=$lanBridge protocol=udp dst-port=53,67 action=accept comment="Allow DNS & DHCP"
 }
 :if ([:len [/ip firewall filter find where comment="Allow Ping"]] = 0) do={
     /ip firewall filter add place-before=0 chain=input protocol=icmp action=accept comment="Allow Ping"
@@ -178,6 +216,11 @@ ${isWireGuard ? `:if ([:len [/ip firewall filter find where comment="Allow WireG
 
 /ip firewall filter remove [find comment="Dummy HQ Rule"]
 
+# Block all other unsolicited WAN input (must be AFTER all accept rules above)
+:if ([:len [/ip firewall filter find where comment="Drop WAN input - HQInvestment"]] = 0) do={
+    /ip firewall filter add chain=input in-interface=$wanInterface action=drop comment="Drop WAN input - HQInvestment"
+}
+
 # ── 8. RADIUS & Walled Garden ──────────────────────────────────
 :if ([:len [/radius find address="${radiusAddress}"]] = 0) do={
     /radius add service=hotspot,ppp address="${radiusAddress}" secret="${routerPassword || 'hqinvestment_radius_secret'}" authentication-port=1812 accounting-port=1813 timeout=3s ${isWireGuard ? `src-address=${routerTunnelIp} ` : ''}comment="HQInvestment RADIUS"
@@ -188,14 +231,18 @@ ${isWireGuard ? `:if ([:len [/ip firewall filter find where comment="Allow WireG
 /ppp aaa set use-radius=yes accounting=yes
 
 # Walled Garden - allow billing portal (DNS-based and IP-based)
+# DNS entry: unauthenticated clients can reach billing portal by hostname
 :if ([:len [/ip hotspot walled-garden find dst-host="${apiHost}"]] = 0) do={
     /ip hotspot walled-garden add dst-host="${apiHost}" action=allow comment="Billing Portal"
 }
-:if ([:len [/ip hotspot walled-garden ip find dst-address="${apiHost}"]] = 0) do={
-    /ip hotspot walled-garden ip add dst-address="${apiHost}" action=accept comment="Billing Portal IP"
+# IP entry: uses actual server IP so portal works even if DNS is not set up
+:if ([:len [/ip hotspot walled-garden ip find dst-address="${radiusAddress}"]] = 0) do={
+    /ip hotspot walled-garden ip add dst-address="${radiusAddress}" action=accept comment="Billing Portal IP"
 }
-
-
+# VPN subnet entry: RADIUS auth traffic must flow even before login
+${subnetAddress ? `:if ([:len [/ip hotspot walled-garden ip find dst-address="${subnetAddress}"]] = 0) do={
+    /ip hotspot walled-garden ip add dst-address="${subnetAddress}" action=accept comment="VPN Subnet - HQInvestment"
+}` : ''}
 # ── 9. System Scheduler (Auto-sync with HQInvestment) ────────
 :if ([:len [/system scheduler find name="billing-sync"]] > 0) do={ /system scheduler remove [find name="billing-sync"] }
 :local syncUrl "${publicApiBase}/api/sync/${routerId}"

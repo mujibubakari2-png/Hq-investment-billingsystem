@@ -13,7 +13,7 @@ async function getRouterWgFields(routerId: string) {
     const rows = await prisma.$queryRawUnsafe(
         `SELECT "wgPrivateKey", "wgPublicKey", "wgPeerPublicKey", "wgPresharedKey",
                 "wgTunnelIp", "wgServerEndpoint", "wgListenPort", "wgEnabled", "wgConfiguredAt",
-                "host", "name", "id", "tenantId"
+                "host", "name", "id", "tenantId", "port", "apiPort", "password", "username"
          FROM "routers" WHERE "id" = $1 LIMIT 1`,
         routerId,
     ) as any[];
@@ -268,7 +268,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         if (action === "push-config") {
             try {
                 const service = await getMikroTikService(id, userPayload.role === "SUPER_ADMIN" ? null : userPayload.tenantId);
-                const routerIdCode = `MYR-${router.id.padStart(3, '0')}VBHBC`;
 
                 console.log(`[PUSH-CONFIG] Starting unified config for router: ${router.name}`);
 
@@ -383,10 +382,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 try {
                     const bridges = await service.apiRequestPublic("/interface/bridge");
                     if (Array.isArray(bridges) && bridges.length > 0) {
-                        const defaultBridge = bridges.find((b: any) => b.name === "bridge" || b.name === "bridge-local" || b.name === "bridgeLocal");
-                        lanBridgeName = defaultBridge ? defaultBridge.name : bridges[0].name;
-                        bridgeExists = true;
-                        console.log(`[PUSH-CONFIG] Found existing bridge: ${lanBridgeName}`);
+                        // Skip WAN/uplink bridges — find a LAN bridge
+                        const lanBridge = bridges.find((b: any) =>
+                            b.name !== "wan" &&
+                            b.name !== "wan-bridge" &&
+                            b.name !== "wan-local" &&
+                            !b.name.toLowerCase().startsWith("wan")
+                        );
+                        if (lanBridge) {
+                            lanBridgeName = lanBridge.name;
+                            bridgeExists = true;
+                            console.log(`[PUSH-CONFIG] Found existing LAN bridge: ${lanBridgeName}`);
+                        }
                     }
                 } catch (e: any) {
                     console.warn("Failed to get bridges, will use bridge-lan");
@@ -396,11 +403,24 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                     try {
                         await service.apiRequestPublic("/interface/bridge", "PUT", {
                             name: lanBridgeName,
+                            // Disable STP (Spanning Tree) to prevent 30-second port-up delays
+                            // that break hotspot login for newly connected clients
+                            "protocol-mode": "none",
+                            "stp": "no",
                             comment: "HQInvestment LAN Bridge - Hotspot & PPPoE"
                         });
                     } catch (e: any) { if (!e.message?.includes("already")) console.warn("Bridge note:", e.message); }
-                    // Note: We deliberately DO NOT forcefully add ether2 to the bridge here.
-                    // Doing so breaks existing DHCP servers on ether2 and drops the network.
+                } else {
+                    // Disable STP on existing bridge too
+                    try {
+                        const bridgeList = await service.apiRequestPublic("/interface/bridge");
+                        const existing = Array.isArray(bridgeList) ? bridgeList.find((b: any) => b.name === lanBridgeName) : null;
+                        if (existing?.[".id"]) {
+                            await service.apiRequestPublic(`/interface/bridge/${existing[".id"]}`, "PATCH", {
+                                "protocol-mode": "none", "stp": "no"
+                            });
+                        }
+                    } catch { }
                 }
 
                 // Sanitize name for RouterOS identifiers using shared lib function
@@ -421,13 +441,69 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                     });
                 } catch (e: any) { if (!e.message?.includes("already")) console.warn("Hotspot profile note:", e.message); }
 
+                // Ensure use-radius=yes on ANY existing hotspot profile (not just the one we created)
+                try {
+                    const existingProfiles = await service.apiRequestPublic("/ip/hotspot/profile");
+                    if (Array.isArray(existingProfiles)) {
+                        for (const prof of existingProfiles) {
+                            if (prof["use-radius"] !== "yes") {
+                                await service.apiRequestPublic(`/ip/hotspot/profile/${prof[".id"]}`, "PATCH", { "use-radius": "yes" });
+                                console.log(`[PUSH-CONFIG] Enforced use-radius=yes on profile: ${prof.name}`);
+                            }
+                        }
+                    }
+                } catch (e: any) { console.warn("Hotspot profile radius enforce note:", e.message); }
+
+                // Use separate pool ranges for Hotspot and PPPoE to prevent IP collisions
+                // Hotspot clients: .10 – .149  |  PPPoE clients: .150 – .250
+                const hsPoolStart  = `${lanPrefix2}.10`;
+                const hsPoolEnd    = `${lanPrefix2}.149`;
+                const ppoePoolStart = `${lanPrefix2}.150`;
+                const ppoePoolEnd   = `${lanPrefix2}.250`;
+
                 try {
                     await service.apiRequestPublic("/ip/pool", "PUT", {
                         name: `hs-pool-${safeRouterName}`,
-                        ranges: `${lanPoolStart}-${lanPoolEnd}`
+                        ranges: `${hsPoolStart}-${hsPoolEnd}`
                     });
                 } catch (e: any) { if (!e.message?.includes("already")) console.warn("HS pool note:", e.message); }
 
+                try {
+                    await service.apiRequestPublic("/ip/pool", "PUT", {
+                        name: `pppoe-pool-${safeRouterName}`,
+                        ranges: `${ppoePoolStart}-${ppoePoolEnd}`
+                    });
+                } catch (e: any) { if (!e.message?.includes("already")) console.warn("PPPoE pool note:", e.message); }
+
+                // STEP 2a: IP address on bridge MUST come before hotspot creation.
+                // RouterOS requires hotspot-address to already exist on the interface.
+                try {
+                    await service.apiRequestPublic("/ip/address", "PUT", {
+                        address: lanCidr,
+                        interface: lanBridgeName,
+                        comment: "HQInvestment Hotspot LAN"
+                    });
+                } catch (e: any) { if (!e.message?.includes("already")) console.warn("HS IP note:", e.message); }
+
+                try {
+                    await service.apiRequestPublic("/ip/dhcp-server/network", "PUT", {
+                        address: lanNetwork,
+                        gateway: lanGateway,
+                        "dns-server": "8.8.8.8,1.1.1.1"
+                    });
+                } catch (e: any) { if (!e.message?.includes("already")) console.warn("DHCP network note:", e.message); }
+
+                try {
+                    await service.apiRequestPublic("/ip/dhcp-server", "PUT", {
+                        name: `dhcp-${safeRouterName}`,
+                        interface: lanBridgeName,
+                        "address-pool": `hs-pool-${safeRouterName}`,
+                        "lease-time": "1h",
+                        disabled: "no"
+                    });
+                } catch (e: any) { if (!e.message?.includes("already")) console.warn("DHCP server note:", e.message); }
+
+                // Hotspot created AFTER IP address is confirmed on bridge
                 try {
                     await service.apiRequestPublic("/ip/hotspot", "PUT", {
                         name: `hotspot-${safeRouterName}`,
@@ -437,13 +513,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                         disabled: "no"
                     });
                 } catch (e: any) { if (!e.message?.includes("already")) console.warn("Hotspot note:", e.message); }
-
-                try {
-                    await service.apiRequestPublic("/ip/pool", "PUT", {
-                        name: `pppoe-pool-${safeRouterName}`,
-                        ranges: `${lanPoolStart}-${lanPoolEnd}`
-                    });
-                } catch (e: any) { if (!e.message?.includes("already")) console.warn("PPPoE pool note:", e.message); }
 
                 try {
                     await service.apiRequestPublic("/ppp/profile", "PUT", {
@@ -467,34 +536,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                         "service-name": `pppoe-svc-${safeRouterName}`,
                         interface: lanBridgeName,
                         "default-profile": `pppoe-profile-${safeRouterName}`,
+                        "one-session-per-host": "yes",
                         disabled: "no"
                     });
                 } catch (e: any) { if (!e.message?.includes("already")) console.warn("PPPoE server note:", e.message); }
-
-                try {
-                    await service.apiRequestPublic("/ip/address", "PUT", {
-                        address: lanCidr,
-                        interface: lanBridgeName,
-                        comment: "HQInvestment Hotspot LAN"
-                    });
-                } catch (e: any) { if (!e.message?.includes("already")) console.warn("HS IP note:", e.message); }
-
-                try {
-                    await service.apiRequestPublic("/ip/dhcp-server/network", "PUT", {
-                        address: lanNetwork,
-                        gateway: lanGateway,
-                        "dns-server": "8.8.8.8,1.1.1.1"
-                    });
-                } catch (e: any) { if (!e.message?.includes("already")) console.warn("DHCP network note:", e.message); }
-
-                try {
-                    await service.apiRequestPublic("/ip/dhcp-server", "PUT", {
-                        name: `dhcp-${safeRouterName}`,
-                        interface: lanBridgeName,
-                        "address-pool": `hs-pool-${safeRouterName}`,
-                        disabled: "no"
-                    });
-                } catch (e: any) { if (!e.message?.includes("already")) console.warn("DHCP server note:", e.message); }
 
                 // ──────────────────────────────────────────────────────────
                 // STEP 3: WIREGUARD VPN
@@ -504,7 +549,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 // Add peer to the Server's WireGuard interface FIRST to avoid race condition
                 // (If Mikrotik tries to connect before the server expects it, handshake fails)
                 try {
-                    await wireguardManager.addPeer(router.wgPublicKey, tunnelIp);
+                    await wireguardManager.addPeer(router.wgPublicKey, tunnelIp, router.wgPresharedKey || undefined);
                 } catch (e: any) {
                     console.error("Failed to add peer to wg0:", e.message);
                 }
@@ -560,10 +605,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 } catch { }
 
                 try {
+                    // allowed-address = VPN subnet ONLY (not 0.0.0.0/0).
+                    // Routing ALL traffic through the tunnel would break internet for hotspot clients
+                    // and overload the server. Only management/RADIUS traffic uses the VPN.
+                    // Preshared key adds an extra layer of symmetric encryption to the handshake.
                     await service.apiRequestPublic("/interface/wireguard/peers", "PUT", {
                         interface: "wg-hq",
                         "public-key": router.wgPeerPublicKey,
-                        "allowed-address": "0.0.0.0/0,::/0",
+                        ...(router.wgPresharedKey ? { "preshared-key": router.wgPresharedKey } : {}),
+                        "allowed-address": `${subnetPrefix}.0/24`,
                         "endpoint-address": serverEndpoint,
                         "endpoint-port": String(serverPort),
                         "persistent-keepalive": "25s",
@@ -578,24 +628,35 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
                 const restPort = router.apiPort || (router.port === 8728 || router.port === 8729 ? 80 : router.port) || 80;
 
+                // ── FIREWALL RULES ────────────────────────────────────────────────
+                // IMPORTANT: The "Allow Hotspot to Internet" forward rule is intentionally
+                // ABSENT. The MikroTik Hotspot engine intercepts all traffic from the bridge
+                // and only forwards it to WAN AFTER successful authentication (voucher/payment).
+                // Adding an unconditional forward rule here would bypass authentication entirely,
+                // allowing any device to get free internet access.
                 const firewallRules = [
+                    // ── INPUT CHAIN: allow management & services ──
                     { chain: "input", protocol: "udp", "dst-port": String(listenPort), action: "accept", comment: "Allow WireGuard - HQInvestment" },
                     { chain: "input", protocol: "icmp", "src-address": `${subnetPrefix}.0/24`, action: "accept", comment: "Allow ICMP from VPN - HQInvestment" },
                     { chain: "input", protocol: "tcp", "dst-port": String(restPort), "src-address": `${subnetPrefix}.0/24`, action: "accept", comment: "Allow REST API from VPN - HQInvestment" },
                     { chain: "input", protocol: "tcp", "dst-port": "8291", "src-address": `${subnetPrefix}.0/24`, action: "accept", comment: "Allow Winbox from VPN - HQInvestment" },
                     { chain: "input", protocol: "udp", "dst-port": "3799", "src-address": `${subnetPrefix}.0/24`, action: "accept", comment: "Allow RADIUS CoA from VPN - HQInvestment" },
-                    { chain: "input", protocol: "tcp", "dst-port": "80,443", action: "accept", comment: "Allow Web - HQInvestment" },
-                    { chain: "input", protocol: "udp", "dst-port": "53,67", action: "accept", comment: "Allow DNS & DHCP - HQInvestment" },
+                    { chain: "input", protocol: "tcp", "dst-port": "80,443", "src-address": `${subnetPrefix}.0/24`, action: "accept", comment: "Allow Web from VPN - HQInvestment" },
+                    { chain: "input", protocol: "udp", "dst-port": "53,67", "in-interface": lanBridgeName, action: "accept", comment: "Allow DNS & DHCP from LAN - HQInvestment" },
                     { chain: "input", protocol: "icmp", action: "accept", comment: "Allow Ping - HQInvestment" },
-                    { chain: "input", "connection-state": "established,related", action: "accept", comment: "Allow Established - HQInvestment" },
-                    { chain: "input", "in-interface": lanBridgeName, protocol: "tcp", "dst-port": "80,443", action: "accept", comment: "Allow Hotspot HTTP/HTTPS - HQInvestment" },
+                    { chain: "input", "connection-state": "established,related", action: "accept", comment: "Allow Established Input - HQInvestment" },
+                    { chain: "input", "in-interface": lanBridgeName, protocol: "tcp", "dst-port": "80,443", action: "accept", comment: "Allow Hotspot Captive Portal - HQInvestment" },
                     { chain: "input", "in-interface": lanBridgeName, protocol: "udp", "dst-port": "67", action: "accept", comment: "Allow Hotspot DHCP - HQInvestment" },
                     { chain: "input", "in-interface": lanBridgeName, protocol: "udp", "dst-port": "53", action: "accept", comment: "Allow Hotspot DNS - HQInvestment" },
-                    { chain: "forward", "in-interface": lanBridgeName, "out-interface": "ether1", action: "accept", comment: "Allow Hotspot to Internet - HQInvestment" },
+                    // ── FORWARD CHAIN: authenticated PPPoE only ──
+                    // NOTE: Hotspot-authenticated forward is handled automatically by the hotspot
+                    // engine. Do NOT add a blanket bridge->ether1 accept rule here!
                     { chain: "forward", "in-interface": "all-ppp", "out-interface": "ether1", action: "accept", comment: "Allow PPPoE to Internet - HQInvestment" },
-                    { chain: "forward", "in-interface": "ether1", "out-interface": lanBridgeName, "connection-state": "established,related", action: "accept", comment: "Allow Internet to Hotspot - HQInvestment" },
+                    { chain: "forward", "connection-state": "established,related", action: "accept", comment: "Allow Established Forward - HQInvestment" },
                     { chain: "forward", "in-interface": "wg-hq", action: "accept", comment: "Allow WG traffic - HQInvestment" },
-                    { chain: "forward", "out-interface": "wg-hq", action: "accept", comment: "Allow WG return - HQInvestment" }
+                    { chain: "forward", "out-interface": "wg-hq", action: "accept", comment: "Allow WG return - HQInvestment" },
+                    // ── DROP RULES: must come LAST (lowest priority) ──
+                    { chain: "input", "in-interface": "ether1", action: "drop", comment: "Drop WAN input - HQInvestment" },
                 ];
 
                 // Reverse the array so that by putting them at index 0, they end up in the correct order at the very top.
@@ -664,6 +725,65 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                         port: "3799"
                     });
                 } catch (e: any) { console.warn("Radius incoming note:", e.message); }
+
+                // ──────────────────────────────────────────────────────────
+                // STEP 7b: WALLED GARDEN — allow billing portal BEFORE login
+                // Without this, clients cannot reach the payment page to buy
+                // a voucher or pay via mobile money.
+                // ──────────────────────────────────────────────────────────
+                console.log("[PUSH-CONFIG] Setting up Walled Garden...");
+                const billingHost = process.env.WG_SERVER_ENDPOINT || process.env.NEXT_PUBLIC_API_URL?.replace(/^https?:\/\//, '') || wgServerIp;
+                const billingHostClean = billingHost.split(':')[0]; // strip port if any
+
+                try {
+                    // Remove old walled garden entries created by HQInvestment
+                    const oldWg = await service.apiRequestPublic("/ip/hotspot/walled-garden");
+                    if (Array.isArray(oldWg)) {
+                        for (const entry of oldWg) {
+                            if (entry.comment?.includes("HQInvestment")) {
+                                try { await service.apiRequestPublic(`/ip/hotspot/walled-garden/${entry[".id"]}`, "DELETE"); } catch {}
+                            }
+                        }
+                    }
+                } catch {}
+
+                try {
+                    const oldWgIp = await service.apiRequestPublic("/ip/hotspot/walled-garden/ip");
+                    if (Array.isArray(oldWgIp)) {
+                        for (const entry of oldWgIp) {
+                            if (entry.comment?.includes("HQInvestment")) {
+                                try { await service.apiRequestPublic(`/ip/hotspot/walled-garden/ip/${entry[".id"]}`, "DELETE"); } catch {}
+                            }
+                        }
+                    }
+                } catch {}
+
+                // Allow billing portal domain (DNS-based) - unauthenticated clients can reach it
+                try {
+                    await service.apiRequestPublic("/ip/hotspot/walled-garden", "PUT", {
+                        "dst-host": billingHostClean,
+                        action: "allow",
+                        comment: "Billing Portal - HQInvestment"
+                    });
+                } catch (e: any) { if (!e.message?.includes("already")) console.warn("Walled garden DNS note:", e.message); }
+
+                // Allow billing portal IP (IP-based) - ensures portal works even if DNS fails
+                try {
+                    await service.apiRequestPublic("/ip/hotspot/walled-garden/ip", "PUT", {
+                        "dst-address": wgServerIp,
+                        action: "accept",
+                        comment: "Billing Portal IP - HQInvestment"
+                    });
+                } catch (e: any) { if (!e.message?.includes("already")) console.warn("Walled garden IP note:", e.message); }
+
+                // Allow VPN subnet access from unauthenticated clients (needed for RADIUS)
+                try {
+                    await service.apiRequestPublic("/ip/hotspot/walled-garden/ip", "PUT", {
+                        "dst-address": `${subnetPrefix}.0/24`,
+                        action: "accept",
+                        comment: "VPN Subnet - HQInvestment"
+                    });
+                } catch (e: any) { if (!e.message?.includes("already")) console.warn("Walled garden VPN note:", e.message); }
 
                 // Verification Step: Wait for tunnel to establish, then check real handshake
                 // We wait up to 15 seconds to allow Mikrotik to retry handshake if needed
@@ -736,7 +856,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 }
             }
 
-            await wireguardManager.addPeer(router.wgPublicKey, tunnelIp);
+            await wireguardManager.addPeer(router.wgPublicKey, tunnelIp, router.wgPresharedKey || undefined);
         } catch (err: any) {
             console.error("Failed to add peer:", err);
             return errorResponse("Failed to add peer to server", 500);

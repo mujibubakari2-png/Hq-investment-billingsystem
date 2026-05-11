@@ -96,9 +96,6 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
         );
     }
 
-    // Compute subnet from tunnel IP dynamically
-    const subnetPrefix = config.routerTunnelIp.split('.').slice(0, 3).join('.');
-    const subnetAddress = `${subnetPrefix}.0/24`;
     // Always use the server public key returned from the backend (dynamically fetched via wg show)
     const serverPubKey = config.serverPublicKey;
 
@@ -118,6 +115,7 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
         listenPort: config.listenPort,
         routerPrivateKey: config.routerPrivateKey,
         serverPubKey,
+        presharedKey: config.presharedKey,
         serverEndpoint: config.serverEndpoint,
         serverPort: config.serverPort,
         routerTunnelIp: config.routerTunnelIp,
@@ -141,7 +139,9 @@ DNS = 8.8.8.8, 1.1.1.1
 # Router: ${config.routerName}
 PublicKey = ${config.routerPublicKey}
 PresharedKey = ${config.presharedKey}
-AllowedIPs = ${subnetAddress}, ${config.routerHost}/32
+# AllowedIPs: only the router's tunnel IP — do NOT add 0.0.0.0/0 here.
+# We only want management/RADIUS traffic to flow through the tunnel.
+AllowedIPs = ${config.routerTunnelIp}/32
 Endpoint = ${config.routerHost}:${config.listenPort}
 PersistentKeepalive = 25`;
 
