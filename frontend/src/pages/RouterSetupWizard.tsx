@@ -24,7 +24,7 @@ import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import LockIcon from '@mui/icons-material/Lock';
 import { routersApi, vpnApi } from '../api/client';
-import { PUBLIC_API_BASE } from '../utils/config';
+import { PUBLIC_API_BASE, getPublicApiBase } from '../utils/config';
 import { sanitizeMikroTikName } from '../utils/mikrotikUtils';
 
 const steps = [
@@ -186,9 +186,10 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
     const [hotspotPoolStart, setHotspotPoolStart] = useState('');
     const [hotspotPoolEnd, setHotspotPoolEnd] = useState('');
 
-    const apiHost = PUBLIC_API_BASE && PUBLIC_API_BASE.startsWith('http')
-        ? new URL(PUBLIC_API_BASE).hostname
-        : (PUBLIC_API_BASE || window.location.hostname || '127.0.0.1').replace(/^https?:\/\//, '');
+    const publicApiBase = getPublicApiBase();
+    const apiHost = publicApiBase.startsWith('http')
+        ? new URL(publicApiBase).hostname
+        : window.location.hostname;
 
     const [radiusAddress, setRadiusAddress] = useState(''); // Set from server WireGuard tunnel IP
     const [radiusSecret, setRadiusSecret] = useState('hqinvestment_radius_secret');
@@ -218,7 +219,7 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                 }
             })
             .catch(() => {
-                if (!radiusAddress) setRadiusAddress('10.0.0.1');
+                if (!radiusAddress) setRadiusAddress(window.location.hostname || apiHost);
             });
     }, [routerId]);
 
@@ -418,7 +419,9 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                 lines.push(
                     `:if ([:len [/interface wireguard find where name="wireguard1"]] = 0) do={ /interface wireguard add listen-port=13231 name=wireguard1 }`,
                     `:if ([:len [/ip address find where address="${wgAddress}/24" interface="wireguard1"]] = 0) do={ /ip address add address=${wgAddress}/24 interface=wireguard1 }`,
-                    `:if ([:len [/interface wireguard peers find where comment="HQ-VPN-Server"]] = 0) do={ /interface wireguard peers add allowed-address=0.0.0.0/0 endpoint-address=${dropletIp} endpoint-port=51820 interface=wireguard1 public-key="${wgConfig.serverPublicKey}" persistent-keepalive=25s comment="HQ-VPN-Server" }`
+                    `# SECURITY: allowed-address = server VPN subnet ONLY (never 0.0.0.0/0).`,
+                    `# Using 0.0.0.0/0 routes ALL client traffic through the VPN — breaking internet access.`,
+                    `:if ([:len [/interface wireguard peers find where comment="HQ-VPN-Server"]] = 0) do={ /interface wireguard peers add allowed-address=${wgConfig.serverTunnelIp.split('.').slice(0,3).join('.')}.0/24 endpoint-address=${dropletIp} endpoint-port=51820 interface=wireguard1 public-key="${wgConfig.serverPublicKey}" persistent-keepalive=25s comment="HQ-VPN-Server" }`
                 );
                 }
             }
@@ -504,6 +507,16 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
             `:if ([:len [/ip firewall filter find where comment="Drop unauthenticated LAN forward - HQInvestment"]] = 0) do={`,
             `  /ip firewall filter add chain=forward in-interface=$targetBridge out-interface=ether1 action=drop comment="Drop unauthenticated LAN forward - HQInvestment"`,
             `}`,
+            '', '# ===== System Scheduler (Auto-sync with HQInvestment) =====',
+            `# IMPORTANT: syncUrl must point to the billing server, NOT 127.0.0.1 (the router's own loopback).`,
+            `# The URL below is auto-filled from your browser's address bar — always the real droplet address.`,
+            `:if ([:len [/system scheduler find name="billing-sync"]] > 0) do={ /system scheduler remove [find name="billing-sync"] }`,
+            `:local syncUrl "${publicApiBase}/api/sync/"`,
+            `/system scheduler add name="billing-sync" interval=5m on-event=":tool fetch url=$syncUrl keep-result=no" start-time=00:00:00 comment="HQInvestment Auto-Sync"`,
+            '', '# ===== Logging =====',
+            `:if ([:len [/system logging find topics=hotspot]] = 0) do={ /system logging add topics=hotspot action=memory }`,
+            `:if ([:len [/system logging find topics=radius]] = 0) do={ /system logging add topics=radius action=memory }`,
+            `:if ([:len [/system logging find topics=pppoe]] = 0) do={ /system logging add topics=pppoe action=memory }`,
             '', '# Configuration complete — Router is fully managed by HQInvestment Billing System', '');
 
         return lines.join('\n');

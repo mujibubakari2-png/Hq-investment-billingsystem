@@ -10,7 +10,7 @@ import LoginIcon from '@mui/icons-material/Login';
 import DeleteIcon from '@mui/icons-material/Delete';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import WireGuardConfigModal from './WireGuardConfigModal';
-import { PUBLIC_API_BASE } from '../utils/config';
+import { PUBLIC_API_BASE, getPublicApiBase } from '../utils/config';
 import type { Router } from '../types';
 import { formatDateTime } from '../utils/formatters';
 import { sanitizeMikroTikName } from '../utils/mikrotikUtils';
@@ -30,10 +30,10 @@ export default function RouterDetailModal({ router, onClose, onDelete }: RouterD
         const routerIdCode = `MYR-${router.id.padStart(3, '0')}VBHBC`;
         const safeRouterName = sanitizeMikroTikName(router.name);
 
-        // Extract the actual backend/RADIUS IP or domain from PUBLIC_API_BASE
-        const apiHost = PUBLIC_API_BASE && PUBLIC_API_BASE.startsWith('http')
-            ? new URL(PUBLIC_API_BASE).hostname
-            : (PUBLIC_API_BASE || window.location.hostname || '127.0.0.1').replace(/^https?:\/\//, '');
+        const publicApiBase = getPublicApiBase();
+        const apiHost = publicApiBase.startsWith('http')
+            ? new URL(publicApiBase).hostname
+            : window.location.hostname;
 
         const script = generateMikrotikScript({
             routerName: router.name,
@@ -41,7 +41,7 @@ export default function RouterDetailModal({ router, onClose, onDelete }: RouterD
             routerPassword: router.password,
             routerId: routerIdCode,
             apiHost,
-            publicApiBase: PUBLIC_API_BASE || 'http://127.0.0.1',
+            publicApiBase,
             isWireGuard: false
         });
         const blob = new Blob([script], { type: 'text/plain' });

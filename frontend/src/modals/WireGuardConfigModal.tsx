@@ -10,7 +10,7 @@ import PowerSettingsNewIcon from '@mui/icons-material/PowerSettingsNew';
 import SyncIcon from '@mui/icons-material/Sync';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import { routersApi } from '../api/client';
-import { PUBLIC_API_BASE } from '../utils/config';
+import { PUBLIC_API_BASE, getPublicApiBase } from '../utils/config';
 import { generateMikrotikScript } from '../utils/mikrotikScriptGenerator';
 import { sanitizeMikroTikName } from '../utils/mikrotikUtils';
 import type { Router } from '../types';
@@ -100,9 +100,12 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
     const serverPubKey = config.serverPublicKey;
 
 
-    const apiHost = PUBLIC_API_BASE && PUBLIC_API_BASE.startsWith('http')
-        ? new URL(PUBLIC_API_BASE).hostname
-        : (PUBLIC_API_BASE || window.location.hostname || '127.0.0.1').replace(/^https?:\/\//, '');
+    const publicApiBase = getPublicApiBase();
+
+    // Extract hostname for RADIUS / walled-garden config
+    const apiHost = publicApiBase.startsWith('http')
+        ? new URL(publicApiBase).hostname
+        : window.location.hostname;
 
     const serverConfig = generateMikrotikScript({
         routerName: config.routerName,
@@ -110,7 +113,7 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
         routerPassword: router.password,
         routerId: config.routerId,
         apiHost,
-        publicApiBase: PUBLIC_API_BASE || 'http://127.0.0.1',
+        publicApiBase,
         isWireGuard: true,
         listenPort: config.listenPort,
         routerPrivateKey: config.routerPrivateKey,

@@ -6,7 +6,7 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import DownloadIcon from '@mui/icons-material/Download';
 import DescriptionIcon from '@mui/icons-material/Description';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import { PUBLIC_API_BASE } from '../utils/config';
+import { PUBLIC_API_BASE, getPublicApiBase } from '../utils/config';
 import type { Router } from '../types';
 
 interface MikrotikScriptModalProps {
@@ -31,10 +31,12 @@ export default function MikrotikScriptModal({ router, onClose }: MikrotikScriptM
 
     const routerIdCode = generateRouterIdCode(router.id);
 
-    // Extract the actual backend/RADIUS IP or domain from PUBLIC_API_BASE
-    const apiHost = PUBLIC_API_BASE && PUBLIC_API_BASE.startsWith('http')
-        ? new URL(PUBLIC_API_BASE).hostname
-        : (PUBLIC_API_BASE || window.location.hostname || '127.0.0.1').replace(/^https?:\/\//, '');
+    const publicApiBase = getPublicApiBase();
+
+    // Extract hostname from the resolved base URL for RADIUS / walled-garden
+    const apiHost = publicApiBase.startsWith('http')
+        ? new URL(publicApiBase).hostname
+        : window.location.hostname;
 
     const mikrotikScript = generateMikrotikScript({
         routerName: router.name,
@@ -42,7 +44,7 @@ export default function MikrotikScriptModal({ router, onClose }: MikrotikScriptM
         routerPassword: router.password,
         routerId: routerIdCode,
         apiHost,
-        publicApiBase: PUBLIC_API_BASE || 'http://127.0.0.1',
+        publicApiBase,
         isWireGuard: false
     });
 
