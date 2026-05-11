@@ -406,7 +406,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                             // Disable STP (Spanning Tree) to prevent 30-second port-up delays
                             // that break hotspot login for newly connected clients
                             "protocol-mode": "none",
-                            "stp": "no",
                             comment: "HQInvestment LAN Bridge - Hotspot & PPPoE"
                         });
                     } catch (e: any) { if (!e.message?.includes("already")) console.warn("Bridge note:", e.message); }
@@ -417,7 +416,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                         const existing = Array.isArray(bridgeList) ? bridgeList.find((b: any) => b.name === lanBridgeName) : null;
                         if (existing?.[".id"]) {
                             await service.apiRequestPublic(`/interface/bridge/${existing[".id"]}`, "PATCH", {
-                                "protocol-mode": "none", "stp": "no"
+                                "protocol-mode": "none"
                             });
                         }
                     } catch { }
