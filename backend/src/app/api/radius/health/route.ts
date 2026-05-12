@@ -16,10 +16,11 @@ export async function GET(req: NextRequest) {
         const { filter } = getTenantFilter(userPayload);
 
         // ── 1. Database checks ────────────────────────────────────────────────
-        const [radcheckCount, nasCount, activeSessionCount] = await Promise.all([
+        const [radcheckCount, nasCount, activeSessionCount, radreplyCount] = await Promise.all([
             prisma.radCheck.count({ where: { ...filter } }),
             prisma.radiusNas.count({ where: { ...filter } }),
             prisma.radAcct.count({ where: { acctstoptime: null, ...filter } }),
+            prisma.radReply.count({ where: { ...filter } }),
         ]);
 
         // ── 2. FreeRADIUS process check (server-side) ─────────────────────────
@@ -41,13 +42,17 @@ export async function GET(req: NextRequest) {
         let port1813Open = false;
 
         try {
-            const { stdout: ssOut } = await execAsync(
-                "ss -ulnp 2>/dev/null | grep -E ':181[23]' | wc -l",
+            const { stdout: ss1812 } = await execAsync(
+                "ss -ulnp 2>/dev/null | grep ':1812' | wc -l",
                 { timeout: 3000 }
             );
-            const portCount = parseInt(ssOut.trim() || "0");
-            port1812Open = portCount >= 1;
-            port1813Open = portCount >= 2;
+            port1812Open = parseInt(ss1812.trim() || "0") > 0;
+
+            const { stdout: ss1813 } = await execAsync(
+                "ss -ulnp 2>/dev/null | grep ':1813' | wc -l",
+                { timeout: 3000 }
+            );
+            port1813Open = parseInt(ss1813.trim() || "0") > 0;
         } catch {
             // Non-blocking — may not be available on all environments
         }
@@ -69,7 +74,20 @@ export async function GET(req: NextRequest) {
 
         if (radcheckCount === 0) {
             warnings.push(
-                "No RADIUS users (radcheck entries) found. Create subscriptions or RADIUS users to populate credentials."
+                "No RADIUS users (radcheck entries) found. Create subscriptions or vouchers to populate credentials."
+            );
+        }
+
+        if (radreplyCount === 0 && radcheckCount > 0) {
+            warnings.push(
+                "CRITICAL: No radreply entries found. MikroTik requires Session-Timeout in radreply to grant access. " +
+                "Re-activate subscriptions or run syncRadiusUser() to populate radreply."
+            );
+        }
+
+        if (!port1812Open && freeradiusRunning) {
+            warnings.push(
+                "Port 1812 (UDP) does not appear to be listening. Check: sudo ss -ulnp | grep 1812"
             );
         }
 
@@ -91,6 +109,7 @@ export async function GET(req: NextRequest) {
             },
             database: {
                 radcheckUsers: radcheckCount,
+                radreplyEntries: radreplyCount,
                 nasClients: nasCount,
                 activeSessions: activeSessionCount,
             },
@@ -99,12 +118,11 @@ export async function GET(req: NextRequest) {
                 ? null
                 : "sudo bash backend/scripts/setup-freeradius.sh",
             mikrotikGuide: {
-                radiusAddress: "10.0.0.1  (WireGuard IP) or your Droplet public IP",
-                authPort: 1812,
-                acctPort: 1813,
-                secret: "Must match the 'secret' field in your NAS client entry",
-                hotspotSettings:
-                    "IP → Hotspot → Servers → your server → RADIUS tab: enable 'Use RADIUS' and 'RADIUS Accounting'",
+                step1_radius: "RADIUS → Add: Service=hotspot, Address=10.0.0.1 (WireGuard IP), Auth-Port=1812, Acct-Port=1813, Timeout=3000, Secret=<your_secret>",
+                step2_hotspot: "IP → Hotspot → Servers → your server → RADIUS tab: enable 'Use RADIUS' and 'RADIUS Accounting'",
+                step3_pppoe: "PPP → Profiles → your profile → General tab: set 'Use RADIUS' = yes",
+                step4_timeout: "IMPORTANT: Set RADIUS Timeout to at least 3000ms in MikroTik to avoid 'RADIUS not respond' errors",
+                secret: "Must match RADIUS_NAS_SECRET in your .env and in clients.conf on the Droplet",
             },
         });
     } catch (e) {

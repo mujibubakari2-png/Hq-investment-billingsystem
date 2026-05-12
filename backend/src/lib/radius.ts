@@ -2,10 +2,90 @@ import prisma from "./prisma";
 
 /**
  * RADIUS Synchronization Utility
- * 
- * Manages the high-level RadiusUser model and the low-level 
- * RadCheck/RadReply tables used by FreeRADIUS.
+ *
+ * Manages the high-level RadiusUser model AND the low-level
+ * FreeRADIUS tables (radcheck / radreply) used directly by FreeRADIUS.
+ *
+ * ARCHITECTURE:
+ *  - radcheck  → attributes FreeRADIUS checks BEFORE granting access
+ *                (Cleartext-Password, Expiration)
+ *  - radreply  → attributes FreeRADIUS sends back AFTER granting access
+ *                (Session-Timeout, Mikrotik-Rate-Limit, etc.)
+ *
+ * Both tables must be populated for MikroTik to accept the session.
  */
+
+// ─── Internal Helpers ────────────────────────────────────────────────────────
+
+async function upsertRadCheck(
+    username: string,
+    attribute: string,
+    value: string,
+    op: string,
+    tenantId: string | null
+) {
+    const existing = await prisma.radCheck.findFirst({
+        where: { username, tenantId, attribute },
+        select: { id: true },
+    });
+
+    if (existing) {
+        await prisma.radCheck.update({
+            where: { id: existing.id },
+            data: { value, op },
+        });
+    } else {
+        await prisma.radCheck.create({
+            data: { username, attribute, op, value, tenantId },
+        });
+    }
+}
+
+async function upsertRadReply(
+    username: string,
+    attribute: string,
+    value: string,
+    op: string,
+    tenantId: string | null
+) {
+    const existing = await prisma.radReply.findFirst({
+        where: { username, tenantId, attribute },
+        select: { id: true },
+    });
+
+    if (existing) {
+        await prisma.radReply.update({
+            where: { id: existing.id },
+            data: { value, op },
+        });
+    } else {
+        await prisma.radReply.create({
+            data: { username, attribute, op, value, tenantId },
+        });
+    }
+}
+
+async function deleteRadReplyAttribute(
+    username: string,
+    attribute: string,
+    tenantId: string | null
+) {
+    await prisma.radReply.deleteMany({
+        where: { username, tenantId, attribute },
+    });
+}
+
+async function deleteRadCheckAttribute(
+    username: string,
+    attribute: string,
+    tenantId: string | null
+) {
+    await prisma.radCheck.deleteMany({
+        where: { username, tenantId, attribute },
+    });
+}
+
+// ─── Public API ───────────────────────────────────────────────────────────────
 
 export async function syncRadiusUser(params: {
     username: string;
@@ -14,19 +94,29 @@ export async function syncRadiusUser(params: {
     fullName?: string;
     expiresAt?: Date;
     status?: "Active" | "Inactive";
+    /** e.g. "10M/20M" upload/download — becomes Mikrotik-Rate-Limit reply attribute */
+    rateLimit?: string;
+    /** Allow simultaneous logins (default 1) */
+    simultaneousUse?: number;
 }) {
-    const { username, password, tenantId, fullName, expiresAt, status } = params;
+    const { username, password, tenantId, fullName, expiresAt, status, rateLimit, simultaneousUse } = params;
 
-    // 1. Manage RadiusUser (High-level model)
+    // ── 1. Manage RadiusUser (high-level tracking model) ──────────────────────
+    const sessionTimeoutSecs = expiresAt
+        ? Math.max(0, Math.floor((expiresAt.getTime() - Date.now()) / 1000))
+        : null;
+
     const radiusUser = await prisma.radiusUser.upsert({
-        where: { 
-            username_tenantId: { username, tenantId: tenantId || "" } 
+        where: {
+            username_tenantId: { username, tenantId: tenantId || "" },
         },
         update: {
             ...(password ? { password } : {}),
             ...(fullName ? { fullName } : {}),
             ...(status ? { status } : {}),
-            ...(expiresAt ? { sessionTimeout: String(Math.floor((expiresAt.getTime() - Date.now()) / 1000)) } : {}),
+            ...(sessionTimeoutSecs !== null
+                ? { sessionTimeout: String(sessionTimeoutSecs) }
+                : {}),
         },
         create: {
             username,
@@ -34,67 +124,84 @@ export async function syncRadiusUser(params: {
             tenantId,
             fullName: fullName || null,
             status: status || "Active",
-            sessionTimeout: expiresAt ? String(Math.floor((expiresAt.getTime() - Date.now()) / 1000)) : null,
+            sessionTimeout: sessionTimeoutSecs !== null ? String(sessionTimeoutSecs) : null,
         },
     });
 
-    // 2. Manage RadCheck (Low-level table for Cleartext-Password)
+    // ── 2. radcheck: Cleartext-Password ───────────────────────────────────────
     if (password) {
-        await prisma.radCheck.upsert({
-            where: { 
-                // Note: radcheck doesn't have a unique constraint on username_tenantId in schema, 
-                // but we should manage it as unique. We use findFirst + create/update.
-                id: (await prisma.radCheck.findFirst({ 
-                    where: { username, tenantId, attribute: "Cleartext-Password" } 
-                }))?.id || -1
-            },
-            update: { value: password },
-            create: {
-                username,
-                value: password,
-                attribute: "Cleartext-Password",
-                op: ":=",
-                tenantId,
-            },
-        });
+        await upsertRadCheck(username, "Cleartext-Password", password, ":=", tenantId);
     }
 
-    // 3. Manage Expiration (Expiration attribute in RadCheck)
-    if (expiresAt) {
-        // FreeRADIUS 'Expiration' format: "Jan 01 2024 00:00:00"
-        const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-        const expStr = `${months[expiresAt.getMonth()]} ${String(expiresAt.getDate()).padStart(2, '0')} ${expiresAt.getFullYear()} ${String(expiresAt.getHours()).padStart(2, '0')}:${String(expiresAt.getMinutes()).padStart(2, '0')}:${String(expiresAt.getSeconds()).padStart(2, '0')}`;
-        
-        await prisma.radCheck.upsert({
-            where: { 
-                id: (await prisma.radCheck.findFirst({ 
-                    where: { username, tenantId, attribute: "Expiration" } 
-                }))?.id || -1
-            },
-            update: { value: expStr },
-            create: {
-                username,
-                value: expStr,
-                attribute: "Expiration",
-                op: ":=",
-                tenantId,
-            },
-        });
+    // ── 3. radcheck: Simultaneous-Use (prevents multi-login abuse) ────────────
+    const maxSessions = simultaneousUse ?? 1;
+    await upsertRadCheck(username, "Simultaneous-Use", String(maxSessions), ":=", tenantId);
+
+    // ── 4. radcheck: Expiration (FreeRADIUS rejects if date passed) ───────────
+    if (expiresAt && expiresAt > new Date()) {
+        const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        const expStr = `${months[expiresAt.getMonth()]} ${String(expiresAt.getDate()).padStart(2, "0")} ${expiresAt.getFullYear()} ${String(expiresAt.getHours()).padStart(2, "0")}:${String(expiresAt.getMinutes()).padStart(2, "0")}:${String(expiresAt.getSeconds()).padStart(2, "0")}`;
+        await upsertRadCheck(username, "Expiration", expStr, ":=", tenantId);
+    } else if (expiresAt && expiresAt <= new Date()) {
+        // Already expired — keep the old expiration so FreeRADIUS rejects immediately
+        const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        const expStr = `${months[expiresAt.getMonth()]} ${String(expiresAt.getDate()).padStart(2, "0")} ${expiresAt.getFullYear()} ${String(expiresAt.getHours()).padStart(2, "0")}:${String(expiresAt.getMinutes()).padStart(2, "0")}:${String(expiresAt.getSeconds()).padStart(2, "0")}`;
+        await upsertRadCheck(username, "Expiration", expStr, ":=", tenantId);
+    }
+
+    // ── 5. radreply: Session-Timeout (CRITICAL for MikroTik) ─────────────────
+    //    MikroTik uses Session-Timeout to know when to disconnect the user.
+    //    Without this, MikroTik may refuse to fully establish the session.
+    if (sessionTimeoutSecs !== null && sessionTimeoutSecs > 0) {
+        await upsertRadReply(username, "Session-Timeout", String(sessionTimeoutSecs), "=", tenantId);
+    } else {
+        // Remove stale Session-Timeout if subscription expired or no expiry
+        await deleteRadReplyAttribute(username, "Session-Timeout", tenantId);
+    }
+
+    // ── 6. radreply: Mikrotik-Rate-Limit (bandwidth control) ─────────────────
+    //    Format: "upload/download" e.g. "10M/20M"
+    //    FreeRADIUS passes this to MikroTik which applies a queue tree.
+    if (rateLimit) {
+        await upsertRadReply(username, "Mikrotik-Rate-Limit", rateLimit, "=", tenantId);
     }
 
     return radiusUser;
 }
 
 /**
- * Suspend a user in RADIUS
+ * Suspend a user in RADIUS — immediately rejects all new auth attempts.
+ * Sets Expiration to the past in radcheck AND removes Session-Timeout
+ * from radreply so any cached session also expires.
  */
 export async function suspendRadiusUser(username: string, tenantId: string | null) {
+    // 1. Mark high-level model as Inactive
     await prisma.radiusUser.updateMany({
         where: { username, tenantId },
-        data: { status: "Inactive" }
+        data: { status: "Inactive" },
     });
-    
-    // Set an expiration in the past to immediately reject
-    const past = new Date(Date.now() - 86400000);
-    await syncRadiusUser({ username, tenantId, status: "Inactive", expiresAt: past });
+
+    // 2. Set Expiration in the past → FreeRADIUS rejects immediately
+    const past = new Date(Date.now() - 86400000); // yesterday
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const expStr = `${months[past.getMonth()]} ${String(past.getDate()).padStart(2, "0")} ${past.getFullYear()} 00:00:00`;
+    await upsertRadCheck(username, "Expiration", expStr, ":=", tenantId);
+
+    // 3. Remove Session-Timeout from radreply → no valid session time
+    await deleteRadReplyAttribute(username, "Session-Timeout", tenantId);
+}
+
+/**
+ * Fully remove a user from all RADIUS tables.
+ * Call this when a client is deleted or permanently banned.
+ */
+export async function deleteRadiusUser(username: string, tenantId: string | null) {
+    await Promise.allSettled([
+        prisma.radCheck.deleteMany({ where: { username, tenantId } }),
+        prisma.radReply.deleteMany({ where: { username, tenantId } }),
+        prisma.radiusUser.deleteMany({ where: { username, tenantId } }),
+    ]);
 }

@@ -16,7 +16,7 @@ ENV_FILE="$BACKEND_DIR/.env"
 
 echo ""
 echo "╔══════════════════════════════════════════════════════╗"
-echo "║      FreeRADIUS Setup — HQInvestment ISP Billing System     ║"
+echo "║    FreeRADIUS Setup — HQInvestment ISP Billing       ║"
 echo "╚══════════════════════════════════════════════════════╝"
 echo ""
 
@@ -52,10 +52,74 @@ echo "✅ FreeRADIUS installed"
 
 RADIUS_CONF_DIR="/etc/freeradius/3.0"
 
-# ── Step 2: Configure SQL module ──────────────────────────────────────────────
+# ── Step 2: Create missing RADIUS tables in PostgreSQL ────────────────────────
 echo ""
-echo "⚙️  Step 2: Configuring FreeRADIUS SQL module (PostgreSQL)..."
+echo "🗄️  Step 2: Ensuring all RADIUS tables exist in PostgreSQL..."
 
+PGPASSWORD="$DB_PASS_DECODED" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" <<SQL
+-- radreply: reply attributes sent back on Access-Accept (Session-Timeout, Rate-Limit)
+CREATE TABLE IF NOT EXISTS radreply (
+    id        SERIAL        PRIMARY KEY,
+    username  VARCHAR(64)   NOT NULL DEFAULT '',
+    attribute VARCHAR(64)   NOT NULL,
+    op        VARCHAR(2)    NOT NULL DEFAULT '=',
+    value     VARCHAR(253)  NOT NULL,
+    "tenantId" TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_radreply_username   ON radreply(username);
+CREATE INDEX IF NOT EXISTS idx_radreply_tenantid   ON radreply("tenantId");
+CREATE INDEX IF NOT EXISTS idx_radreply_tenant_usr ON radreply("tenantId", username);
+
+-- radpostauth: authentication attempt log
+CREATE TABLE IF NOT EXISTS radpostauth (
+    id        BIGSERIAL     PRIMARY KEY,
+    username  VARCHAR(64)   NOT NULL DEFAULT '',
+    pass      VARCHAR(64)   NOT NULL DEFAULT '',
+    reply     VARCHAR(32)   NOT NULL DEFAULT '',
+    authdate  TIMESTAMPTZ   NOT NULL DEFAULT now(),
+    "tenantId" TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_radpostauth_username ON radpostauth(username);
+CREATE INDEX IF NOT EXISTS idx_radpostauth_tenantid ON radpostauth("tenantId");
+
+-- radgroupcheck: group-level check attributes
+CREATE TABLE IF NOT EXISTS radgroupcheck (
+    id        SERIAL       PRIMARY KEY,
+    groupname VARCHAR(64)  NOT NULL DEFAULT '',
+    attribute VARCHAR(64)  NOT NULL,
+    op        VARCHAR(2)   NOT NULL DEFAULT ':=',
+    value     VARCHAR(253) NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_radgroupcheck_groupname ON radgroupcheck(groupname);
+
+-- radgroupreply: group-level reply attributes
+CREATE TABLE IF NOT EXISTS radgroupreply (
+    id        SERIAL       PRIMARY KEY,
+    groupname VARCHAR(64)  NOT NULL DEFAULT '',
+    attribute VARCHAR(64)  NOT NULL,
+    op        VARCHAR(2)   NOT NULL DEFAULT '=',
+    value     VARCHAR(253) NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_radgroupreply_groupname ON radgroupreply(groupname);
+
+-- radusergroup: maps users to groups
+CREATE TABLE IF NOT EXISTS radusergroup (
+    id        SERIAL      PRIMARY KEY,
+    username  VARCHAR(64) NOT NULL DEFAULT '',
+    groupname VARCHAR(64) NOT NULL DEFAULT '',
+    priority  INT         NOT NULL DEFAULT 1
+);
+CREATE INDEX IF NOT EXISTS idx_radusergroup_username ON radusergroup(username);
+SQL
+echo "✅ RADIUS tables ready"
+
+# ── Step 3: Configure SQL module ──────────────────────────────────────────────
+echo ""
+echo "⚙️  Step 3: Configuring FreeRADIUS SQL module (PostgreSQL)..."
+
+# IMPORTANT: PostgreSQL column names created by Prisma with camelCase use
+# quoted identifiers (e.g. "tenantId", "nasName"). The SQL queries below
+# use these quoted names to match the actual DB schema.
 sudo tee "$RADIUS_CONF_DIR/mods-available/sql" > /dev/null <<EOF
 sql {
     driver = "rlm_sql_postgresql"
@@ -68,19 +132,21 @@ sql {
     password = "$DB_PASS_DECODED"
     radius_db = "$DB_NAME"
 
-    # ── Table Names (must match Prisma schema) ──────────────────────
-    acct_table1    = "radacct"
-    acct_table2    = "radacct"
-    postauth_table = "radpostauth"
-    authcheck_table = "radcheck"
+    # ── Table Names (must match Prisma @@map names) ─────────────────
+    acct_table1      = "radacct"
+    acct_table2      = "radacct"
+    postauth_table   = "radpostauth"
+    authcheck_table  = "radcheck"
     authreply_table  = "radreply"
     groupcheck_table = "radgroupcheck"
     groupreply_table = "radgroupreply"
     usergroup_table  = "radusergroup"
 
-    # ── NAS Clients from DB ─────────────────────────────────────────
-    read_clients = yes
-    client_table = "radius_nas"
+    # ── NAS Clients: read from static clients.conf (not DB)
+    # We do NOT use read_clients=yes because Prisma uses camelCase
+    # column names ("nasName") which FreeRADIUS SQL cannot handle.
+    # NAS clients are registered in clients.conf (Step 5).
+    read_clients = no
 
     # ── Connection Pool ─────────────────────────────────────────────
     pool {
@@ -94,15 +160,45 @@ sql {
         idle_timeout = 60
     }
 
-    # ── SQL Queries ─────────────────────────────────────────────────
-    # Authenticate: check password in radcheck table
+    # ── authorize_check_query ───────────────────────────────────────
+    # Fetch all check attributes for this username.
+    # NOTE: "tenantId" is quoted because Prisma creates it as camelCase.
     authorize_check_query = "\
         SELECT id, username, attribute, value, op \
         FROM radcheck \
         WHERE username = '%{SQL-User-Name}' \
         ORDER BY id"
 
-    # Accounting: insert/update radacct
+    # ── authorize_reply_query ───────────────────────────────────────
+    # Fetch reply attributes (Session-Timeout, Rate-Limit, etc.)
+    authorize_reply_query = "\
+        SELECT id, username, attribute, value, op \
+        FROM radreply \
+        WHERE username = '%{SQL-User-Name}' \
+        ORDER BY id"
+
+    # ── authorize_group_check_query ─────────────────────────────────
+    authorize_group_check_query = "\
+        SELECT id, groupname, attribute, value, op \
+        FROM radgroupcheck \
+        WHERE groupname = '%{SQL-Group}' \
+        ORDER BY id"
+
+    # ── authorize_group_reply_query ─────────────────────────────────
+    authorize_group_reply_query = "\
+        SELECT id, groupname, attribute, value, op \
+        FROM radgroupreply \
+        WHERE groupname = '%{SQL-Group}' \
+        ORDER BY id"
+
+    # ── group_membership_query ──────────────────────────────────────
+    group_membership_query = "\
+        SELECT groupname \
+        FROM radusergroup \
+        WHERE username = '%{SQL-User-Name}' \
+        ORDER BY priority ASC"
+
+    # ── Accounting: INSERT on Start ─────────────────────────────────
     accounting_start_query = "\
         INSERT INTO radacct \
             (acctsessionid, acctuniqueid, username, realm, \
@@ -122,67 +218,164 @@ sql {
              '%{Connect-Info}', 0, 0, \
              '%{Called-Station-Id}', '%{Calling-Station-Id}', '', \
              '%{Service-Type}', '%{Framed-Protocol}', '%{Framed-IP-Address}')"
+
+    # ── Accounting: UPDATE on Interim-Update ───────────────────────
+    accounting_update_query = "\
+        UPDATE radacct \
+        SET \
+            acctupdatetime  = TO_TIMESTAMP('%S', 'YYYY-MM-DD HH24:MI:SS'), \
+            acctsessiontime = '%{Acct-Session-Time}', \
+            acctinputoctets  = '%{Acct-Input-Octets}', \
+            acctoutputoctets = '%{Acct-Output-Octets}' \
+        WHERE acctsessionid  = '%{Acct-Session-Id}' \
+          AND nasipaddress    = '%{NAS-IP-Address}'"
+
+    # ── Accounting: UPDATE on Stop ──────────────────────────────────
+    accounting_stop_query = "\
+        UPDATE radacct \
+        SET \
+            acctstoptime       = TO_TIMESTAMP('%S', 'YYYY-MM-DD HH24:MI:SS'), \
+            acctsessiontime    = '%{Acct-Session-Time}', \
+            acctinputoctets    = '%{Acct-Input-Octets}', \
+            acctoutputoctets   = '%{Acct-Output-Octets}', \
+            acctterminatecause = '%{Acct-Terminate-Cause}', \
+            connectinfo_stop   = '%{Connect-Info}' \
+        WHERE acctsessionid = '%{Acct-Session-Id}' \
+          AND nasipaddress  = '%{NAS-IP-Address}'"
+
+    # ── Post-Auth logging ────────────────────────────────────────────
+    postauth_query = "\
+        INSERT INTO radpostauth (username, pass, reply, authdate) \
+        VALUES (\
+            '%{SQL-User-Name}', \
+            '%{%{User-Password}:-%{Chap-Password}}', \
+            '%{reply:Packet-Type}', \
+            NOW())"
 }
 EOF
 
 # Enable the SQL module
 sudo ln -sf "$RADIUS_CONF_DIR/mods-available/sql" "$RADIUS_CONF_DIR/mods-enabled/sql" 2>/dev/null || true
-echo "✅ SQL module configured (port $DB_PORT)"
+echo "✅ SQL module configured (PostgreSQL port $DB_PORT)"
 
-# ── Step 3: Create radpostauth table (if missing) ─────────────────────────────
+# ── Step 4: Configure the default virtual server to use SQL ──────────────────
 echo ""
-echo "🗄️  Step 3: Ensuring radpostauth table exists in PostgreSQL..."
-PGPASSWORD="$DB_PASS_DECODED" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" <<SQL 2>/dev/null || echo "⚠️  Could not create radpostauth (may already exist)"
-CREATE TABLE IF NOT EXISTS radpostauth (
-    id          BIGSERIAL PRIMARY KEY,
-    username    VARCHAR(64)  NOT NULL DEFAULT '',
-    pass        VARCHAR(64)  NOT NULL DEFAULT '',
-    reply       VARCHAR(32)  NOT NULL DEFAULT '',
-    authdate    TIMESTAMPTZ  NOT NULL DEFAULT now(),
-    "tenantId"  TEXT
-);
-CREATE INDEX IF NOT EXISTS idx_radpostauth_username ON radpostauth(username);
-SQL
-echo "✅ radpostauth table ready"
+echo "⚙️  Step 4: Writing a clean default site configuration..."
 
-# ── Step 4: Configure default site to use SQL ─────────────────────────────────
-echo ""
-echo "⚙️  Step 4: Enabling SQL in the default virtual server..."
+sudo tee "$RADIUS_CONF_DIR/sites-available/default" > /dev/null <<'VSERVER'
+server default {
+    listen {
+        type      = auth
+        ipaddr    = *
+        port      = 0
+        limit {
+            max_connections = 16
+            lifetime        = 0
+            idle_timeout    = 30
+        }
+    }
 
-# Enable sql in authorize section
-sudo sed -i '/^[[:space:]]*#[[:space:]]*sql$/s/^[[:space:]]*#[[:space:]]*/\t/' \
-    "$RADIUS_CONF_DIR/sites-available/default" 2>/dev/null || true
+    listen {
+        ipaddr = *
+        port   = 0
+        type   = acct
+        limit {}
+    }
 
-# Enable sql in accounting section
-sudo sed -i '/authorize/,/}/ s/#\tsql/\tsql/' \
-    "$RADIUS_CONF_DIR/sites-available/default" 2>/dev/null || true
+    authorize {
+        filter_username
+        preprocess
+        chap
+        mschap
+        eap { ok = return }
+        expiration
+        logintime
 
-echo "✅ Default site updated"
+        # Pull user's check + reply attributes from PostgreSQL
+        sql
+
+        pap
+    }
+
+    authenticate {
+        Auth-Type PAP  { pap  }
+        Auth-Type CHAP { chap }
+        Auth-Type MS-CHAP { mschap }
+        eap
+    }
+
+    preacct {
+        preprocess
+        acct_unique
+        suffix
+        files
+    }
+
+    accounting {
+        detail
+        unix
+        sql
+        exec
+        attr_filter.accounting_response
+    }
+
+    session {
+        sql
+    }
+
+    post-auth {
+        update {
+            &reply: += &session-state:
+        }
+        sql
+        exec
+        remove_reply_message_if_eap
+        Post-Auth-Type REJECT {
+            sql
+            attr_filter.access_reject
+            eap
+            remove_reply_message_if_eap
+        }
+    }
+
+    pre-proxy {}
+    post-proxy { eap }
+}
+VSERVER
+
+sudo ln -sf "$RADIUS_CONF_DIR/sites-available/default" "$RADIUS_CONF_DIR/sites-enabled/default" 2>/dev/null || true
+echo "✅ Default virtual server configured"
 
 # ── Step 5: Configure clients.conf ────────────────────────────────────────────
 echo ""
 echo "🔑 Step 5: Configuring NAS clients (MikroTik routers)..."
 
-# Check if we already have a HQInvestment block
-if ! grep -q "# HQInvestment ISP Managed Clients" "$RADIUS_CONF_DIR/clients.conf" 2>/dev/null; then
-# ─── HQInvestment ISP Managed Clients ───────────────────────────────────────────────
-# MikroTik routers connecting via WireGuard VPN (10.0.0.0/24 subnet)
-# Secret loaded from RADIUS_NAS_SECRET env var
 RADIUS_SECRET="${RADIUS_NAS_SECRET:-hqinvestment_radius_secret}"
 WG_SERVER="${WG_SERVER_IP:-10.0.0.1}"
 WG_SUBNET=$(echo "$WG_SERVER" | cut -d. -f1-3).0/24
+DROPLET_PUBLIC_IP="${DROPLET_IP:-}"
+
+if ! grep -q "# HQInvestment ISP Managed Clients" "$RADIUS_CONF_DIR/clients.conf" 2>/dev/null; then
 
 sudo tee -a "$RADIUS_CONF_DIR/clients.conf" > /dev/null <<CLIENTS
 
-# ─── HQInvestment ISP Managed Clients ───────────────────────────────────────────────
-# MikroTik routers connecting via WireGuard VPN
+# ─── HQInvestment ISP Managed Clients ───────────────────────────────────────
+# MikroTik routers connect via WireGuard VPN (10.0.0.0/24) using this secret.
+# The same secret must be configured in MikroTik → RADIUS → Secret.
+
 client wireguard_subnet {
     ipaddr    = $WG_SUBNET
     secret    = $RADIUS_SECRET
     shortname = mikrotik-wg
     nastype   = other
-    # Secret from .env: RADIUS_NAS_SECRET
-    # WG subnet auto-derived from WG_SERVER_IP
+}
+
+# Allow the WireGuard server IP directly as well
+client wireguard_server {
+    ipaddr    = $WG_SERVER
+    secret    = $RADIUS_SECRET
+    shortname = wg-server
+    nastype   = other
 }
 
 # Allow localhost testing
@@ -193,7 +386,22 @@ client localhost_test {
     nastype   = other
 }
 CLIENTS
-echo "✅ clients.conf updated"
+
+# If a public IP is set, also allow direct public IP access (fallback)
+if [ -n "$DROPLET_PUBLIC_IP" ]; then
+sudo tee -a "$RADIUS_CONF_DIR/clients.conf" > /dev/null <<PUBCLIENT
+
+# Allow direct public IP access (fallback when WireGuard is not used)
+client droplet_public {
+    ipaddr    = $DROPLET_PUBLIC_IP
+    secret    = $RADIUS_SECRET
+    shortname = droplet-public
+    nastype   = other
+}
+PUBCLIENT
+fi
+
+echo "✅ clients.conf updated (secret: $RADIUS_SECRET, subnet: $WG_SUBNET)"
 else
     echo "ℹ️  clients.conf already has HQInvestment entries — skipping"
 fi
@@ -219,17 +427,17 @@ if sudo systemctl is-active --quiet freeradius; then
 else
     echo "❌ FreeRADIUS failed to start. Check logs:"
     echo "   sudo journalctl -u freeradius -n 50 --no-pager"
-    echo "   sudo freeradius -X   (for verbose debug mode)"
+    echo "   sudo systemctl stop freeradius && sudo freeradius -X"
     exit 1
 fi
 
 # ── Step 8: Self-test ──────────────────────────────────────────────────────────
 echo ""
-echo "🧪 Step 8: Running self-test..."
+echo "🧪 Step 8: Running self-test (localhost)..."
 if radtest test test 127.0.0.1 0 testing123 2>/dev/null | grep -q "Access-"; then
     echo "✅ FreeRADIUS is responding to auth requests"
 else
-    echo "⚠️  Self-test inconclusive — FreeRADIUS is running but test user not in DB (that's OK)"
+    echo "⚠️  Self-test inconclusive — FreeRADIUS running but 'test' user not in DB (that is OK)"
 fi
 
 # ── Done ───────────────────────────────────────────────────────────────────────
@@ -239,16 +447,26 @@ echo "║              ✅  Setup Complete!                      ║"
 echo "╚══════════════════════════════════════════════════════╝"
 echo ""
 echo "📋 Next steps:"
-echo "  1. In your billing dashboard → Settings → Routers → RADIUS NAS:"
-echo "     Add your MikroTik router with the secret: hqinvestment_radius_secret"
-echo "  2. In MikroTik → RADIUS:"
-echo "     Address : 10.0.0.1  (WireGuard IP of this Droplet)"
-echo "     Secret  : hqinvestment_radius_secret"
+echo "  1. In your billing dashboard → RADIUS → NAS Clients:"
+echo "     Add your MikroTik router IP with secret: $RADIUS_SECRET"
+echo ""
+echo "  2. In MikroTik → RADIUS → Add:"
+echo "     Service  : hotspot (and/or ppp)"
+echo "     Address  : $WG_SERVER  (WireGuard IP of this Droplet)"
+echo "     Secret   : $RADIUS_SECRET"
 echo "     Auth Port: 1812   Acct Port: 1813"
+echo "     Timeout  : 3000 ms  (or more if latency is high)"
+echo ""
 echo "  3. In MikroTik → IP → Hotspot → Servers → your server → RADIUS:"
 echo "     ✅ Use RADIUS checked"
 echo "     ✅ RADIUS Accounting checked"
 echo ""
+echo "  4. In MikroTik → PPP → Profiles → your profile → General:"
+echo "     Use RADIUS: yes"
+echo ""
 echo "🔍 To debug RADIUS in real-time:"
 echo "   sudo systemctl stop freeradius && sudo freeradius -X"
+echo ""
+echo "🔍 To verify NAS client is known to FreeRADIUS:"
+echo "   radtest <username> <password> $WG_SERVER 0 $RADIUS_SECRET"
 echo ""

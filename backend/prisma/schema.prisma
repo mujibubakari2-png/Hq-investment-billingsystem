@@ -398,6 +398,7 @@ model Tenant {
   paymentChannels  PaymentChannel[]
   radaccts         RadAcct[]
   radchecks        RadCheck[]
+  radReplies       RadReply[]
   radPostAuths     RadPostAuth[]
   radiusNas        RadiusNas[]
   radiusUsers      RadiusUser[]
@@ -548,6 +549,58 @@ model RadCheck {
   @@index([tenantId])
   @@index([tenantId, username])
   @@map("radcheck")
+}
+
+// radreply — FreeRADIUS reply attributes sent to client on Access-Accept
+// e.g. Session-Timeout, Mikrotik-Rate-Limit, Framed-IP-Address
+model RadReply {
+  id        Int     @id @default(autoincrement())
+  username  String  @db.VarChar(64)
+  attribute String  @default("Session-Timeout") @db.VarChar(64)
+  op        String  @default("=") @db.VarChar(2)
+  value     String  @db.VarChar(253)
+  tenantId  String?
+  tenant    Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([username])
+  @@index([tenantId])
+  @@index([tenantId, username])
+  @@map("radreply")
+}
+
+// radgroupcheck — FreeRADIUS group-level check attributes
+model RadGroupCheck {
+  id        Int    @id @default(autoincrement())
+  groupname String @db.VarChar(64)
+  attribute String @db.VarChar(64)
+  op        String @default(":=") @db.VarChar(2)
+  value     String @db.VarChar(253)
+
+  @@index([groupname])
+  @@map("radgroupcheck")
+}
+
+// radgroupreply — FreeRADIUS group-level reply attributes
+model RadGroupReply {
+  id        Int    @id @default(autoincrement())
+  groupname String @db.VarChar(64)
+  attribute String @db.VarChar(64)
+  op        String @default("=") @db.VarChar(2)
+  value     String @db.VarChar(253)
+
+  @@index([groupname])
+  @@map("radgroupreply")
+}
+
+// radusergroup — maps users to groups for FreeRADIUS
+model RadUserGroup {
+  id        Int    @id @default(autoincrement())
+  username  String @db.VarChar(64)
+  groupname String @db.VarChar(64)
+  priority  Int    @default(1)
+
+  @@index([username])
+  @@map("radusergroup")
 }
 
 model RadAcct {
