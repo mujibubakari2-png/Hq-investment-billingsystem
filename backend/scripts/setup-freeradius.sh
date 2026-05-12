@@ -125,6 +125,9 @@ sql {
     driver = "rlm_sql_postgresql"
     dialect = "postgresql"
 
+    # Set SQL user name
+    sql_user_name = "%{User-Name}"
+
     # ── Database Connection ─────────────────────────────────────────
     server   = "$DB_HOST"
     port     = $DB_PORT
