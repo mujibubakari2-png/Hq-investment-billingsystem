@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 import { getMikroTikService } from "@/lib/mikrotik";
+import { syncRadiusUser } from "@/lib/radius";
 
 /**
  * POST /api/hotspot/callback
@@ -146,12 +147,35 @@ export async function POST(req: NextRequest) {
             return [utx, sub];
         });
 
-        // 4. Log the hotspot activation on the router and create/enable mikrotik user
+        // 4. Sync to RADIUS — CRITICAL: must happen before MikroTik activation
+        //    so FreeRADIUS can authenticate the user immediately.
+        try {
+            const client = transaction.client;
+            let rateLimit: string | undefined;
+            if (pkg.uploadSpeed && pkg.downloadSpeed) {
+                const ulUnit = pkg.uploadUnit === "Mbps" ? "M" : "k";
+                const dlUnit = pkg.downloadUnit === "Mbps" ? "M" : "k";
+                rateLimit = `${pkg.uploadSpeed}${ulUnit}/${pkg.downloadSpeed}${dlUnit}`;
+            }
+            await syncRadiusUser({
+                username: client.username,
+                password: client.phone || undefined,
+                tenantId: pkg.tenantId || null,
+                fullName: client.fullName || undefined,
+                expiresAt,
+                status: "Active",
+                rateLimit,
+            });
+        } catch (radErr: any) {
+            console.error("[RADIUS] sync error in callback:", radErr);
+            // Non-blocking: continue even if RADIUS sync fails
+        }
+
+        // 5. Log the hotspot activation on the router and create/enable mikrotik user
         let finalSyncStatus = "PENDING";
         if (pkg.routerId) {
             try {
                 const mikrotik = await getMikroTikService(pkg.routerId);
-                // We use phone number or a default password for the created hotspot user
                 const userPassword = transaction.client.phone || "123456";
                 await mikrotik.activateService(transaction.client.username, userPassword, pkg.name, "hotspot");
 

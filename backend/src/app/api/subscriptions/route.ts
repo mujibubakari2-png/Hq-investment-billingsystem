@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { getMikroTikService } from "@/lib/mikrotik";
+import { syncRadiusUser } from "@/lib/radius";
 import { parseSafeDate, toISOSafe, toTimestampSafe, isValidDate } from "@/lib/dateUtils";
 
 // GET /api/subscriptions
@@ -126,6 +127,32 @@ export async function POST(req: NextRequest) {
             include: { client: true, package: true, router: true },
         });
 
+        // ── Sync to RADIUS (always, regardless of router availability) ─────────
+        if (sub.client && sub.package) {
+            try {
+                const expiresAt = parseSafeDate(body.expiresAt) || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+                const pkg = sub.package;
+                let rateLimit: string | undefined;
+                if (pkg.uploadSpeed && pkg.downloadSpeed) {
+                    const ulUnit = pkg.uploadUnit === "Mbps" ? "M" : "k";
+                    const dlUnit = pkg.downloadUnit === "Mbps" ? "M" : "k";
+                    rateLimit = `${pkg.uploadSpeed}${ulUnit}/${pkg.downloadSpeed}${dlUnit}`;
+                }
+                await syncRadiusUser({
+                    username: sub.client.username,
+                    password: sub.client.phone || undefined,
+                    tenantId: sub.tenantId || null,
+                    fullName: sub.client.fullName || undefined,
+                    expiresAt,
+                    status: "Active",
+                    rateLimit,
+                });
+            } catch (radErr: any) {
+                console.error("RADIUS sync error (manual sub):", radErr);
+            }
+        }
+
+        // ── Activate on MikroTik router (if router is set) ────────────────────
         if (sub.routerId && sub.client && sub.package) {
             try {
                 const mikrotik = await getMikroTikService(sub.routerId);
