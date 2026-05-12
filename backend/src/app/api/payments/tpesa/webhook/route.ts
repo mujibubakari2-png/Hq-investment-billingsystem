@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 import { getMikroTikService } from "@/lib/mikrotik";
+import { syncRadiusUser } from "@/lib/radius";
 import { env } from "@/lib/env";
 import { rateLimitMiddleware } from "@/middleware/rateLimiter";
 
@@ -143,7 +144,28 @@ export async function POST(req: NextRequest) {
             return [utx, sub];
         });
 
-        // 4. Log the hotspot activation on the router and create/enable mikrotik user
+        // 4. Sync to RADIUS
+        try {
+            let rateLimit: string | undefined;
+            if (pkg.uploadSpeed && pkg.downloadSpeed) {
+                const ulUnit = pkg.uploadUnit === "Mbps" ? "M" : "k";
+                const dlUnit = pkg.downloadUnit === "Mbps" ? "M" : "k";
+                rateLimit = `${pkg.uploadSpeed}${ulUnit}/${pkg.downloadSpeed}${dlUnit}`;
+            }
+            await syncRadiusUser({
+                username: transaction.client.username,
+                password: transaction.client.phone || undefined,
+                tenantId: pkg.tenantId || null,
+                fullName: transaction.client.fullName || undefined,
+                expiresAt,
+                status: "Active",
+                rateLimit,
+            });
+        } catch (radErr: any) {
+            console.error("[RADIUS] T-Pesa webhook sync error:", radErr);
+        }
+
+        // 5. Activate on MikroTik router
         let finalSyncStatus = "PENDING";
         if (pkg.routerId) {
             try {

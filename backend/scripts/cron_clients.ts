@@ -1,5 +1,6 @@
 import prisma from "../src/lib/prisma";
 import { getMikroTikService } from "../src/lib/mikrotik";
+import { suspendRadiusUser } from "../src/lib/radius";
 
 /**
  * ISP Subscriber Expiration Job
@@ -102,6 +103,14 @@ async function checkClientSubscriptions() {
                         where: { id: sub.clientId },
                         data: { status: "EXPIRED" }
                     });
+                }
+
+                // 5. Suspend in RADIUS — removes Session-Timeout so FreeRADIUS rejects immediately
+                try {
+                    await suspendRadiusUser(sub.client.username, sub.tenantId || null);
+                    console.log(`[RADIUS] Suspended ${username} in FreeRADIUS`);
+                } catch (radErr: any) {
+                    console.error(`[RADIUS] Failed to suspend ${username}:`, radErr.message);
                 }
 
                 console.log(`[Success] ${username} marked as EXPIRED.`);
