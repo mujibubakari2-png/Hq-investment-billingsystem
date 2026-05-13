@@ -20,9 +20,9 @@ function isSmsNotificationsEnabled(): boolean {
 function getPortalUrl(): string {
     return (
         process.env.ACCOUNT_PORTAL_URL ||
-        process.env.NEXT_PUBLIC_APP_URL ||
         process.env.APP_URL ||
-        "http://localhost:5173/"
+        process.env.NEXT_PUBLIC_APP_URL ||
+        "http://174.138.42.168/"
     );
 }
 

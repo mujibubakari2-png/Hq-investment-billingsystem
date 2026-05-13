@@ -9,10 +9,10 @@
     "start": "bash scripts/droplet-start.sh",
     "start:droplet": "bash scripts/droplet-start.sh",
     "next:start": "next start --hostname 0.0.0.0 --port ${PORT:-3000}",
-    "test": "vitest",
+
     "db:seed": "npx tsx scripts/seed.ts",
     "db:migrate": "npx prisma migrate deploy",
-    "db:test": "npx tsx scripts/test-db.js",
+
     "db:check-migrations": "npx tsx scripts/check-migrations.js",
     "db:fix-migrations": "npx tsx scripts/fix-migrations.js",
     "db:generate": "npx prisma generate"

@@ -32,12 +32,12 @@ const swaggerOptions = {
         },
         servers: [
             {
-                url: 'http://localhost:3001',
-                description: 'Development server',
+                url: 'http://174.138.42.168',
+                description: 'Production server (DigitalOcean Droplet)',
             },
             {
-                url: 'https://api.yourdomain.com',
-                description: 'Production server',
+                url: 'http://localhost:3001',
+                description: 'Local development server',
             },
         ],
         components: {

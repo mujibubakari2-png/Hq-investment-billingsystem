@@ -120,7 +120,7 @@ export async function syncRadiusUser(params: {
         },
         create: {
             username,
-            password: password || "123456",
+            password: password || (() => { throw new Error("[RADIUS] Cannot create RadiusUser without a password — password is required."); })(),
             tenantId,
             fullName: fullName || null,
             status: status || "Active",

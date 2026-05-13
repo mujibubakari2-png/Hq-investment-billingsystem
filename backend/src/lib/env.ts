@@ -5,7 +5,7 @@ const envSchema = z.object({
   DATABASE_URL: z.string().url().optional(),
   
   // App Config
-  NEXT_PUBLIC_APP_URL: z.string().url().default("http://localhost:5173"),
+  NEXT_PUBLIC_APP_URL: z.string().url().default("http://174.138.42.168"),
   APP_NAME: z.string().default("HQ INVESTMENT"),
 
   // JWT

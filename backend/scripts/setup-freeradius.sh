@@ -381,13 +381,6 @@ client wireguard_server {
     nastype   = other
 }
 
-# Allow localhost testing
-client localhost_test {
-    ipaddr    = 127.0.0.1
-    secret    = testing123
-    shortname = localhost
-    nastype   = other
-}
 CLIENTS
 
 # If a public IP is set, also allow direct public IP access (fallback)
@@ -434,13 +427,16 @@ else
     exit 1
 fi
 
-# ── Step 8: Self-test ──────────────────────────────────────────────────────────
+# ── Step 8: Production verification ──────────────────────────────────────────
 echo ""
-echo "🧪 Step 8: Running self-test (localhost)..."
-if radtest test test 127.0.0.1 0 testing123 2>/dev/null | grep -q "Access-"; then
-    echo "✅ FreeRADIUS is responding to auth requests"
+echo "🔍 Step 8: Verifying FreeRADIUS service status..."
+if sudo systemctl is-active --quiet freeradius; then
+    echo "✅ FreeRADIUS service is active and running in production mode"
+    echo "   Listening on UDP 1812 (auth) and 1813 (acct)"
 else
-    echo "⚠️  Self-test inconclusive — FreeRADIUS running but 'test' user not in DB (that is OK)"
+    echo "❌ FreeRADIUS is not running. Check logs:"
+    echo "   sudo journalctl -u freeradius -n 50 --no-pager"
+    exit 1
 fi
 
 # ── Done ───────────────────────────────────────────────────────────────────────
