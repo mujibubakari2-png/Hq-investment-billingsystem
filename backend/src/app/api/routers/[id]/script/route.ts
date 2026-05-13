@@ -123,7 +123,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
             console.error("Failed to parse APP_URL for RADIUS address:", e);
         }
 
-        const requestHost = req.nextUrl.hostname;
+        const requestHost = process.env.SERVER_PUBLIC_IP || req.nextUrl.hostname;
         const radiusAddr = router.wgTunnelIp ? vpnIp : (publicIp || requestHost || "YOUR_SERVER_IP");
         const srcAddrPart = router.wgTunnelIp ? `src-address=${router.wgTunnelIp}` : "";
 

@@ -121,7 +121,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         const listenPort = router.wgListenPort || 51820;
 
         // Use request host as fallback if no endpoint is configured
-        const requestHost = req.headers.get("host")?.split(":")[0];
+        const requestHost = process.env.SERVER_PUBLIC_IP || req.headers.get("host")?.split(":")[0] || "localhost";
         const serverEndpoint = router.wgServerEndpoint || process.env.WG_SERVER_ENDPOINT || requestHost || "vpn.billing-system.local";
         const serverPort = parseInt(process.env.WG_SERVER_PORT || "51820");
 
@@ -263,7 +263,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         const listenPort = router.wgListenPort || 51820;
 
         // Use request host as fallback if no endpoint is configured (match GET logic)
-        const requestHost = req.headers.get("host")?.split(":")[0];
+        const requestHost = process.env.SERVER_PUBLIC_IP || req.headers.get("host")?.split(":")[0] || "localhost";
         const serverEndpoint = router.wgServerEndpoint || process.env.WG_SERVER_ENDPOINT || requestHost || "vpn.billing-system.local";
         const serverPort = parseInt(process.env.WG_SERVER_PORT || "51820");
 
