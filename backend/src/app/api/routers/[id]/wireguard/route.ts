@@ -445,6 +445,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                     });
                 } catch (e: any) { if (!e.message?.includes("already")) console.warn("Hotspot profile note:", e.message); }
 
+                // Add static DNS entry for the Hotspot login page
+                try {
+                    await service.apiRequestPublic("/ip/dns/static", "PUT", {
+                        name: `${safeRouterNameLower}.hotspot`,
+                        address: lanGateway,
+                        comment: "HQInvestment Hotspot DNS"
+                    });
+                } catch (e: any) { if (!e.message?.includes("already")) console.warn("Static DNS note:", e.message); }
+
                 // SECURITY: Enforce use-radius=yes AND remove 'mac' from login-by on ALL existing profiles.
                 // A previously misconfigured profile with login-by=mac allows unauthenticated internet access.
                 try {
@@ -672,7 +681,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                     // The Hotspot engine creates DYNAMIC accept rules for authenticated users, so
                     // authenticated clients are NOT affected by this drop rule.
                     // PPPoE clients use the all-ppp forward rule above and are also unaffected.
-                    { chain: "forward", "in-interface": lanBridgeName, "out-interface": "ether1", action: "drop", comment: "Drop unauthenticated LAN forward - HQInvestment" },
+                    { chain: "forward", "in-interface": lanBridgeName, action: "drop", comment: "Drop unauthenticated LAN forward - HQInvestment" },
                 ];
 
                 // Reverse the array so that by putting them at index 0, they end up in the correct order at the very top.
@@ -691,7 +700,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
                 try {
                     await service.apiRequestPublic("/ip/firewall/nat", "PUT", {
-                        chain: "srcnat", "out-interface": "ether1",
+                        chain: "srcnat",
                         action: "masquerade", comment: "NAT for Internet - HQInvestment", "place-before": "0"
                     });
                 } catch (e: any) { console.warn("NAT note:", e.message); }
@@ -729,7 +738,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                         service: "hotspot,ppp",
                         "authentication-port": "1812",
                         "accounting-port": "1813",
-                        timeout: "3000ms",
+                        timeout: "10000ms",
                         "src-address": tunnelIp,
                         comment: "HQInvestment RADIUS"
                     });
