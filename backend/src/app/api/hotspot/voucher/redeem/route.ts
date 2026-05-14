@@ -124,13 +124,18 @@ export async function POST(req: NextRequest) {
 
         // 4. SYNC TO RADIUS (Crucial for fast connection when RADIUS is enabled on router)
         try {
+            const upUnit = pkg.uploadUnit?.charAt(0)?.toUpperCase() || "M";
+            const downUnit = pkg.downloadUnit?.charAt(0)?.toUpperCase() || "M";
+            const rateLimit = `${pkg.uploadSpeed}${upUnit}/${pkg.downloadSpeed}${downUnit}`;
+
             await syncRadiusUser({
                 username: client.username,
                 password: code,
                 tenantId: pkg.tenantId || null,
                 fullName: client.fullName,
                 expiresAt: expiresAt,
-                status: "Active"
+                status: "Active",
+                rateLimit: rateLimit
             });
         } catch (radErr) {
             console.error("RADIUS sync error for voucher:", radErr);
