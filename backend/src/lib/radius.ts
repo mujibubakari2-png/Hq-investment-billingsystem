@@ -98,8 +98,9 @@ export async function syncRadiusUser(params: {
     rateLimit?: string;
     /** Allow simultaneous logins (default 1) */
     simultaneousUse?: number;
+    macAddress?: string;
 }) {
-    const { username, password, tenantId, fullName, expiresAt, status, rateLimit, simultaneousUse } = params;
+    const { username, password, tenantId, fullName, expiresAt, status, rateLimit, simultaneousUse, macAddress } = params;
 
     // ── 1. Manage RadiusUser (high-level tracking model) ──────────────────────
     const sessionTimeoutSecs = expiresAt
@@ -131,6 +132,12 @@ export async function syncRadiusUser(params: {
     // ── 2. radcheck: Cleartext-Password ───────────────────────────────────────
     if (password) {
         await upsertRadCheck(username, "Cleartext-Password", password, ":=", tenantId);
+    }
+
+    // ── 2b. radcheck: Calling-Station-Id (MAC Address binding) ────────────────
+    if (macAddress) {
+        // Enforce that only this specific MAC address can login using these credentials
+        await upsertRadCheck(username, "Calling-Station-Id", macAddress, "==", tenantId);
     }
 
     // ── 3. radcheck: Simultaneous-Use (prevents multi-login abuse) ────────────

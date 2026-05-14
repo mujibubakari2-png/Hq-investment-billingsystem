@@ -725,7 +725,7 @@ export class MikroTikService {
     /**
      * Activate a customer's service after payment
      */
-    async activateService(username: string, password: string, profileName: string, serviceType: "pppoe" | "hotspot", expiresAt?: Date): Promise<void> {
+    async activateService(username: string, password: string, profileName: string, serviceType: "pppoe" | "hotspot", expiresAt?: Date, macAddress?: string): Promise<void> {
         let limitUptime: string | undefined = undefined;
         if (expiresAt) {
             const seconds = Math.floor((expiresAt.getTime() - Date.now()) / 1000);
@@ -761,6 +761,7 @@ export class MikroTikService {
                 await this.enableHotspotUser(existing.id, username);
                 const updateData: any = { profile: profileName, name: username };
                 if (limitUptime) updateData.limitUptime = limitUptime;
+                if (macAddress) updateData.macAddress = macAddress;
                 await this.updateHotspotUser(existing.id, updateData);
             } else {
                 await this.createHotspotUser({
@@ -770,6 +771,7 @@ export class MikroTikService {
                     server: "all",
                     disabled: false,
                     limitUptime,
+                    macAddress,
                 });
             }
         }

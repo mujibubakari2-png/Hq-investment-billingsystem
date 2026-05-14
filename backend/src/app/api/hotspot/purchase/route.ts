@@ -330,7 +330,8 @@ async function completeHotspotPurchase(
                 tenantId: pkg.tenantId || null,
                 fullName: client.fullName,
                 expiresAt: expiresAt,
-                status: "Active"
+                status: "Active",
+                macAddress: client.macAddress || undefined
             });
         }
     });
@@ -349,7 +350,8 @@ async function completeHotspotPurchase(
                 password, 
                 pkg.name, 
                 "hotspot",
-                expiresAt
+                expiresAt,
+                client?.macAddress || undefined
             );
 
             await prisma.routerLog.create({
