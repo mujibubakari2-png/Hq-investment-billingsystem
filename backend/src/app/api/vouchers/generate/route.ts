@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
+import { getMikroTikService } from "@/lib/mikrotik";
 
 // POST /api/vouchers/generate - Bulk generate vouchers
 export async function POST(req: NextRequest) {
@@ -112,6 +113,50 @@ export async function POST(req: NextRequest) {
             where: { code: { in: codeList } },
             orderBy: { createdAt: "desc" },
         });
+
+        // Push vouchers directly to the MikroTik Router so default Hotspot login works
+        if (routerIdValue) {
+            try {
+                const mikrotik = await getMikroTikService(routerIdValue);
+                
+                // Calculate limit-uptime for MikroTik
+                let limitUptime: string | undefined = undefined;
+                let seconds = 0;
+                switch (pkg.durationUnit) {
+                    case "MINUTES": seconds = pkg.duration * 60; break;
+                    case "HOURS": seconds = pkg.duration * 3600; break;
+                    case "DAYS": seconds = pkg.duration * 86400; break;
+                    case "MONTHS": seconds = pkg.duration * 30 * 86400; break; // Approx
+                }
+                
+                if (seconds > 0) {
+                    const days = Math.floor(seconds / 86400);
+                    const hours = Math.floor((seconds % 86400) / 3600);
+                    const mins = Math.floor((seconds % 3600) / 60);
+                    const secs = seconds % 60;
+                    limitUptime = `${days > 0 ? days + 'd' : ''}${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+                }
+
+                // Batch create users
+                // We use Promise.allSettled to not fail the whole request if one voucher fails
+                const createPromises = codeList.map(code => 
+                    mikrotik.createHotspotUser({
+                        name: code,
+                        password: code,
+                        profile: pkg.name,
+                        server: "all",
+                        disabled: false,
+                        limitUptime
+                    })
+                );
+
+                await Promise.allSettled(createPromises);
+                console.log(`Pushed ${codeList.length} vouchers to router ${routerIdValue}`);
+            } catch (err) {
+                console.error("Failed to push vouchers to MikroTik:", err);
+                // We don't throw here so the vouchers are still created in the DB
+            }
+        }
 
         return jsonResponse({
             message: "Vouchers generated successfully",
