@@ -153,6 +153,7 @@ export async function POST(req: NextRequest) {
                 expiresAt,
                 status: "Active",
                 rateLimit,
+                profileName: pkg.name,
             });
         } catch (radErr: any) {
             console.error("[RADIUS] Airtel Money webhook sync error:", radErr);

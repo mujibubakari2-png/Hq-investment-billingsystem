@@ -95,9 +95,10 @@ async function main() {
                 expiresAt,
                 status: "Active",
                 rateLimit,
+                profileName: pkg?.name,
             });
 
-            console.log(`  ✅ Synced ${client.username} → Session-Timeout: ${remainingSecs}s${rateLimit ? ` | Rate: ${rateLimit}` : ""}`);
+            console.log(`  ✅ Synced ${client.username} → Session-Timeout: ${remainingSecs}s${rateLimit ? ` | Rate: ${rateLimit}` : ""}${pkg?.name ? ` | Profile: ${pkg.name}` : ""}`);
             synced++;
         } catch (err: any) {
             console.error(`  ❌ Failed for ${client.username}: ${err.message}`);

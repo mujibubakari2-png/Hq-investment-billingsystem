@@ -132,10 +132,11 @@ export async function POST(req: NextRequest) {
                 username: client.username,
                 password: code,
                 tenantId: pkg.tenantId || null,
-                fullName: client.fullName,
+                fullName: client.fullName || undefined,
                 expiresAt: expiresAt,
                 status: "Active",
-                rateLimit: rateLimit
+                rateLimit: rateLimit,
+                profileName: pkg.name
             });
         } catch (radErr) {
             console.error("RADIUS sync error for voucher:", radErr);

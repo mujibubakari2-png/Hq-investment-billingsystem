@@ -96,10 +96,12 @@ export async function syncRadiusUser(params: {
     status?: "Active" | "Inactive";
     /** e.g. "10M/20M" upload/download — becomes Mikrotik-Rate-Limit reply attribute */
     rateLimit?: string;
+    /** The MikroTik profile name, becomes Mikrotik-Group reply attribute */
+    profileName?: string;
     /** Allow simultaneous logins (default 1) */
     simultaneousUse?: number;
 }) {
-    const { username, password, tenantId, fullName, expiresAt, status, rateLimit, simultaneousUse } = params;
+    const { username, password, tenantId, fullName, expiresAt, status, rateLimit, profileName, simultaneousUse } = params;
 
     // ── 1. Manage RadiusUser (high-level tracking model) ──────────────────────
     const sessionTimeoutSecs = expiresAt
@@ -166,6 +168,14 @@ export async function syncRadiusUser(params: {
     //    FreeRADIUS passes this to MikroTik which applies a queue tree.
     if (rateLimit) {
         await upsertRadReply(username, "Mikrotik-Rate-Limit", rateLimit, "=", tenantId);
+    }
+
+    // ── 7. radreply: Mikrotik-Group (Hotspot/PPPoE Profile) ──────────────────
+    //    FreeRADIUS passes this to MikroTik which assigns the matching profile.
+    if (profileName) {
+        await upsertRadReply(username, "Mikrotik-Group", profileName, "=", tenantId);
+    } else {
+        await deleteRadReplyAttribute(username, "Mikrotik-Group", tenantId);
     }
 
     return radiusUser;

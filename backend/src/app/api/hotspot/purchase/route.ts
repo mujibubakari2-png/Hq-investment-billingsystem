@@ -324,13 +324,21 @@ async function completeHotspotPurchase(
         // 4. SYNC TO RADIUS (for High Protection)
         const client = await tx.client.findUnique({ where: { id: clientId } });
         if (client) {
+            let rateLimit: string | undefined;
+            if (pkg.uploadSpeed && pkg.downloadSpeed) {
+                const ulUnit = pkg.uploadUnit === "Mbps" ? "M" : "k";
+                const dlUnit = pkg.downloadUnit === "Mbps" ? "M" : "k";
+                rateLimit = `${pkg.uploadSpeed}${ulUnit}/${pkg.downloadSpeed}${dlUnit}`;
+            }
             await syncRadiusUser({
                 username: client.username,
                 password: client.phone || "123456",
                 tenantId: pkg.tenantId || null,
-                fullName: client.fullName,
+                fullName: client.fullName || undefined,
                 expiresAt: expiresAt,
-                status: "Active"
+                status: "Active",
+                profileName: pkg.name,
+                rateLimit
             });
         }
     });
