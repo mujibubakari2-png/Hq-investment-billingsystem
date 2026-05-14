@@ -135,8 +135,7 @@ export async function POST(req: NextRequest) {
                 fullName: client.fullName,
                 expiresAt: expiresAt,
                 status: "Active",
-                rateLimit: rateLimit,
-                macAddress: client.macAddress || macAddress || undefined
+                rateLimit: rateLimit
             });
         } catch (radErr) {
             console.error("RADIUS sync error for voucher:", radErr);
@@ -151,14 +150,7 @@ export async function POST(req: NextRequest) {
                 const mikrotik = await getMikroTikService(rId);
                 // We call this but don't necessarily need to block the response for too long
                 // However, for vouchers, it's safer to ensure it's done.
-                await mikrotik.activateService(
-                    client.username, 
-                    code, 
-                    pkg.name, 
-                    "hotspot", 
-                    expiresAt, 
-                    macAddress || undefined
-                );
+                await mikrotik.activateService(client.username, code, pkg.name, "hotspot", expiresAt);
 
                 finalSyncStatus = "SYNCED";
                 await prisma.routerLog.create({
