@@ -137,7 +137,9 @@ export async function syncRadiusUser(params: {
     // ── 2b. radcheck: Calling-Station-Id (MAC Address binding) ────────────────
     if (macAddress) {
         // Enforce that only this specific MAC address can login using these credentials
-        await upsertRadCheck(username, "Calling-Station-Id", macAddress, "==", tenantId);
+        // FreeRADIUS and MikroTik typically use uppercase MAC addresses (AA:BB:CC:DD:EE:FF)
+        const upperMac = macAddress.toUpperCase();
+        await upsertRadCheck(username, "Calling-Station-Id", upperMac, "==", tenantId);
     }
 
     // ── 3. radcheck: Simultaneous-Use (prevents multi-login abuse) ────────────

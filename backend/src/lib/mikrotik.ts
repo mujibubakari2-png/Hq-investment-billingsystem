@@ -761,7 +761,7 @@ export class MikroTikService {
                 await this.enableHotspotUser(existing.id, username);
                 const updateData: any = { profile: profileName, name: username };
                 if (limitUptime) updateData.limitUptime = limitUptime;
-                if (macAddress) updateData.macAddress = macAddress;
+                if (macAddress) updateData.macAddress = macAddress.toUpperCase();
                 await this.updateHotspotUser(existing.id, updateData);
             } else {
                 await this.createHotspotUser({
@@ -771,7 +771,7 @@ export class MikroTikService {
                     server: "all",
                     disabled: false,
                     limitUptime,
-                    macAddress,
+                    macAddress: macAddress ? macAddress.toUpperCase() : undefined,
                 });
             }
         }
