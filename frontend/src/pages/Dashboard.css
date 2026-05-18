@@ -203,16 +203,26 @@
     background: var(--bg-card);
     border-radius: var(--radius-lg);
     border: 1px solid var(--border-light);
+    border-left: 4px solid transparent;
     padding: 18px 20px;
     position: relative;
     transition: all 0.25s ease;
     box-shadow: var(--shadow-sm);
+    overflow: hidden;
 }
 
 .dash-stat-card:hover {
     box-shadow: var(--shadow-md);
-    transform: translateY(-2px);
+    transform: translateY(-3px);
 }
+
+/* Colored left-border accents per card type */
+.dash-stat-card.accent-green  { border-left-color: #10b981; }
+.dash-stat-card.accent-red    { border-left-color: #ef4444; }
+.dash-stat-card.accent-blue   { border-left-color: #3b82f6; }
+.dash-stat-card.accent-orange { border-left-color: #f59e0b; }
+.dash-stat-card.accent-purple { border-left-color: #8b5cf6; }
+.dash-stat-card.accent-teal   { border-left-color: #14b8a6; }
 
 .dash-stat-top {
     display: flex;
@@ -819,11 +829,13 @@
     }
 
     .dash-stat-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
     }
 
     .dash-stat-grid.voucher-row {
-        grid-template-columns: 1fr;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
     }
 
     .connection-grid {
@@ -849,6 +861,22 @@
     }
 
     .dash-stat-card {
-        padding: 14px 16px;
+        padding: 13px 14px;
+    }
+
+    .dash-stat-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .dash-stat-grid.voucher-row {
+        grid-template-columns: 1fr;
+    }
+
+    .dash-stat-value {
+        font-size: 1.25rem;
+    }
+
+    .dash-welcome-text h1 {
+        font-size: 1.1rem;
     }
 }

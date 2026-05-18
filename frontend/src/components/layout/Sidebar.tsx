@@ -23,8 +23,8 @@ import PlayCircleIcon from '@mui/icons-material/PlayCircle';
 import ReceiptIcon from '@mui/icons-material/Receipt';
 import VpnKeyIcon from '@mui/icons-material/VpnKey';
 import BusinessIcon from '@mui/icons-material/Business';
-
 import CloseIcon from '@mui/icons-material/Close';
+
 import authStore from '../../stores/authStore';
 import { settingsApi } from '../../api/client';
 import './Sidebar.css';
@@ -33,7 +33,7 @@ const navSections = [
     {
         title: 'MAIN',
         items: [
-            { label: 'Dashboard', icon: 'dashboard', path: '/' },
+            { label: 'Dashboard', icon: 'dashboard', path: '/dashboard' },
         ],
     },
     {
@@ -70,7 +70,6 @@ const navSections = [
         title: 'NETWORK MANAGEMENT',
         items: [
             { label: 'Mikrotiks', icon: 'router', path: '/mikrotiks' },
-
             { label: 'Equipments', icon: 'devices', path: '/equipments' },
         ],
     },
@@ -124,17 +123,16 @@ const iconMap: Record<string, React.ReactNode> = {
     invoice: <ReceiptIcon fontSize="small" />,
     vpn: <VpnKeyIcon fontSize="small" />,
     business: <BusinessIcon fontSize="small" />,
-
 };
 
 interface SidebarProps {
     isOpen: boolean;
+    collapsed?: boolean;
     onClose: () => void;
 }
 
-export default function Sidebar({ isOpen, onClose }: SidebarProps) {
+export default function Sidebar({ isOpen, collapsed = false, onClose }: SidebarProps) {
     const location = useLocation();
-    const [collapsed] = useState(false);
     const { user } = authStore.useAuth();
     const [brand, setBrand] = useState({ main: 'HQ', sub: 'INVESTMENT' });
 
@@ -148,7 +146,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                     if (parts.length > 1) {
                         setBrand({ main: parts[0], sub: parts.slice(1).join(' ') });
                     } else {
-                        setBrand({ main: parts[0], sub: 'SYSTEM' }); // Fallback sub label if only one word
+                        setBrand({ main: parts[0], sub: 'SYSTEM' });
                     }
                 }
             }).catch(console.error);
@@ -163,14 +161,16 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 
     return (
         <>
+            {/* Mobile overlay — shown only when sidebar is open on small screens */}
             {isOpen && <div className="sidebar-overlay" onClick={onClose} />}
-            <aside className={`sidebar ${isOpen ? 'open' : ''} ${collapsed ? 'collapsed' : ''}`}>
+
+            <aside className={`sidebar${isOpen ? ' open' : ''}${collapsed ? ' collapsed' : ''}`}>
                 <div className="sidebar-header">
                     <div className="sidebar-brand">
                         <h1 className="brand-name">{brand.main}</h1>
                         <p className="brand-sub">{brand.sub}</p>
                     </div>
-                    <button className="sidebar-close-mobile" onClick={onClose}>
+                    <button className="sidebar-close-mobile" onClick={onClose} aria-label="Close menu">
                         <CloseIcon fontSize="small" />
                     </button>
                 </div>
@@ -184,12 +184,8 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                         const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
 
                         const filteredItems = section.items.filter(item => {
-                            if (item.label === 'System Users') {
-                                return isAdmin;
-                            }
-                            if (item.label === 'Invoices') {
-                                return user?.role === 'SUPER_ADMIN';
-                            }
+                            if (item.label === 'System Users') return isAdmin;
+                            if (item.label === 'Invoices') return user?.role === 'SUPER_ADMIN';
                             return true;
                         });
 
@@ -202,7 +198,9 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                                     <NavLink
                                         key={item.path}
                                         to={item.path}
-                                        className={`nav-item ${location.pathname === item.path ? 'active' : ''}`}
+                                        className={({ isActive }) =>
+                                            `nav-item${isActive || location.pathname === item.path ? ' active' : ''}`
+                                        }
                                         onClick={onClose}
                                     >
                                         <span className="nav-icon">{iconMap[item.icon]}</span>
