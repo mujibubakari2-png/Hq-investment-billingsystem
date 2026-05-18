@@ -55,18 +55,56 @@ export async function GET(req: NextRequest) {
             console.error("[DASHBOARD SYNC ERROR]: Failed to map RADIUS sessions to tenants", e);
         }
 
-        // Debug: Log if there are still unmapped radacct records for this user's tenant potential
-        if (process.env.NODE_ENV !== "production") {
-            const unmappedCount = await prisma.radAcct.count({ where: { tenantId: null } });
-            if (unmappedCount > 0) {
-                const sampleUnmapped = await prisma.radAcct.findMany({
-                    where: { tenantId: null },
-                    select: { nasipaddress: true },
-                    distinct: ['nasipaddress'],
-                    take: 5
-                });
-                console.warn(`[DASHBOARD DEBUG]: Found ${unmappedCount} unmapped RADIUS records. Sample NAS IPs: ${sampleUnmapped.map(u => u.nasipaddress).join(', ')}`);
+        // ── RADIUS Online Status Sync ──
+        // Sync subscription onlineStatus from live RADIUS accounting sessions.
+        // Users with an open radacct record (acctstoptime IS NULL) are ONLINE.
+        try {
+            const activeRadiusSessions = await prisma.radAcct.findMany({
+                where: { acctstoptime: null, ...tenantFilter },
+                select: { username: true },
+                distinct: ["username"],
+            });
+
+            const onlineUsernames = new Set(activeRadiusSessions.map((s) => s.username));
+
+            // Get all active subscriptions with their client usernames
+            const activeSubscriptions = await prisma.subscription.findMany({
+                where: { status: "ACTIVE", ...tenantFilter },
+                select: {
+                    id: true,
+                    onlineStatus: true,
+                    client: { select: { username: true } },
+                },
+            });
+
+            // Batch update online status based on RADIUS sessions
+            const toSetOnline: string[] = [];
+            const toSetOffline: string[] = [];
+
+            for (const sub of activeSubscriptions as any[]) {
+                const username = sub.client?.username;
+                if (!username) continue;
+                if (onlineUsernames.has(username) && sub.onlineStatus !== "ONLINE") {
+                    toSetOnline.push(sub.id);
+                } else if (!onlineUsernames.has(username) && sub.onlineStatus !== "OFFLINE") {
+                    toSetOffline.push(sub.id);
+                }
             }
+
+            if (toSetOnline.length > 0) {
+                await prisma.subscription.updateMany({
+                    where: { id: { in: toSetOnline } },
+                    data: { onlineStatus: "ONLINE" },
+                });
+            }
+            if (toSetOffline.length > 0) {
+                await prisma.subscription.updateMany({
+                    where: { id: { in: toSetOffline } },
+                    data: { onlineStatus: "OFFLINE" },
+                });
+            }
+        } catch (e) {
+            console.error("[DASHBOARD RADIUS SYNC ERROR]: Failed to sync online status from RADIUS", e);
         }
 
         // Fixed: Use timezone-aware boundaries (Africa/Dar_es_Salaam) to match frontend display
@@ -89,7 +127,7 @@ export async function GET(req: NextRequest) {
             recentTransactions,
             recentSubscriptions,
             recentLogins,
-            // New items:
+            // Voucher stats
             todayVoucherRev,
             monthlyVoucherRev,
             vouchersGeneratedToday,
@@ -119,6 +157,7 @@ export async function GET(req: NextRequest) {
                 },
                 _sum: { amount: true },
             }) : Promise.resolve({ _sum: { amount: 0 } }),
+            // Online users count from subscriptions (already synced from RADIUS above)
             prisma.subscription.count({
                 where: { status: "ACTIVE", onlineStatus: "ONLINE", ...tenantFilter, ...routerFilter },
             }),
@@ -132,11 +171,16 @@ export async function GET(req: NextRequest) {
                 },
                 _sum: { amount: true },
             }) : Promise.resolve({ _sum: { amount: 0 } }),
+            // Recent transactions - include today only, with payment channel info
             prisma.transaction.findMany({
-                where: tenantFilter,
+                where: {
+                    ...tenantFilter,
+                    createdAt: { gte: todayStart },
+                    status: "COMPLETED",
+                },
                 take: 10,
                 orderBy: { createdAt: "desc" },
-                include: { client: { select: { username: true } }, tenant: true },
+                include: { client: { select: { username: true } } },
             }),
             prisma.subscription.findMany({
                 where: { ...tenantFilter, ...routerFilter },
@@ -147,13 +191,20 @@ export async function GET(req: NextRequest) {
                     package: { select: { name: true } },
                 },
             }),
+            // Tenant login activity for system activity (last 5 days)
             isAdmin ? prisma.user.findMany({
-                where: { lastLogin: { not: null }, ...tenantFilter },
+                where: {
+                    lastLogin: {
+                        not: null,
+                        gte: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000), // Last 5 days only
+                    },
+                    ...tenantFilter,
+                },
                 orderBy: { lastLogin: "desc" },
-                take: 5,
-                select: { username: true, role: true, email: true, lastLogin: true },
+                take: 20, // More entries so we can show varied activity
+                select: { username: true, role: true, email: true, lastLogin: true, fullName: true },
             }) : Promise.resolve([]),
-            // new resolutions
+            // Voucher stats
             isAdmin ? prisma.transaction.aggregate({
                 where: { status: "COMPLETED", type: "VOUCHER", createdAt: { gte: todayStart }, ...tenantFilter },
                 _sum: { amount: true }
@@ -171,7 +222,9 @@ export async function GET(req: NextRequest) {
             prisma.transaction.count({ where: { status: "COMPLETED", type: "MOBILE", createdAt: { gte: monthStart }, ...tenantFilter } }),
             prisma.client.count({ where: { createdAt: { gte: monthStart }, ...tenantFilter } }),
             prisma.package.findMany({ where: { ...tenantFilter, ...routerFilter }, include: { _count: { select: { subscriptions: true } } } }),
+            // RADIUS-based hotspot online count (acctstoptime IS NULL, not PPP)
             prisma.radAcct.count({ where: { acctstoptime: null, framedprotocol: { not: "PPP" }, ...tenantFilter } }),
+            // RADIUS-based PPPoE online count (acctstoptime IS NULL, framedprotocol = PPP)
             prisma.radAcct.count({ where: { acctstoptime: null, framedprotocol: "PPP", ...tenantFilter } }),
         ]);
 
@@ -275,44 +328,58 @@ export async function GET(req: NextRequest) {
             console.error("Dashboard Raw SQL error (Growth):", e);
         }
 
-        const loginActivities = recentLogins.map(u => ({
-            id: `login-${u.username}-${toTimestampSafe(u.lastLogin)}`,
-            title: u.role === 'SUPER_ADMIN' ? 'SuperAdmin' : u.role === 'ADMIN' ? 'Admin' : 'User',
-            description: `${u.email || u.username} logged in via System`,
-            date: toISOSafe(u.lastLogin),
-            timestamp: toTimestampSafe(u.lastLogin),
-            status: 'Info',
-            type: 'login'
-        }));
+        // Build system activities from tenant logins within last 5 days
+        // Each login event is a separate activity entry
+        const loginActivities = recentLogins.map(u => {
+            const roleLabel = u.role === "SUPER_ADMIN" ? "Super Admin" : u.role === "ADMIN" ? "Admin" : "Agent";
+            const displayName = (u as any).fullName || u.username;
+            return {
+                id: `login-${u.username}-${toTimestampSafe(u.lastLogin)}`,
+                title: `${roleLabel} Login`,
+                description: `${displayName} (${u.email || u.username}) signed in to the system`,
+                date: toISOSafe(u.lastLogin),
+                timestamp: toTimestampSafe(u.lastLogin),
+                status: "Info",
+                type: "login",
+            };
+        });
 
-        const transactionActivities = recentTransactions.map((t) => ({
-            id: t.id,
-            title: t.client.username,
-            description: `${t.amount} TZS via ${t.method}`,
-            date: toISOSafe(t.createdAt),
-            timestamp: toTimestampSafe(t.createdAt),
-            status: t.status.charAt(0) + t.status.slice(1).toLowerCase(),
-            type: 'transaction'
-        }));
+        // Build transaction activities from today's transactions (already filtered to today)
+        const transactionActivities = recentTransactions.map((t) => {
+            const transactionType = t.type === "VOUCHER" ? "Voucher" : t.type === "MOBILE" ? "Payment" : "Manual";
+            const paymentChannel = t.method || "Unknown";
+            return {
+                id: t.id,
+                title: `${transactionType} Transaction`,
+                description: `${t.client.username} paid ${t.amount.toLocaleString()} TZS via ${paymentChannel}`,
+                date: toISOSafe(t.createdAt),
+                timestamp: toTimestampSafe(t.createdAt),
+                status: t.status.charAt(0) + t.status.slice(1).toLowerCase(),
+                type: "transaction",
+            };
+        });
 
+        // Merge and sort, keep last 5 days, limit to 10 for display
+        const fiveDaysAgo = Date.now() - 5 * 24 * 60 * 60 * 1000;
         const systemActivities = [...loginActivities, ...transactionActivities]
-            .sort((a, b) => (b.timestamp) - (a.timestamp))
-            .slice(0, 5)
+            .filter(act => act.timestamp > fiveDaysAgo) // Only last 5 days
+            .sort((a, b) => b.timestamp - a.timestamp)
+            .slice(0, 10)
             .map(act => ({
                 id: act.id,
                 title: act.title,
                 description: act.description,
                 type: act.type,
                 status: act.status,
-                date: act.date || null
+                date: act.date || null,
             }));
 
         // Mobile transactions metrics
         let mobileTransactionsStats: any[] = [];
         try {
             mobileTransactionsStats = await prisma.transaction.groupBy({
-                by: ['status'],
-                where: { type: 'MOBILE', ...tenantFilter },
+                by: ["status"],
+                where: { type: "MOBILE", ...tenantFilter },
                 _count: { _all: true },
                 _sum: { amount: true }
             } as any);
@@ -320,20 +387,20 @@ export async function GET(req: NextRequest) {
 
         const mobileTransactions = {
             totalCount: mobileTransactionsStats.reduce((acc, curr) => acc + curr._count._all, 0),
-            totalRevenue: mobileTransactionsStats.filter(s => s.status === 'COMPLETED').reduce((acc, curr) => acc + (curr._sum.amount || 0), 0),
-            paid: mobileTransactionsStats.find(s => s.status === 'COMPLETED')?._count._all || 0,
-            unpaid: mobileTransactionsStats.find(s => s.status === 'PENDING')?._count._all || 0,
-            failed: mobileTransactionsStats.find(s => s.status === 'FAILED')?._count._all || 0,
-            canceled: mobileTransactionsStats.find(s => s.status === 'CANCELED')?._count._all || 0,
+            totalRevenue: mobileTransactionsStats.filter(s => s.status === "COMPLETED").reduce((acc, curr) => acc + (curr._sum.amount || 0), 0),
+            paid: mobileTransactionsStats.find(s => s.status === "COMPLETED")?._count._all || 0,
+            unpaid: mobileTransactionsStats.find(s => s.status === "PENDING")?._count._all || 0,
+            failed: mobileTransactionsStats.find(s => s.status === "FAILED")?._count._all || 0,
+            canceled: mobileTransactionsStats.find(s => s.status === "CANCELED")?._count._all || 0,
         };
 
         const response = {
             totalClients,
-            newCustomersThisMonth, // newly added
+            newCustomersThisMonth,
             activeSubscribers,
             expiredSubscribers,
             totalRevenue: totalRevenue._sum.amount || 0,
-            revenue: totalRevenue._sum.amount || 0, // Alias for TestSprite
+            revenue: totalRevenue._sum.amount || 0,
             todayRevenue: todayRevenue._sum.amount || 0,
             monthlyRevenue: monthlyRevenue._sum.amount || 0,
 
@@ -354,27 +421,35 @@ export async function GET(req: NextRequest) {
             })),
             mobileTransactions,
 
-            revenueAnalytics, // Fine-tuned addition
+            revenueAnalytics,
             revenueChartData,
             onlineUsers,
             hotspotOnlineUsers,
             pppoeOnlineUsers,
-            active_users: onlineUsers, // Alias for TestSprite
+            active_users: onlineUsers,
             totalRouters,
             onlineRouters,
-            router_status: `${onlineRouters}/${totalRouters}`, // Alias for TestSprite
+            router_status: `${onlineRouters}/${totalRouters}`,
             subscriberGrowthData,
             systemActivities,
-            recentTransactions: isAdmin ? recentTransactions.map((t) => ({
-                id: t.id,
-                user: t.client.username,
-                amount: t.amount,
-                method: t.method,
-                planType: t.planName || 'N/A',
-                status: t.status.charAt(0) + t.status.slice(1).toLowerCase(),
-                date: toISOSafe(t.createdAt),
-                timeActiveSys: "N/A",
-            })) : [],
+            // Recent transactions for today only, enriched with payment channel + type
+            recentTransactions: isAdmin ? recentTransactions.map((t) => {
+                const isVoucher = t.type === "VOUCHER";
+                const channelLabel = isVoucher ? "Voucher" : (t.method || "N/A");
+                return {
+                    id: t.id,
+                    user: t.client.username,
+                    amount: t.amount,
+                    method: channelLabel,
+                    transactionType: t.type || "MOBILE",
+                    isVoucher,
+                    paymentChannel: t.method || "N/A",
+                    planType: t.planName || "N/A",
+                    status: t.status.charAt(0) + t.status.slice(1).toLowerCase(),
+                    date: toISOSafe(t.createdAt),
+                    timeActiveSys: "N/A",
+                };
+            }) : [],
             recentSubscriptions: recentSubscriptions.map((s) => ({
                 id: s.id,
                 username: s.client.username,
@@ -390,4 +465,3 @@ export async function GET(req: NextRequest) {
         return errorResponse("Internal server error", 500);
     }
 }
-

@@ -9,7 +9,6 @@ export async function GET(req: NextRequest) {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
 
-        const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
         const tenantFilter = { tenantId: userPayload.tenantId };
 
         const { searchParams } = new URL(req.url);
@@ -21,6 +20,61 @@ export async function GET(req: NextRequest) {
         const limitParam = searchParams.get("limit") || "25";
         const limit = limitParam === "All" ? 999999 : parseInt(limitParam);
 
+        // ── Real-time RADIUS Online Status Sync ──────────────────────────────────
+        // Before returning data, sync onlineStatus from live RADIUS accounting sessions.
+        // A subscription is ONLINE if the client's username has an open session
+        // in radacct (acctstoptime IS NULL). Otherwise it's OFFLINE.
+        try {
+            // Get all usernames that currently have an active RADIUS session
+            const activeRadiusSessions = await prisma.radAcct.findMany({
+                where: { acctstoptime: null, ...tenantFilter },
+                select: { username: true },
+                distinct: ["username"],
+            });
+
+            const onlineUsernames = new Set(activeRadiusSessions.map((s) => s.username));
+
+            // Fetch all active subscriptions with client info
+            const allActiveSubs = await prisma.subscription.findMany({
+                where: { status: "ACTIVE", ...tenantFilter },
+                select: {
+                    id: true,
+                    onlineStatus: true,
+                    client: { select: { username: true } },
+                },
+            });
+
+            const toSetOnline: string[] = [];
+            const toSetOffline: string[] = [];
+
+            for (const sub of allActiveSubs as any[]) {
+                const username = sub.client?.username;
+                if (!username) continue;
+                if (onlineUsernames.has(username) && sub.onlineStatus !== "ONLINE") {
+                    toSetOnline.push(sub.id);
+                } else if (!onlineUsernames.has(username) && sub.onlineStatus !== "OFFLINE") {
+                    toSetOffline.push(sub.id);
+                }
+            }
+
+            // Batch update to avoid N+1 queries
+            if (toSetOnline.length > 0) {
+                await prisma.subscription.updateMany({
+                    where: { id: { in: toSetOnline } },
+                    data: { onlineStatus: "ONLINE" },
+                });
+            }
+            if (toSetOffline.length > 0) {
+                await prisma.subscription.updateMany({
+                    where: { id: { in: toSetOffline } },
+                    data: { onlineStatus: "OFFLINE" },
+                });
+            }
+        } catch (e) {
+            console.error("[ACTIVE SUBSCRIBERS RADIUS SYNC ERROR]:", e);
+            // Do NOT block the response — just log and continue with stale data
+        }
+
         // Base filter for ACTIVE status
         const whereCondition: any = { status: "ACTIVE", ...tenantFilter };
 
@@ -28,7 +82,7 @@ export async function GET(req: NextRequest) {
             whereCondition.routerId = routerId;
         }
 
-        // Fetch all active for stats calculations
+        // Fetch all active subscriptions after online status sync
         const allActive = await prisma.subscription.findMany({
             where: whereCondition,
             include: { client: true, package: true, router: true },
@@ -41,6 +95,8 @@ export async function GET(req: NextRequest) {
                 id: s.id,
                 user: s.client?.username || "Unknown",
                 username: s.client?.username || "Unknown",
+                fullName: s.client?.fullName || "",
+                phone: s.client?.phone || "",
                 plan: s.package?.name || "N/A",
                 type: s.client?.serviceType === "HOTSPOT" ? "Hotspot" : "PPPoE",
                 device: s.client?.device || "N/A",
@@ -51,12 +107,13 @@ export async function GET(req: NextRequest) {
                 router: s.router?.name || "N/A",
                 routerId: s.routerId || "",
                 status: "Active",
+                // Real-time online status sourced from RADIUS
                 online: s.onlineStatus === "ONLINE" ? "Online" : "Offline",
-                sync: s.syncStatus || "Synced"
+                sync: s.syncStatus || "Synced",
             };
         });
 
-        // Compute summaries
+        // Compute summaries from complete dataset
         const summaries = {
             totalActive: allMapped.length,
             online: allMapped.filter(s => s.online === "Online").length,
@@ -69,10 +126,11 @@ export async function GET(req: NextRequest) {
         const filtered = allMapped.filter(s => {
             const matchType = type === "All" || s.type === type;
             const matchOnline = onlineStatus === "All" || s.online === onlineStatus;
-            const matchSearch = search === "" || 
-                s.username.toLowerCase().includes(search) || 
-                s.plan.toLowerCase().includes(search) || 
-                s.macAddress.toLowerCase().includes(search);
+            const matchSearch = search === "" ||
+                s.username.toLowerCase().includes(search) ||
+                s.plan.toLowerCase().includes(search) ||
+                s.macAddress.toLowerCase().includes(search) ||
+                s.fullName.toLowerCase().includes(search);
             return matchType && matchOnline && matchSearch;
         });
 
@@ -83,7 +141,7 @@ export async function GET(req: NextRequest) {
         return jsonResponse({
             data,
             total,
-            summaries
+            summaries,
         });
 
     } catch (e) {

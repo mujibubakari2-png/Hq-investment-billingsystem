@@ -163,7 +163,7 @@ export interface DashboardResponse {
     revenueChartData: { name: string; value: number }[];
     subscriberGrowthData: { month: string; clients: number }[];
     systemActivities: { id: string; title: string; description: string; date: string; type: string; status: string }[];
-    recentTransactions: { id: string; user: string; amount: number; method: string; status: string; date: string; planType: string; timeActiveSys: string }[];
+    recentTransactions: { id: string; user: string; amount: number; method: string; transactionType: string; isVoucher: boolean; paymentChannel: string; status: string; date: string; planType: string; timeActiveSys: string }[];
     recentSubscriptions: { id: string; username: string; plan: string; status: string; expiresAt: string }[];
 }
 
@@ -460,6 +460,19 @@ export const reportsApi = {
         const qs = '?' + new URLSearchParams(params).toString();
         return get<Record<string, unknown>>(`/reports${qs}`);
     },
+};
+
+// ── RADIUS Sync ─────────────────────────────────────────────────────────────
+
+export const radiusSyncApi = {
+    /** Trigger a full RADIUS ↔ subscription online-status sync for the tenant */
+    syncOnline: () => post<{ success: boolean; message: string; summary: Record<string, number> }>('/radius/sync-online', {}),
+    /** Get current RADIUS online session stats without modifying data */
+    getOnlineStats: () => get<{ totalOnline: number; hotspotOnline: number; pppoeOnline: number; totalActiveSubscriptions: number; onlineUsernames: string[]; sessions: Record<string, unknown>[] }>('/radius/sync-online'),
+    /** Preview expired voucher subscriptions (no changes made) */
+    previewExpiredVouchers: () => get<{ count: number; subscriptions: { id: string; username: string; fullName: string; plan: string; expiresAt: string | null; method: string }[] }>('/radius/voucher-expire'),
+    /** Expire overdue voucher subscriptions and suspend them in RADIUS */
+    expireVouchers: () => post<{ success: boolean; message: string; processed: number; succeeded: number; failed: number }>('/radius/voucher-expire', {}),
 };
 
 // ── VPN Management ──────────────────────────────────────────────────────────

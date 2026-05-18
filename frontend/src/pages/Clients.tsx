@@ -8,13 +8,14 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import DeleteIcon from '@mui/icons-material/Delete';
 import PhoneIcon from '@mui/icons-material/Phone';
 import SortIcon from '@mui/icons-material/UnfoldMore';
-import { clientsApi } from '../api/client';
+import { clientsApi, radiusSyncApi } from '../api/client';
 import { formatDate } from '../utils/formatters';
 import AddClientModal from '../modals/AddClientModal';
 import EditClientModal from '../modals/EditClientModal';
 import ViewClientModal from '../modals/ViewClientModal';
 import ConfirmDeleteModal from '../modals/ConfirmDeleteModal';
 import type { Client } from '../types';
+import WifiIcon from '@mui/icons-material/Wifi';
 
 export default function Clients() {
     const [clients, setClients] = useState<Client[]>([]);
@@ -28,6 +29,19 @@ export default function Clients() {
     const [viewClient, setViewClient] = useState<Client | null>(null);
     const [editClient, setEditClient] = useState<Client | null>(null);
     const [deleteClient, setDeleteClient] = useState<Client | null>(null);
+    const [onlineUsernames, setOnlineUsernames] = useState<Set<string>>(new Set());
+    const [radiusOnlineCount, setRadiusOnlineCount] = useState(0);
+
+    // Fetch RADIUS online usernames to show live online status per client
+    const fetchRadiusOnline = async () => {
+        try {
+            const stats = await radiusSyncApi.getOnlineStats();
+            setOnlineUsernames(new Set(stats.onlineUsernames || []));
+            setRadiusOnlineCount(stats.totalOnline || 0);
+        } catch {
+            // Non-blocking: RADIUS may not be configured
+        }
+    };
 
     const fetchClients = useCallback(async () => {
         setLoading(true);
@@ -52,6 +66,12 @@ export default function Clients() {
     useEffect(() => {
         fetchClients();
     }, [fetchClients]);
+
+    useEffect(() => {
+        fetchRadiusOnline();
+        const interval = setInterval(fetchRadiusOnline, 30000);
+        return () => clearInterval(interval);
+    }, []);
 
     const handleDelete = async () => {
         if (!deleteClient) return;
@@ -103,6 +123,13 @@ export default function Clients() {
                     </div>
                 </div>
                 <div className="page-header-right">
+                    {radiusOnlineCount > 0 && (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'rgba(76,175,80,0.12)', color: '#4caf50', borderRadius: 8, padding: '5px 12px', fontSize: '0.78rem', fontWeight: 700, marginRight: 8 }}>
+                            <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#4caf50', boxShadow: '0 0 6px #4caf50', display: 'inline-block' }} />
+                            <WifiIcon style={{ fontSize: 14 }} />
+                            {radiusOnlineCount} clients online (RADIUS)
+                        </span>
+                    )}
                     <button className="btn btn-primary" onClick={() => setShowAddModal(true)}>
                         <AddIcon fontSize="small" /> Add Client
                     </button>
@@ -214,6 +241,13 @@ export default function Clients() {
                                             <span className={`badge ${client.serviceType ? client.serviceType.toLowerCase() : 'unknown'}`}>
                                                 {client.serviceType || 'Unknown'}
                                             </span>
+                                            {/* Show live RADIUS online dot for this client */}
+                                            {onlineUsernames.has(client.username) && (
+                                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, marginLeft: 6, fontSize: '0.7rem', color: '#4caf50', fontWeight: 700 }}>
+                                                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#4caf50', boxShadow: '0 0 5px #4caf50', display: 'inline-block' }} />
+                                                    Online
+                                                </span>
+                                            )}
                                         </td>
                                         <td>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>

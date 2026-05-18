@@ -6,9 +6,10 @@ import SearchIcon from '@mui/icons-material/Search';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import RouterIcon from '@mui/icons-material/Router';
-import { packagesApi } from '../api/client';
+import { packagesApi, radiusSyncApi } from '../api/client';
 import type { Package } from '../types';
 import ConfirmDeleteModal from '../modals/ConfirmDeleteModal';
+import WifiIcon from '@mui/icons-material/Wifi';
 
 export default function Packages() {
     const navigate = useNavigate();
@@ -18,6 +19,7 @@ export default function Packages() {
     const [typeFilter, setTypeFilter] = useState('All Types');
     const [statusFilter, setStatusFilter] = useState('All Status');
     const [deleteId, setDeleteId] = useState<string | null>(null);
+    const [radiusOnlineMap, setRadiusOnlineMap] = useState<Map<string, number>>(new Map());
 
     const fetchPackages = async () => {
         setLoading(true);
@@ -28,7 +30,21 @@ export default function Packages() {
         finally { setLoading(false); }
     };
 
-    useEffect(() => { fetchPackages(); }, []);
+    const fetchRadiusStats = async () => {
+        try {
+            const stats = await radiusSyncApi.getOnlineStats();
+            // Store total online counts as a map for display in the header badges
+            setRadiusOnlineMap(new Map([['total', stats.totalOnline], ['hotspot', stats.hotspotOnline], ['pppoe', stats.pppoeOnline]]));
+        } catch (err) {
+            console.error('Failed to fetch RADIUS stats:', err);
+        }
+    };
+
+    useEffect(() => { fetchPackages(); fetchRadiusStats(); }, []);
+
+    const totalOnline = radiusOnlineMap.get('total') || 0;
+    const hotspotOnline = radiusOnlineMap.get('hotspot') || 0;
+    const pppoeOnline = radiusOnlineMap.get('pppoe') || 0;
 
     const handleDelete = async () => {
         if (!deleteId) return;
@@ -74,6 +90,15 @@ export default function Packages() {
                     </div>
                 </div>
                 <div className="page-header-right">
+                    {/* RADIUS live counters */}
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginRight: 12 }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'rgba(76,175,80,0.12)', color: '#4caf50', borderRadius: 8, padding: '4px 10px', fontSize: '0.78rem', fontWeight: 700 }}>
+                            <WifiIcon style={{ fontSize: 14 }} /> {totalOnline} Online
+                        </span>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'rgba(33,150,243,0.12)', color: '#2196f3', borderRadius: 8, padding: '4px 10px', fontSize: '0.78rem', fontWeight: 600 }}>
+                            <RouterIcon style={{ fontSize: 14 }} /> {hotspotOnline} Hotspot · {pppoeOnline} PPPoE
+                        </span>
+                    </div>
                     <button className="btn btn-primary" onClick={() => navigate('/add-package')}>
                         <AddIcon fontSize="small" /> Add Package
                     </button>

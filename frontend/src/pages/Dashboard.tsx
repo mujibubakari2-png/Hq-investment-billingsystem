@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { dashboardApi, routersApi } from '../api/client';
 import type { DashboardResponse } from '../api/client';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -30,6 +30,9 @@ import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import ViewListIcon from '@mui/icons-material/ViewList';
 import TimelineIcon from '@mui/icons-material/Timeline';
 import BoltIcon from '@mui/icons-material/Bolt';
+import LoginIcon from '@mui/icons-material/Login';
+import ConfirmationNumberIcon from '@mui/icons-material/ConfirmationNumber';
+import PaymentIcon from '@mui/icons-material/Payment';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import './Dashboard.css';
 
@@ -49,7 +52,7 @@ export default function Dashboard() {
     const [selectedRouter, setSelectedRouter] = useState<string>('All');
     const [analyticsPeriod, setAnalyticsPeriod] = useState<'daily' | 'weekly' | 'monthly' | 'yearly'>('daily');
 
-    const fetchData = async () => {
+    const fetchData = useCallback(async () => {
         setLoading(true);
         setError(null);
         try {
@@ -65,10 +68,17 @@ export default function Dashboard() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [tenantIdParam, selectedRouter]);
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    useEffect(() => { fetchData(); }, [tenantIdParam, selectedRouter]);
+    useEffect(() => { fetchData(); }, [fetchData]);
+
+    // Auto-refresh every 30 seconds to get real-time RADIUS online status
+    useEffect(() => {
+        const interval = setInterval(() => {
+            fetchData();
+        }, 30000);
+        return () => clearInterval(interval);
+    }, [fetchData]);
 
     const toggleCardVisibility = (index: number) => {
         setHiddenCards(prev => {
@@ -114,6 +124,9 @@ export default function Dashboard() {
         timeActive: t.timeActiveSys,
         amount: fmt(t.amount),
         method: t.method,
+        isVoucher: t.isVoucher,
+        transactionType: t.transactionType,
+        paymentChannel: t.paymentChannel,
     }));
 
     const revenueAnalyticsData = (stats?.revenueAnalytics?.[analyticsPeriod] ?? []).map(d => ({
@@ -470,12 +483,12 @@ export default function Dashboard() {
                     </div>
                 </div>
 
-                {/* Recent Transactions */}
+                {/* Recent Transactions - today only, reset daily */}
                 <div className="dash-card">
                     <div className="dash-card-header">
                         <div className="dash-card-title">
                             <ReceiptLongIcon style={{ fontSize: 18, color: '#4caf50' }} />
-                            Recent Transactions
+                            Today's Transactions
                         </div>
                         <button className="dash-view-all-btn" onClick={() => navigate('/all-transactions')}>
                             <ViewListIcon style={{ fontSize: 14 }} />
@@ -483,12 +496,18 @@ export default function Dashboard() {
                         </button>
                     </div>
                     <div className="dash-card-body no-pad">
+                        {recentTransactions.length === 0 ? (
+                            <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                                No transactions recorded today yet.
+                            </div>
+                        ) : (
                         <table className="dash-transactions-table">
                             <thead>
                                 <tr>
                                     <th>User</th>
                                     <th>Plan</th>
                                     <th>Amount</th>
+                                    <th>Channel</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -496,7 +515,7 @@ export default function Dashboard() {
                                     <tr key={i}>
                                         <td>
                                             <div className="tx-user-cell">
-                                                <FiberManualRecordIcon style={{ fontSize: 8, color: '#e53935' }} />
+                                                <FiberManualRecordIcon style={{ fontSize: 8, color: tx.isVoucher ? '#9c27b0' : '#2196f3' }} />
                                                 <div>
                                                     <div className="tx-username">{tx.user}</div>
                                                     <div className="tx-time">{tx.time}</div>
@@ -505,16 +524,34 @@ export default function Dashboard() {
                                         </td>
                                         <td>
                                             <div className="tx-plan">{tx.planType}</div>
-                                            <div className="tx-type" style={{ fontSize: '0.75rem', opacity: 0.8 }}>Time Active: {tx.timeActive}</div>
                                         </td>
                                         <td>
                                             <div className="tx-amount">{tx.amount}</div>
-                                            <div className="tx-method">{tx.method}</div>
+                                        </td>
+                                        <td>
+                                            {tx.isVoucher ? (
+                                                <span style={{
+                                                    display: 'inline-flex', alignItems: 'center', gap: 4,
+                                                    background: 'rgba(156,39,176,0.12)', color: '#9c27b0',
+                                                    borderRadius: 6, padding: '2px 8px', fontSize: '0.72rem', fontWeight: 700
+                                                }}>
+                                                    🎟️ Voucher
+                                                </span>
+                                            ) : (
+                                                <span style={{
+                                                    display: 'inline-flex', alignItems: 'center', gap: 4,
+                                                    background: 'rgba(33,150,243,0.12)', color: '#2196f3',
+                                                    borderRadius: 6, padding: '2px 8px', fontSize: '0.72rem', fontWeight: 700
+                                                }}>
+                                                    💳 {tx.paymentChannel}
+                                                </span>
+                                            )}
                                         </td>
                                     </tr>
                                 ))}
                             </tbody>
                         </table>
+                        )}
                     </div>
                 </div>
             </div>
@@ -619,35 +656,54 @@ export default function Dashboard() {
                     </div>
                 </div>
 
-                {/* System Activity */}
+                {/* System Activity - last 5 days, auto-purges on refresh */}
                 <div className="dash-card">
                     <div className="dash-card-header">
                         <div className="dash-card-title">
                             <BoltIcon style={{ fontSize: 18, color: '#9c27b0' }} />
                             System Activity
                         </div>
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', background: 'var(--bg-hover)', padding: '2px 8px', borderRadius: 6 }}>
+                            Last 5 days
+                        </span>
                     </div>
                     <div className="dash-card-body no-pad">
                         <div className="system-activity-list">
-                            {(stats?.systemActivities ?? []).slice(0, 5).map((act: { id: string; title: string; description: string; date: string; type: string; status: string }, i: number) => (
-                                <div className="sys-activity-item" key={i}>
-                                    <div className="sys-activity-icon-wrap" style={{
-                                        background: act.type === 'login' ? 'rgba(244, 67, 54, 0.12)' : 'rgba(76, 175, 80, 0.12)',
-                                        color: act.type === 'login' ? '#f44336' : '#4caf50'
-                                    }}>
-                                        {act.type === 'login' ? <BoltIcon style={{ fontSize: 16 }} /> : <ReceiptLongIcon style={{ fontSize: 16 }} />}
-                                    </div>
-                                    <div className="sys-activity-content">
-                                        <div className="sys-activity-role">
-                                            {act.title}
-                                        </div>
-                                        <div className="sys-activity-desc">
-                                            {act.description}
-                                        </div>
-                                        <div className="sys-activity-time">{formatDateTime(act.date)}</div>
-                                    </div>
+                            {(stats?.systemActivities ?? []).length === 0 && (
+                                <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                                    No recent activity in the last 5 days.
                                 </div>
-                            ))}
+                            )}
+                            {(stats?.systemActivities ?? []).slice(0, 10).map((act: { id: string; title: string; description: string; date: string; type: string; status: string }, i: number) => {
+                                const isLogin = act.type === 'login';
+                                const isVoucherTx = act.description?.toLowerCase().includes('voucher');
+                                const iconColor = isLogin ? '#2196f3' : isVoucherTx ? '#9c27b0' : '#4caf50';
+                                const iconBg = isLogin
+                                    ? 'rgba(33,150,243,0.12)'
+                                    : isVoucherTx
+                                    ? 'rgba(156,39,176,0.12)'
+                                    : 'rgba(76,175,80,0.12)';
+                                return (
+                                    <div className="sys-activity-item" key={i}>
+                                        <div className="sys-activity-icon-wrap" style={{ background: iconBg, color: iconColor }}>
+                                            {isLogin
+                                                ? <LoginIcon style={{ fontSize: 16 }} />
+                                                : isVoucherTx
+                                                ? <ConfirmationNumberIcon style={{ fontSize: 16 }} />
+                                                : <PaymentIcon style={{ fontSize: 16 }} />}
+                                        </div>
+                                        <div className="sys-activity-content">
+                                            <div className="sys-activity-role" style={{ color: iconColor }}>
+                                                {act.title}
+                                            </div>
+                                            <div className="sys-activity-desc">
+                                                {act.description}
+                                            </div>
+                                            <div className="sys-activity-time">{formatDateTime(act.date)}</div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
                         </div>
                     </div>
                 </div>

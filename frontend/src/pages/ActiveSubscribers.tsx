@@ -20,6 +20,8 @@ interface SubscriptionSummaries {
     totalActive: number;
     online: number;
     offline: number;
+    pppoe: number;
+    hotspot: number;
 }
 
 export default function ActiveSubscribers() {
@@ -74,6 +76,14 @@ export default function ActiveSubscribers() {
         fetchSubs();
     }, [fetchSubs]);
 
+    // Auto-refresh every 30 seconds to sync real-time RADIUS online status
+    useEffect(() => {
+        const interval = setInterval(() => {
+            fetchSubs();
+        }, 30000);
+        return () => clearInterval(interval);
+    }, [fetchSubs]);
+
     useEffect(() => {
         fetchRouters();
     }, []);
@@ -85,8 +95,8 @@ export default function ActiveSubscribers() {
         total: summaries?.totalActive || 0,
         online: summaries?.online || 0,
         offline: summaries?.offline || 0,
-        pppoe: 0,
-        hotspot: 0,
+        pppoe: summaries?.pppoe || 0,
+        hotspot: summaries?.hotspot || 0,
     };
 
 
@@ -136,14 +146,20 @@ export default function ActiveSubscribers() {
                     <PersonIcon className="stat-card-icon" style={{ fontSize: 40 }} />
                 </div>
                 <div className="stat-card blue">
-                    <div className="stat-card-label">Online Users</div>
-                    <div className="stat-card-value">{stats.online}</div>
-                    <PowerSettingsNewIcon className="stat-card-icon" style={{ fontSize: 40 }} />
+                    <div className="stat-card-label">Online Now (RADIUS)</div>
+                    <div className="stat-card-value" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#4caf50', display: 'inline-block', boxShadow: '0 0 6px #4caf50' }} />
+                        {stats.online}
+                    </div>
+                    <PowerSettingsNewIcon className="stat-card-icon" style={{ fontSize: 40, color: '#4caf50' }} />
                 </div>
                 <div className="stat-card red">
-                    <div className="stat-card-label">Offline Users</div>
-                    <div className="stat-card-value">{stats.offline}</div>
-                    <PowerSettingsNewIcon className="stat-card-icon" style={{ fontSize: 40 }} />
+                    <div className="stat-card-label">Offline</div>
+                    <div className="stat-card-value" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#e53935', display: 'inline-block' }} />
+                        {stats.offline}
+                    </div>
+                    <PowerSettingsNewIcon className="stat-card-icon" style={{ fontSize: 40, color: '#e53935' }} />
                 </div>
                 <div className="stat-card indigo">
                     <div className="stat-card-label">PPPoE Active</div>
@@ -306,8 +322,19 @@ export default function ActiveSubscribers() {
                                             <span className="badge active">Active</span>
                                         </td>
                                         <td>
-                                            <span className={`badge ${sub.online.toLowerCase()}`}>
-                                                {sub.online === 'Online' ? '● ' : '○ '}{sub.online}
+                                            <span className={`badge ${sub.online === 'Online' ? 'online' : 'offline'}`}
+                                                style={{
+                                                    display: 'inline-flex', alignItems: 'center', gap: 4,
+                                                    fontWeight: 600
+                                                }}
+                                            >
+                                                <span style={{
+                                                    width: 7, height: 7, borderRadius: '50%',
+                                                    background: sub.online === 'Online' ? '#4caf50' : '#9e9e9e',
+                                                    display: 'inline-block',
+                                                    boxShadow: sub.online === 'Online' ? '0 0 5px #4caf50' : 'none'
+                                                }} />
+                                                {sub.online}
                                             </span>
                                         </td>
                                         <td style={{ fontSize: '0.78rem' }}>
