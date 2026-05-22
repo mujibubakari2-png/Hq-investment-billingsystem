@@ -8,8 +8,6 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
 import SettingsIcon from '@mui/icons-material/Settings';
-import PowerSettingsNewIcon from '@mui/icons-material/PowerSettingsNew';
-import SyncIcon from '@mui/icons-material/Sync';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import { routersApi } from '../api/client';
 import AddRouterModal from '../modals/AddRouterModal';
@@ -33,7 +31,6 @@ export default function Mikrotiks() {
     const [loading, setLoading] = useState(false);
     const [pageSize, setPageSize] = useState<number | 'All'>(25);
     const [wizardRouter, setWizardRouter] = useState<Router | null>(null);
-    const [testingId, setTestingId] = useState<string>('');
     const [currentPage, setCurrentPage] = useState(1);
     const [totalRouters, setTotalRouters] = useState(0);
     const [actionMenuId, setActionMenuId] = useState<string | null>(null);
@@ -51,8 +48,8 @@ export default function Mikrotiks() {
         return () => document.removeEventListener('mousedown', handleClick);
     }, [actionMenuId]);
 
-    const fetchRouters = async () => {
-        setLoading(true);
+    const fetchRouters = async (showLoading = true) => {
+        if (showLoading) setLoading(true);
         try {
             const res = await routersApi.listPaginated({
                 search: searchTerm,
@@ -64,12 +61,50 @@ export default function Mikrotiks() {
         } catch (err) {
             console.error('Failed to load routers:', err);
         } finally {
-            setLoading(false);
+            if (showLoading) setLoading(false);
         }
     };
 
     useEffect(() => { fetchRouters(); }, [searchTerm, currentPage, pageSize]);
     useEffect(() => { setCurrentPage(1); }, [searchTerm, pageSize]);
+
+    // Auto-refresh router statuses and CPU load silently in the background
+    useEffect(() => {
+        let isMounted = true;
+        const intervalId = setInterval(() => {
+            setRouters(currentRouters => {
+                if (!isMounted || currentRouters.length === 0) return currentRouters;
+                
+                currentRouters.forEach(async (router) => {
+                    try {
+                        const result: any = await routersApi.testConnection(router.id);
+                        if (!isMounted) return;
+                        
+                        setRouters(latest => {
+                            const updated = [...latest];
+                            const idx = updated.findIndex(r => r.id === router.id);
+                            if (idx !== -1) {
+                                const newStatus = result.success ? 'Online' : 'Offline';
+                                const newCpu = result.info?.cpuLoad ?? updated[idx].cpuLoad;
+                                
+                                if (updated[idx].status !== newStatus || updated[idx].cpuLoad !== newCpu) {
+                                    updated[idx] = { ...updated[idx], status: newStatus as any, cpuLoad: newCpu };
+                                    return updated;
+                                }
+                            }
+                            return latest;
+                        });
+                    } catch (e) {}
+                });
+                return currentRouters;
+            });
+        }, 10000); // Auto-refresh every 10 seconds
+        
+        return () => {
+            isMounted = false;
+            clearInterval(intervalId);
+        };
+    }, []);
 
 
 
@@ -113,23 +148,6 @@ export default function Mikrotiks() {
         } catch (err: any) {
             console.error('Failed to update router:', err);
             alert(`Failed to update router: ${err?.message || 'Unknown error'}`);
-        }
-    };
-
-    const handleTestConnection = async (router: Router) => {
-        setTestingId(router.id);
-        try {
-            const result = await routersApi.testConnection(router.id);
-            if ((result as any).success) {
-                alert(`✅ Connected! RouterOS ${(result as any).info?.version || ''}`);
-            } else {
-                alert(`❌ Connection failed: ${(result as any).message || 'Unknown error'}`);
-            }
-            fetchRouters();
-        } catch (err: any) {
-            alert(`❌ Connection failed: ${err?.message || 'Unknown error'}`);
-        } finally {
-            setTestingId('');
         }
     };
 
@@ -365,23 +383,6 @@ export default function Mikrotiks() {
                                                 onMouseOut={(e) => { (e.currentTarget as HTMLButtonElement).style.transform = 'none'; (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 1px 3px rgba(22,163,74,0.3)'; }}
                                             >
                                                 <VisibilityIcon style={{ fontSize: 13 }} /> Details
-                                            </button>
-                                            <button
-                                                className="btn-icon"
-                                                style={{
-                                                    background: testingId === router.id ? '#fef3c7' : '#e0f2fe',
-                                                    color: testingId === router.id ? '#d97706' : '#0284c7',
-                                                    width: 30, height: 30, borderRadius: 6,
-                                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                    border: 'none', cursor: 'pointer', transition: 'all 0.15s',
-                                                }}
-                                                title="Test Connection"
-                                                onClick={() => handleTestConnection(router)}
-                                                disabled={testingId === router.id}
-                                            >
-                                                {testingId === router.id
-                                                    ? <SyncIcon style={{ fontSize: 14, animation: 'spin 1s linear infinite' }} />
-                                                    : <PowerSettingsNewIcon style={{ fontSize: 14 }} />}
                                             </button>
                                             <div style={{ position: 'relative' }} ref={actionMenuId === router.id ? menuRef : undefined}>
                                                 <button
