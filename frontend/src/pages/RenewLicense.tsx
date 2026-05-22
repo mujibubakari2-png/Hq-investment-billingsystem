@@ -117,7 +117,7 @@ export default function RenewLicense() {
         const periodTo = new Date(Date.now() + (selectedPackage || 1) * 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
         const dueDate = license?.outstandingInvoices?.[0]?.dueDate || 'Immediately';
         const invoiceRef = license?.outstandingInvoices?.[0]?.id || 'INV-RENEWAL';
-        const description = selectedPackage === 0 ? 'Outstanding Invoice Balance' : `License Fee - ${selectedPackage} Month(s)`;
+        const description = selectedPackage === 0 ? 'Outstanding Invoice Balance' : `${currentPlanName} — License Fee (${selectedPackage} Month${selectedPackage > 1 ? 's' : ''})`;
         const amount = getAmountToPay().toLocaleString(undefined, { maximumFractionDigits: 0 });
 
         const printContent = `

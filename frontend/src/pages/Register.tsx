@@ -412,10 +412,6 @@ export default function Register() {
                                 <button onClick={handleNext} disabled={loading} style={{ width: '100%', padding: '14px', backgroundColor: '#0ea5e9', color: '#ffffff', border: 'none', borderRadius: '8px', fontSize: '1rem', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', cursor: loading ? 'wait' : 'pointer', opacity: loading ? 0.7 : 1 }}>
                                     {loading ? 'Sending Verification Code...' : <>Continue to Verify OTP <ArrowRightAltIcon /></>}
                                 </button>
-                            </div>
-                                <button onClick={handleNext} disabled={loading} style={{ width: '100%', padding: '14px', backgroundColor: '#0ea5e9', color: '#ffffff', border: 'none', borderRadius: '8px', fontSize: '1rem', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', cursor: loading ? 'wait' : 'pointer', opacity: loading ? 0.7 : 1 }}>
-                                    {loading ? 'Sending Verification Code...' : <>Continue to Verify OTP <ArrowRightAltIcon /></>}
-                                </button>
                                 <button onClick={handleBack} style={{ width: '100%', padding: '12px', backgroundColor: '#fff', color: '#64748b', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '0.95rem', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', cursor: 'pointer', marginTop: '10px' }}>
                                     <ArrowBackIcon fontSize="small" /> Back to Plan Selection
                                 </button>
