@@ -109,7 +109,7 @@ export default function PricingCard({
                     <span className="text-gray-400 text-sm">/month</span>
                 </div>
                 <p className="text-xs text-gray-400 mt-1">
-                    Billed monthly • Cancel anytime
+                    10-day free trial • Cancel anytime
                 </p>
             </div>
 
@@ -147,7 +147,7 @@ export default function PricingCard({
                     Get Started with {name} →
                 </a>
                 <p className="text-center text-xs text-gray-400 mt-3">
-                    No setup fees · Free 7-day trial
+                    No setup fees · 10-day free trial included
                 </p>
             </div>
         </motion.div>

@@ -9,7 +9,7 @@ export default function Footer() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-16">
           <div className="space-y-6">
-            <h3 className="text-2xl font-bold">HQInvestment <span className="text-secondary">Billing</span></h3>
+            <h3 className="text-2xl font-bold tracking-wide">HQ INVESTMENT <span className="text-secondary">ISP BILLING</span></h3>
             <p className="text-blue-100 leading-relaxed">
               Trusted by hundreds of ISPs across East Africa. We simplify billing so you can focus on connecting more customers.
             </p>
@@ -56,7 +56,7 @@ export default function Footer() {
           </div>
         </div>
         <div className="border-t border-accent pt-8 flex flex-col md:flex-row justify-between items-center text-blue-100 text-sm gap-3">
-          <p>© {currentYear} HQInvestment Billing. All rights reserved.</p>
+          <p>© {currentYear} HQ INVESTMENT ISP BILLING. All rights reserved.</p>
           <div className="flex space-x-6 mt-4 md:mt-0">
             <Link href="#" className="hover:text-white transition-colors">Privacy Policy</Link>
             <Link href="#" className="hover:text-white transition-colors">Terms of Service</Link>

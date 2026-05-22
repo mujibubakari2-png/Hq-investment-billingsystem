@@ -1,0 +1,6 @@
+@echo off
+echo Checking environment...
+node -e "var d = require('dotenv').config(); var e = process.env; console.log('DB:', e.DATABASE_URL ? 'configured' : 'MISSING'); console.log('JWT:', e.JWT_SECRET ? 'configured' : 'MISSING'); console.log('NODE_ENV:', e.NODE_ENV);"
+echo.
+echo Running full test suite...
+node --loader ts-node/esm --no-warnings src/scripts/run-all-tests.ts

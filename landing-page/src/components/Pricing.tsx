@@ -10,50 +10,48 @@ interface SaasPlan {
 }
 
 // ── Feature matrix per price tier ───────────────────────────────────────────
-// Plans are sorted ascending by price. Index 0 = cheapest (Basic), last = Premium.
-// Each tier unlocks everything below it + its own extras.
+// Hotspot is UNLIMITED for all plans. PPPoE is limited by clientLimit.
+// Plans are sorted ascending by price. Index 0 = cheapest, last = most expensive.
 
 const TIER_FEATURES: Record<
     "basic" | "standard" | "professional" | "enterprise",
     string[]
 > = {
     basic: [
-        "Up to {limit} customers",
-        "MikroTik Hotspot management",
-        "Voucher-based billing",
+        "Unlimited Hotspot subscribers",
+        "Up to {limit} PPPoE connections",
+        "Full customer management",
         "Mobile payment (M-Pesa & Airtel)",
-        "Basic subscriber reports",
+        "Standard billing reports",
         "Email & SMS payment alerts",
     ],
     standard: [
-        "Up to {limit} customers",
-        "Hotspot + PPPoE subscriber management",
-        "Voucher & subscription billing",
-        "Mobile payment (M-Pesa, Airtel, Tigo)",
+        "Unlimited Hotspot subscribers",
+        "Up to {limit} PPPoE connections",
+        "Fully automated billing",
+        "Real-time SMS payment alerts",
+        "Advanced analytics & reports",
         "Real-time RADIUS online/offline sync",
-        "Advanced analytics dashboard",
         "Automated expiry & renewal alerts",
         "Multi-router support (up to 3)",
     ],
     professional: [
-        "Up to {limit} customers",
-        "Full PPPoE + Hotspot + static IP",
+        "Unlimited Hotspot subscribers",
+        "Up to {limit} PPPoE connections",
+        "Full billing & renewal automation",
+        "Business intelligence dashboard",
         "All payment channels + API callbacks",
-        "Real-time RADIUS billing & sync",
-        "Business intelligence & revenue charts",
         "Unlimited routers & WireGuard VPN",
-        "Automated subscriber management",
         "SMS bulk messaging to clients",
         "Priority technical support",
     ],
     enterprise: [
-        "Up to {limit} customers",
+        "Unlimited Hotspot subscribers",
+        "Up to {limit} PPPoE connections",
         "Everything in Professional",
+        "API access for custom integrations",
         "Custom branding & white-labelling",
-        "REST API access for integrations",
         "Multi-admin & role-based access",
-        "Custom RADIUS attribute mapping",
-        "Dedicated server resources",
         "SLA uptime guarantee",
         "24/7 dedicated support line",
     ],
@@ -103,12 +101,11 @@ export default function Pricing() {
                         Transparent Pricing
                     </span>
                     <h2 className="text-3xl md:text-5xl font-bold text-primary mb-4">
-                        Plans for Every ISP Size
+                        Simple Pricing. Real Value.
                     </h2>
-                    <p className="text-lg text-gray-500 max-w-2xl mx-auto">
-                        Start small, grow big. Every plan includes MikroTik
-                        integration and mobile payments — upgrade as your
-                        network expands.
+                    <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+                        Pick the plan that matches your network size. Upgrade any time as you grow.
+                        Every plan includes a <strong>10-day free trial</strong> — no credit card required.
                     </p>
                 </div>
 
@@ -142,8 +139,7 @@ export default function Pricing() {
                 )}
 
                 <p className="text-center text-sm text-gray-400 mt-10">
-                    All plans include a 7-day free trial. No credit card
-                    required to start.
+                    🎉 All plans include a <strong>10-day free trial</strong>. After the trial, billing starts automatically based on your chosen plan. No credit card required to start.
                 </p>
             </div>
         </section>
