@@ -188,7 +188,7 @@ export default function VpnManagement() {
                                 </div>
                                 <div className="form-group">
                                     <label className="form-label">Full Name</label>
-                                    <input className="form-input" placeholder="John Doe" value={formData.fullName} onChange={e => setFormData({ ...formData, fullName: e.target.value })} />
+                                    <input className="form-input" placeholder="Mujibu Bakari" value={formData.fullName} onChange={e => setFormData({ ...formData, fullName: e.target.value })} />
                                 </div>
                             </div>
                             <div className="form-row">

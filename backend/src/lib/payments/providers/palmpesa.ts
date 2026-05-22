@@ -1,0 +1,183 @@
+/**
+ * PalmPesa Payment Provider
+ *
+ * PalmPesa aggregates TZ mobile money networks (M-Pesa, Airtel, Tigo, Halo, TTCL)
+ * into a single wallet. Contact: Support@palmpesa.co.tz
+ *
+ * Auth: Bearer token (API Key)
+ * Base URL: https://api.palmpesa.com/v1  (update from developer portal)
+ */
+
+import {
+  PaymentProvider,
+  PaymentRequest,
+  PaymentResponse,
+  TransactionStatus,
+  WebhookVerification,
+  ParsedWebhookPayload,
+  ProviderConfig,
+} from "@/lib/payments/types";
+import {
+  formatPhoneTZ,
+  timingSafeEqual,
+  httpPost,
+  httpGet,
+  retryWithBackoff,
+} from "@/lib/payments/utils";
+
+export class PalmPesaProvider implements PaymentProvider {
+  readonly name = "PALMPESA" as const;
+
+  private apiKey: string;
+  private apiUrl: string;
+  private webhookSecret: string;
+  private environment: "sandbox" | "live";
+
+  constructor(config: ProviderConfig) {
+    if (!config.apiKey) throw new Error("PalmPesa: apiKey is required");
+    this.apiKey = config.apiKey;
+    this.apiUrl = config.apiUrl ?? process.env.PALMPESA_API_URL ?? "https://api.palmpesa.com/v1";
+    this.webhookSecret = config.webhookSecret ?? "";
+    this.environment = config.environment ?? "sandbox";
+  }
+
+  private get headers(): Record<string, string> {
+    return {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${this.apiKey}`,
+      "X-Environment": this.environment,
+    };
+  }
+
+  // ── Initiate Payment (STK Push) ───────────────────────────────────────────
+
+  async initiatePayment(request: PaymentRequest): Promise<PaymentResponse> {
+    const phone = formatPhoneTZ(request.phone);
+
+    const payload = {
+      PhoneNumber: phone,
+      Amount: Math.round(request.amount),
+      AccountReference: request.reference,
+      TransactionDesc: request.description ?? `Payment ${request.reference}`,
+      CallbackUrl: request.callbackUrl,
+      BuyerName: request.buyerName,
+      BuyerEmail: request.buyerEmail,
+    };
+
+    try {
+      const result = await retryWithBackoff(
+        () => httpPost(`${this.apiUrl}/payments/stk-push`, payload, this.headers),
+        2
+      );
+
+      const data = result.data as Record<string, unknown>;
+
+      if (result.ok && (data?.ResponseCode === "0" || data?.success === true)) {
+        return {
+          success: true,
+          providerRef:
+            (data?.CheckoutRequestID as string) ??
+            (data?.transaction_id as string) ??
+            undefined,
+          message: (data?.ResponseDescription as string) ?? "Payment initiated",
+          rawResponse: data,
+        };
+      }
+
+      return {
+        success: false,
+        message: (data?.ResponseDescription as string) ?? (data?.message as string) ?? "Failed to initiate payment",
+        rawResponse: data,
+      };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Network error";
+      return { success: false, message: `PalmPesa error: ${msg}` };
+    }
+  }
+
+  // ── Check Transaction Status ──────────────────────────────────────────────
+
+  async checkStatus(providerRef: string): Promise<TransactionStatus> {
+    try {
+      const result = await httpGet(
+        `${this.apiUrl}/payments/status/${providerRef}`,
+        this.headers
+      );
+
+      const data = result.data as Record<string, unknown>;
+      const rawStatus = (data?.ResultCode ?? data?.status ?? "") as string;
+
+      let status: TransactionStatus["status"] = "PENDING";
+      if (rawStatus === "0" || rawStatus === "SUCCESS" || rawStatus === "COMPLETED") {
+        status = "COMPLETED";
+      } else if (rawStatus === "FAILED" || rawStatus === "CANCELLED") {
+        status = "FAILED";
+      } else if (rawStatus === "EXPIRED") {
+        status = "EXPIRED";
+      }
+
+      return {
+        status,
+        providerRef,
+        amount: data?.Amount ? Number(data.Amount) : undefined,
+        rawResponse: data,
+      };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      console.error(`[PALMPESA] checkStatus error: ${msg}`);
+      return { status: "PENDING" };
+    }
+  }
+
+  // ── Webhook Verification ──────────────────────────────────────────────────
+
+  async verifyWebhook(
+    headers: Record<string, string | string[] | undefined>,
+    _rawBody: string
+  ): Promise<WebhookVerification> {
+    if (!this.webhookSecret) {
+      console.warn("[PALMPESA] No webhook secret configured — skipping verification");
+      return { verified: true, reason: "No secret configured" };
+    }
+
+    const provided =
+      (headers["x-webhook-secret"] as string) ??
+      (headers["x-palmpesa-signature"] as string) ??
+      "";
+
+    if (!provided) {
+      return { verified: false, reason: "Missing webhook signature header" };
+    }
+
+    const valid = timingSafeEqual(provided, this.webhookSecret);
+    return {
+      verified: valid,
+      reason: valid ? undefined : "Webhook signature mismatch",
+    };
+  }
+
+  // ── Parse Webhook Payload ─────────────────────────────────────────────────
+
+  parseWebhookPayload(body: unknown): ParsedWebhookPayload {
+    const b = body as Record<string, unknown>;
+
+    // PalmPesa sends ResultCode "0" for success
+    return {
+      transactionRef:
+        (b?.AccountReference as string) ??
+        (b?.account_reference as string) ??
+        "",
+      providerRef:
+        (b?.TransactionId as string) ??
+        (b?.transaction_id as string) ??
+        undefined,
+      resultCode:
+        (b?.ResultCode as string) ?? (b?.result_code as string) ?? "1",
+      resultMessage:
+        (b?.ResultDesc as string) ?? (b?.message as string) ?? undefined,
+      amount: b?.Amount ? Number(b.Amount) : undefined,
+      phone: (b?.PhoneNumber as string) ?? undefined,
+      rawBody: body,
+    };
+  }
+}

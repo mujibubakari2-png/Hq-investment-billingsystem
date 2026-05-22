@@ -354,6 +354,8 @@ model PaymentChannel {
   accountNumber String?
   apiKey        String?
   apiSecret     String?
+  webhookSecret String?
+  environment   String        @default("sandbox")
   status        ChannelStatus @default(ACTIVE)
   config        Json?
   createdAt     DateTime      @default(now())
@@ -362,6 +364,31 @@ model PaymentChannel {
   tenant        Tenant?       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("payment_channels")
+}
+
+model WebhookLog {
+  id             String    @id @default(cuid())
+  provider       String
+  event          String    @default("PAYMENT_CALLBACK")
+  payload        Json
+  headers        Json?
+  signature      String?
+  verified       Boolean   @default(false)
+  transactionRef String?
+  providerRef    String?
+  status         String    @default("RECEIVED")
+  errorMessage   String?
+  processedAt    DateTime?
+  createdAt      DateTime  @default(now())
+  tenantId       String?
+  tenant         Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([provider])
+  @@index([transactionRef])
+  @@index([providerRef])
+  @@index([tenantId])
+  @@index([createdAt])
+  @@map("webhook_logs")
 }
 
 model SystemSetting {
@@ -415,6 +442,7 @@ model Tenant {
   users            User[]
   vouchers         Voucher[]
   vpnUsers         VpnUser[]
+  webhookLogs      WebhookLog[]
 
   @@map("tenants")
 }
