@@ -15,13 +15,7 @@
 
     "db:check-migrations": "npx tsx scripts/check-migrations.js",
     "db:fix-migrations": "npx tsx scripts/fix-migrations.js",
-    "db:generate": "npx prisma generate",
-    "test:integration": "tsx --tsconfig tsconfig.json src/scripts/run-all-tests.ts",
-    "test:radius": "tsx --tsconfig tsconfig.json src/scripts/test-radius-flow.ts",
-    "test:channels": "tsx --tsconfig tsconfig.json src/scripts/test-payment-channels.ts",
-    "test:mobile": "tsx --tsconfig tsconfig.json src/scripts/test-mobile-transaction.ts",
-    "test:voucher": "tsx --tsconfig tsconfig.json src/scripts/test-voucher-radius.ts",
-    "test:mikrotik": "tsx --tsconfig tsconfig.json src/scripts/test-mikrotik-refresh.ts"
+    "db:generate": "npx prisma generate"
   },
   "prisma": {
     "seed": "npx tsx scripts/seed.ts"
