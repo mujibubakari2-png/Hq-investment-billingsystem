@@ -253,7 +253,7 @@ export const activeSubscribersApi = {
 // ── Transactions ────────────────────────────────────────────────────────────
 
 export const licenseApi = {
-    getLicense: () => get<LicenseResponse>('/license'),
+    getLicense: () => get<LicenseResponse>(`/license?_t=${Date.now()}`),
     renewLicense: (data: { packageMonths: number; phoneNumber: string; amount: number; invoiceId?: string }) => post<{ success: boolean; message: string; expiresAt: string }>('/license/renew', data),
     changePlan: (planId: string) => post<{ message: string; plan: { id: string; name: string; price: number; clientLimit: number } }>('/license/change-plan', { planId }),
 };

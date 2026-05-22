@@ -284,16 +284,9 @@ export default function LicenseManagement() {
                 <button
                     className="btn btn-primary"
                     style={{ display: 'flex', alignItems: 'center', gap: 6 }}
-                    onClick={() => navigate('/renew-license')}
+                    onClick={() => navigate('/renew')}
                 >
                     <PaymentIcon style={{ fontSize: 16 }} /> Pay Invoice / Renew
-                </button>
-                <button
-                    className="btn btn-outline"
-                    style={{ display: 'flex', alignItems: 'center', gap: 6 }}
-                    onClick={() => setShowChangePlan(true)}
-                >
-                    <SwapHorizIcon style={{ fontSize: 16 }} /> Change Plan
                 </button>
             </div>
 
@@ -306,7 +299,7 @@ export default function LicenseManagement() {
                         <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: 16 }}>
                             You have unpaid invoices pending. Please settle them to avoid suspension.
                         </p>
-                        <button className="btn btn-primary" onClick={() => navigate('/renew-license')}>
+                        <button className="btn btn-primary" onClick={() => navigate('/renew')}>
                             <PaymentIcon style={{ fontSize: 16, marginRight: 6 }} /> Pay Now
                         </button>
                     </>
