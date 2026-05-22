@@ -282,9 +282,9 @@ export class MikroTikService {
             const info: RouterSystemInfo = {
                 identity: ident?.name || "Unknown",
                 version: res?.version || "Unknown",
-                cpuLoad: res?.["cpu-load"] !== undefined ? Number(res["cpu-load"]) : 0,
-                freeMemory: res?.["free-memory"] !== undefined ? Number(res["free-memory"]) : 0,
-                totalMemory: res?.["total-memory"] !== undefined ? Number(res["total-memory"]) : 0,
+                cpuLoad: parseInt(res?.["cpu-load"] || "0"),
+                freeMemory: parseInt(res?.["free-memory"] || "0"),
+                totalMemory: parseInt(res?.["total-memory"] || "0"),
                 uptime: res?.uptime || "0s",
                 boardName: res?.["board-name"] || "Unknown",
                 architecture: res?.["architecture-name"] || "Unknown",
