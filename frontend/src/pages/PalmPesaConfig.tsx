@@ -9,9 +9,9 @@ import LinkIcon from '@mui/icons-material/Link';
 
 export default function PalmPesaConfig() {
     const navigate = useNavigate();
-    const [apiKey, setApiKey] = useState('337');
+    const [apiKey, setApiKey] = useState('');
     const [apiToken, setApiToken] = useState('');
-    const [secretKey, setSecretKey] = useState('F12457789611');
+    const [secretKey, setSecretKey] = useState('');
     const [callbackUrl, setCallbackUrl] = useState('');
     const [cancelUrl, setCancelUrl] = useState('');
     const [saved, setSaved] = useState(false);
