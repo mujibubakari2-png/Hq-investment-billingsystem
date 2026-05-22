@@ -85,7 +85,51 @@ sudo apt install certbot python3-certbot-nginx
 sudo certbot --nginx -d your-domain.com
 ```
 
-## Troubleshooting Migration Failures
+## Troubleshooting Build Failures (Exit 137 / OOM)
+
+### Symptom
+```
+frontend build$ vite build
+│ Killed
+└─ Failed in 7m 42.8s
+ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  frontend@0.0.0 build: `vite build`
+Exit status 137
+```
+
+**Exit 137 = Linux OOM killer terminated the process.** The Vite/Rollup build temporarily
+needs more RAM than is available. Two fixes are applied automatically:
+
+1. **Node heap cap** — `frontend/package.json` now runs vite with
+   `--max-old-space-size=1536` so Node never allocates more than 1.5 GB.
+2. **Swap file** — `droplet-setup.sh` creates a 2 GB swap file at `/swapfile`
+   during initial setup.
+
+### If the server is already running (quick fix)
+
+SSH into the droplet and run the included fix script:
+```bash
+chmod +x fix-oom-build.sh
+./fix-oom-build.sh
+```
+It will add swap (if missing) then re-run the frontend build automatically.
+
+### Manual steps (if you prefer)
+```bash
+# Add 2 GB swap
+sudo fallocate -l 2G /swapfile
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+
+# Rebuild only the frontend
+pnpm --filter frontend build
+
+# Deploy static files
+cp -r frontend/dist/* /var/www/html/billing/
+```
+
+
 
 ### If you see "❌ Migration failed — refusing to start to avoid schema drift"
 
