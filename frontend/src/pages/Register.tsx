@@ -263,35 +263,65 @@ export default function Register() {
                                                     onClick={() => updateField('planId', plan.id)}
                                                     style={{
                                                         border: `2px solid ${isSelected ? '#0ea5e9' : '#e2e8f0'}`,
-                                                        borderRadius: '10px',
+                                                        borderRadius: '12px',
                                                         padding: '16px 20px',
                                                         cursor: 'pointer',
                                                         background: isSelected ? '#f0f9ff' : '#fff',
                                                         position: 'relative',
                                                         transition: 'all 0.2s',
-                                                        display: 'flex',
-                                                        justifyContent: 'space-between',
-                                                        alignItems: 'center',
+                                                        boxShadow: isSelected ? '0 0 0 3px rgba(14,165,233,0.15)' : 'none',
                                                     }}
                                                 >
+                                                    {/* Popular badge */}
                                                     {isPopular && (
-                                                        <span style={{ position: 'absolute', top: '-10px', left: '16px', background: '#0ea5e9', color: '#fff', fontSize: '0.7rem', fontWeight: 700, padding: '2px 10px', borderRadius: '20px' }}>POPULAR</span>
+                                                        <span style={{ position: 'absolute', top: '-11px', left: '16px', background: '#0ea5e9', color: '#fff', fontSize: '0.68rem', fontWeight: 700, padding: '2px 12px', borderRadius: '20px', letterSpacing: '0.05em' }}>
+                                                            ⭐ MOST POPULAR
+                                                        </span>
                                                     )}
-                                                    <div>
-                                                        <div style={{ fontWeight: 700, fontSize: '1rem', color: isSelected ? '#0ea5e9' : '#0f172a' }}>{plan.name}</div>
-                                                        <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '2px' }}>Up to {plan.clientLimit.toLocaleString()} customers</div>
-                                                    </div>
-                                                    <div style={{ textAlign: 'right' }}>
-                                                        <div style={{ fontWeight: 800, fontSize: '1.2rem', color: isSelected ? '#0ea5e9' : '#0f172a' }}>TSH {plan.price.toLocaleString()}</div>
-                                                        <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>/month</div>
-                                                    </div>
+
+                                                    {/* Selected check */}
                                                     {isSelected && (
-                                                        <CheckCircleIcon style={{ position: 'absolute', top: '8px', right: '12px', color: '#0ea5e9', fontSize: '18px' }} />
+                                                        <CheckCircleIcon style={{ position: 'absolute', top: '12px', right: '14px', color: '#0ea5e9', fontSize: '20px' }} />
                                                     )}
+
+                                                    {/* Top row: name + price */}
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px', paddingRight: isSelected ? '28px' : '0' }}>
+                                                        <div>
+                                                            <div style={{ fontWeight: 700, fontSize: '1rem', color: isSelected ? '#0369a1' : '#0f172a' }}>{plan.name}</div>
+                                                        </div>
+                                                        <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                                                            <div style={{ fontWeight: 800, fontSize: '1.1rem', color: isSelected ? '#0ea5e9' : '#0f172a' }}>
+                                                                TSH {plan.price.toLocaleString()}
+                                                            </div>
+                                                            <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>/month</div>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Features matching landing page */}
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '7px', fontSize: '0.8rem', color: '#475569' }}>
+                                                            <span style={{ color: '#22c55e', fontWeight: 700, fontSize: '1rem', lineHeight: 1 }}>✓</span>
+                                                            <span><strong>Unlimited</strong> Hotspot subscribers</span>
+                                                        </div>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '7px', fontSize: '0.8rem', color: '#475569' }}>
+                                                            <span style={{ color: '#22c55e', fontWeight: 700, fontSize: '1rem', lineHeight: 1 }}>✓</span>
+                                                            <span>Up to <strong>{plan.clientLimit.toLocaleString()}</strong> PPPoE connections</span>
+                                                        </div>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '7px', fontSize: '0.8rem', color: '#475569' }}>
+                                                            <span style={{ color: '#22c55e', fontWeight: 700, fontSize: '1rem', lineHeight: 1 }}>✓</span>
+                                                            <span>Full customer management & billing</span>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* 10-day trial note */}
+                                                    <div style={{ marginTop: '10px', padding: '6px 10px', background: '#fefce8', border: '1px solid #fde68a', borderRadius: '6px', fontSize: '0.75rem', color: '#92400e', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                                        🎉 Includes <strong>10-day free trial</strong> — no credit card required
+                                                    </div>
                                                 </div>
                                             );
                                         })}
                                     </div>
+
                                 )}
 
                                 {error && <div style={{ padding: '12px', backgroundColor: '#fee2e2', color: '#b91c1c', borderRadius: '8px', marginBottom: '16px', fontSize: '0.9rem' }}>{error}</div>}
