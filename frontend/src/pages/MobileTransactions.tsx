@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import PhoneAndroidIcon from '@mui/icons-material/PhoneAndroid';
 import SearchIcon from '@mui/icons-material/Search';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
@@ -43,7 +43,7 @@ export default function MobileTransactions() {
         document.body.removeChild(link);
     };
 
-    const fetchTransactions = async () => {
+    const fetchTransactions = useCallback(async () => {
         setLoading(true);
         try {
             // Fetch dynamically aggregated stats & fully paginated/filtered data natively from backend
@@ -64,11 +64,15 @@ export default function MobileTransactions() {
         } finally {
             setLoading(false);
         }
-    };
-
-    useEffect(() => {
-        fetchTransactions();
     }, [searchTerm, entriesPerPage, statusFilter, methodFilter, currentPage]);
+
+    useEffect(() => { fetchTransactions(); }, [fetchTransactions]);
+
+    // Auto-refresh every 30 seconds for real-time payment transaction status
+    useEffect(() => {
+        const interval = setInterval(fetchTransactions, 30000);
+        return () => clearInterval(interval);
+    }, [fetchTransactions]);
 
     // Reset pagination on filter change
     useEffect(() => { setCurrentPage(1); }, [searchTerm, entriesPerPage, statusFilter, methodFilter]);

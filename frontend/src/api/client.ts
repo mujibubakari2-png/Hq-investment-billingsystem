@@ -255,6 +255,20 @@ export const activeSubscribersApi = {
 export const licenseApi = {
     getLicense: () => get<LicenseResponse>('/license'),
     renewLicense: (data: { packageMonths: number; phoneNumber: string; amount: number; invoiceId?: string }) => post<{ success: boolean; message: string; expiresAt: string }>('/license/renew', data),
+    changePlan: (planId: string) => post<{ message: string; plan: { id: string; name: string; price: number; clientLimit: number } }>('/license/change-plan', { planId }),
+};
+
+// ── SaaS Plans (public) ─────────────────────────────────────────────────────
+
+export interface SaasPlan {
+    id: string;
+    name: string;
+    price: number;
+    clientLimit: number;
+}
+
+export const saasPlansApi = {
+    list: () => get<SaasPlan[]>('/saas-plans'),
 };
 
 export const transactionsApi = {

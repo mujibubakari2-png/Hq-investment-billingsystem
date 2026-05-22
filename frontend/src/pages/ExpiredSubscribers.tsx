@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import PersonOffIcon from '@mui/icons-material/PersonOff';
 import SearchIcon from '@mui/icons-material/Search';
 import RefreshIcon from '@mui/icons-material/Refresh';
@@ -33,7 +33,7 @@ export default function ExpiredSubscribers() {
     const [selectedSubs, setSelectedSubs] = useState<string[]>([]);
     const [bulkExtending, setBulkExtending] = useState(false);
 
-    const fetchSubs = async () => {
+    const fetchSubs = useCallback(async () => {
         setLoading(true);
         try {
             const res = await expiredSubscribersApi.list({
@@ -52,7 +52,7 @@ export default function ExpiredSubscribers() {
             setLoading(false);
             setSelectedSubs([]);
         }
-    };
+    }, [searchTerm, activeTab, routerFilter, currentPage, entriesPerPage]);
 
     const handleBulkExtend = async () => {
         if (selectedSubs.length === 0) return alert('Please select at least one subscriber to extend.');
@@ -85,9 +85,13 @@ export default function ExpiredSubscribers() {
         fetchSubs();
     }, [searchTerm, activeTab, routerFilter, currentPage, entriesPerPage]);
 
+    useEffect(() => { fetchRouters(); }, []);
+
+    // Auto-refresh every 30 seconds for real-time expired subscriber status
     useEffect(() => {
-        fetchRouters();
-    }, []);
+        const interval = setInterval(fetchSubs, 30000);
+        return () => clearInterval(interval);
+    }, [fetchSubs]);
 
     // Reset pagination on filter change
     useEffect(() => { setCurrentPage(1); }, [searchTerm, activeTab, routerFilter, entriesPerPage]);

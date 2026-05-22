@@ -4,7 +4,8 @@ import PaymentIcon from '@mui/icons-material/Payment';
 import PrintIcon from '@mui/icons-material/Print';
 import DescriptionIcon from '@mui/icons-material/Description';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import { licenseApi, type LicenseResponse } from '../api/client';
+import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
+import { licenseApi, saasPlansApi, type LicenseResponse, type SaasPlan } from '../api/client';
 import authStore from '../stores/authStore';
 import { formatDate } from '../utils/formatters';
 
@@ -14,13 +15,17 @@ export default function RenewLicense() {
     const { user } = authStore.useAuth();
     
     const [license, setLicense] = useState<LicenseResponse | null>(null);
+    const [allPlans, setAllPlans] = useState<SaasPlan[]>([]);
     const [phone, setPhone] = useState(user?.phone || '');
     const [name, setName] = useState(user?.fullName || user?.username || '');
     const [email, setEmail] = useState(user?.email || '');
     const [submitting, setSubmitting] = useState(false);
     const [paymentSent, setPaymentSent] = useState(false);
     const [paymentMessage, setPaymentMessage] = useState('');
-    
+    const [showChangePlan, setShowChangePlan] = useState(false);
+    const [changingPlan, setChangingPlan] = useState(false);
+    const [changePlanMsg, setChangePlanMsg] = useState('');
+
     // Check if we came from "Pay Outstanding"
     const isPayingBalance = location.state?.amount !== undefined;
     const balanceAmount = location.state?.amount || 0;
@@ -29,7 +34,25 @@ export default function RenewLicense() {
 
     useEffect(() => {
         licenseApi.getLicense().then(setLicense).catch(console.error);
+        saasPlansApi.list().then(setAllPlans).catch(console.error);
     }, []);
+
+    const handleChangePlan = async (planId: string) => {
+        setChangingPlan(true);
+        setChangePlanMsg('');
+        try {
+            const res = await licenseApi.changePlan(planId);
+            setChangePlanMsg(res.message || 'Plan changed successfully!');
+            // Reload license to reflect new plan
+            const updated = await licenseApi.getLicense();
+            setLicense(updated);
+            setTimeout(() => { setShowChangePlan(false); setChangePlanMsg(''); }, 2000);
+        } catch (err: any) {
+            setChangePlanMsg(err.message || 'Failed to change plan.');
+        } finally {
+            setChangingPlan(false);
+        }
+    };
 
     const basePrice = license?.plan?.price || 20000;
 
@@ -238,17 +261,47 @@ export default function RenewLicense() {
         );
     }
 
+    const currentPlanName = license?.plan?.name || 'Current Plan';
+
     return (
         <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg-lighter)', fontFamily: 'var(--font-family)', justifyContent: 'center', padding: 'clamp(10px, 3vw, 2rem)' }}>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', width: '100%', maxWidth: 1000 }}>
-                
+
+                {/* Change Plan Modal */}
+                {showChangePlan && (
+                    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+                        <div style={{ background: '#fff', borderRadius: '12px', padding: '2rem', maxWidth: 480, width: '100%', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+                            <h3 style={{ margin: '0 0 0.5rem', fontWeight: 700 }}>Change SaaS Plan</h3>
+                            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1.25rem' }}>Current plan: <strong>{currentPlanName}</strong>. Select a new plan:</p>
+                            {allPlans.map(p => (
+                                <div key={p.id} onClick={() => !changingPlan && handleChangePlan(p.id)}
+                                    style={{ border: `2px solid ${license?.plan?.id === p.id ? '#1a1a2e' : 'var(--border-light)'}`, borderRadius: '8px', padding: '0.75rem 1rem', marginBottom: '0.75rem', cursor: changingPlan ? 'wait' : 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: license?.plan?.id === p.id ? '#f8f9fa' : '#fff' }}>
+                                    <div>
+                                        <div style={{ fontWeight: 600 }}>{p.name}</div>
+                                        <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Up to {p.clientLimit.toLocaleString()} customers</div>
+                                    </div>
+                                    <div style={{ fontWeight: 700 }}>TSH {p.price.toLocaleString()}/mo</div>
+                                </div>
+                            ))}
+                            {changePlanMsg && <div style={{ padding: '10px', background: changePlanMsg.includes('success') || changePlanMsg.includes('changed') ? '#dcfce7' : '#fee2e2', borderRadius: '6px', color: changePlanMsg.includes('success') || changePlanMsg.includes('changed') ? '#166534' : '#b91c1c', fontSize: '0.85rem', marginTop: '0.5rem' }}>{changePlanMsg}</div>}
+                            <button onClick={() => setShowChangePlan(false)} style={{ marginTop: '1rem', width: '100%', padding: '10px', background: '#f1f5f9', border: '1px solid var(--border-light)', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}>Cancel</button>
+                        </div>
+                    </div>
+                )}
+
                 {/* Left Column - Payment Selection */}
                 <div style={{ flex: '1 1 300px', background: '#fff', borderRadius: '12px', boxShadow: 'var(--shadow-md)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-                    <div style={{ background: '#1a1a2e', color: 'white', padding: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600 }}>
-                        <PaymentIcon fontSize="small" /> Pay Invoice
+                    <div style={{ background: '#1a1a2e', color: 'white', padding: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontWeight: 600 }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><PaymentIcon fontSize="small" /> Pay Invoice</span>
+                        <button onClick={() => setShowChangePlan(true)} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: 'white', borderRadius: '6px', padding: '4px 10px', cursor: 'pointer', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <SwapHorizIcon style={{ fontSize: 14 }} /> Change Plan
+                        </button>
                     </div>
                     <div style={{ padding: '1.5rem', flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                        <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Choose Payment Package:</div>
+                        <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '6px', padding: '8px 12px' }}>
+                            Plan: <strong>{currentPlanName}</strong> — TSH {(license?.plan?.price || 0).toLocaleString()}/month
+                        </div>
+                        <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Choose Payment Duration:</div>
                         
                         {packages.map(pkg => (
                             <div 
@@ -397,7 +450,10 @@ export default function RenewLicense() {
                         <tbody>
                             <tr style={{ borderBottom: '1px solid var(--border-light)' }}>
                                 <td style={{ padding: '1rem 0', fontWeight: 500, fontSize: '0.9rem' }}>
-                                    {selectedPackage === 0 ? 'Outstanding Invoice Balance' : `License Fee - ${selectedPackage} Month(s)`}
+                                    {selectedPackage === 0
+                                        ? 'Outstanding Invoice Balance'
+                                        : `${currentPlanName} — License Fee (${selectedPackage} Month${selectedPackage > 1 ? 's' : ''})`
+                                    }
                                 </td>
                                 <td style={{ padding: '1rem 0', textAlign: 'right', color: '#1976d2' }}>1</td>
                                 <td style={{ padding: '1rem 0', textAlign: 'right' }}>TZS {getAmountToPay().toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
