@@ -1,33 +1,37 @@
-import { PrismaClient } from "../src/generated/prisma";
-import { PrismaPg } from "@prisma/adapter-pg";
-import { Pool } from "pg";
-
-const connectionString = "postgresql://enterprisedb:Muu%4066487125@localhost:5444/hqinvestment_isp";
-const pool = new Pool({ connectionString });
-const adapter = new PrismaPg(pool);
-const prisma = new PrismaClient({ adapter });
+/**
+ * Add real production SaaS tenant plans.
+ *
+ * Usage:
+ *   npx tsx scripts/add_saas_plans.ts
+ *
+ * Reads DATABASE_URL from .env — never hardcode credentials in scripts.
+ */
+import "dotenv/config";
+import prisma from "../src/lib/prisma";
 
 async function main() {
     try {
-        console.log("Creating requested SaaS Plans...");
+        console.log("Creating production SaaS Plans...");
         await prisma.saasPlan.createMany({
             data: [
-                { id: "plan_15000", name: "Monthly 15,000 TSH - Unlimited Hotspot / 150 PPPoE", price: 15000, clientLimit: 150 },
-                { id: "plan_30000", name: "Monthly 30,000 TSH - Unlimited Hotspot / 300 PPPoE", price: 30000, clientLimit: 300 },
-                { id: "plan_50000", name: "Monthly 50,000 TSH - Unlimited Hotspot / 5000 PPPoE", price: 50000, clientLimit: 5000 },
+                { id: "plan_starter",      name: "Starter",      price: 15000,  clientLimit: 150  },
+                { id: "plan_business",     name: "Business",     price: 30000,  clientLimit: 300  },
+                { id: "plan_enterprise",   name: "Enterprise",   price: 50000,  clientLimit: 5000 },
             ],
-            skipDuplicates: true
+            skipDuplicates: true,
         });
-        console.log("✅ New SaaS Plans seeded successfully!");
+        console.log("✅ Production SaaS Plans created!");
 
-        const plans = await prisma.saasPlan.findMany({
-            orderBy: { price: 'asc' }
-        });
-        console.log("Current plans in database:");
-        console.log(plans);
-
+        const plans = await prisma.saasPlan.findMany({ orderBy: { price: "asc" } });
+        console.log("\nAll plans in database:");
+        console.table(plans.map(p => ({
+            id: p.id,
+            name: p.name,
+            price: `${p.price.toLocaleString()} TSH`,
+            pppoeLimit: p.clientLimit,
+        })));
     } catch (e) {
-        console.error("❌ Action failed:", e);
+        console.error("❌ Failed:", e);
     } finally {
         await prisma.$disconnect();
     }

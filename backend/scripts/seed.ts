@@ -50,9 +50,10 @@ async function main() {
         if (existingPlans === 0) {
             await prisma.saasPlan.createMany({
                 data: [
-                    { id: "free_trial", name: "10-Day Free Trial", price: 0, clientLimit: 10 },
-                    { id: "plan_basic", name: "Basic Plan", price: 50000, clientLimit: 100 },
-                    { id: "plan_standard", name: "Standard Plan", price: 150000, clientLimit: 500 },
+                    { id: "free_trial",      name: "10-Day Free Trial", price: 0,     clientLimit: 10   },
+                    { id: "plan_starter",    name: "Starter",           price: 15000, clientLimit: 150  },
+                    { id: "plan_business",   name: "Business",          price: 30000, clientLimit: 300  },
+                    { id: "plan_enterprise", name: "Enterprise",        price: 50000, clientLimit: 5000 },
                 ],
                 skipDuplicates: true
             });

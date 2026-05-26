@@ -1,6 +1,6 @@
 "use client";
 import { motion } from "framer-motion";
-import { Check, Zap, Star, Shield, Crown } from "lucide-react";
+import { Check, Zap, Star, Shield, Crown, Users, Wifi } from "lucide-react";
 
 interface PricingCardProps {
     id: string;
@@ -23,7 +23,7 @@ const TIER_CONFIG = {
         btn: "bg-slate-800 text-white hover:bg-slate-700",
     },
     standard: {
-        label: "Standard",
+        label: "Business",
         icon: Star,
         gradient: "from-sky-50 to-white",
         accent: "#0ea5e9",
@@ -52,6 +52,7 @@ export default function PricingCard({
     id,
     name,
     price,
+    clientLimit,
     features,
     tier,
     isPopular,
@@ -100,8 +101,11 @@ export default function PricingCard({
                     </span>
                 </div>
 
+                {/* Plan name — this is a TENANT/OPERATOR plan, not a customer package */}
                 <h3 className="text-xl font-bold text-gray-900 mb-1">{name}</h3>
+                <p className="text-xs text-gray-400 mb-3">Operator subscription plan</p>
 
+                {/* Price */}
                 <div className="flex items-baseline gap-1 mt-3">
                     <span className="text-3xl font-extrabold text-gray-900">
                         Tsh {price}
@@ -111,6 +115,30 @@ export default function PricingCard({
                 <p className="text-xs text-gray-400 mt-1">
                     10-day free trial • Cancel anytime
                 </p>
+
+                {/* Key plan metrics — PPPoE limit & Hotspot */}
+                <div className="mt-4 grid grid-cols-2 gap-2">
+                    <div
+                        className="flex flex-col items-center justify-center rounded-xl py-2.5 px-2 text-center"
+                        style={{ background: cfg.accent + "14" }}
+                    >
+                        <Users size={16} style={{ color: cfg.accent }} className="mb-1" />
+                        <span className="text-lg font-extrabold" style={{ color: cfg.accent }}>
+                            {clientLimit.toLocaleString()}
+                        </span>
+                        <span className="text-xs text-gray-500 leading-tight">PPPoE connections</span>
+                    </div>
+                    <div
+                        className="flex flex-col items-center justify-center rounded-xl py-2.5 px-2 text-center"
+                        style={{ background: cfg.accent + "14" }}
+                    >
+                        <Wifi size={16} style={{ color: cfg.accent }} className="mb-1" />
+                        <span className="text-lg font-extrabold" style={{ color: cfg.accent }}>
+                            ∞
+                        </span>
+                        <span className="text-xs text-gray-500 leading-tight">Hotspot subscribers</span>
+                    </div>
+                </div>
             </div>
 
             {/* Divider */}
@@ -144,7 +172,7 @@ export default function PricingCard({
                     href={`${billingUrl}/register?planId=${encodeURIComponent(id)}&plan=${encodeURIComponent(name)}`}
                     className={`block w-full text-center py-3.5 rounded-xl font-semibold text-sm transition-all shadow-sm ${cfg.btn}`}
                 >
-                    Get Started with {name} →
+                    Start Free Trial with {name} →
                 </a>
                 <p className="text-center text-xs text-gray-400 mt-3">
                     No setup fees · 10-day free trial included

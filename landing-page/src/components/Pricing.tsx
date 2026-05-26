@@ -9,51 +9,45 @@ interface SaasPlan {
     clientLimit: number;
 }
 
-// ── Feature matrix per price tier ───────────────────────────────────────────
-// Hotspot is UNLIMITED for all plans. PPPoE is limited by clientLimit.
-// Plans are sorted ascending by price. Index 0 = cheapest, last = most expensive.
+// ── Feature matrix per tier ─────────────────────────────────────────────────
+// These describe what the ISP OPERATOR gets, not their end customers.
+// All plans include unlimited Hotspot subscribers and all payment gateways.
+// The main differentiator is PPPoE capacity, router count, and support level.
 
 const TIER_FEATURES: Record<
-    "basic" | "standard" | "professional" | "enterprise",
+    "starter" | "business" | "enterprise",
     string[]
 > = {
-    basic: [
+    starter: [
         "Unlimited Hotspot subscribers",
         "Up to {limit} PPPoE connections",
-        "Full customer management",
-        "Mobile payment (M-Pesa & Airtel)",
-        "Standard billing reports",
-        "Email & SMS payment alerts",
+        "Full customer management & billing",
+        "All payment gateways (M-Pesa, Airtel, Halo, etc.)",
+        "SMS & Email payment notifications",
+        "Basic billing reports & dashboard",
+        "Single router support",
     ],
-    standard: [
+    business: [
         "Unlimited Hotspot subscribers",
         "Up to {limit} PPPoE connections",
-        "Fully automated billing",
+        "Full automated billing & renewals",
+        "All payment gateways + API callbacks",
         "Real-time SMS payment alerts",
-        "Advanced analytics & reports",
-        "Real-time RADIUS online/offline sync",
-        "Automated expiry & renewal alerts",
-        "Multi-router support (up to 3)",
-    ],
-    professional: [
-        "Unlimited Hotspot subscribers",
-        "Up to {limit} PPPoE connections",
-        "Full billing & renewal automation",
-        "Business intelligence dashboard",
-        "All payment channels + API callbacks",
-        "Unlimited routers & WireGuard VPN",
-        "SMS bulk messaging to clients",
-        "Priority technical support",
+        "Advanced analytics & financial reports",
+        "RADIUS online/offline sync",
+        "Multi-router support (up to 5)",
+        "Voucher generation system",
     ],
     enterprise: [
         "Unlimited Hotspot subscribers",
         "Up to {limit} PPPoE connections",
-        "Everything in Professional",
-        "API access for custom integrations",
-        "Custom branding & white-labelling",
+        "Everything in Business, plus:",
+        "Unlimited routers & WireGuard VPN",
+        "Custom hotspot login portal branding",
+        "Bulk SMS messaging to clients",
         "Multi-admin & role-based access",
-        "SLA uptime guarantee",
-        "24/7 dedicated support line",
+        "Priority technical support",
+        "Business intelligence dashboard",
     ],
 };
 
@@ -61,12 +55,21 @@ function getTierKey(
     index: number,
     total: number
 ): keyof typeof TIER_FEATURES {
-    if (total === 1) return "standard";
-    const ratio = index / (total - 1);
-    if (ratio === 0) return "basic";
-    if (ratio <= 0.33) return "standard";
-    if (ratio <= 0.66) return "professional";
-    return "enterprise";
+    if (total <= 1) return "business";
+    if (total === 2) return index === 0 ? "starter" : "enterprise";
+    // 3+ plans: first = starter, last = enterprise, middle = business
+    if (index === 0) return "starter";
+    if (index === total - 1) return "enterprise";
+    return "business";
+}
+
+// Map tier keys to PricingCard tier props
+function toCardTier(tier: keyof typeof TIER_FEATURES): "basic" | "standard" | "professional" | "enterprise" {
+    switch (tier) {
+        case "starter": return "basic";
+        case "business": return "standard";
+        case "enterprise": return "enterprise";
+    }
 }
 
 function buildFeatures(plan: SaasPlan, index: number, total: number): string[] {
@@ -98,13 +101,15 @@ export default function Pricing() {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="text-center mb-16">
                     <span className="inline-block text-sm font-semibold text-secondary uppercase tracking-widest mb-3">
-                        Transparent Pricing
+                        Pricing Plans
                     </span>
                     <h2 className="text-3xl md:text-5xl font-bold text-primary mb-4">
-                        Simple Pricing. Real Value.
+                        Choose Your Plan
                     </h2>
                     <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-                        Pick the plan that matches your network size. Upgrade any time as you grow.
+                        These are <strong>operator subscription plans</strong> — the monthly fee you pay
+                        to run HQ Investment billing on your ISP network.
+                        Pick the plan that fits your subscriber base. Upgrade any time as you grow.
                         Every plan includes a <strong>10-day free trial</strong> — no credit card required.
                     </p>
                 </div>
@@ -122,19 +127,22 @@ export default function Pricing() {
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10 items-start">
-                        {plans.map((plan, index) => (
-                            <PricingCard
-                                key={plan.id}
-                                id={plan.id}
-                                name={plan.name}
-                                price={plan.price.toLocaleString()}
-                                clientLimit={plan.clientLimit}
-                                features={buildFeatures(plan, index, plans.length)}
-                                tier={getTierKey(index, plans.length)}
-                                isPopular={index === popularIndex}
-                                delay={index * 0.1}
-                            />
-                        ))}
+                        {plans.map((plan, index) => {
+                            const tier = getTierKey(index, plans.length);
+                            return (
+                                <PricingCard
+                                    key={plan.id}
+                                    id={plan.id}
+                                    name={plan.name}
+                                    price={plan.price.toLocaleString()}
+                                    clientLimit={plan.clientLimit}
+                                    features={buildFeatures(plan, index, plans.length)}
+                                    tier={toCardTier(tier)}
+                                    isPopular={index === popularIndex}
+                                    delay={index * 0.1}
+                                />
+                            );
+                        })}
                     </div>
                 )}
 
