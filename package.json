@@ -14,7 +14,7 @@
         "build:landing": "pnpm --filter landing-page build",
         "start:landing": "pnpm --filter landing-page start",
         "build:frontend": "pnpm --filter frontend build",
-        "build:all": "pnpm -r --workspace-concurrency=1 build",
+        "build:all": "CI=true NEXT_TELEMETRY_DISABLED=1 pnpm -r --workspace-concurrency=1 build",
         "start:all": "pnpm -r start"
     },
     "workspaces": [
