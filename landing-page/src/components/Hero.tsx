@@ -28,10 +28,10 @@ export default function Hero() {
           className="flex flex-col sm:flex-row justify-center items-center space-y-4 sm:space-y-0 sm:space-x-4"
         >
           <a 
-            href={`${process.env.NEXT_PUBLIC_BILLING_SYSTEM_URL}/register`}
+            href="#pricing"
             className="w-full sm:w-auto bg-primary text-white px-10 py-4 rounded-full text-lg font-bold shadow-lg hover:bg-accent hover:-translate-y-1 transition-all text-center"
           >
-            Start Free Trial
+            Choose Plan & Start
           </a>
           <a href="#features" className="w-full sm:w-auto bg-white text-primary border-2 border-primary px-10 py-4 rounded-full text-lg font-bold hover:bg-blue-50 transition-all text-center">
             See How It Works

@@ -106,12 +106,6 @@ export default function Pricing() {
                     <h2 className="text-3xl md:text-5xl font-bold text-primary mb-4">
                         Choose Your Plan
                     </h2>
-                    <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-                        These are <strong>operator subscription plans</strong> — the monthly fee you pay
-                        to run HQ Investment billing on your ISP network.
-                        Pick the plan that fits your subscriber base. Upgrade any time as you grow.
-                        Every plan includes a <strong>10-day free trial</strong> — no credit card required.
-                    </p>
                 </div>
 
                 {loading ? (

@@ -12,10 +12,9 @@ import PublicIcon from '@mui/icons-material/Public';
 import ArrowRightAltIcon from '@mui/icons-material/ArrowRightAlt';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import StarIcon from '@mui/icons-material/Star';
 import Footer from '../components/layout/Footer';
 import { GoogleLogin } from '@react-oauth/google';
-import { authApi, saasPlansApi, type SaasPlan } from '../api/client';
+import { authApi, saasPlansApi } from '../api/client';
 import authStore from '../stores/authStore';
 
 // Helper for step icons
@@ -47,8 +46,6 @@ export default function Register() {
     const navigate = useNavigate();
     // Steps: 1=Choose Plan, 2=Account Details, 3=Verify Email, 4=Company Info
     const [step, setStep] = useState(1);
-    const [plans, setPlans] = useState<SaasPlan[]>([]);
-    const [plansLoading, setPlansLoading] = useState(true);
     const [showPass, setShowPass] = useState(false);
     const [showConfirmPass, setShowConfirmPass] = useState(false);
 
@@ -83,7 +80,6 @@ export default function Register() {
 
         saasPlansApi.list()
             .then(data => {
-                setPlans(data);
                 if (data.length > 0) {
                     // Try matching by planId first, then by name
                     let matched = planIdParam ? data.find(p => p.id === planIdParam) : null;
@@ -96,8 +92,7 @@ export default function Register() {
                     setFormData(prev => ({ ...prev, planId: initialPlanId }));
                 }
             })
-            .catch(err => console.error('Failed to load plans', err))
-            .finally(() => setPlansLoading(false));
+            .catch(err => console.error('Failed to load plans', err));
     }, []);
 
     const updateField = (field: string, value: any) => {
@@ -107,14 +102,7 @@ export default function Register() {
     const handleNext = async () => {
         setError('');
         if (step === 1) {
-            // Step 1: Plan selection — must pick a plan
-            if (!formData.planId) {
-                setError('Please select a plan to continue.');
-                return;
-            }
-            setStep(2);
-        } else if (step === 2) {
-            // Step 2: Personal info + request OTP
+            // Step 1: Personal info + request OTP
             if (!formData.fullName || !formData.email || !formData.phone || !formData.password) {
                 setError('Please fill in all personal information fields.');
                 return;
@@ -131,14 +119,14 @@ export default function Register() {
             try {
                 const response = await authApi.requestRegisterOtp({ email: formData.email, fullName: formData.fullName });
                 console.log('TESTING ONLY - OTP sent:', response.otp);
-                setStep(3);
+                setStep(2);
             } catch (err: any) {
                 setError(err.message || 'Failed to request OTP.');
             } finally {
                 setLoading(false);
             }
-        } else if (step === 3) {
-            // Step 3: Verify OTP
+        } else if (step === 2) {
+            // Step 2: Verify OTP
             const enteredOtp = formData.otp.join('');
             if (enteredOtp.length !== 6) {
                 setError('Please enter the complete 6-digit OTP.');
@@ -147,14 +135,14 @@ export default function Register() {
             setLoading(true);
             try {
                 await authApi.verifyRegisterOtp({ email: formData.email, otp: enteredOtp });
-                setStep(4);
+                setStep(3);
             } catch (err: any) {
                 setError(err.message || 'Invalid Verification Code.');
             } finally {
                 setLoading(false);
             }
         } else {
-            setStep(prev => Math.min(prev + 1, 4));
+            setStep(prev => Math.min(prev + 1, 3));
         }
     };
 
@@ -232,111 +220,14 @@ export default function Register() {
 
                         {/* Stepper Header */}
                         <div style={{ position: 'relative', display: 'flex', justifyContent: 'center', gap: 'clamp(10px, 5vw, 56px)', marginBottom: '28px' }}>
-                            <div style={{ position: 'absolute', top: '20px', left: 'calc(50% - 140px)', right: 'calc(50% - 140px)', height: '2px', backgroundColor: '#e2e8f0', zIndex: 0 }} />
-                            <StepIcon step={1} currentStep={step} label="Choose Plan" />
-                            <StepIcon step={2} currentStep={step} label="Account" />
-                            <StepIcon step={3} currentStep={step} label="Verify" />
-                            <StepIcon step={4} currentStep={step} label="Business" />
+                            <div style={{ position: 'absolute', top: '20px', left: 'calc(50% - 100px)', right: 'calc(50% - 100px)', height: '2px', backgroundColor: '#e2e8f0', zIndex: 0 }} />
+                            <StepIcon step={1} currentStep={step} label="Account" />
+                            <StepIcon step={2} currentStep={step} label="Verify" />
+                            <StepIcon step={3} currentStep={step} label="Business" />
                         </div>
 
-                        {/* ── STEP 1: Choose Plan ── */}
+                        {/* ── STEP 1: Account Details ── */}
                         {step === 1 && (
-                            <div className="fade-in">
-                                <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#0f172a', margin: '0 0 8px 0', fontSize: '1.1rem' }}>
-                                    <StarIcon style={{ color: '#0ea5e9' }} /> Choose Your Plan
-                                </h3>
-                                <p style={{ color: '#64748b', fontSize: '0.85rem', marginBottom: '20px' }}>Select the plan that matches your network size. You can upgrade anytime.</p>
-
-                                {plansLoading ? (
-                                    <div style={{ textAlign: 'center', padding: '32px', color: '#94a3b8' }}>Loading plans...</div>
-                                ) : plans.length === 0 ? (
-                                    <div style={{ padding: '16px', background: '#fef9c3', borderRadius: '8px', color: '#92400e', fontSize: '0.9rem' }}>No plans available. Please contact support.</div>
-                                ) : (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
-                                        {plans.map((plan, idx) => {
-                                            const isSelected = formData.planId === plan.id;
-                                            const isPopular = idx === Math.floor(plans.length / 2);
-                                            return (
-                                                <div
-                                                    key={plan.id}
-                                                    onClick={() => updateField('planId', plan.id)}
-                                                    style={{
-                                                        border: `2px solid ${isSelected ? '#0ea5e9' : '#e2e8f0'}`,
-                                                        borderRadius: '12px',
-                                                        padding: '16px 20px',
-                                                        cursor: 'pointer',
-                                                        background: isSelected ? '#f0f9ff' : '#fff',
-                                                        position: 'relative',
-                                                        transition: 'all 0.2s',
-                                                        boxShadow: isSelected ? '0 0 0 3px rgba(14,165,233,0.15)' : 'none',
-                                                    }}
-                                                >
-                                                    {/* Popular badge */}
-                                                    {isPopular && (
-                                                        <span style={{ position: 'absolute', top: '-11px', left: '16px', background: '#0ea5e9', color: '#fff', fontSize: '0.68rem', fontWeight: 700, padding: '2px 12px', borderRadius: '20px', letterSpacing: '0.05em' }}>
-                                                            ⭐ MOST POPULAR
-                                                        </span>
-                                                    )}
-
-                                                    {/* Selected check */}
-                                                    {isSelected && (
-                                                        <CheckCircleIcon style={{ position: 'absolute', top: '12px', right: '14px', color: '#0ea5e9', fontSize: '20px' }} />
-                                                    )}
-
-                                                    {/* Top row: name + price */}
-                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px', paddingRight: isSelected ? '28px' : '0' }}>
-                                                        <div>
-                                                            <div style={{ fontWeight: 700, fontSize: '1rem', color: isSelected ? '#0369a1' : '#0f172a' }}>{plan.name}</div>
-                                                        </div>
-                                                        <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                                                            <div style={{ fontWeight: 800, fontSize: '1.1rem', color: isSelected ? '#0ea5e9' : '#0f172a' }}>
-                                                                TSH {plan.price.toLocaleString()}
-                                                            </div>
-                                                            <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>/month</div>
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Features matching landing page */}
-                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '7px', fontSize: '0.8rem', color: '#475569' }}>
-                                                            <span style={{ color: '#22c55e', fontWeight: 700, fontSize: '1rem', lineHeight: 1 }}>✓</span>
-                                                            <span><strong>Unlimited</strong> Hotspot subscribers</span>
-                                                        </div>
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '7px', fontSize: '0.8rem', color: '#475569' }}>
-                                                            <span style={{ color: '#22c55e', fontWeight: 700, fontSize: '1rem', lineHeight: 1 }}>✓</span>
-                                                            <span>Up to <strong>{plan.clientLimit.toLocaleString()}</strong> PPPoE connections</span>
-                                                        </div>
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '7px', fontSize: '0.8rem', color: '#475569' }}>
-                                                            <span style={{ color: '#22c55e', fontWeight: 700, fontSize: '1rem', lineHeight: 1 }}>✓</span>
-                                                            <span>Full customer management & billing</span>
-                                                        </div>
-                                                    </div>
-
-                                                    {/* 10-day trial note */}
-                                                    <div style={{ marginTop: '10px', padding: '6px 10px', background: '#fefce8', border: '1px solid #fde68a', borderRadius: '6px', fontSize: '0.75rem', color: '#92400e', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                                        🎉 Includes <strong>10-day free trial</strong> — no credit card required
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-
-                                )}
-
-                                {error && <div style={{ padding: '12px', backgroundColor: '#fee2e2', color: '#b91c1c', borderRadius: '8px', marginBottom: '16px', fontSize: '0.9rem' }}>{error}</div>}
-
-                                <button
-                                    onClick={handleNext}
-                                    disabled={!formData.planId || plansLoading}
-                                    style={{ width: '100%', padding: '14px', backgroundColor: '#0ea5e9', color: '#ffffff', border: 'none', borderRadius: '8px', fontSize: '1rem', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', cursor: (!formData.planId || plansLoading) ? 'not-allowed' : 'pointer', opacity: (!formData.planId || plansLoading) ? 0.7 : 1 }}
-                                >
-                                    Continue with {plans.find(p => p.id === formData.planId)?.name || 'Selected Plan'} <ArrowRightAltIcon />
-                                </button>
-                            </div>
-                        )}
-
-                        {/* ── STEP 2: Account Details (was step 1) ── */}
-                        {step === 2 && (
                             <div className="fade-in">
                                 <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'center' }}>
                                     <GoogleLogin
@@ -441,14 +332,11 @@ export default function Register() {
                                 <button onClick={handleNext} disabled={loading} style={{ width: '100%', padding: '14px', backgroundColor: '#0ea5e9', color: '#ffffff', border: 'none', borderRadius: '8px', fontSize: '1rem', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', cursor: loading ? 'wait' : 'pointer', opacity: loading ? 0.7 : 1 }}>
                                     {loading ? 'Sending Verification Code...' : <>Continue to Verify OTP <ArrowRightAltIcon /></>}
                                 </button>
-                                <button onClick={handleBack} style={{ width: '100%', padding: '12px', backgroundColor: '#fff', color: '#64748b', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '0.95rem', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', cursor: 'pointer', marginTop: '10px' }}>
-                                    <ArrowBackIcon fontSize="small" /> Back to Plan Selection
-                                </button>
                             </div>
                         )}
 
-                        {/* ── STEP 3: Verify Email (was step 2) ── */}
-                        {step === 3 && (
+                        {/* ── STEP 2: Verify Email ── */}
+                        {step === 2 && (
                             <div className="fade-in" style={{ textAlign: 'center' }}>
                                 <h3 style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', color: '#0f172a', margin: '0 0 32px 0', fontSize: '1.2rem' }}>
                                     <MailOutlineIcon style={{ color: '#0ea5e9' }} /> Verify Your Email
@@ -493,8 +381,8 @@ export default function Register() {
                             </div>
                         )}
 
-                        {/* ── STEP 4: Company Info (was step 3) ── */}
-                        {step === 4 && (
+                        {/* ── STEP 3: Company Info ── */}
+                        {step === 3 && (
                             <div className="fade-in">
                                 <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#0f172a', margin: '0 0 24px 0', fontSize: '1.1rem' }}>
                                     <BusinessIcon style={{ color: '#0ea5e9' }} /> Company Information

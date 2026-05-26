@@ -29,10 +29,10 @@ export default function Navbar() {
           </div>
           <div className="hidden md:block">
             <Link 
-              href={`${process.env.NEXT_PUBLIC_BILLING_SYSTEM_URL}/register`}
+              href="#pricing"
               className="bg-primary text-white px-6 py-2 rounded-full font-medium hover:bg-accent transition-all inline-block"
             >
-              Start Free Trial
+              Choose Plan
             </Link>
           </div>
           <div className="md:hidden">
@@ -58,11 +58,11 @@ export default function Navbar() {
             Login
           </Link>
           <Link 
-            href={`${process.env.NEXT_PUBLIC_BILLING_SYSTEM_URL}/register`}
+            href="#pricing"
             onClick={() => setIsOpen(false)} 
             className="block w-full bg-primary text-white px-6 py-2 rounded-lg font-medium text-center"
           >
-            Start Free Trial
+            Choose Plan
           </Link>
         </div>
       )}
