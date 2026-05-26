@@ -53,7 +53,7 @@ backend/response.json
 
 # Generated files
 backend/src/generated/
-backend/tsconfig.tsbuildinfo
+*.tsbuildinfo
 frontend/dist/
 frontend/.vite/
 
