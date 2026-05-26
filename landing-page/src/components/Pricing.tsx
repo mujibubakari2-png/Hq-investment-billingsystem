@@ -84,7 +84,7 @@ export default function Pricing() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        fetch("/api/plans")
+        fetch("/api/saas-plans")
             .then((res) => res.json())
             .then((data: SaasPlan[]) =>
                 setPlans(Array.isArray(data) ? data : [])
@@ -146,9 +146,7 @@ export default function Pricing() {
                     </div>
                 )}
 
-                <p className="text-center text-sm text-gray-400 mt-10">
-                    🎉 All plans include a <strong>10-day free trial</strong>. After the trial, billing starts automatically based on your chosen plan. No credit card required to start.
-                </p>
+
             </div>
         </section>
     );

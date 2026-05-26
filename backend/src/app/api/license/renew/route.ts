@@ -2,9 +2,8 @@ import { NextRequest } from "next/server";
 import { randomUUID } from "node:crypto";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
-
-const PALMPESA_API_URL = process.env.PALMPESA_API_URL || "https://api.palmpesa.com/v1/payments/stk-push";
-const PALMPESA_API_KEY = process.env.PALMPESA_API_KEY;
+import { getPaymentProvider } from "@/lib/payments/registry";
+import { formatPhoneTZ } from "@/lib/payments/utils";
 
 export async function POST(req: NextRequest) {
     try {
@@ -56,44 +55,44 @@ export async function POST(req: NextRequest) {
             return errorResponse("Server payment callback URL is not configured", 500);
         }
 
-        const stkPayload = {
-            PhoneNumber: phoneNumber,
-            Amount: invoice.amount,
-            AccountReference: invoice.invoiceNumber,
-            TransactionDesc: `SaaS License Renewal - ${packageMonths} Month(s)`,
-            CallbackUrl: `${appUrl}/api/payments/palmpesa/webhook`,
-        };
-
-        // In a real production deployment with credentials:
-        /*
-        if (!PALMPESA_API_KEY) {
-            return errorResponse("PalmPesa API key is not configured", 500);
+        // Dynamically resolve payment provider from environment configuration
+        let providerName = "PALMPESA"; // default
+        if (process.env.ZENOPAY_API_KEY) {
+            providerName = "ZENOPAY";
+        } else if (process.env.HARAKAPAY_API_KEY) {
+            providerName = "HARAKAPAY";
+        } else if (process.env.MONGIKE_API_KEY) {
+            providerName = "MONGIKE";
         }
-        const response = await fetch(PALMPESA_API_URL, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${PALMPESA_API_KEY}`
-            },
-            body: JSON.stringify(stkPayload)
-        });
-        const result = await response.json();
-        */
 
-        // For local development mockup of successful STK push initiation:
-        const result = {
-            ResponseCode: "0",
-            CheckoutRequestID: `ws_CO_${Date.now()}`
-        };
+        const callbackUrl = `${appUrl}/api/payments/${providerName.toLowerCase()}/webhook`;
 
-        if (result.ResponseCode === "0") {
-            return jsonResponse({
-                success: true,
-                message: "Please enter your M-Pesa pin to complete the transaction.",
-                status: "processing"
+        try {
+            const cleanPhone = formatPhoneTZ(phoneNumber);
+            const provider = getPaymentProvider(providerName);
+
+            const result = await provider.initiatePayment({
+                amount: invoice.amount,
+                phone: cleanPhone,
+                reference: invoice.invoiceNumber,
+                description: `SaaS License Renewal - ${packageMonths} Month(s)`,
+                callbackUrl: callbackUrl,
+                buyerName: tenant.name,
+                buyerEmail: tenant.email,
             });
-        } else {
-            return errorResponse("Failed to initiate STK Push", 500);
+
+            if (result.success) {
+                return jsonResponse({
+                    success: true,
+                    message: "STK push initiated! Please enter your mobile money PIN to complete the transaction.",
+                    status: "processing"
+                });
+            } else {
+                return errorResponse(result.message || "Failed to initiate STK Push", 500);
+            }
+        } catch (paymentErr: any) {
+            console.error("STK push error during license renewal:", paymentErr);
+            return errorResponse(paymentErr.message || "Payment provider error", 500);
         }
 
     } catch (error) {

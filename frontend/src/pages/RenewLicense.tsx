@@ -16,6 +16,7 @@ export default function RenewLicense() {
     
     const [license, setLicense] = useState<LicenseResponse | null>(null);
     const [allPlans, setAllPlans] = useState<SaasPlan[]>([]);
+    const [selectedPlanId, setSelectedPlanId] = useState<string>('');
     const [phone, setPhone] = useState(user?.phone || '');
     const [name, setName] = useState(user?.fullName || user?.username || '');
     const [email, setEmail] = useState(user?.email || '');
@@ -33,8 +34,16 @@ export default function RenewLicense() {
     const [selectedPackage, setSelectedPackage] = useState<number>(isPayingBalance ? 0 : 1);
 
     useEffect(() => {
-        licenseApi.getLicense().then(setLicense).catch(console.error);
-        saasPlansApi.list().then(setAllPlans).catch(console.error);
+        licenseApi.getLicense().then(data => {
+            setLicense(data);
+            if (data?.plan?.id) {
+                setSelectedPlanId(data.plan.id);
+            }
+        }).catch(console.error);
+        
+        saasPlansApi.list().then(data => {
+            setAllPlans(data);
+        }).catch(console.error);
     }, []);
 
     const handleChangePlan = async (planId: string) => {
@@ -46,6 +55,7 @@ export default function RenewLicense() {
             // Reload license to reflect new plan
             const updated = await licenseApi.getLicense();
             setLicense(updated);
+            setSelectedPlanId(planId);
             setTimeout(() => { setShowChangePlan(false); setChangePlanMsg(''); }, 2000);
         } catch (err: any) {
             setChangePlanMsg(err.message || 'Failed to change plan.');
@@ -54,7 +64,8 @@ export default function RenewLicense() {
         }
     };
 
-    const basePrice = license?.plan?.price || 20000;
+    const activePlan = allPlans.find(p => p.id === selectedPlanId) || license?.plan;
+    const basePrice = activePlan?.price || 20000;
 
     const packages = [
         { months: 1, title: '1 Month License', subtitle: 'Standard 30-day license', price: basePrice, save: 0 },
@@ -84,6 +95,11 @@ export default function RenewLicense() {
                     amount = pkg.price;
                     months = pkg.months;
                 }
+            }
+
+            // Dynamically change plan if selectedPlanId differs from current license plan
+            if (selectedPlanId && license?.plan?.id && selectedPlanId !== license.plan.id) {
+                await licenseApi.changePlan(selectedPlanId);
             }
 
             const res = await licenseApi.renewLicense({
@@ -261,7 +277,7 @@ export default function RenewLicense() {
         );
     }
 
-    const currentPlanName = license?.plan?.name || 'Current Plan';
+    const currentPlanName = activePlan?.name || 'Current Plan';
 
     return (
         <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg-lighter)', fontFamily: 'var(--font-family)', justifyContent: 'center', padding: 'clamp(10px, 3vw, 2rem)' }}>
@@ -298,10 +314,27 @@ export default function RenewLicense() {
                         </button>
                     </div>
                     <div style={{ padding: '1.5rem', flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                        <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '6px', padding: '8px 12px' }}>
-                            Plan: <strong>{currentPlanName}</strong> — TSH {(license?.plan?.price || 0).toLocaleString()}/month
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 600 }}>SaaS Subscription Plan:</label>
+                            <select 
+                                className="form-select" 
+                                value={selectedPlanId} 
+                                onChange={e => setSelectedPlanId(e.target.value)}
+                                style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-light)', outline: 'none', backgroundColor: '#f0f9ff', fontWeight: 600, color: '#0369a1' }}
+                            >
+                                {allPlans.map(p => (
+                                    <option key={p.id} value={p.id}>
+                                        {p.name} — TSH {p.price.toLocaleString()}/mo ({p.clientLimit} clients limit)
+                                    </option>
+                                ))}
+                            </select>
                         </div>
-                        <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Choose Payment Duration:</div>
+                        {license?.plan?.id && selectedPlanId !== license.plan.id && (
+                            <div style={{ fontSize: '0.78rem', color: '#b91c1c', background: '#fef2f2', border: '1px solid #fee2e2', borderRadius: '6px', padding: '6px 10px', fontWeight: 500 }}>
+                                🔄 Changing plan from {license.plan.name} to <strong>{allPlans.find(p => p.id === selectedPlanId)?.name}</strong> on payment.
+                            </div>
+                        )}
+                        <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Choose Renewal Duration:</div>
                         
                         {packages.map(pkg => (
                             <div 
