@@ -1,20 +1,14 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { errorResponse, jsonResponse, hashPassword, signToken, isAutomationRequest } from "@/lib/auth";
-import { checkRateLimit, getClientIp } from "@/lib/rateLimiter";
+import { checkRateLimit } from "@/lib/rateLimiter";
+import logger from "@/lib/logger";
 import { sendAccountCreatedNotifications } from "@/lib/accountNotifications";
 import { env } from "@/lib/env";
 
 export async function POST(req: NextRequest) {
-    // Rate limit: 10 registrations per 30 minutes per IP
-    const ip = getClientIp(req);
-    const rateLimit = await checkRateLimit(ip, "register", { limit: 10, windowSeconds: 30 * 60 });
-    if (!rateLimit.allowed) {
-        return errorResponse(
-            `Too many registration attempts. Please try again in ${rateLimit.retryAfterSeconds} seconds.`,
-            429
-        );
-    }
+    const rateLimitResponse = await checkRateLimit(req);
+    if (rateLimitResponse) return rateLimitResponse;
 
     try {
         let body;
@@ -240,7 +234,7 @@ export async function POST(req: NextRequest) {
             tenant: result.tenant
         }, 201);
     } catch (e) {
-        console.error("REGISTER ERROR:", e);
+        logger.error('Register error', { error: (e as Error)?.message || String(e) });
         return errorResponse("Internal server error", 500);
     }
 }

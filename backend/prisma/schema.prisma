@@ -123,6 +123,13 @@ model Subscription {
   router       Router?            @relation(fields: [routerId], references: [id])
   tenant       Tenant?            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
+  @@index([tenantId])
+  @@index([clientId])
+  @@index([status])
+  @@index([expiresAt])
+  @@index([tenantId, status])
+  @@index([tenantId, expiresAt])
+  @@index([routerId])
   @@map("subscriptions")
 }
 

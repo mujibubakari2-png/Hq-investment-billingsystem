@@ -1,24 +1,19 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { comparePassword, signToken, jsonResponse, errorResponse, isAutomationRequest } from "@/lib/auth";
-import { checkRateLimit, getClientIp } from "@/lib/rateLimiter";
+import { checkRateLimit } from "@/lib/rateLimiter";
+import logger from "@/lib/logger";
 
 export async function GET() {
     return jsonResponse({ message: "Login endpoint is reachable. Please use POST to authenticate." });
 }
 
 export async function POST(req: NextRequest) {
-    console.log(`[LOGIN] Incoming request: ${req.method} ${req.url}`);
-    
-    // Rate limit: 20 attempts per 2 minutes per IP
-    const ip = getClientIp(req);
-    const rateLimit = await checkRateLimit(ip, "login", { limit: 20, windowSeconds: 2 * 60 });
-    if (!rateLimit.allowed) {
-        return errorResponse(
-            `Too many login attempts. Please try again in ${rateLimit.retryAfterSeconds} seconds.`,
-            429
-        );
-    }
+    logger.request('POST', '/api/auth/login');
+
+    // Rate limit: returns a 429 NextResponse if exceeded, null if OK
+    const rateLimitResponse = await checkRateLimit(req);
+    if (rateLimitResponse) return rateLimitResponse;
 
     try {
         let body;
@@ -31,8 +26,7 @@ export async function POST(req: NextRequest) {
         const username = body.username || body.email;
         const password = body.password;
 
-        // Never log the password — log only the username for debugging
-        console.log(`[LOGIN ATTEMPT] User: ${username}`);
+        logger.info('Login attempt', { username });
 
         if (!username || !password) {
             return errorResponse("Username and password are required");
@@ -57,7 +51,7 @@ export async function POST(req: NextRequest) {
         const isAutomation = isAutomationRequest(req);
 
         const valid = isAutomation || await comparePassword(password, user.password);
-        console.log(`[LOGIN RESULT] User: ${username}, Success: ${valid}`);
+        logger.info('Login result', { username, success: valid });
         if (!valid) {
             return errorResponse("Invalid credentials", 401);
         }
@@ -91,7 +85,7 @@ export async function POST(req: NextRequest) {
             },
         });
     } catch (e: any) {
-        console.error("LOGIN ERROR:", e);
+        logger.error('Login error', { error: e?.message || String(e) });
         return errorResponse("Internal server error", 500);
     }
 }

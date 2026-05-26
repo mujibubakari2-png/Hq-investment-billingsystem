@@ -51,25 +51,13 @@ export function escapeHtml(input: string): string {
 }
 
 /**
- * Sanitize user input to prevent SQL injection
+ * NOTE: SQL injection prevention is handled automatically by Prisma's
+ * parameterized queries. You do NOT need to sanitize strings before passing
+ * them to Prisma — doing so can corrupt legitimate data (e.g. a client named
+ * "Drew Select" would have "Select" stripped).
+ *
+ * Only use escapeHtml() for output that will be rendered as HTML.
  */
-export function sanitizeSqlInput(input: string): string {
-    if (!input) return '';
-
-    let sanitized = input;
-
-    // Remove SQL comments
-    sanitized = sanitized.replace(/--.*$/gm, '');
-    sanitized = sanitized.replace(/\/\*[\s\S]*?\*\//g, '');
-
-    // Remove common SQL injection patterns
-    sanitized = sanitized.replace(/(\b(UNION|SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|EXEC|EXECUTE|DECLARE)\b)/gi, '');
-
-    // Replace potentially dangerous characters outside of quotes
-    sanitized = sanitized.replace(/[;'"]/g, '');
-
-    return sanitized.trim();
-}
 
 /**
  * Sanitize file names

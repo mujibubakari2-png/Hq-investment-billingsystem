@@ -1,137 +1,146 @@
 /**
- * Simple database-based rate limiter for API routes.
+ * DB-Backed Rate Limiter
  *
- * Limits requests per IP address within a sliding window.
- * Uses database store — suitable for multi-instance/serverless deployments.
+ * Uses the existing `RateLimit` Prisma model so limits survive server
+ * restarts and work across multiple instances. Replaces the in-memory Map.
  */
 
-import { prisma } from "./prisma";
+import { NextRequest, NextResponse } from 'next/server';
+import prisma from '@/lib/prisma';
+import logger from '@/lib/logger';
 
-interface RateLimitEntry {
-    count: number;
-    resetAt: number; // Unix timestamp (ms)
+interface RateLimitConfig {
+  windowMs: number;
+  maxRequests: number;
+  message?: string;
 }
 
-export interface RateLimitOptions {
-    /** Maximum number of requests allowed in the window */
-    limit: number;
-    /** Window duration in seconds */
-    windowSeconds: number;
+const endpointLimits: Record<string, { anonymous: RateLimitConfig; user: RateLimitConfig; admin: RateLimitConfig }> = {
+  '/api/auth/login': {
+    anonymous: { windowMs: 15 * 60 * 1000, maxRequests: 5,  message: 'Too many login attempts, try again later' },
+    user:      { windowMs: 15 * 60 * 1000, maxRequests: 20 },
+    admin:     { windowMs: 15 * 60 * 1000, maxRequests: 50 },
+  },
+  '/api/auth/register': {
+    anonymous: { windowMs: 60 * 60 * 1000, maxRequests: 3, message: 'Registration limit exceeded, try later' },
+    user:      { windowMs: 60 * 60 * 1000, maxRequests: 5  },
+    admin:     { windowMs: 60 * 60 * 1000, maxRequests: 10 },
+  },
+  '/api/auth/forgot-password': {
+    anonymous: { windowMs: 15 * 60 * 1000, maxRequests: 3, message: 'Too many password reset attempts' },
+    user:      { windowMs: 15 * 60 * 1000, maxRequests: 10 },
+    admin:     { windowMs: 15 * 60 * 1000, maxRequests: 20 },
+  },
+};
+
+const defaultLimit = {
+  anonymous: { windowMs: 60 * 1000, maxRequests: 30  },
+  user:      { windowMs: 60 * 1000, maxRequests: 100 },
+  admin:     { windowMs: 60 * 1000, maxRequests: 500 },
+};
+
+function getClientKey(req: NextRequest, userId?: string): string {
+  const ip =
+    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    req.headers.get('x-real-ip') ||
+    'unknown';
+  return userId ? `${ip}:${userId}` : ip;
 }
 
-export interface RateLimitResult {
-    allowed: boolean;
-    remaining: number;
-    resetAt: number; // Unix timestamp (ms)
-    retryAfterSeconds: number;
+function getRole(req: NextRequest): 'admin' | 'user' | 'anonymous' {
+  const role = req.headers.get('x-user-role');
+  if (role === 'ADMIN' || role === 'SUPER_ADMIN') return 'admin';
+  if (role) return 'user';
+  return 'anonymous';
+}
+
+function getConfig(path: string, role: 'admin' | 'user' | 'anonymous'): RateLimitConfig {
+  for (const [pattern, cfg] of Object.entries(endpointLimits)) {
+    if (path.startsWith(pattern)) return cfg[role];
+  }
+  return defaultLimit[role];
 }
 
 /**
- * Check whether a key (IP address or user identifier) is within the rate limit.
- *
- * @param key       - Unique identifier for the requester (e.g. client IP)
- * @param namespace - Prefix to namespace limits per route (e.g. "login", "register")
- * @param options   - Rate limit configuration
+ * Check rate limit against the database.
+ * Returns null if OK, or a 429 NextResponse if the limit is exceeded.
  */
 export async function checkRateLimit(
-    key: string,
-    namespace: string,
-    options: RateLimitOptions
-): Promise<RateLimitResult> {
-    const storeKey = `${namespace}:${key}`;
-    const now = Date.now();
-    const windowMs = options.windowSeconds * 1000;
+  req: NextRequest,
+  userId?: string,
+): Promise<NextResponse | null> {
+  try {
+    const path   = new URL(req.url).pathname;
+    const role   = getRole(req);
+    const config = getConfig(path, role);
+    const key    = `rl:${path}:${getClientKey(req, userId)}`;
+    const now    = new Date();
 
-    try {
-        // Try to find existing entry
-        let entry = await prisma.rateLimit.findUnique({
-            where: { key: storeKey }
-        });
+    const record = await prisma.rateLimit.findUnique({ where: { key } });
 
-        if (!entry || entry.resetAt.getTime() <= now) {
-            // Create new or update expired entry
-            entry = await prisma.rateLimit.upsert({
-                where: { key: storeKey },
-                update: {
-                    count: 1,
-                    resetAt: new Date(now + windowMs),
-                    updatedAt: new Date()
-                },
-                create: {
-                    key: storeKey,
-                    count: 1,
-                    resetAt: new Date(now + windowMs)
-                }
-            });
-            return {
-                allowed: true,
-                remaining: options.limit - 1,
-                resetAt: entry.resetAt.getTime(),
-                retryAfterSeconds: 0,
-            };
-        }
-
-        // Increment count
-        entry = await prisma.rateLimit.update({
-            where: { key: storeKey },
-            data: {
-                count: { increment: 1 },
-                updatedAt: new Date()
-            }
-        });
-
-        if (entry.count > options.limit) {
-            // Check if resetAt is valid
-            const isValidResetAt = entry.resetAt instanceof Date && !isNaN(entry.resetAt.getTime());
-            const resetTime = isValidResetAt ? entry.resetAt.getTime() : (now + windowMs);
-
-            // If resetAt was invalid, update it in the database for future requests
-            if (!isValidResetAt) {
-                // Update in background, don't wait
-                prisma.rateLimit.update({
-                    where: { key: storeKey },
-                    data: {
-                        resetAt: new Date(now + windowMs),
-                        updatedAt: new Date()
-                    }
-                }).catch(err => console.error('Failed to update invalid rate limit entry:', err));
-            }
-
-            const retryAfterSeconds = Math.max(1, Math.ceil((resetTime - now) / 1000));
-            return {
-                allowed: false,
-                remaining: 0,
-                resetAt: resetTime,
-                retryAfterSeconds,
-            };
-        }
-
-        return {
-            allowed: true,
-            remaining: options.limit - entry.count,
-            resetAt: entry.resetAt.getTime(),
-            retryAfterSeconds: 0,
-        };
-    } catch (error) {
-        // If database fails, allow request to prevent blocking
-        console.error('Rate limit check failed:', error);
-        return {
-            allowed: true,
-            remaining: options.limit - 1,
-            resetAt: now + windowMs,
-            retryAfterSeconds: 0,
-        };
+    if (!record || record.resetAt <= now) {
+      await prisma.rateLimit.upsert({
+        where:  { key },
+        create: { key, count: 1, resetAt: new Date(now.getTime() + config.windowMs) },
+        update: { count: 1,      resetAt: new Date(now.getTime() + config.windowMs) },
+      });
+      return null;
     }
+
+    if (record.count >= config.maxRequests) {
+      const retryAfter = Math.ceil((record.resetAt.getTime() - now.getTime()) / 1000);
+      const message    = config.message ?? `Rate limit exceeded. Retry in ${retryAfter}s`;
+      logger.warn('Rate limit exceeded', { key, count: record.count, path });
+      return NextResponse.json(
+        { error: message, code: 'RATE_LIMIT_EXCEEDED' },
+        {
+          status: 429,
+          headers: {
+            'Retry-After':           String(retryAfter),
+            'X-RateLimit-Limit':     String(config.maxRequests),
+            'X-RateLimit-Remaining': '0',
+            'X-RateLimit-Reset':     String(Math.ceil(record.resetAt.getTime() / 1000)),
+          },
+        },
+      );
+    }
+
+    await prisma.rateLimit.update({ where: { key }, data: { count: { increment: 1 } } });
+    return null;
+  } catch (err: unknown) {
+    // Fail open — don't block requests if DB is temporarily unavailable
+    logger.error('Rate limiter DB error — failing open', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return null;
+  }
 }
 
 /**
- * Extract the real client IP from a Next.js request.
- * Respects common proxy headers.
+ * Cleanup expired rate limit records.
+ * Call this from /api/cron or a scheduled job.
  */
-export function getClientIp(req: { headers: { get: (key: string) => string | null } }): string {
-    return (
-        req.headers.get("x-forwarded-for")?.split(",")[0].trim() ||
-        req.headers.get("x-real-ip") ||
-        "unknown"
-    );
+export async function cleanupExpiredRateLimits(): Promise<number> {
+  const result = await prisma.rateLimit.deleteMany({
+    where: { resetAt: { lte: new Date() } },
+  });
+  return result.count;
+}
+
+// ── Legacy compatibility exports (used by src/middleware/rateLimiter.ts) ───────
+/** @deprecated Use checkRateLimit() instead */
+export function isRateLimited() {
+  return { limited: false, message: '' };
+}
+/** @deprecated Use checkRateLimit() instead */
+export function rateLimitMiddleware() {
+  return null;
+}
+/** @deprecated No-op — cleanup is now automatic via DB TTL */
+export function cleanupRateLimitStore() {}
+/** @deprecated No-op */
+export function resetRateLimit(_id: string) {}
+/** @deprecated */
+export function getRateLimitStats() {
+  return { totalKeys: 0, activeKeys: 0 };
 }

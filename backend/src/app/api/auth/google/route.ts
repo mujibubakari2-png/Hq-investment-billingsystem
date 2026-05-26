@@ -1,27 +1,21 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { errorResponse, jsonResponse, hashPassword, signToken } from "@/lib/auth";
-import { checkRateLimit, getClientIp } from "@/lib/rateLimiter";
+import { checkRateLimit } from "@/lib/rateLimiter";
+import logger from "@/lib/logger";
 import { OAuth2Client } from "google-auth-library";
 import crypto from "crypto";
 
 export async function POST(req: NextRequest) {
-    // Rate limit: 20 Google auth attempts per 15 minutes per IP
-    const ip = getClientIp(req);
-    const rateLimit = await checkRateLimit(ip, "google-auth", { limit: 20, windowSeconds: 15 * 60 });
-    if (!rateLimit.allowed) {
-        return errorResponse(
-            `Too many requests. Please try again in ${rateLimit.retryAfterSeconds} seconds.`,
-            429
-        );
-    }
+    const rateLimitResponse = await checkRateLimit(req);
+    if (rateLimitResponse) return rateLimitResponse;
 
     const googleClientId = process.env.GOOGLE_CLIENT_ID;
     const isProduction = process.env.NODE_ENV === "production";
 
     // In production, refuse to run without a real Google Client ID
     if (isProduction && !googleClientId) {
-        console.error("[GOOGLE AUTH] GOOGLE_CLIENT_ID is not set in production!");
+        logger.error('Google OAuth not configured in production');
         return errorResponse("Google login is not configured on this server.", 503);
     }
 
@@ -65,7 +59,7 @@ export async function POST(req: NextRequest) {
                 email = payload.email;
                 fullName = payload.name || "Google User";
             } catch (err: any) {
-                console.error("[GOOGLE AUTH] Token verification failed:", err.message);
+                logger.error('Google token verification failed', { error: err.message });
                 return errorResponse(
                     "Google token verification failed. Ensure the correct Google Client ID is configured.",
                     401
@@ -158,7 +152,7 @@ export async function POST(req: NextRequest) {
             },
         }, 200);
     } catch (e) {
-        console.error("[GOOGLE AUTH] Unexpected error:", e);
+        logger.error('Google auth error', { error: (e as Error)?.message || String(e) });
         return errorResponse("Internal server error", 500);
     }
 }

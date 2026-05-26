@@ -21,7 +21,7 @@
     "seed": "npx tsx scripts/seed.ts"
   },
   "engines": {
-    "node": ">=18.17.0"
+    "node": ">=22.12.0"
   },
   "lint-staged": {
     "*.{ts,tsx}": [

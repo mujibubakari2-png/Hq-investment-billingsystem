@@ -56,7 +56,7 @@ export function comparePassword(password: string, hash: string): Promise<boolean
 }
 
 export function signToken(payload: JwtPayload): string {
-    return jwt.sign(payload, getJwtSecret(), { expiresIn: "7d" });
+    return jwt.sign(payload, getJwtSecret(), { expiresIn: "30m" });
 }
 
 export function verifyToken(token: string): JwtPayload | null {
