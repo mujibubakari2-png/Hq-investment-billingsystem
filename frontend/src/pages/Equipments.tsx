@@ -7,7 +7,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import AddEquipmentModal from '../modals/AddEquipmentModal';
 import EditEquipmentModal from '../modals/EditEquipmentModal';
 import ConfirmDeleteModal from '../modals/ConfirmDeleteModal';
-import { equipmentApi } from '../api';
+import { equipmentsApi } from '../api';
 import type { Equipment } from '../types';
 
 export default function Equipments() {
@@ -21,7 +21,7 @@ export default function Equipments() {
     const fetchEquipment = async () => {
         setLoading(true);
         try {
-            const data = await equipmentApi.list();
+            const data = await equipmentsApi.list();
             setEquipmentList(data as unknown as Equipment[]);
         } catch (err) {
             console.error('Failed to load equipment:', err);
@@ -42,7 +42,7 @@ export default function Equipments() {
 
     const handleEditEquipment = async (updated: Equipment) => {
         try {
-            await equipmentApi.update(updated.id, updated as unknown as Record<string, unknown>);
+            await equipmentsApi.update(updated.id, updated as unknown as Record<string, unknown>);
             setEditEquipment(null);
             fetchEquipment();
         } catch (err) {
@@ -55,7 +55,7 @@ export default function Equipments() {
         <div>
             {showAddModal && <AddEquipmentModal onClose={() => setShowAddModal(false)} onSave={async (data) => {
                 try {
-                    await equipmentApi.create(data as Record<string, unknown>);
+                    await equipmentsApi.create(data as Record<string, unknown>);
                     setShowAddModal(false);
                     fetchEquipment();
                 } catch (err) {
@@ -78,7 +78,7 @@ export default function Equipments() {
                     onClose={() => setDeleteId(null)}
                     onConfirm={async () => {
                         try {
-                            await equipmentApi.delete(deleteId);
+                            await equipmentsApi.delete(deleteId);
                             setDeleteId(null);
                             fetchEquipment();
                         } catch (err) {
