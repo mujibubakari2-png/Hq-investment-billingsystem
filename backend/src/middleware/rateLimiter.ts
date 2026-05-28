@@ -24,9 +24,9 @@ const requestStore = new Map<string, { count: number; resetTime: number }>();
 const endpointLimits: Record<string, UserRateLimitConfig> = {
     // Authentication endpoints - stricter limits
     '/api/auth/login': {
-        anonymous: { windowMs: 15 * 60 * 1000, maxRequests: 5, message: 'Too many login attempts, try again later' },
-        user: { windowMs: 15 * 60 * 1000, maxRequests: 20 },
-        admin: { windowMs: 15 * 60 * 1000, maxRequests: 50 },
+        anonymous: { windowMs: 5 * 60 * 1000, maxRequests: 5, message: 'Too many login attempts, try again later' },
+        user: { windowMs: 5 * 60 * 1000, maxRequests: 20 },
+        admin: { windowMs: 5 * 60 * 1000, maxRequests: 50 },
     },
     '/api/auth/register': {
         anonymous: { windowMs: 60 * 60 * 1000, maxRequests: 3, message: 'Registration limit exceeded, try later' },
