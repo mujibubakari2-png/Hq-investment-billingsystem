@@ -8,7 +8,7 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 
-import { usersApi } from '../api';
+import { systemUsersApi } from '../api';
 import type { SystemUser } from '../types';
 import { formatDateTime } from '../utils/formatters';
 
@@ -44,7 +44,7 @@ export default function SystemUsers() {
     const fetchUsers = async () => {
         try {
             setIsRefreshing(true);
-            const data = await usersApi.list();
+            const data = await systemUsersApi.list();
             setUsers(data as unknown as SystemUser[]);
         } catch (err) {
             console.error('Failed to load users:', err);
@@ -80,7 +80,7 @@ export default function SystemUsers() {
     const handleDelete = async (id: string) => {
         if (!window.confirm('Are you sure you want to delete this user? This cannot be undone.')) return;
         try {
-            await usersApi.delete(id);
+            await systemUsersApi.delete(id);
             await fetchUsers();
         } catch (err: any) {
             alert(err.message || 'Failed to delete user. Please make sure you have sufficient permissions.');
@@ -126,9 +126,9 @@ export default function SystemUsers() {
             }
 
             if (editingUserId) {
-                await usersApi.update(editingUserId, payload);
+                await systemUsersApi.update(editingUserId, payload);
             } else {
-                await usersApi.create(payload);
+                await systemUsersApi.create(payload);
             }
 
             await fetchUsers();
