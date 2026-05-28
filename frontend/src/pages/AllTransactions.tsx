@@ -4,7 +4,7 @@ import AddIcon from '@mui/icons-material/Add';
 import SearchIcon from '@mui/icons-material/Search';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import DeleteIcon from '@mui/icons-material/Delete';
-import { transactionsApi, vouchersApi, settingsApi } from '../api';
+import { transactionsApi, voucherCodesApi, settingsApi } from '../api';
 import type { Transaction } from '../types';
 import AddTransactionModal from '../modals/AddTransactionModal';
 import ViewTransactionModal from '../modals/ViewTransactionModal';
@@ -47,7 +47,7 @@ export default function AllTransactions() {
         try {
             const [txRes, vRes, settingsRes] = await Promise.all([
                 transactionsApi.list(),
-                vouchersApi.list(),
+                voucherCodesApi.list(),
                 settingsApi.get()
             ]);
 

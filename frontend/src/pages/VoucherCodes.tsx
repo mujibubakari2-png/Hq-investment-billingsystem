@@ -11,7 +11,7 @@ import CheckBoxOutlineBlankIcon from '@mui/icons-material/CheckBoxOutlineBlank';
 import RouterIcon from '@mui/icons-material/Router';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
-import { vouchersApi } from '../api';
+import { voucherCodesApi } from '../api';
 import type { Voucher } from '../types';
 import GenerateVouchersModal from '../modals/GenerateVouchersModal';
 import ConfirmDeleteModal from '../modals/ConfirmDeleteModal';
@@ -53,7 +53,7 @@ export default function VoucherCodes() {
     const fetchVouchers = async () => {
         setLoading(true);
         try {
-            const res = await vouchersApi.list({ limit: '1000' });
+            const res = await voucherCodesApi.list({ limit: '1000' });
             setVouchers((res.data || []) as unknown as Voucher[]);
         } catch (err) {
             console.error('Failed to fetch vouchers', err);
@@ -68,7 +68,7 @@ export default function VoucherCodes() {
 
     const handleGenerate = async (data: any) => {
         try {
-            await vouchersApi.generate(data);
+            await voucherCodesApi.generate(data);
             setShowGenerateModal(false);
             fetchVouchers();
         } catch (err) {
@@ -83,7 +83,7 @@ export default function VoucherCodes() {
     const handleRevoke = async () => {
         if (!deleteTargetId) return;
         try {
-            await vouchersApi.delete(deleteTargetId);
+            await voucherCodesApi.delete(deleteTargetId);
             setDeleteTargetId(null);
             setShowDeleteModal(false);
             fetchVouchers();
@@ -110,7 +110,7 @@ export default function VoucherCodes() {
             const chunkSize = 5;
             for (let i = 0; i < vouchersToDelete.length; i += chunkSize) {
                 const chunk = vouchersToDelete.slice(i, i + chunkSize);
-                await Promise.all(chunk.map(v => vouchersApi.delete(v.id)));
+                await Promise.all(chunk.map(v => voucherCodesApi.delete(v.id)));
             }
 
             setShowDeleteAllModal(false);
