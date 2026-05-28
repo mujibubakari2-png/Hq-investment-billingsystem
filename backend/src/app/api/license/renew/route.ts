@@ -35,7 +35,15 @@ export async function POST(req: NextRequest) {
             });
             if (!invoice) return errorResponse("Invoice not found", 404);
         } else {
-            // CREATE PENDING INVOICE
+            // FIX: Avoid duplicating PENDING invoices. Delete any existing PENDING invoice before creating a new one.
+            await prisma.tenantInvoice.deleteMany({
+                where: { 
+                    tenantId: tenant.id,
+                    status: "PENDING"
+                }
+            });
+
+            // CREATE NEW PENDING INVOICE
             const invoiceNumber = `INV-${new Date().getFullYear()}-${randomUUID().replace(/-/g, "").slice(0, 8).toUpperCase()}`;
             invoice = await prisma.tenantInvoice.create({
                 data: {
