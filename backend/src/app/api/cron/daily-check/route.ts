@@ -4,9 +4,9 @@ import nodemailer from "nodemailer";
 
 export async function GET(req: Request) {
     try {
-        // Optional security - Require an authorization header if provided in ENV
+        // Require CRON_SECRET in environment and authorization header
         const authHeader = req.headers.get("authorization");
-        if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+        if (!process.env.CRON_SECRET || authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
             return new NextResponse("Unauthorized", { status: 401 });
         }
 

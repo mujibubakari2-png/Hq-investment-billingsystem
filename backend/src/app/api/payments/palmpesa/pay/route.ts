@@ -51,8 +51,6 @@ export async function POST(req: NextRequest) {
             CallbackUrl: `${appUrl}/api/payments/palmpesa/webhook`,
         };
 
-        // In a real scenario, we send this to PalmPesa once credentials exist:
-        /*
         if (!PALMPESA_API_KEY) {
             return errorResponse("PalmPesa API key is not configured", 500);
         }
@@ -65,14 +63,6 @@ export async function POST(req: NextRequest) {
             body: JSON.stringify(stkPayload)
         });
         const result = await response.json();
-        */
-
-        // For now, we simulate success
-        const result = {
-            ResponseCode: "0",
-            ResponseDescription: "Success. Request accepted for processing",
-            CheckoutRequestID: `ws_CO_${Date.now()}`
-        };
 
         if (result.ResponseCode === "0") {
             return jsonResponse({

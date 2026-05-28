@@ -39,7 +39,8 @@ export async function POST(req: NextRequest) {
             await prisma.tenantInvoice.deleteMany({
                 where: { 
                     tenantId: tenant.id,
-                    status: "PENDING"
+                    status: "PENDING",
+                    planId: tenant.planId
                 }
             });
 
@@ -63,9 +64,17 @@ export async function POST(req: NextRequest) {
             return errorResponse("Server payment callback URL is not configured", 500);
         }
 
-        // Dynamically resolve payment provider from environment configuration
+        // Dynamically resolve payment provider from environment or DB configuration
         let providerName = "PALMPESA"; // default
-        if (process.env.ZENOPAY_API_KEY) {
+        
+        // Prefer the configured global PaymentChannel for the platform
+        const systemChannel = await prisma.paymentChannel.findFirst({
+            where: { status: "ACTIVE", tenantId: null }
+        });
+        
+        if (systemChannel && systemChannel.provider) {
+            providerName = systemChannel.provider;
+        } else if (process.env.ZENOPAY_API_KEY) {
             providerName = "ZENOPAY";
         } else if (process.env.HARAKAPAY_API_KEY) {
             providerName = "HARAKAPAY";

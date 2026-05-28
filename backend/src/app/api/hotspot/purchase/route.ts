@@ -277,9 +277,11 @@ async function completeHotspotPurchase(
       where: { id: clientId },
       data: { status: "ACTIVE" },
     });
+  });
 
-    // Sync to RADIUS
-    const client = await tx.client.findUnique({ where: { id: clientId } });
+  // Sync to RADIUS
+  try {
+    const client = await prisma.client.findUnique({ where: { id: clientId } });
     if (client) {
       let rateLimit: string | undefined;
       if (pkg.uploadSpeed && pkg.downloadSpeed) {
@@ -298,7 +300,9 @@ async function completeHotspotPurchase(
         rateLimit,
       });
     }
-  });
+  } catch (radErr) {
+    console.error("[HOTSPOT] RADIUS sync error:", radErr);
+  }
 
   // MikroTik activation
   if (routerId) {

@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { getMikroTikService } from "@/lib/mikrotik";
+import { syncRadiusUser } from "@/lib/radius";
 
 export async function POST(req: NextRequest) {
     try {
@@ -65,6 +66,28 @@ export async function POST(req: NextRequest) {
                         username: sub.client.username
                     }
                 });
+
+                // Sync RADIUS
+                try {
+                    let rateLimit: string | undefined;
+                    if (sub.package.uploadSpeed && sub.package.downloadSpeed) {
+                        const ul = sub.package.uploadUnit === "Mbps" ? "M" : "k";
+                        const dl = sub.package.downloadUnit === "Mbps" ? "M" : "k";
+                        rateLimit = `${sub.package.uploadSpeed}${ul}/${sub.package.downloadSpeed}${dl}`;
+                    }
+                    await syncRadiusUser({
+                        username: sub.client.username,
+                        password: sub.client.phone || "123456",
+                        tenantId: sub.package.tenantId || null,
+                        fullName: sub.client.fullName || undefined,
+                        expiresAt: newExpiresDate,
+                        status: "Active",
+                        profileName: sub.package.name,
+                        rateLimit,
+                    });
+                } catch (radErr) {
+                    console.error(`Bulk extend RADIUS sync error on ${sub.id}:`, radErr);
+                }
 
                 successes.push(sub.client.username);
             } catch (err: any) {
