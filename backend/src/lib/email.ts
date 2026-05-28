@@ -11,7 +11,7 @@ export const emailConfig: any = {
     host: env.SMTP_HOST || "smtp.gmail.com",
     port: Number(env.SMTP_PORT) || 587,
     // Port 465 is always secure (SSL/TLS). Port 587 uses STARTTLS so secure MUST be false
-    secure: Number(env.SMTP_PORT) === 465 || env.SMTP_SECURE === "true",
+    secure: Number(env.SMTP_PORT) === 465 || env.SMTP_SECURE,
     auth: {
         user: env.SMTP_USER,
         pass: env.SMTP_PASS,
@@ -48,7 +48,7 @@ export async function sendEmail({
     let activeTransporter = nodemailer.createTransport({
         ...emailConfig,
         port: currentPort,
-        secure: currentPort === 465 || env.SMTP_SECURE === "true"
+        secure: currentPort === 465 || env.SMTP_SECURE
     });
 
     try {
