@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
-import { comparePassword, signToken, jsonResponse, errorResponse, isAutomationRequest } from "@/lib/auth";
+import { comparePassword, signToken, signRefreshToken, jsonResponse, errorResponse, isAutomationRequest } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/rateLimiter";
 import logger from "@/lib/logger";
 
@@ -48,9 +48,7 @@ export async function POST(req: NextRequest) {
             return errorResponse("Account is disabled", 403);
         }
 
-        const isAutomation = isAutomationRequest(req);
-
-        const valid = isAutomation || await comparePassword(password, user.password);
+        const valid = await comparePassword(password, user.password);
         logger.info('Login result', { username, success: valid });
         if (!valid) {
             return errorResponse("Invalid credentials", 401);
@@ -62,14 +60,16 @@ export async function POST(req: NextRequest) {
             data: { lastLogin: new Date() },
         });
 
-        const token = signToken({
+        const payload = {
             userId: user.id,
             username: user.username,
             role: user.role,
             tenantId: user.tenantId,
-        });
+        };
+        const token = signToken(payload);
+        const refreshToken = signRefreshToken(payload);
 
-        return jsonResponse({
+        const response = jsonResponse({
             token,
             id: user.id, // Alias for tests
             user_id: user.id, // Alias for tests
@@ -84,8 +84,15 @@ export async function POST(req: NextRequest) {
                 tenant_id: user.tenantId, // Alias for tests
             },
         });
-    } catch (e: any) {
-        logger.error('Login error', { error: e?.message || String(e) });
+
+        const isSecure = process.env.NODE_ENV === 'production';
+        response.headers.append('Set-Cookie', `accessToken=${token}; Path=/; HttpOnly; SameSite=Lax${isSecure ? '; Secure' : ''}; Max-Age=1800`);
+        response.headers.append('Set-Cookie', `refreshToken=${refreshToken}; Path=/; HttpOnly; SameSite=Lax${isSecure ? '; Secure' : ''}; Max-Age=604800`);
+
+        return response;
+    } catch (e: unknown) {
+        const message = e instanceof Error ? e.message : String(e);
+        logger.error('Login error', { error: message });
         return errorResponse("Internal server error", 500);
     }
 }

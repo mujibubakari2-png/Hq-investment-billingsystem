@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import ExtensionIcon from '@mui/icons-material/Extension';
 import CloseIcon from '@mui/icons-material/Close';
 import CheckIcon from '@mui/icons-material/Check';
-import { packagesApi } from '../api/client';
+import { packagesApi } from '../api';
 import type { ExpiredSubscriber, Package } from '../types';
 import { formatDate } from '../utils/formatters';
 

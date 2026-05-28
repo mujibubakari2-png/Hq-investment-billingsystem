@@ -7,7 +7,7 @@ import WarningIcon from '@mui/icons-material/Warning';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import PaymentIcon from '@mui/icons-material/Payment';
-import { licenseApi, saasPlansApi, type LicenseResponse, type SaasPlan } from '../api/client';
+import { licenseApi, saasPlansApi, type LicenseResponse, type SaasPlan } from '../api';
 import CircularProgress from '@mui/material/CircularProgress';
 import { formatDate } from '../utils/formatters';
 import { useNavigate } from 'react-router-dom';

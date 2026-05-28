@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { authApi } from '../api/client';
+import { authApi } from '../api';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import KeyIcon from '@mui/icons-material/Key';
 import MailOutlineIcon from '@mui/icons-material/MailOutline';

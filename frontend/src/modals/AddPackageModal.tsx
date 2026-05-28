@@ -5,7 +5,7 @@ import CheckIcon from '@mui/icons-material/Check';
 import SpeedIcon from '@mui/icons-material/Speed';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import SettingsIcon from '@mui/icons-material/Settings';
-import { routersApi } from '../api/client';
+import { routersApi } from '../api';
 import type { Router } from '../types';
 
 interface AddPackageModalProps {

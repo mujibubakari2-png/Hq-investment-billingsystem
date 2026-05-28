@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { dashboardApi, routersApi } from '../api/client';
-import type { DashboardResponse } from '../api/client';
+import { dashboardApi, routersApi } from '../api';
+import type { DashboardResponse } from '../api';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import authStore from '../stores/authStore';
 import { formatDateTime } from '../utils/formatters';

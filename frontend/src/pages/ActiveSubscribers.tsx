@@ -11,7 +11,7 @@ import CellTowerIcon from '@mui/icons-material/CellTower';
 import SyncIcon from '@mui/icons-material/Sync';
 
 import { useNavigate } from 'react-router-dom';
-import { activeSubscribersApi, subscriptionsApi, routersApi } from '../api/client';
+import { activeSubscribersApi, subscriptionsApi, routersApi } from '../api';
 import { formatDate } from '../utils/formatters';
 import type { ActiveSubscriber, Router } from '../types';
 import ConfirmDeleteModal from '../modals/ConfirmDeleteModal';

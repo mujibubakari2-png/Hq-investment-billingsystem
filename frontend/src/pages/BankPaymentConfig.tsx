@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { settingsApi } from '../api/client';
+import { settingsApi } from '../api';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import SecurityIcon from '@mui/icons-material/Security';

@@ -8,7 +8,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ErrorIcon from '@mui/icons-material/Error';
 import SyncIcon from '@mui/icons-material/Sync';
 import BusinessIcon from '@mui/icons-material/Business';
-import { settingsApi } from '../api/client';
+import { settingsApi } from '../api';
 
 type TabKey = 'general' | 'sms' | 'whatsapp' | 'email';
 

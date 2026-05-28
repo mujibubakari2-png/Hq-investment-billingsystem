@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import LockPersonIcon from '@mui/icons-material/LockPerson';
 import PaymentIcon from '@mui/icons-material/Payment';
 import ConfirmationNumberIcon from '@mui/icons-material/ConfirmationNumber';
-import { licenseApi, type LicenseResponse } from '../api/client';
+import { licenseApi, type LicenseResponse } from '../api';
 import authStore from '../stores/authStore';
 import { formatDate } from '../utils/formatters';
 

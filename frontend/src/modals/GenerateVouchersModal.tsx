@@ -3,7 +3,7 @@ import ConfirmationNumberIcon from '@mui/icons-material/ConfirmationNumber';
 import CloseIcon from '@mui/icons-material/Close';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
-import { packagesApi, routersApi } from '../api/client';
+import { packagesApi, routersApi } from '../api';
 import type { Package, Router } from '../types';
 
 interface GenerateVouchersModalProps {

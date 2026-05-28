@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { settingsApi } from '../api/client';
+import { settingsApi } from '../api';
 import PaymentIcon from '@mui/icons-material/Payment';
 import SaveIcon from '@mui/icons-material/Save';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';

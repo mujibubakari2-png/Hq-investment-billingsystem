@@ -6,7 +6,7 @@ import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import SpeedIcon from '@mui/icons-material/Speed';
 import CloseIcon from '@mui/icons-material/Close';
 import CheckIcon from '@mui/icons-material/Check';
-import { packagesApi, routersApi } from '../api/client';
+import { packagesApi, routersApi } from '../api';
 import type { Package, Router } from '../types';
 
 export default function EditPackage() {

@@ -35,5 +35,5 @@ export const profileApi = {
     update: (data: { fullName?: string; username?: string; email?: string; phone?: string }) =>
         put<{ message: string }>('/auth/profile', data),
     changePassword: (data: { currentPassword: string; newPassword: string }) =>
-        put<{ message: string }>('/auth/profile', data),
+        post<{ message: string }>('/auth/profile/change-password', data),
 };

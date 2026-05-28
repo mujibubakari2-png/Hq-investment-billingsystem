@@ -8,7 +8,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import PendingIcon from '@mui/icons-material/Pending';
 import SyncIcon from '@mui/icons-material/Sync';
-import { smsApi } from '../api/client';
+import { smsApi } from '../api';
 import type { SmsMessage } from '../types';
 import { formatDateTime } from '../utils/formatters';
 

@@ -11,7 +11,7 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import PersonIcon from '@mui/icons-material/Person';
 import RouterIcon from '@mui/icons-material/Router';
 import SpeedIcon from '@mui/icons-material/Speed';
-import { vpnApi, routersApi } from '../api/client';
+import { vpnApi, routersApi } from '../api';
 import ConfirmDeleteModal from '../modals/ConfirmDeleteModal';
 
 interface VpnUser {

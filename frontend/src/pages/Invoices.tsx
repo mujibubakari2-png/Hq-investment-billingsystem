@@ -5,7 +5,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import PrintIcon from '@mui/icons-material/Print';
 import DeleteIcon from '@mui/icons-material/Delete';
-import { invoicesApi } from '../api/client';
+import { invoicesApi } from '../api';
 import type { Invoice } from '../types';
 import CreateInvoiceModal from '../modals/CreateInvoiceModal';
 import ViewInvoiceModal from '../modals/ViewInvoiceModal';

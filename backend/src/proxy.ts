@@ -8,6 +8,9 @@ function getAllowedOrigins(): string[] {
         .filter(Boolean);
 }
 
+const INITIAL_ALLOWED_ORIGINS = getAllowedOrigins();
+console.log("[CORS] Allowed origins:", INITIAL_ALLOWED_ORIGINS.length ? INITIAL_ALLOWED_ORIGINS : "(none)");
+
 export function proxy(request: NextRequest) {
     const origin = request.headers.get("origin");
     const pathname = new URL(request.url).pathname;

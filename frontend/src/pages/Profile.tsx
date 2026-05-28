@@ -6,7 +6,7 @@ import BadgeIcon from '@mui/icons-material/Badge';
 import LockIcon from '@mui/icons-material/Lock';
 import SaveIcon from '@mui/icons-material/Save';
 import authStore from '../stores/authStore';
-import { profileApi } from '../api/client';
+import { profileApi } from '../api';
 
 export default function Profile() {
     const { user } = authStore.useAuth();

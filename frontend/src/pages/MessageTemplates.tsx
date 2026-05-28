@@ -8,7 +8,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import SyncIcon from '@mui/icons-material/Sync';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import { smsApi } from '../api/client';
+import { smsApi } from '../api';
 import AddMessageTemplateModal from '../modals/AddMessageTemplateModal';
 import EditMessageTemplateModal from '../modals/EditMessageTemplateModal';
 import ConfirmDeleteModal from '../modals/ConfirmDeleteModal';

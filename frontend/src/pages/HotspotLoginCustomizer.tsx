@@ -16,7 +16,7 @@ import GridViewIcon from '@mui/icons-material/GridView';
 import WifiIcon from '@mui/icons-material/Wifi';
 import RouterIcon from '@mui/icons-material/Router';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
-import { routersApi, settingsApi, packagesApi, hotspotSettingsApi, CLEAN_API_URL } from '../api/client';
+import { routersApi, settingsApi, packagesApi, hotspotSettingsApi, CLEAN_API_URL } from '../api';
 import authStore from '../stores/authStore';
 import type { Router } from '../types';
 

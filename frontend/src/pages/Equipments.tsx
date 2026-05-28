@@ -7,7 +7,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import AddEquipmentModal from '../modals/AddEquipmentModal';
 import EditEquipmentModal from '../modals/EditEquipmentModal';
 import ConfirmDeleteModal from '../modals/ConfirmDeleteModal';
-import { equipmentApi } from '../api/client';
+import { equipmentApi } from '../api';
 import type { Equipment } from '../types';
 
 export default function Equipments() {

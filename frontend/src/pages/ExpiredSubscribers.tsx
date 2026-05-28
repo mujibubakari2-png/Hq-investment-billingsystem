@@ -10,7 +10,7 @@ import TodayIcon from '@mui/icons-material/Today';
 import WifiIcon from '@mui/icons-material/Wifi';
 import PersonIcon from '@mui/icons-material/Person';
 import { useNavigate } from 'react-router-dom';
-import { expiredSubscribersApi, subscriptionsApi, routersApi } from '../api/client';
+import { expiredSubscribersApi, subscriptionsApi, routersApi } from '../api';
 import { formatDate } from '../utils/formatters';
 import type { ExpiredSubscriber, Router } from '../types';
 import ExtendSubscriberModal from '../modals/ExtendSubscriberModal';

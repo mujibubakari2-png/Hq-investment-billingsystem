@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import PaymentIcon from '@mui/icons-material/Payment';
 import { useNavigate } from 'react-router-dom';
-import { clientsApi, routersApi, packagesApi, subscriptionsApi } from '../api/client';
+import { clientsApi, routersApi, packagesApi, subscriptionsApi } from '../api';
 
 export default function RechargeAccount() {
     const navigate = useNavigate();

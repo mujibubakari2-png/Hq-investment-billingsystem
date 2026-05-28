@@ -3,7 +3,7 @@ import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
-import { expensesApi } from '../api/client';
+import { expensesApi } from '../api';
 import type { Expense } from '../types';
 import AddExpenseModal from '../modals/AddExpenseModal';
 import EditExpenseModal from '../modals/EditExpenseModal';

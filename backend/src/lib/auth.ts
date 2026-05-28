@@ -16,12 +16,6 @@ function getJwtSecret(): string {
     if (!jwtSecret) {
         const secret = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET;
         if (!secret) {
-            // Use fallback for build time or CI environments
-            if (isNextBuild() || process.env.CI || process.env.VERCEL || process.env.NETLIFY) {
-                jwtSecret = "build-time-fallback-secret-please-set-JWT_SECRET";
-                console.warn("WARNING: Using fallback JWT_SECRET/NEXTAUTH_SECRET for build/CI environment. Ensure JWT_SECRET is set in production!");
-                return jwtSecret;
-            }
             throw new Error("FATAL: JWT_SECRET or NEXTAUTH_SECRET environment variable is required. Add it to your .env file.");
         }
         if (secret.length < 32) {
@@ -59,6 +53,10 @@ export function signToken(payload: JwtPayload): string {
     return jwt.sign(payload, getJwtSecret(), { expiresIn: "30m" });
 }
 
+export function signRefreshToken(payload: JwtPayload): string {
+    return jwt.sign(payload, getJwtSecret(), { expiresIn: "7d" });
+}
+
 export function verifyToken(token: string): JwtPayload | null {
     try {
         return jwt.verify(token, getJwtSecret()) as JwtPayload;
@@ -76,7 +74,7 @@ export function getTokenFromRequest(req: NextRequest): string | null {
 }
 
 function isAutomationEnv(): boolean {
-    return process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test";
+    return process.env.NODE_ENV === "test";
 }
 
 function isAutomationBypassEnabled(): boolean {

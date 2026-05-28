@@ -1,5 +1,5 @@
 // ── Finance & Payments API ────────────────────────────────────────────────────
-import { get, post, del } from './httpClient';
+import { get, post, put, del } from './httpClient';
 
 export const transactionsApi = {
     list: (params?: Record<string, string>) => {
@@ -20,7 +20,7 @@ export const mobileTransactionsApi = {
 export const expensesApi = {
     list:   ()                                          => get<Record<string, unknown>[]>('/expenses'),
     create: (data: Record<string, unknown>)             => post<Record<string, unknown>>('/expenses', data),
-    update: (id: string, data: Record<string, unknown>) => import('./httpClient').then(m => m.put<Record<string, unknown>>(`/expenses/${id}`, data)),
+    update: (id: string, data: Record<string, unknown>) => put<Record<string, unknown>>(`/expenses/${id}`, data),
     delete: (id: string)                                => del<{ message: string }>(`/expenses/${id}`),
 };
 
@@ -30,14 +30,14 @@ export const invoicesApi = {
         return get<{ data: Record<string, unknown>[]; total: number }>(`/invoices${qs}`);
     },
     create: (data: Record<string, unknown>)             => post<Record<string, unknown>>('/invoices', data),
-    update: (id: string, data: Record<string, unknown>) => import('./httpClient').then(m => m.put<Record<string, unknown>>(`/invoices/${id}`, data)),
+    update: (id: string, data: Record<string, unknown>) => put<Record<string, unknown>>(`/invoices/${id}`, data),
     delete: (id: string)                                => del<{ message: string }>(`/invoices/${id}`),
 };
 
 export const paymentChannelsApi = {
     list:   ()                                          => get<Record<string, unknown>[]>('/payment-channels'),
     create: (data: Record<string, unknown>)             => post<Record<string, unknown>>('/payment-channels', data),
-    update: (id: string, data: Record<string, unknown>) => import('./httpClient').then(m => m.put<Record<string, unknown>>(`/payment-channels/${id}`, data)),
+    update: (id: string, data: Record<string, unknown>) => put<Record<string, unknown>>(`/payment-channels/${id}`, data),
     delete: (id: string)                                => del<{ message: string }>(`/payment-channels/${id}`),
 };
 

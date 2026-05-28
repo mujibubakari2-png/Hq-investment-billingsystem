@@ -4,7 +4,7 @@ import AddIcon from '@mui/icons-material/Add';
 import SearchIcon from '@mui/icons-material/Search';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import DeleteIcon from '@mui/icons-material/Delete';
-import { transactionsApi, vouchersApi, settingsApi } from '../api/client';
+import { transactionsApi, vouchersApi, settingsApi } from '../api';
 import type { Transaction } from '../types';
 import AddTransactionModal from '../modals/AddTransactionModal';
 import ViewTransactionModal from '../modals/ViewTransactionModal';

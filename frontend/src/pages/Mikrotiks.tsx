@@ -11,7 +11,7 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import PowerSettingsNewIcon from '@mui/icons-material/PowerSettingsNew';
 import SyncIcon from '@mui/icons-material/Sync';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
-import { routersApi } from '../api/client';
+import { routersApi } from '../api';
 import AddRouterModal from '../modals/AddRouterModal';
 import RouterDetailModal from '../modals/RouterDetailModal';
 import ConfirmDeleteModal from '../modals/ConfirmDeleteModal';

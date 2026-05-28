@@ -6,8 +6,11 @@ export const CLEAN_API_URL = API_URL.endsWith('/') ? API_URL.slice(0, -1) : API_
 const BASE = `${CLEAN_API_URL}/api`;
 
 function authHeaders(): Record<string, string> {
-    const token = localStorage.getItem('token');
-    return token ? { Authorization: `Bearer ${token}` } : {};
+    // If you're keeping a short-lived token in memory or fallback, use it.
+    // Otherwise, relying on HttpOnly cookie means we might not need this header.
+    // For now we will keep it if it exists in authStore (or localStorage if we didn't remove it).
+    // The instructions say "Update headers to rely on HttpOnly cookies instead of localStorage"
+    return {};
 }
 
 export async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -15,6 +18,7 @@ export async function request<T>(path: string, init?: RequestInit): Promise<T> {
     try {
         const res = await fetch(fullUrl, {
             ...init,
+            credentials: 'include',
             headers: {
                 'Content-Type': 'application/json',
                 ...authHeaders(),
@@ -22,9 +26,32 @@ export async function request<T>(path: string, init?: RequestInit): Promise<T> {
             },
         });
 
-        if (res.status === 401) {
+        if (res.status === 401 && !path.includes('/auth/login') && !path.includes('/auth/refresh')) {
+            try {
+                const refreshRes = await fetch(`${BASE}/auth/refresh`, { method: 'POST', credentials: 'include' });
+                if (refreshRes.ok) {
+                    const refreshData = await refreshRes.json();
+                    if (refreshData.token) {
+                        // Retry original request
+                        const retryRes = await fetch(fullUrl, {
+                            ...init,
+                            credentials: 'include',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                ...authHeaders(),
+                                ...(init?.headers as Record<string, string>),
+                            },
+                        });
+                        if (retryRes.ok) {
+                            return await retryRes.json() as T;
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error("Token refresh failed", err);
+            }
+
             if (typeof window !== 'undefined') {
-                localStorage.removeItem('token');
                 localStorage.removeItem('user');
                 window.location.href = '/login';
             }
@@ -46,7 +73,8 @@ export async function request<T>(path: string, init?: RequestInit): Promise<T> {
     }
 }
 
-export const get  = <T>(path: string)                    => request<T>(path);
-export const post = <T>(path: string, body: unknown)     => request<T>(path, { method: 'POST', body: JSON.stringify(body) });
-export const put  = <T>(path: string, body: unknown)     => request<T>(path, { method: 'PUT',  body: JSON.stringify(body) });
-export const del  = <T>(path: string)                    => request<T>(path, { method: 'DELETE' });
+export const get   = <T>(path: string)                    => request<T>(path);
+export const post  = <T>(path: string, body: unknown)     => request<T>(path, { method: 'POST', body: JSON.stringify(body) });
+export const put   = <T>(path: string, body: unknown)     => request<T>(path, { method: 'PUT',  body: JSON.stringify(body) });
+export const patch = <T>(path: string, body: unknown)     => request<T>(path, { method: 'PATCH', body: JSON.stringify(body) });
+export const del   = <T>(path: string)                    => request<T>(path, { method: 'DELETE' });

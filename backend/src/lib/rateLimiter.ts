@@ -108,13 +108,56 @@ export async function checkRateLimit(
     await prisma.rateLimit.update({ where: { key }, data: { count: { increment: 1 } } });
     return null;
   } catch (err: unknown) {
-    // Fail open — don't block requests if DB is temporarily unavailable
-    logger.error('Rate limiter DB error — failing open', {
+    // Fail open or use in-memory fallback if DB is temporarily unavailable
+    logger.error('Rate limiter DB error — using in-memory fallback', {
       error: err instanceof Error ? err.message : String(err),
     });
+
+    const path = new URL(req.url).pathname;
+    const role = getRole(req);
+    const config = getConfig(path, role);
+    const key = `rl:${path}:${getClientKey(req, userId)}`;
+    const now = Date.now();
+
+    const record = memoryRateLimitStore.get(key);
+    if (!record || record.resetAt <= now) {
+        memoryRateLimitStore.set(key, { count: 1, resetAt: now + config.windowMs });
+        return null;
+    }
+
+    if (record.count >= config.maxRequests) {
+        const retryAfter = Math.ceil((record.resetAt - now) / 1000);
+        return NextResponse.json(
+            { error: config.message ?? `Rate limit exceeded. Retry in ${retryAfter}s`, code: 'RATE_LIMIT_EXCEEDED' },
+            {
+                status: 429,
+                headers: {
+                    'Retry-After': String(retryAfter),
+                    'X-RateLimit-Limit': String(config.maxRequests),
+                    'X-RateLimit-Remaining': '0',
+                    'X-RateLimit-Reset': String(Math.ceil(record.resetAt / 1000)),
+                },
+            },
+        );
+    }
+    
+    record.count += 1;
     return null;
   }
 }
+
+// In-memory fallback map for when DB is down
+const memoryRateLimitStore = new Map<string, { count: number; resetAt: number }>();
+
+// Cleanup in-memory store periodically to avoid memory leaks
+setInterval(() => {
+    const now = Date.now();
+    for (const [key, record] of memoryRateLimitStore.entries()) {
+        if (record.resetAt <= now) {
+            memoryRateLimitStore.delete(key);
+        }
+    }
+}, 60 * 1000);
 
 /**
  * Cleanup expired rate limit records.

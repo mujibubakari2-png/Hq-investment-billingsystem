@@ -14,7 +14,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import Footer from '../components/layout/Footer';
 import { GoogleLogin } from '@react-oauth/google';
-import { authApi, saasPlansApi } from '../api/client';
+import { authApi, saasPlansApi } from '../api';
 import authStore from '../stores/authStore';
 
 // Helper for step icons

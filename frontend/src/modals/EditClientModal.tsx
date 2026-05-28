@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import EditIcon from '@mui/icons-material/Edit';
 import CloseIcon from '@mui/icons-material/Close';
 import CheckIcon from '@mui/icons-material/Check';
-import { routersApi, packagesApi } from '../api/client';
+import { routersApi, packagesApi } from '../api';
 import type { Client, Router, Package } from '../types';
 
 interface EditClientModalProps {

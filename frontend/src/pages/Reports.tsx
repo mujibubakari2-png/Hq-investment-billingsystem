@@ -4,7 +4,7 @@ import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import GroupIcon from '@mui/icons-material/Group';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { dashboardApi, expensesApi } from '../api/client';
+import { dashboardApi, expensesApi } from '../api';
 
 const COLORS = ['#e53935', '#4caf50', '#2196f3', '#ff9800', '#9c27b0'];
 

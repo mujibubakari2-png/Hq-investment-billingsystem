@@ -11,24 +11,19 @@ import App from './App'
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
 const isGoogleConfigured = !!googleClientId && googleClientId.length > 20;
 
-const AppTree = (
-  <StrictMode>
-    <ErrorBoundary>
-      <App />
-    </ErrorBoundary>
-  </StrictMode>
-);
+function GoogleOAuthWrapper({ children }: { children: React.ReactNode }) {
+  if (!isGoogleConfigured) {
+    return <>{children}</>;
+  }
+  return <GoogleOAuthProvider clientId={googleClientId!}>{children}</GoogleOAuthProvider>;
+}
 
 createRoot(document.getElementById('root')!).render(
-  isGoogleConfigured
-    ? (
-        <StrictMode>
-          <ErrorBoundary>
-            <GoogleOAuthProvider clientId={googleClientId!}>
-              <App />
-            </GoogleOAuthProvider>
-          </ErrorBoundary>
-        </StrictMode>
-      )
-    : AppTree
+  <StrictMode>
+    <ErrorBoundary>
+      <GoogleOAuthWrapper>
+        <App />
+      </GoogleOAuthWrapper>
+    </ErrorBoundary>
+  </StrictMode>
 );

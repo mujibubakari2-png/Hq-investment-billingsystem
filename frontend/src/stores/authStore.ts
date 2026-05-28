@@ -17,9 +17,28 @@ export interface AuthState {
     isAuthenticated: boolean;
 }
 
-// Read initial state from localStorage
+// Helper to check token expiry without a heavy library
+function isTokenValid(token: string | null): boolean {
+    if (!token) return false;
+    try {
+        const payloadStr = atob(token.split('.')[1]);
+        const payload = JSON.parse(payloadStr);
+        if (payload.exp) {
+            return payload.exp > Date.now() / 1000;
+        }
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+// Read initial state from localStorage (token should no longer be stored, but we might receive one during login/refresh)
+// The token is primarily stored in HttpOnly cookies, so we can ignore token in localStorage.
+// However, we still need to manage `isAuthenticated` based on whether we have a valid token (e.g. kept in memory) and user.
+// Since HttpOnly cookies are used, on page load we don't have the token.
+// The backend needs to provide a way to check if we're authenticated, which `/auth/me` does.
+// But for synchronous initial state, if user is in localStorage, we assume they are authenticated until an API call fails.
 function loadState(): AuthState {
-    const token = localStorage.getItem('token');
     const userJson = localStorage.getItem('user');
     let user: AuthUser | null = null;
 
@@ -32,9 +51,9 @@ function loadState(): AuthState {
     }
 
     return {
-        token,
+        token: null, // Token handled via cookies
         user,
-        isAuthenticated: !!token && !!user,
+        isAuthenticated: !!user,
     };
 }
 
@@ -58,14 +77,12 @@ function getState(): AuthState {
 }
 
 function login(token: string, user: AuthUser) {
-    localStorage.setItem('token', token);
     localStorage.setItem('user', JSON.stringify(user));
     state = { token, user, isAuthenticated: true };
     notify();
 }
 
 function logout() {
-    localStorage.removeItem('token');
     localStorage.removeItem('user');
     state = { token: null, user: null, isAuthenticated: false };
     notify();

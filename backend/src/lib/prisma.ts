@@ -23,7 +23,7 @@ try {
 
     // Production: Adjust pool size for optimal performance
     // Development: Use smaller pool
-    const maxConnections = isProduction ? 5 : 5;
+    const maxConnections = isProduction ? 10 : 3;
     const idleTimeoutMillis = isProduction ? 30000 : 10000;
 
     pool = new Pool({

@@ -9,7 +9,7 @@ import SendIcon from '@mui/icons-material/Send';
 import PowerSettingsNewIcon from '@mui/icons-material/PowerSettingsNew';
 import SyncIcon from '@mui/icons-material/Sync';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
-import { routersApi } from '../api/client';
+import { routersApi } from '../api';
 import { getPublicApiBase } from '../utils/config';
 import { generateMikrotikScript } from '../utils/mikrotikScriptGenerator';
 import { sanitizeMikroTikName } from '../utils/mikrotikUtils';

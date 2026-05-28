@@ -5,7 +5,7 @@ import DarkModeIcon from '@mui/icons-material/DarkMode';
 import LightModeIcon from '@mui/icons-material/LightMode';
 import LogoutIcon from '@mui/icons-material/Logout';
 import PersonIcon from '@mui/icons-material/Person';
-import { licenseApi, type LicenseResponse } from '../../api/client';
+import { licenseApi, type LicenseResponse } from '../../api';
 import authStore from '../../stores/authStore';
 import './Header.css';
 

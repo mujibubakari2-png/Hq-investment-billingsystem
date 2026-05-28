@@ -2,7 +2,7 @@ import { z } from "zod";
 
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
-  DATABASE_URL: z.string().url().optional(),
+  DATABASE_URL: z.string().url(),
 
   // App Config
   NEXT_PUBLIC_APP_URL: z.string().url().optional(),
@@ -69,6 +69,7 @@ const parsedEnv = envSchema.safeParse(process.env);
 
 if (!parsedEnv.success) {
   console.error("❌ Invalid environment variables:", parsedEnv.error.format());
+  process.exit(1);
 }
 
-export const env = parsedEnv.success ? parsedEnv.data : (process.env as any);
+export const env = parsedEnv.data;

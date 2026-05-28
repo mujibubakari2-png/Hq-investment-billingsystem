@@ -103,3 +103,5 @@ trigger-palmpesa-webhook.js
 
 # Landing page copy inside backend (canonical is the root landing-page/)
 /landing-page/
+
+next.config.js

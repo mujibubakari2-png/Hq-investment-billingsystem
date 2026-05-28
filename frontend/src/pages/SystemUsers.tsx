@@ -8,7 +8,7 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 
-import { usersApi } from '../api/client';
+import { usersApi } from '../api';
 import type { SystemUser } from '../types';
 import { formatDateTime } from '../utils/formatters';
 

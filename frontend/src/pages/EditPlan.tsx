@@ -8,7 +8,7 @@ import SaveIcon from '@mui/icons-material/Save';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SyncIcon from '@mui/icons-material/Sync';
 import { useNavigate, useParams } from 'react-router-dom';
-import { subscriptionsApi, packagesApi, routersApi } from '../api/client';
+import { subscriptionsApi, packagesApi, routersApi } from '../api';
 
 interface SubscriptionDetail {
     id: string;

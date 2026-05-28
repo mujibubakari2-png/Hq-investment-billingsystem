@@ -5,7 +5,7 @@ import PrintIcon from '@mui/icons-material/Print';
 import DescriptionIcon from '@mui/icons-material/Description';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
-import { licenseApi, saasPlansApi, type LicenseResponse, type SaasPlan } from '../api/client';
+import { licenseApi, saasPlansApi, type LicenseResponse, type SaasPlan } from '../api';
 import authStore from '../stores/authStore';
 import { formatDate } from '../utils/formatters';
 

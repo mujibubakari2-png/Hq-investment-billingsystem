@@ -6,7 +6,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import RouterIcon from '@mui/icons-material/Router';
-import { packagesApi, radiusSyncApi } from '../api/client';
+import { packagesApi, radiusSyncApi } from '../api';
 import type { Package } from '../types';
 import ConfirmDeleteModal from '../modals/ConfirmDeleteModal';
 import WifiIcon from '@mui/icons-material/Wifi';

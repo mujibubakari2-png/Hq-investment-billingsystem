@@ -8,7 +8,7 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import BlockIcon from '@mui/icons-material/Block';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
-import { mobileTransactionsApi } from '../api/client';
+import { mobileTransactionsApi } from '../api';
 import { formatDateTime } from '../utils/formatters';
 
 export default function MobileTransactions() {

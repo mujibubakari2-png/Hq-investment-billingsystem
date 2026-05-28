@@ -11,7 +11,7 @@ import CheckBoxOutlineBlankIcon from '@mui/icons-material/CheckBoxOutlineBlank';
 import RouterIcon from '@mui/icons-material/Router';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
-import { vouchersApi } from '../api/client';
+import { vouchersApi } from '../api';
 import type { Voucher } from '../types';
 import GenerateVouchersModal from '../modals/GenerateVouchersModal';
 import ConfirmDeleteModal from '../modals/ConfirmDeleteModal';

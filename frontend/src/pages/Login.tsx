@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
-import { authApi } from '../api/client';
+import { authApi } from '../api';
 import authStore from '../stores/authStore';
 import Footer from '../components/layout/Footer';
 import { GoogleLogin } from '@react-oauth/google';

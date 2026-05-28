@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
-import { licenseApi } from '../api/client';
+import { licenseApi } from '../api';
 import authStore from '../stores/authStore';
 
 const BYPASS_PATHS = ['/restricted', '/renew', '/pending-approval'];
@@ -42,9 +42,14 @@ export default function LicenseGuard() {
         }
         
         checkLicense();
+
+        const intervalId = setInterval(checkLicense, 15 * 60 * 1000);
+        window.addEventListener('focus', checkLicense);
         
         return () => {
             mounted = false;
+            clearInterval(intervalId);
+            window.removeEventListener('focus', checkLicense);
         };
     }, [user?.role]);
 
@@ -100,6 +105,10 @@ export default function LicenseGuard() {
 
     if (status === 'restricted' && !BYPASS_PATHS.includes(location.pathname)) {
         return <Navigate to="/restricted" replace />;
+    }
+
+    if (status === 'active' && BYPASS_PATHS.includes(location.pathname)) {
+        return <Navigate to="/dashboard" replace />;
     }
 
     return <Outlet />;

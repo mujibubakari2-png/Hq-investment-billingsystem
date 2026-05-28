@@ -23,7 +23,7 @@ import VpnKeyIcon from '@mui/icons-material/VpnKey';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import LockIcon from '@mui/icons-material/Lock';
-import { routersApi, vpnApi } from '../api/client';
+import { routersApi, vpnApi } from '../api';
 import { getPublicApiBase } from '../utils/config';
 import { sanitizeMikroTikName } from '../utils/mikrotikUtils';
 

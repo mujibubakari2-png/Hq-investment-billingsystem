@@ -8,7 +8,7 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import DeleteIcon from '@mui/icons-material/Delete';
 import PhoneIcon from '@mui/icons-material/Phone';
 import SortIcon from '@mui/icons-material/UnfoldMore';
-import { clientsApi, radiusSyncApi } from '../api/client';
+import { clientsApi, radiusSyncApi } from '../api';
 import { formatDate } from '../utils/formatters';
 import AddClientModal from '../modals/AddClientModal';
 import EditClientModal from '../modals/EditClientModal';

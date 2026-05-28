@@ -51,7 +51,7 @@ export default defineConfig({
               id.includes('node_modules/zod')) {
             return 'forms'
           }
-          if (id.includes('node_modules/axios')) return 'axios'
+
           if (id.includes('node_modules/date-fns')) return 'date-fns'
           if (id.includes('node_modules/zustand')) return 'zustand'
           if (id.includes('node_modules/jszip') ||

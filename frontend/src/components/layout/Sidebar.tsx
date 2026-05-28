@@ -26,7 +26,7 @@ import BusinessIcon from '@mui/icons-material/Business';
 import CloseIcon from '@mui/icons-material/Close';
 
 import authStore from '../../stores/authStore';
-import { settingsApi } from '../../api/client';
+import { settingsApi } from '../../api';
 import './Sidebar.css';
 
 const navSections = [

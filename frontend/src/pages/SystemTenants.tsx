@@ -6,7 +6,7 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import ExtensionIcon from '@mui/icons-material/Extension';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import { useNavigate } from 'react-router-dom';
-import { superAdminTenantsApi, adminInvoicesApi } from '../api/client';
+import { superAdminTenantsApi, adminInvoicesApi } from '../api';
 import { formatExactDate, formatDate } from '../utils/formatters';
 
 export default function SystemTenants() {

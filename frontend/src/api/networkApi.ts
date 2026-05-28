@@ -45,9 +45,9 @@ export const routersApi = {
 export const vpnApi = {
     getStatus:     ()                              => get<Record<string, unknown>>('/vpn/status'),
     getConfig:     ()                              => get<Record<string, unknown>>('/vpn/config'),
-    addPeer:       (data: Record<string, unknown>) => post<Record<string, unknown>>('/vpn/peers', data),
-    getPeers:      ()                              => get<Record<string, unknown>[]>('/vpn/peers'),
-    deletePeer:    (publicKey: string)             => del<{ message: string }>(`/vpn/peers/${encodeURIComponent(publicKey)}`),
+    addPeer:       (data: Record<string, unknown>) => post<Record<string, unknown>>('/vpn', data),
+    getPeers:      ()                              => get<Record<string, unknown>[]>('/vpn'),
+    deletePeer:    (publicKey: string)             => del<{ message: string }>(`/vpn/${encodeURIComponent(publicKey)}`),
 };
 
 export const equipmentsApi = {
@@ -56,4 +56,32 @@ export const equipmentsApi = {
     create: (data: Record<string, unknown>)             => post<Record<string, unknown>>('/equipments', data),
     update: (id: string, data: Record<string, unknown>) => put<Record<string, unknown>>(`/equipments/${id}`, data),
     delete: (id: string)                                => del<{ message: string }>(`/equipments/${id}`),
+};
+
+export interface HotspotSettings {
+    id: string;
+    routerId: string;
+    primaryColor: string;
+    accentColor: string;
+    selectedFont: string;
+    layout: string;
+    enableAds: boolean;
+    enableAnnouncement: boolean;
+    enableRememberMe: boolean;
+    companyName?: string;
+    customerCareNumber?: string;
+    adMessage?: string;
+    backendUrl?: string;
+}
+
+export const hotspotSettingsApi = {
+    get: (routerId: string) => get<HotspotSettings>(`/hotspot-settings?routerId=${routerId}`),
+    update: (data: Partial<HotspotSettings> & { routerId: string }) => post<HotspotSettings>('/hotspot-settings', data),
+};
+
+export const radiusSyncApi = {
+    syncOnline: () => post<{ success: boolean; message: string; summary: Record<string, number> }>('/radius/sync-online', {}),
+    getOnlineStats: () => get<{ totalOnline: number; hotspotOnline: number; pppoeOnline: number; totalActiveSubscriptions: number; onlineUsernames: string[]; sessions: Record<string, unknown>[] }>('/radius/sync-online'),
+    previewExpiredVouchers: () => get<{ count: number; subscriptions: { id: string; username: string; fullName: string; plan: string; expiresAt: string | null; method: string }[] }>('/radius/voucher-expire'),
+    expireVouchers: () => post<{ success: boolean; message: string; processed: number; succeeded: number; failed: number }>('/radius/voucher-expire', {}),
 };
