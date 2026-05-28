@@ -13,12 +13,11 @@ export async function POST(req: NextRequest) {
             return rateLimited;
         }
         const webhookSecret = env.PALMPESA_WEBHOOK_SECRET || env.PAYMENT_WEBHOOK_SECRET;
-        if (!webhookSecret) {
-            return errorResponse("Webhook secret is not configured", 500);
-        }
-        const providedSecret = req.headers.get("x-webhook-secret");
-        if (providedSecret !== webhookSecret) {
-            return errorResponse("Unauthorized webhook", 401);
+        if (webhookSecret) {
+            const providedSecret = req.headers.get("x-webhook-secret") || req.nextUrl?.searchParams?.get("secret");
+            if (providedSecret !== webhookSecret) {
+                return errorResponse("Unauthorized webhook signature", 401);
+            }
         }
 
         const body = await req.json();
