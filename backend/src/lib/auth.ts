@@ -66,10 +66,18 @@ export function verifyToken(token: string): JwtPayload | null {
 }
 
 export function getTokenFromRequest(req: NextRequest): string | null {
+    // 1. Try to get it from the HttpOnly cookie
+    const cookieToken = req.cookies.get("accessToken")?.value;
+    if (cookieToken) {
+        return cookieToken;
+    }
+
+    // 2. Fallback to Authorization header
     const authHeader = req.headers.get("authorization");
     if (authHeader?.startsWith("Bearer ")) {
         return authHeader.slice(7);
     }
+    
     return null;
 }
 

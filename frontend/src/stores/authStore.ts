@@ -17,20 +17,7 @@ export interface AuthState {
     isAuthenticated: boolean;
 }
 
-// Helper to check token expiry without a heavy library
-function isTokenValid(token: string | null): boolean {
-    if (!token) return false;
-    try {
-        const payloadStr = atob(token.split('.')[1]);
-        const payload = JSON.parse(payloadStr);
-        if (payload.exp) {
-            return payload.exp > Date.now() / 1000;
-        }
-        return true;
-    } catch {
-        return false;
-    }
-}
+
 
 // Read initial state from localStorage (token should no longer be stored, but we might receive one during login/refresh)
 // The token is primarily stored in HttpOnly cookies, so we can ignore token in localStorage.
