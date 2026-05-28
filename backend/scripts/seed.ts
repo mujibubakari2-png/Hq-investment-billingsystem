@@ -70,8 +70,13 @@ async function main() {
 
         let existing = null;
         try {
-            existing = await prisma.user.findUnique({
-                where: { email: superAdminEmail }
+            existing = await prisma.user.findFirst({
+                where: {
+                    OR: [
+                        { email: superAdminEmail },
+                        { username: "superadmin" }
+                    ]
+                }
             });
         } catch (err) {
             console.error(`❌ Error querying users table: ${(err as Error).message}`);
@@ -83,6 +88,8 @@ async function main() {
             await prisma.user.update({
                 where: { id: existing.id },
                 data: {
+                    email: superAdminEmail,
+                    username: "superadmin",
                     role: "SUPER_ADMIN",
                     password: hashedPassword,
                     tenantId: null
