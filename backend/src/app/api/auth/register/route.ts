@@ -217,7 +217,10 @@ export async function POST(req: NextRequest) {
             phone: result.tenant.phone,
         });
 
-        return jsonResponse({
+        const isSecure = env.NODE_ENV === "production";
+        const sameSiteStr = isSecure ? 'None; Secure' : 'Lax';
+        
+        const response = jsonResponse({
             message: "Registration successful. Please wait for an administrator to approve your account setup.",
             token,
             id: result.user.id, // Alias for tests
@@ -233,6 +236,9 @@ export async function POST(req: NextRequest) {
             },
             tenant: result.tenant
         }, 201);
+        
+        response.headers.append('Set-Cookie', `accessToken=${token}; Path=/; HttpOnly; SameSite=${sameSiteStr}; Max-Age=1800`);
+        return response;
     } catch (e) {
         logger.error('Register error', { error: (e as Error)?.message || String(e) });
         return errorResponse("Internal server error", 500);

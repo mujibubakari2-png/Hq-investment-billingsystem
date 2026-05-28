@@ -86,8 +86,9 @@ export async function POST(req: NextRequest) {
         });
 
         const isSecure = process.env.NODE_ENV === 'production';
-        response.headers.append('Set-Cookie', `accessToken=${token}; Path=/; HttpOnly; SameSite=Lax${isSecure ? '; Secure' : ''}; Max-Age=1800`);
-        response.headers.append('Set-Cookie', `refreshToken=${refreshToken}; Path=/; HttpOnly; SameSite=Lax${isSecure ? '; Secure' : ''}; Max-Age=604800`);
+        const sameSiteStr = isSecure ? 'None; Secure' : 'Lax';
+        response.headers.append('Set-Cookie', `accessToken=${token}; Path=/; HttpOnly; SameSite=${sameSiteStr}; Max-Age=1800`);
+        response.headers.append('Set-Cookie', `refreshToken=${refreshToken}; Path=/; HttpOnly; SameSite=${sameSiteStr}; Max-Age=604800`);
 
         return response;
     } catch (e: unknown) {
