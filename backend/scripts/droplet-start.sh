@@ -69,7 +69,7 @@ if command -v wg &> /dev/null; then
         echo "   Peers connected: $(sudo wg show wg0 peers 2>/dev/null | wc -l)"
     else
         echo "⚠️  WireGuard wg0 is NOT running — restarting..."
-        sudo systemctl restart wg-quick@wg0
+        sudo systemctl restart wg-quick@wg0 || true
         sleep 2
         if systemctl is-active --quiet wg-quick@wg0; then
             echo "✅ WireGuard wg0 restarted successfully (UDP port 51820)"
@@ -89,7 +89,7 @@ if command -v freeradius &> /dev/null || command -v radiusd &> /dev/null; then
         echo "✅ FreeRADIUS is running (UDP 1812/1813)"
     else
         echo "⚠️  FreeRADIUS is NOT running — attempting restart..."
-        sudo systemctl restart freeradius 2>/dev/null
+        sudo systemctl restart freeradius 2>/dev/null || true
         sleep 2
         if systemctl is-active --quiet freeradius; then
             echo "✅ FreeRADIUS restarted successfully"
