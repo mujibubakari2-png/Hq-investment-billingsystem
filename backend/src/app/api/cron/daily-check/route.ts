@@ -2,6 +2,16 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import nodemailer from "nodemailer";
 
+// Bug #8 FIX: Resolve app URL from env at startup to avoid hardcoded IPs leaking into emails.
+function getAppUrl(): string {
+    const url = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL;
+    if (!url) {
+        console.warn('[CRON] WARNING: APP_URL is not set. Renewal links in emails will be broken. Set APP_URL in your .env file.');
+        return 'https://your-billing-system-domain.com';
+    }
+    return url.replace(/\/$/, '');
+}
+
 export async function GET(req: Request) {
     try {
         // Require CRON_SECRET in environment and authorization header
@@ -64,13 +74,13 @@ export async function GET(req: Request) {
                     from: process.env.SMTP_FROM || '"HQ INVESTMENT" <no-reply@hqinvestment.local>',
                     to: tenant.email,
                     subject: "Action Required: Your License Expires in 2 Days",
-                    text: `Hello ${tenant.name},\n\nYour license is scheduled to expire on ${formattedDate}. Please log in to your dashboard and make a payment to renew your license before your account gets restricted.\n\nDashboard: ${process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://174.138.42.168'}/`,
+                    text: `Hello ${tenant.name},\n\nYour license is scheduled to expire on ${formattedDate}. Please log in to your dashboard and make a payment to renew your license before your account gets restricted.\n\nDashboard: ${getAppUrl()}/`,
                     html: `<div style="font-family: sans-serif; padding: 20px;">
                             <h2>Subscription Expiration Warning</h2>
                             <p>Hello <strong>${tenant.name}</strong>,</p>
                             <p>This is a courtesy reminder that your license is expiring in <strong>2 days</strong> (on ${formattedDate}).</p>
                             <p>To avoid any service interruption and restriction of your account, please log in and generate an invoice payment.</p>
-                            <a href="${process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://174.138.42.168'}/renew" style="background-color: #d97706; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin-top: 10px;">Renew Now</a>
+                            <a href="${getAppUrl()}/renew" style="background-color: #d97706; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin-top: 10px;">Renew Now</a>
                            </div>`
                 };
 

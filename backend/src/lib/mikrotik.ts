@@ -7,6 +7,7 @@
  * Uses HTTP REST API (RouterOS v7+) or falls back to simulation mode.
  */
 
+import https from "https";
 import { isIPv4 } from "net";
 import { env } from "@/lib/env";
 import prisma from "./prisma";
@@ -173,9 +174,12 @@ export class MikroTikService {
             // If using HTTPS and insecure flag is set, allow self‑signed certificates
             // SECURITY WARNING: Only enable MIKROTIK_INSECURE in development or isolated networks.
             // Disabling certificate verification makes connections vulnerable to MITM attacks.
+            // Bug #9 FIX: Use ES module import instead of CommonJS require.
+            // NOTE: The https.Agent option is not supported by Node.js built-in fetch (v18+).
+            // It only works if node-fetch is used as the fetch implementation.
+            // For production, prefer a valid TLS cert instead of using MIKROTIK_INSECURE.
             if (this.baseUrl.startsWith('https') && env.MIKROTIK_INSECURE) {
                 console.warn(`[SECURITY WARNING] MIKROTIK_INSECURE is enabled for ${this.conn.host}. Certificate verification is disabled. This should only be used in development or isolated network environments.`);
-                const https = require('https');
                 fetchOptions.agent = new https.Agent({ rejectUnauthorized: false });
             }
 

@@ -76,6 +76,7 @@ export async function POST(req: Request) {
                 }
 
                 // Record Transaction
+                // Bug #3 FIX: Include tenantId so transaction appears in tenant-scoped dashboard
                 await prisma.transaction.create({
                     data: {
                         clientId: client.id,
@@ -85,6 +86,7 @@ export async function POST(req: Request) {
                         status: 'COMPLETED',
                         method: 'M-PESA/MOBILE-MONEY',
                         reference: TransactionID,
+                        tenantId: client.tenantId,
                     }
                 });
 
@@ -141,7 +143,8 @@ export async function POST(req: Request) {
                                 action: "PAYMENT_ACTIVATION_SUCCESS",
                                 details: `Webhook paid ${Amount} for ${pkg.name}. Activated ${type}`,
                                 status: "success",
-                                username: client.username
+                                username: client.username,
+                                tenantId: client.tenantId,
                             }
                         });
                     } catch (err: any) {
@@ -152,7 +155,8 @@ export async function POST(req: Request) {
                                 action: "PAYMENT_ACTIVATION_FAILED",
                                 details: `Webhook paid ${Amount} but activation failed: ${err.message}`,
                                 status: "error",
-                                username: client.username
+                                username: client.username,
+                                tenantId: client.tenantId,
                             }
                         });
                     }

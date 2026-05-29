@@ -27,8 +27,64 @@ export const settingsApi = {
     update: (data: Record<string, string>) => put<{ message: string }>('/system-settings', data),
 };
 
+export interface DashboardResponse {
+    todayRevenue: number;
+    monthlyRevenue: number;
+    todayRechargesMobile: number;
+    monthlyRechargesMobile: number;
+    activeSubscribers: number;
+    onlineUsers: number;
+    totalClients: number;
+    newCustomersThisMonth: number;
+    todayVoucherRev: number;
+    vouchersUsedToday: number;
+    vouchersGeneratedToday: number;
+    monthlyVoucherRev: number;
+    vouchersUsedMonth: number;
+    vouchersGeneratedMonth: number;
+    onlineRouters: number;
+    totalRouters: number;
+    hotspotOnlineUsers: number;
+    pppoeOnlineUsers: number;
+    todayRechargesVoucher: number;
+    recentTransactions: Array<{
+        user: string;
+        date: string;
+        planType: string;
+        timeActiveSys: string;
+        amount: number;
+        method: string;
+        isVoucher: boolean;
+        transactionType: string;
+        paymentChannel: string;
+    }>;
+    revenueAnalytics: Record<string, Array<{
+        name: string;
+        value: number;
+    }>>;
+    serviceUtilization: Array<{
+        name: string;
+        type: string;
+        activeUsersCount: number;
+    }>;
+    systemActivities?: Array<{
+        id: string;
+        title: string;
+        description: string;
+        date: string;
+        type: string;
+        status: string;
+    }>;
+}
+
 export const dashboardApi = {
-    getStats: () => get<Record<string, unknown>>('/dashboard'),
+    getStats: (tenantId?: string, routerId?: string) => {
+        const params = new URLSearchParams();
+        if (tenantId) params.append('tenantId', tenantId);
+        if (routerId && routerId !== 'All') params.append('routerId', routerId);
+        const qs = params.toString() ? `?${params.toString()}` : '';
+        return get<DashboardResponse>(`/dashboard${qs}`);
+    }
 };
 
 export const superAdminTenantsApi = {

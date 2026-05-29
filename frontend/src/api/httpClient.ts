@@ -6,11 +6,50 @@ export const CLEAN_API_URL = API_URL.endsWith('/') ? API_URL.slice(0, -1) : API_
 const BASE = `${CLEAN_API_URL}/api`;
 
 function authHeaders(): Record<string, string> {
-    // If you're keeping a short-lived token in memory or fallback, use it.
-    // Otherwise, relying on HttpOnly cookie means we might not need this header.
-    // For now we will keep it if it exists in authStore (or localStorage if we didn't remove it).
-    // The instructions say "Update headers to rely on HttpOnly cookies instead of localStorage"
+    // Auth token is stored in HttpOnly cookies — no manual header needed.
     return {};
+}
+
+// Bug #7 FIX: Mutex to prevent multiple concurrent refresh attempts.
+// When several requests get 401 at the same time, only the first one
+// triggers a refresh. Others wait for the result and then retry.
+let refreshPromise: Promise<boolean> | null = null;
+
+async function doRefresh(): Promise<boolean> {
+    try {
+        const refreshRes = await fetch(`${BASE}/auth/refresh`, {
+            method: 'POST',
+            credentials: 'include',
+        });
+        if (refreshRes.ok) {
+            const data = await refreshRes.json();
+            return !!data.token;
+        }
+        return false;
+    } catch {
+        return false;
+    }
+}
+
+async function refreshToken(): Promise<boolean> {
+    // If a refresh is already in progress, wait for it instead of starting another
+    if (refreshPromise) {
+        return refreshPromise;
+    }
+    refreshPromise = doRefresh();
+    try {
+        return await refreshPromise;
+    } finally {
+        refreshPromise = null;
+    }
+}
+
+function forceLogout(): never {
+    if (typeof window !== 'undefined') {
+        try { localStorage.removeItem('user'); } catch { /* ignore */ }
+        window.location.href = '/login';
+    }
+    throw new Error('Unauthorized');
 }
 
 export async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -26,36 +65,26 @@ export async function request<T>(path: string, init?: RequestInit): Promise<T> {
             },
         });
 
+        // Bug #7 FIX: On 401, attempt a single mutex-guarded refresh then retry once.
         if (res.status === 401 && !path.includes('/auth/login') && !path.includes('/auth/refresh')) {
-            try {
-                const refreshRes = await fetch(`${BASE}/auth/refresh`, { method: 'POST', credentials: 'include' });
-                if (refreshRes.ok) {
-                    const refreshData = await refreshRes.json();
-                    if (refreshData.token) {
-                        // Retry original request
-                        const retryRes = await fetch(fullUrl, {
-                            ...init,
-                            credentials: 'include',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                ...authHeaders(),
-                                ...(init?.headers as Record<string, string>),
-                            },
-                        });
-                        if (retryRes.ok) {
-                            return await retryRes.json() as T;
-                        }
-                    }
+            const refreshed = await refreshToken();
+            if (refreshed) {
+                // Retry the original request exactly once
+                const retryRes = await fetch(fullUrl, {
+                    ...init,
+                    credentials: 'include',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...authHeaders(),
+                        ...(init?.headers as Record<string, string>),
+                    },
+                });
+                if (retryRes.ok) {
+                    return await retryRes.json() as T;
                 }
-            } catch (err) {
-                console.error("Token refresh failed", err);
             }
-
-            if (typeof window !== 'undefined') {
-                localStorage.removeItem('user');
-                window.location.href = '/login';
-            }
-            throw new Error('Unauthorized');
+            // Refresh failed or retry failed — force logout
+            forceLogout();
         }
 
         const data = await res.json();

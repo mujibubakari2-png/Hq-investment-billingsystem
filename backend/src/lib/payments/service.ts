@@ -251,8 +251,29 @@ export class PaymentService {
     });
 
     // Calculate expiry
+    // Bug #15 FIX: If the client already has an active, unexpired subscription for this
+    // package, extend from the current expiry date (stack time) instead of starting from
+    // now. This prevents customers losing days they already paid for on early renewal.
     const now = new Date();
-    const expiresAt = new Date(now);
+    let baseDate = now;
+
+    if (pkg) {
+      const existingActiveSub = await prisma.subscription.findFirst({
+        where: {
+          clientId: transaction.clientId,
+          packageId: pkg.id,
+          status: "ACTIVE",
+          expiresAt: { gt: now },
+        },
+        orderBy: { expiresAt: "desc" },
+      });
+
+      if (existingActiveSub) {
+        baseDate = existingActiveSub.expiresAt;
+      }
+    }
+
+    const expiresAt = new Date(baseDate);
     if (pkg) {
       switch (pkg.durationUnit) {
         case "MINUTES": expiresAt.setMinutes(expiresAt.getMinutes() + pkg.duration); break;

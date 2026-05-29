@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import logger from '@/lib/logger';
+import { getUserFromRequest } from '@/lib/auth';
 
 interface RateLimitConfig {
   windowMs: number;
@@ -47,11 +48,17 @@ function getClientKey(req: NextRequest, userId?: string): string {
   return userId ? `${ip}:${userId}` : ip;
 }
 
+// Bug #13 FIX: Extract role from the verified JWT token instead of the
+// x-user-role header, which any client could spoof to bypass rate limits.
 function getRole(req: NextRequest): 'admin' | 'user' | 'anonymous' {
-  const role = req.headers.get('x-user-role');
-  if (role === 'ADMIN' || role === 'SUPER_ADMIN') return 'admin';
-  if (role) return 'user';
-  return 'anonymous';
+  try {
+    const payload = getUserFromRequest(req);
+    if (!payload) return 'anonymous';
+    if (payload.role === 'ADMIN' || payload.role === 'SUPER_ADMIN') return 'admin';
+    return 'user';
+  } catch {
+    return 'anonymous';
+  }
 }
 
 function getConfig(path: string, role: 'admin' | 'user' | 'anonymous'): RateLimitConfig {

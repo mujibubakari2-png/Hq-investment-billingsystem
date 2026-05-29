@@ -3,6 +3,10 @@ import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { toISOSafe, toTimestampSafe, getStartOfTodayTZ, getStartOfMonthTZ } from "@/lib/dateUtils";
 
+// Bug #5 FIX: Throttle RADIUS sync to at most once per 60 seconds
+const RADIUS_SYNC_INTERVAL_MS = 60_000;
+let lastRadiusSyncTs = 0;
+
 // GET /api/dashboard - aggregate stats
 export async function GET(req: NextRequest) {
     try {
@@ -31,80 +35,91 @@ export async function GET(req: NextRequest) {
         }
 
         // ── RADIUS Accounting Cleanup (Multi-tenancy fix) ──
-        // Ensure all radacct records have a tenantId by mapping nasipaddress to our Router table.
-        // This is done on-the-fly to ensure dashboard stats are accurate.
-        try {
-            const routers = await prisma.router.findMany({
-                where: { tenantId: { not: null } },
-                select: { host: true, tenantId: true, wgTunnelIp: true }
-            });
-            
-            for (const router of routers) {
-                const possibleIps = [router.host, router.wgTunnelIp].filter(Boolean) as string[];
-                if (possibleIps.length > 0) {
-                    await prisma.radAcct.updateMany({
-                        where: {
-                            nasipaddress: { in: possibleIps },
-                            tenantId: null
-                        },
-                        data: { tenantId: router.tenantId }
-                    });
+        // Bug #5 FIX: Throttle sync operations to run at most once per 60 seconds
+        // instead of on every dashboard load (which fires every 30s auto-refresh).
+        const now_ts = Date.now();
+        const shouldSync = now_ts - lastRadiusSyncTs > RADIUS_SYNC_INTERVAL_MS;
+
+        if (shouldSync) {
+            lastRadiusSyncTs = now_ts;
+
+            // Ensure all radacct records have a tenantId by mapping nasipaddress to Router table.
+            try {
+                const routers = await prisma.router.findMany({
+                    where: { tenantId: { not: null } },
+                    select: { host: true, tenantId: true, wgTunnelIp: true }
+                });
+                
+                for (const router of routers) {
+                    const possibleIps = [router.host, router.wgTunnelIp].filter(Boolean) as string[];
+                    if (possibleIps.length > 0) {
+                        await prisma.radAcct.updateMany({
+                            where: {
+                                nasipaddress: { in: possibleIps },
+                                tenantId: null
+                            },
+                            data: { tenantId: router.tenantId }
+                        });
+                    }
                 }
+            } catch (e) {
+                console.error("[DASHBOARD SYNC ERROR]: Failed to map RADIUS sessions to tenants", e);
             }
-        } catch (e) {
-            console.error("[DASHBOARD SYNC ERROR]: Failed to map RADIUS sessions to tenants", e);
         }
 
         // ── RADIUS Online Status Sync ──
         // Sync subscription onlineStatus from live RADIUS accounting sessions.
         // Users with an open radacct record (acctstoptime IS NULL) are ONLINE.
-        try {
-            const activeRadiusSessions = await prisma.radAcct.findMany({
-                where: { acctstoptime: null, ...tenantFilter },
-                select: { username: true },
-                distinct: ["username"],
-            });
+        // Bug #5 FIX: Also throttled to avoid heavy DB writes on every 30s refresh.
+        if (shouldSync) {
+            try {
+                const activeRadiusSessions = await prisma.radAcct.findMany({
+                    where: { acctstoptime: null, ...tenantFilter },
+                    select: { username: true },
+                    distinct: ["username"],
+                });
 
-            const onlineUsernames = new Set(activeRadiusSessions.map((s) => s.username));
+                const onlineUsernames = new Set(activeRadiusSessions.map((s) => s.username));
 
-            // Get all active subscriptions with their client usernames
-            const activeSubscriptions = await prisma.subscription.findMany({
-                where: { status: "ACTIVE", ...tenantFilter },
-                select: {
-                    id: true,
-                    onlineStatus: true,
-                    client: { select: { username: true } },
-                },
-            });
+                // Get all active subscriptions with their client usernames
+                const activeSubscriptions = await prisma.subscription.findMany({
+                    where: { status: "ACTIVE", ...tenantFilter },
+                    select: {
+                        id: true,
+                        onlineStatus: true,
+                        client: { select: { username: true } },
+                    },
+                });
 
-            // Batch update online status based on RADIUS sessions
-            const toSetOnline: string[] = [];
-            const toSetOffline: string[] = [];
+                // Batch update online status based on RADIUS sessions
+                const toSetOnline: string[] = [];
+                const toSetOffline: string[] = [];
 
-            for (const sub of activeSubscriptions as any[]) {
-                const username = sub.client?.username;
-                if (!username) continue;
-                if (onlineUsernames.has(username) && sub.onlineStatus !== "ONLINE") {
-                    toSetOnline.push(sub.id);
-                } else if (!onlineUsernames.has(username) && sub.onlineStatus !== "OFFLINE") {
-                    toSetOffline.push(sub.id);
+                for (const sub of activeSubscriptions as any[]) {
+                    const username = sub.client?.username;
+                    if (!username) continue;
+                    if (onlineUsernames.has(username) && sub.onlineStatus !== "ONLINE") {
+                        toSetOnline.push(sub.id);
+                    } else if (!onlineUsernames.has(username) && sub.onlineStatus !== "OFFLINE") {
+                        toSetOffline.push(sub.id);
+                    }
                 }
-            }
 
-            if (toSetOnline.length > 0) {
-                await prisma.subscription.updateMany({
-                    where: { id: { in: toSetOnline } },
-                    data: { onlineStatus: "ONLINE" },
-                });
+                if (toSetOnline.length > 0) {
+                    await prisma.subscription.updateMany({
+                        where: { id: { in: toSetOnline } },
+                        data: { onlineStatus: "ONLINE" },
+                    });
+                }
+                if (toSetOffline.length > 0) {
+                    await prisma.subscription.updateMany({
+                        where: { id: { in: toSetOffline } },
+                        data: { onlineStatus: "OFFLINE" },
+                    });
+                }
+            } catch (e) {
+                console.error("[DASHBOARD RADIUS SYNC ERROR]: Failed to sync online status from RADIUS", e);
             }
-            if (toSetOffline.length > 0) {
-                await prisma.subscription.updateMany({
-                    where: { id: { in: toSetOffline } },
-                    data: { onlineStatus: "OFFLINE" },
-                });
-            }
-        } catch (e) {
-            console.error("[DASHBOARD RADIUS SYNC ERROR]: Failed to sync online status from RADIUS", e);
         }
 
         // Fixed: Use timezone-aware boundaries (Africa/Dar_es_Salaam) to match frontend display

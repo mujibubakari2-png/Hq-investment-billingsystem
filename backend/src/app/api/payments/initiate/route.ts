@@ -8,7 +8,7 @@
 import { NextRequest } from "next/server";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { paymentService } from "@/lib/payments/service";
-import { isSupportedProvider } from "@/lib/payments/registry";
+import { isSupportedProvider, SUPPORTED_PROVIDERS } from "@/lib/payments/registry";
 import { isValidAmount, formatPhoneTZ } from "@/lib/payments/utils";
 
 export async function POST(req: NextRequest) {
@@ -38,8 +38,9 @@ export async function POST(req: NextRequest) {
     }
 
     if (!isSupportedProvider(provider)) {
+      // Bug #4 FIX: Dynamically list supported providers from registry
       return errorResponse(
-        `Unsupported provider "${provider}". Supported: PALMPESA, ZENOPAY, MONGIKE, HARAKAPAY`,
+        `Unsupported provider "${provider}". Supported: ${SUPPORTED_PROVIDERS.join(", ")}`,
         400
       );
     }

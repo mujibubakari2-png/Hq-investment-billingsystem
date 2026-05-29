@@ -32,29 +32,29 @@ async function upsertRadCheck(
     op: string,
     tenantId: string | null
 ) {
-    // E16 FIX: Use upsert() instead of findFirst + create/update to eliminate
-    // the race condition under concurrent traffic.
-    await prisma.radCheck.upsert({
-        where: {
-            username_tenantId_attribute: {
-                username,
-                // Prisma requires a non-null value in compound unique keys.
-                // Use empty string as sentinel when tenantId is null, matching
-                // the @@unique([username, tenantId, attribute]) constraint setup.
-                tenantId: tenantId ?? "",
-                attribute,
-            },
-        },
-        update: { value, op },
-        create: {
-            username,
-            attribute,
-            op,
-            value,
-            // E08 FIX: store null when no tenantId (not empty string)
-            tenantId: tenantId || null,
-        },
+    // Use findFirst + update/create instead of upsert to correctly handle
+    // NULL tenantId. Prisma's compound unique upsert requires non-null values
+    // in the WHERE clause, which caused a NULL vs "" mismatch (Bug #2).
+    const existing = await prisma.radCheck.findFirst({
+        where: { username, attribute, tenantId: tenantId || null },
     });
+
+    if (existing) {
+        await prisma.radCheck.update({
+            where: { id: existing.id },
+            data: { value, op },
+        });
+    } else {
+        await prisma.radCheck.create({
+            data: {
+                username,
+                attribute,
+                op,
+                value,
+                tenantId: tenantId || null,
+            },
+        });
+    }
 }
 
 async function upsertRadReply(
@@ -64,24 +64,27 @@ async function upsertRadReply(
     op: string,
     tenantId: string | null
 ) {
-    // E16 FIX: same upsert pattern as upsertRadCheck above
-    await prisma.radReply.upsert({
-        where: {
-            username_tenantId_attribute: {
-                username,
-                tenantId: tenantId ?? "",
-                attribute,
-            },
-        },
-        update: { value, op },
-        create: {
-            username,
-            attribute,
-            op,
-            value,
-            tenantId: tenantId || null,
-        },
+    // Bug #2 FIX: same findFirst pattern as upsertRadCheck above
+    const existing = await prisma.radReply.findFirst({
+        where: { username, attribute, tenantId: tenantId || null },
     });
+
+    if (existing) {
+        await prisma.radReply.update({
+            where: { id: existing.id },
+            data: { value, op },
+        });
+    } else {
+        await prisma.radReply.create({
+            data: {
+                username,
+                attribute,
+                op,
+                value,
+                tenantId: tenantId || null,
+            },
+        });
+    }
 }
 
 async function deleteRadReplyAttribute(

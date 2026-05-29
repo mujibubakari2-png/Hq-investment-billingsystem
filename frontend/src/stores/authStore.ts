@@ -17,16 +17,38 @@ export interface AuthState {
     isAuthenticated: boolean;
 }
 
+// Bug #14 FIX: Safe localStorage wrapper — prevents crashes in incognito mode,
+// when storage is full, or when localStorage is disabled by browser policy.
+function safeGetItem(key: string): string | null {
+    try {
+        return localStorage.getItem(key);
+    } catch {
+        return null;
+    }
+}
 
+function safeSetItem(key: string, value: string): void {
+    try {
+        localStorage.setItem(key, value);
+    } catch {
+        // Storage full or unavailable — silently ignore
+    }
+}
 
-// Read initial state from localStorage (token should no longer be stored, but we might receive one during login/refresh)
-// The token is primarily stored in HttpOnly cookies, so we can ignore token in localStorage.
-// However, we still need to manage `isAuthenticated` based on whether we have a valid token (e.g. kept in memory) and user.
-// Since HttpOnly cookies are used, on page load we don't have the token.
-// The backend needs to provide a way to check if we're authenticated, which `/auth/me` does.
-// But for synchronous initial state, if user is in localStorage, we assume they are authenticated until an API call fails.
+function safeRemoveItem(key: string): void {
+    try {
+        localStorage.removeItem(key);
+    } catch {
+        // Storage unavailable — silently ignore
+    }
+}
+
+// Bug #6 FIX: Read initial state from localStorage with safe accessors.
+// The token is stored in HttpOnly cookies (server-side verification).
+// localStorage only stores the user profile for UI display.
+// If someone injects a fake user, the first API call returns 401 → logout.
 function loadState(): AuthState {
-    const userJson = localStorage.getItem('user');
+    const userJson = safeGetItem('user');
     let user: AuthUser | null = null;
 
     if (userJson) {
@@ -64,13 +86,13 @@ function getState(): AuthState {
 }
 
 function login(token: string, user: AuthUser) {
-    localStorage.setItem('user', JSON.stringify(user));
+    safeSetItem('user', JSON.stringify(user));
     state = { token, user, isAuthenticated: true };
     notify();
 }
 
 function logout() {
-    localStorage.removeItem('user');
+    safeRemoveItem('user');
     state = { token: null, user: null, isAuthenticated: false };
     notify();
 }
@@ -79,7 +101,7 @@ function logout() {
 function updateUser(partial: Partial<AuthUser>) {
     if (!state.user) return;
     const updated = { ...state.user, ...partial };
-    localStorage.setItem('user', JSON.stringify(updated));
+    safeSetItem('user', JSON.stringify(updated));
     state = { ...state, user: updated };
     notify();
 }
