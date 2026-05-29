@@ -237,7 +237,11 @@ export async function POST(req: NextRequest) {
             tenant: result.tenant
         }, 201);
         
+        const isSecure = req.headers.get("x-forwarded-proto") === "https" || (req as any).nextUrl?.protocol === "https:";
+        const sameSiteStr = isSecure ? 'None; Secure' : 'Lax';
         response.headers.append('Set-Cookie', `accessToken=${token}; Path=/; HttpOnly; SameSite=${sameSiteStr}; Max-Age=1800`);
+        response.headers.append('Set-Cookie', `refreshToken=${token}; Path=/; HttpOnly; SameSite=${sameSiteStr}; Max-Age=604800`);
+        
         return response;
     } catch (e) {
         logger.error('Register error', { error: (e as Error)?.message || String(e) });

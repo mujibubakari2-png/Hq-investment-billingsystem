@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
             user: newPayload
         });
 
-        const isSecure = process.env.NODE_ENV === 'production';
+        const isSecure = req.headers.get("x-forwarded-proto") === "https" || req.nextUrl.protocol === "https:";
         const sameSiteStr = isSecure ? 'None; Secure' : 'Lax';
         response.headers.append('Set-Cookie', `accessToken=${token}; Path=/; HttpOnly; SameSite=${sameSiteStr}; Max-Age=1800`);
 
