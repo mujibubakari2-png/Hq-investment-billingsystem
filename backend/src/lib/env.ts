@@ -58,6 +58,11 @@ const envSchema = z.object({
   // "sandbox" or "live"
   PAYMENT_ENVIRONMENT: z.enum(["sandbox", "live"]).default("sandbox"),
 
+  // ─── Cron Security ───────────────────────────────────────────────────────────
+  // E17 FIX: Added CRON_SECRET to schema so it is validated at startup.
+  // Set a random value of at least 16 characters in your .env file.
+  CRON_SECRET: z.string().min(16, "CRON_SECRET must be at least 16 characters").optional(),
+
   // Mikrotik
   MIKROTIK_USE_HTTPS: z.string().default("false").transform((v) => v === "true"),
   MIKROTIK_TIMEOUT_MS: z.string().default("8000").transform(Number),

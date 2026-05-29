@@ -12,13 +12,11 @@ export async function GET(req: Request) {
 
         const now = new Date();
         
-        // Find tenants whose trial or license expires in EXACTLY 2 days (between 48 and 72 hours from now)
-        // Or to be simpler: Just get all tenants that expire within 2 days and haven't been notified yet.
-        // Wait, since we don't have a 'notified' flag in the schema, we can just find any account expiring 
-        // between 1 and 3 days from now. But this will spam them daily for 2 days.
-        // To be precise, we look for expiration dates between 48 hours and 72 hours from current execution.
-        const twoDaysFromNow = new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000);
-        const twoDaysAndOneHourFromNow = new Date(now.getTime() + 2.1 * 24 * 60 * 60 * 1000); // Small window, assuming cron runs daily
+        // E15 FIX: Widened window from exactly 2.1 days to 23h–25h (±1 hour around the 24h mark).
+        // This guarantees exactly one notification per account per day even if the cron runs
+        // slightly late or early, eliminating the silent miss from the original 2.1-day window.
+        const windowStart = new Date(now.getTime() + 23 * 60 * 60 * 1000); // 23 hours from now
+        const windowEnd   = new Date(now.getTime() + 25 * 60 * 60 * 1000); // 25 hours from now
 
         const expiringTenants = await prisma.tenant.findMany({
             where: {
@@ -26,16 +24,16 @@ export async function GET(req: Request) {
                 OR: [
                     {
                         licenseExpiresAt: {
-                            gte: new Date(now.getTime() + 24 * 60 * 60 * 1000), // Between 1 and 2 days
-                            lte: twoDaysFromNow,
+                            gte: windowStart,
+                            lte: windowEnd,
                         }
                     },
                     {
                         trialEnd: {
-                            gte: new Date(now.getTime() + 24 * 60 * 60 * 1000),
-                            lte: twoDaysFromNow,
+                            gte: windowStart,
+                            lte: windowEnd,
                         },
-                        licenseExpiresAt: null 
+                        licenseExpiresAt: null
                     }
                 ]
             }

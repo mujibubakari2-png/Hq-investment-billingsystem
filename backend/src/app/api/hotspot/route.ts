@@ -51,7 +51,8 @@ export async function GET(req: NextRequest) {
             price: s.package?.price || 0,
             router: s.router?.name || "N/A",
             macAddress: s.client?.macAddress || "N/A",
-            expiresAt: isValidDate(s.expiresAt) ? s.expiresAt.toLocaleDateString("en-US", { timeZone: "Africa/Dar_es_Salaam", month: "short", day: "numeric", year: "numeric" }) : "N/A",
+            // E20 FIX: Return raw ISO string — frontend handles locale-aware display formatting
+            expiresAt: isValidDate(s.expiresAt) ? s.expiresAt!.toISOString() : null,
             online: s.onlineStatus === "ONLINE" ? "Online" : "Offline",
             status: "Active",
             createdAt: s.createdAt

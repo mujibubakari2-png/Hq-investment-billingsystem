@@ -70,18 +70,29 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Find or Create Client ─────────────────────────────────────────────────
-    const existingClient = await prisma.client.findFirst({
+    // E14 FIX: Split the single OR (phone || MAC) query into two sequential lookups.
+    // A single OR can merge two completely different clients who happen to share a MAC
+    // address (e.g. a device was resold). Phone is the primary identifier; MAC is only
+    // used as a fallback when no phone match is found.
+    let existingClient = await prisma.client.findFirst({
       where: {
-        OR: [
-          { phone: cleanPhone },
-          { phone: phone },
-          ...(macAddress ? [{ macAddress }] : []),
-        ],
+        phone: cleanPhone,
         subscriptions: {
           some: { status: "ACTIVE", expiresAt: { gt: new Date() } },
         },
       },
     });
+
+    if (!existingClient && macAddress) {
+      existingClient = await prisma.client.findFirst({
+        where: {
+          macAddress,
+          subscriptions: {
+            some: { status: "ACTIVE", expiresAt: { gt: new Date() } },
+          },
+        },
+      });
+    }
 
     let clientId: string;
 

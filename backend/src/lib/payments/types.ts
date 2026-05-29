@@ -4,7 +4,8 @@
  */
 
 // ─── Provider Names ───────────────────────────────────────────────────────────
-export type ProviderName = "PALMPESA" | "ZENOPAY" | "MONGIKE" | "HARAKAPAY";
+// E11 FIX: Added 'MPESA' — was in .env.example but missing from type and registry
+export type ProviderName = "PALMPESA" | "ZENOPAY" | "MONGIKE" | "HARAKAPAY" | "MPESA";
 
 // ─── Payment Request ──────────────────────────────────────────────────────────
 export interface PaymentRequest {

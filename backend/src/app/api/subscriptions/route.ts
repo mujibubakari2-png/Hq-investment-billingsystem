@@ -51,7 +51,8 @@ export async function GET(req: NextRequest) {
         const mapped = subs.map((s) => {
             const expiresTs = toTimestampSafe(s.expiresAt);
             const nowTs = Date.now();
-            const days = expiresTs > 0 ? Math.max(0, Math.floor((nowTs - expiresTs) / (1000 * 3600 * 24))) : 0;
+            // E07 FIX: was (nowTs - expiresTs) which computed ELAPSED days; now correctly computes REMAINING days
+            const days = expiresTs > 0 ? Math.max(0, Math.floor((expiresTs - nowTs) / (1000 * 3600 * 24))) : 0;
             
             return {
                 id: s.id,

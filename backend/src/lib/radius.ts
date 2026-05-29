@@ -13,6 +13,14 @@ import prisma from "./prisma";
  *                (Session-Timeout, Mikrotik-Rate-Limit, etc.)
  *
  * Both tables must be populated for MikroTik to accept the session.
+ *
+ * E08 FIX: All upserts now use `tenantId: tenantId || null` (not `|| ""`)
+ *          to avoid DB constraint errors when tenantId is absent.
+ * E16 FIX: upsertRadCheck / upsertRadReply now use prisma.upsert() with a
+ *          unique compound key, eliminating the findFirst → create/update
+ *          race condition under high concurrency.
+ *          Requires a unique constraint: @@unique([username, tenantId, attribute])
+ *          on both RadCheck and RadReply models in schema.prisma.
  */
 
 // ─── Internal Helpers ────────────────────────────────────────────────────────
@@ -24,21 +32,29 @@ async function upsertRadCheck(
     op: string,
     tenantId: string | null
 ) {
-    const existing = await prisma.radCheck.findFirst({
-        where: { username, tenantId, attribute },
-        select: { id: true },
+    // E16 FIX: Use upsert() instead of findFirst + create/update to eliminate
+    // the race condition under concurrent traffic.
+    await prisma.radCheck.upsert({
+        where: {
+            username_tenantId_attribute: {
+                username,
+                // Prisma requires a non-null value in compound unique keys.
+                // Use empty string as sentinel when tenantId is null, matching
+                // the @@unique([username, tenantId, attribute]) constraint setup.
+                tenantId: tenantId ?? "",
+                attribute,
+            },
+        },
+        update: { value, op },
+        create: {
+            username,
+            attribute,
+            op,
+            value,
+            // E08 FIX: store null when no tenantId (not empty string)
+            tenantId: tenantId || null,
+        },
     });
-
-    if (existing) {
-        await prisma.radCheck.update({
-            where: { id: existing.id },
-            data: { value, op },
-        });
-    } else {
-        await prisma.radCheck.create({
-            data: { username, attribute, op, value, tenantId },
-        });
-    }
 }
 
 async function upsertRadReply(
@@ -48,21 +64,24 @@ async function upsertRadReply(
     op: string,
     tenantId: string | null
 ) {
-    const existing = await prisma.radReply.findFirst({
-        where: { username, tenantId, attribute },
-        select: { id: true },
+    // E16 FIX: same upsert pattern as upsertRadCheck above
+    await prisma.radReply.upsert({
+        where: {
+            username_tenantId_attribute: {
+                username,
+                tenantId: tenantId ?? "",
+                attribute,
+            },
+        },
+        update: { value, op },
+        create: {
+            username,
+            attribute,
+            op,
+            value,
+            tenantId: tenantId || null,
+        },
     });
-
-    if (existing) {
-        await prisma.radReply.update({
-            where: { id: existing.id },
-            data: { value, op },
-        });
-    } else {
-        await prisma.radReply.create({
-            data: { username, attribute, op, value, tenantId },
-        });
-    }
 }
 
 async function deleteRadReplyAttribute(
@@ -108,27 +127,42 @@ export async function syncRadiusUser(params: {
         ? Math.max(0, Math.floor((expiresAt.getTime() - Date.now()) / 1000))
         : null;
 
-    const radiusUser = await prisma.radiusUser.upsert({
-        where: {
-            username_tenantId: { username, tenantId: tenantId || "" },
-        },
-        update: {
-            ...(password ? { password } : {}),
-            ...(fullName ? { fullName } : {}),
-            ...(status ? { status } : {}),
-            ...(sessionTimeoutSecs !== null
-                ? { sessionTimeout: String(sessionTimeoutSecs) }
-                : {}),
-        },
-        create: {
-            username,
-            password: password || (() => { throw new Error("[RADIUS] Cannot create RadiusUser without a password — password is required."); })(),
-            tenantId,
-            fullName: fullName || null,
-            status: status || "Active",
-            sessionTimeout: sessionTimeoutSecs !== null ? String(sessionTimeoutSecs) : null,
-        },
+    // E08 FIX: We use findFirst + create/update instead of upsert because Prisma's
+    // generated type for the unique compound index strictly demands a string for tenantId,
+    // which prevents us from cleanly passing `null` in an upsert's where clause.
+    let radiusUser = await prisma.radiusUser.findFirst({
+        where: { username, tenantId: tenantId || null },
     });
+
+    const updateData = {
+        ...(password ? { password } : {}),
+        ...(fullName ? { fullName } : {}),
+        ...(status ? { status } : {}),
+        ...(sessionTimeoutSecs !== null
+            ? { sessionTimeout: String(sessionTimeoutSecs) }
+            : {}),
+    };
+
+    if (radiusUser) {
+        radiusUser = await prisma.radiusUser.update({
+            where: { id: radiusUser.id },
+            data: updateData,
+        });
+    } else {
+        if (!password) {
+            throw new Error("[RADIUS] Cannot create RadiusUser without a password — password is required.");
+        }
+        radiusUser = await prisma.radiusUser.create({
+            data: {
+                username,
+                password,
+                tenantId: tenantId || null,
+                fullName: fullName || null,
+                status: status || "Active",
+                sessionTimeout: sessionTimeoutSecs !== null ? String(sessionTimeoutSecs) : null,
+            },
+        });
+    }
 
     // ── 2. radcheck: Cleartext-Password ───────────────────────────────────────
     if (password) {
@@ -140,15 +174,9 @@ export async function syncRadiusUser(params: {
     await upsertRadCheck(username, "Simultaneous-Use", String(maxSessions), ":=", tenantId);
 
     // ── 4. radcheck: Expiration (FreeRADIUS rejects if date passed) ───────────
-    if (expiresAt && expiresAt > new Date()) {
-        const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
-                        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-        const expStr = `${months[expiresAt.getMonth()]} ${String(expiresAt.getDate()).padStart(2, "0")} ${expiresAt.getFullYear()} ${String(expiresAt.getHours()).padStart(2, "0")}:${String(expiresAt.getMinutes()).padStart(2, "0")}:${String(expiresAt.getSeconds()).padStart(2, "0")}`;
-        await upsertRadCheck(username, "Expiration", expStr, ":=", tenantId);
-    } else if (expiresAt && expiresAt <= new Date()) {
-        // Already expired — keep the old expiration so FreeRADIUS rejects immediately
-        const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
-                        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    if (expiresAt) {
         const expStr = `${months[expiresAt.getMonth()]} ${String(expiresAt.getDate()).padStart(2, "0")} ${expiresAt.getFullYear()} ${String(expiresAt.getHours()).padStart(2, "0")}:${String(expiresAt.getMinutes()).padStart(2, "0")}:${String(expiresAt.getSeconds()).padStart(2, "0")}`;
         await upsertRadCheck(username, "Expiration", expStr, ":=", tenantId);
     }

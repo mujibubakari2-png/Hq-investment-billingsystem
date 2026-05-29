@@ -232,8 +232,13 @@ export class PaymentService {
     }
 
     // 6. Handle SUCCESSFUL payment
+    // E10 FIX: Look up package by packageId stored on Transaction first,
+    // fall back to planName (string) only if packageId is absent.
+    // This prevents subscription creation failure when a package is renamed.
     const pkg = await prisma.package.findFirst({
-      where: { name: transaction.planName ?? "" },
+      where: transaction.packageId
+        ? { id: transaction.packageId }
+        : { name: transaction.planName ?? "" },
     });
 
     // Calculate expiry
@@ -281,7 +286,7 @@ export class PaymentService {
       return [updatedTx, sub];
     });
 
-    // 7. Sync RADIUS
+    // 7. Sync RADIUS (E09: with compensation on failure)
     if (pkg) {
       try {
         const client = transaction.client;
@@ -302,7 +307,15 @@ export class PaymentService {
           profileName: pkg.name,
         });
       } catch (radErr) {
-        console.error(`[PAYMENT SERVICE] RADIUS sync failed:`, radErr);
+        // E09 FIX: RADIUS sync failed — mark subscription for retry instead of
+        // silently swallowing the error. A background job can retry PENDING_RADIUS_SYNC.
+        console.error(`[PAYMENT SERVICE] RADIUS sync failed — scheduling retry:`, radErr);
+        if (newSub?.id) {
+          await prisma.subscription.update({
+            where: { id: newSub.id },
+            data: { syncStatus: "PENDING_RADIUS_SYNC" },
+          }).catch((e) => console.error("[PAYMENT SERVICE] Failed to mark PENDING_RADIUS_SYNC:", e));
+        }
       }
     }
 

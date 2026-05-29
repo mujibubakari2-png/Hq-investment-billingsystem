@@ -137,6 +137,7 @@ model Transaction {
   id         String            @id @default(cuid())
   clientId   String
   planName   String?
+  packageId  String?
   amount     Float
   type       TransactionType   @default(MOBILE)
   method     String
@@ -583,6 +584,7 @@ model RadCheck {
   @@index([username])
   @@index([tenantId])
   @@index([tenantId, username])
+  @@unique([username, tenantId, attribute], name: "username_tenantId_attribute")
   @@map("radcheck")
 }
 
@@ -600,6 +602,7 @@ model RadReply {
   @@index([username])
   @@index([tenantId])
   @@index([tenantId, username])
+  @@unique([username, tenantId, attribute], name: "username_tenantId_attribute")
   @@map("radreply")
 }
 

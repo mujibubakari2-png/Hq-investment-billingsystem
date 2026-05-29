@@ -1,5 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+// E18 FIX: Import ErrorBoundary — prevents a single component crash from blanking the entire app
+import ErrorBoundary from './components/ErrorBoundary';
 
 // ── Lazy-loaded pages (code splitting — each page is its own JS chunk) ────────
 const MainLayout = lazy(() => import('./components/layout/MainLayout'));
@@ -81,8 +83,11 @@ function PageLoader() {
 export default function App() {
   return (
     <BrowserRouter>
-      <Suspense fallback={<PageLoader />}>
-        <Routes>
+      {/* E18 FIX: ErrorBoundary wraps all routes so a crash in any page */}
+      {/* renders a friendly recovery screen instead of a blank white page  */}
+      <ErrorBoundary>
+        <Suspense fallback={<PageLoader />}>
+          <Routes>
           {/* Standalone pages (no sidebar layout) */}
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
@@ -185,8 +190,9 @@ export default function App() {
               }}>Go to Dashboard</a>
             </div>
           } />
-        </Routes>
-      </Suspense>
+          </Routes>
+        </Suspense>
+      </ErrorBoundary>
     </BrowserRouter>
   );
 }
