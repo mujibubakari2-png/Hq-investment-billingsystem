@@ -74,9 +74,20 @@ export function isValidAmount(amount: number): boolean {
  * Build the full webhook callback URL for a provider.
  * Uses APP_URL env var (must be a publicly reachable URL).
  */
-export function buildCallbackUrl(provider: string, req?: Request): string {
+export function buildCallbackUrl(provider: string, req?: Request, baseUrl?: string): string {
+  // E04 FIX: Warn in production when APP_URL is not configured.
+  // Without it, webhook callbacks fall back to localhost and will never be received.
+  if (!env.APP_URL && process.env.NODE_ENV === "production" && !baseUrl) {
+    console.error(
+      "[PAYMENT] CRITICAL: APP_URL is not set in production. " +
+      "Webhook callback URLs will resolve to http://localhost:3001 and payment confirmations " +
+      "will never arrive. Set APP_URL=https://yourdomain.com in your production .env file."
+    );
+  }
+
   const base =
-    env.APP_URL ||
+    baseUrl ??
+    env.APP_URL ??
     (() => {
       if (req) {
         const host = req.headers.get("host") || "localhost:3001";

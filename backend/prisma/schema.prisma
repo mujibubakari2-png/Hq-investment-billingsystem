@@ -172,6 +172,10 @@ model Router {
   updatedAt        DateTime         @updatedAt
   tenantId         String?
   apiPort          Int?             @default(8728)
+  // E22 FIX: Optional REST API port, separate from the terminal/Winbox port (8728).
+  // RouterOS REST API runs on 80 (HTTP) or 443 (HTTPS) by default, but can be custom.
+  // If null, getMikroTikService() auto-maps port 8728/8729 → 80/443 as before.
+  restPort         Int?
   description      String?
   vpnMode          String?          @default("hybrid")
   wgConfiguredAt   DateTime?

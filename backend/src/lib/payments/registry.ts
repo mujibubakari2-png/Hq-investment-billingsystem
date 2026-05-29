@@ -19,6 +19,16 @@ import { env } from "@/lib/env";
 function envConfigFor(provider: ProviderName): ProviderConfig {
   const environment = (env.PAYMENT_ENVIRONMENT ?? "sandbox") as "sandbox" | "live";
 
+  // E03 FIX: Alert loudly in production when payment gateway is still in sandbox mode.
+  // Real money transactions will fail silently or go to a test bucket if this is left as 'sandbox'.
+  if (process.env.NODE_ENV === "production" && environment === "sandbox") {
+    console.error(
+      "[PAYMENT] CRITICAL: PAYMENT_ENVIRONMENT=sandbox in a production environment! " +
+      "Real payments will be routed to the test gateway — money will NOT be credited. " +
+      "Set PAYMENT_ENVIRONMENT=live in your production .env file and restart the server."
+    );
+  }
+
   switch (provider) {
     case "PALMPESA":
       return {

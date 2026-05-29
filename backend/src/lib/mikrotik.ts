@@ -18,6 +18,8 @@ export interface MikroTikConnection {
     port: number;
     username: string;
     password: string;
+    /** E22 FIX: Optional dedicated REST API port. If not set, port 8728/8729 is auto-mapped to 80/443. */
+    restPort?: number;
 }
 
 export interface PPPoEUser {
@@ -135,12 +137,17 @@ export class MikroTikService {
         this.conn = conn;
         this.routerId = routerId;
         this.tenantId = tenantId || null;
-        // RouterOS REST API runs on the HTTP (80) or HTTPS (443) port, not the terminal API port (8728)
-        // Determine protocol based on environment or port. Prefer HTTPS if enabled.
+        // E22 FIX: Use the explicit restPort field when set (allows custom REST API ports per router).
+        // Fall back to auto-mapping: terminal API ports 8728/8729 are mapped to 80 (HTTP) or 443 (HTTPS).
         const useHttps = env.MIKROTIK_USE_HTTPS;
-        const restPort = conn.port === 8728 || conn.port === 8729 ? (useHttps ? 443 : 80) : conn.port;
+        let resolvedRestPort: number;
+        if (conn.restPort != null) {
+            resolvedRestPort = conn.restPort;
+        } else {
+            resolvedRestPort = (conn.port === 8728 || conn.port === 8729) ? (useHttps ? 443 : 80) : conn.port;
+        }
         const protocol = useHttps ? "https" : "http";
-        this.baseUrl = `${protocol}://${conn.host}:${restPort}`;
+        this.baseUrl = `${protocol}://${conn.host}:${resolvedRestPort}`;
     }
 
     // ── Internal HTTP helper for RouterOS REST API ───────────────────────────
@@ -941,6 +948,9 @@ export async function getMikroTikService(routerId: string, tenantId?: string | n
         {
             host: router.host,
             port: router.apiPort || router.port || 8728,
+            // E22 FIX: Pass the stored restPort so the constructor uses it directly
+            // instead of the generic 8728→80 auto-mapping. Falls back to auto-mapping when null.
+            restPort: (router as any).restPort ?? undefined,
             username: router.username || "admin",
             password: router.password || "",
         },

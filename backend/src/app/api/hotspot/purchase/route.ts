@@ -69,6 +69,18 @@ export async function POST(req: NextRequest) {
       return errorResponse("Package price is too low (minimum 100 TZS)", 402);
     }
 
+    // E19 FIX: Look up HotspotSettings.backendUrl for the package's router.
+    // This allows each router to override the global APP_URL for payment callbacks,
+    // which is essential in multi-region or multi-instance deployments.
+    let hotspotBackendUrl: string | null = null;
+    if (pkg.routerId) {
+      const hs = await prisma.hotspotSettings.findUnique({
+        where: { routerId: pkg.routerId },
+        select: { backendUrl: true },
+      });
+      hotspotBackendUrl = hs?.backendUrl || null;
+    }
+
     // ── Find or Create Client ─────────────────────────────────────────────────
     // E14 FIX: Split the single OR (phone || MAC) query into two sequential lookups.
     // A single OR can merge two completely different clients who happen to share a MAC
@@ -134,6 +146,9 @@ export async function POST(req: NextRequest) {
       data: {
         clientId,
         planName: pkg.name,
+        // E10 FIX: Store packageId so the webhook handler can find the package by ID
+        // even if the package name is later renamed. Falls back to planName only if ID lookup fails.
+        packageId: pkg.id,
         amount: pkg.price,
         type: "MOBILE",
         method: "MOBILE_MONEY",
@@ -185,6 +200,12 @@ export async function POST(req: NextRequest) {
     let paymentInitiated = false;
 
     try {
+      // E19 FIX: Build callback URL from HotspotSettings.backendUrl if configured,
+      // falling back to the global APP_URL via buildCallbackUrl() inside PaymentService.
+      const callbackUrlOverride = hotspotBackendUrl
+        ? `${hotspotBackendUrl.replace(/\/$/, "")}/api/webhooks/${provider.toLowerCase()}`
+        : undefined;
+
       const result = await paymentService.initiatePayment({
         tenantId: pkg.tenantId ?? null,
         amount: pkg.price,
@@ -193,6 +214,7 @@ export async function POST(req: NextRequest) {
         reference,
         description: `Hotspot: ${pkg.name}`,
         buyerName: existingClient?.fullName || `Hotspot ${cleanPhone}`,
+        callbackUrl: callbackUrlOverride,
       });
 
       if (result.success) {

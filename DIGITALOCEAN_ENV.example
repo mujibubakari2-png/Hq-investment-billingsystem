@@ -53,6 +53,16 @@ ZENOPAY_WEBHOOK_SECRET=zenopay-secret
 HARAKAPAY_WEBHOOK_SECRET=harakapay-secret
 WEBHOOK_SECRET=generic-webhook-secret
 
+# ─── Payment Settings ────────────────────────────────────────────────────────
+# E03 FIX: CRITICAL — set to 'live' in production so real payments are processed
+# If left as 'sandbox', payments will go to the test gateway and money is NOT credited.
+PAYMENT_ENVIRONMENT=live
+
+# ─── Cron Security ───────────────────────────────────────────────────────────
+# E17 FIX: Set a random secret of at least 16 characters to protect the cron endpoint
+# Generate: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+CRON_SECRET=replace-with-random-32-char-secret-here
+
 # Keep setup/test endpoints disabled in production
 ENABLE_SUPER_ADMIN_SETUP=false
 ENABLE_TEST_MIKROTIK_LOGIC=false
@@ -63,7 +73,7 @@ ENABLE_TEST_MIKROTIK_LOGIC=false
 VITE_API_URL=${backend.PUBLIC_URL}/api
 
 # Google OAuth Client ID (optional, if using Google Sign In)
-VITE_GOOGLE_CLIENT_ID=96960694156-pg7m1cjdqas9nelo83nicrq4ig3kuq3l.apps.googleusercontent.com
+VITE_GOOGLE_CLIENT_ID=your-google-client-id-here.apps.googleusercontent.com
 
 # ─── LANDING PAGE SERVICE ─────────────────────────────────────────────────────
 

@@ -34,6 +34,13 @@ export interface InitiatePaymentOptions {
   description?: string;
   buyerName?: string;
   buyerEmail?: string;
+  /**
+   * E19 FIX: Optional pre-built callback URL.
+   * When set (e.g. from HotspotSettings.backendUrl), this overrides the global
+   * APP_URL so each router can point to its own backend instance.
+   * Falls back to buildCallbackUrl(providerName) if not provided.
+   */
+  callbackUrl?: string;
 }
 
 // ─── PaymentService ─────────────────────────────────────────────────────────
@@ -75,7 +82,9 @@ export class PaymentService {
 
     const reference = opts.reference ?? generateReference(providerName.slice(0, 2));
     const cleanPhone = formatPhoneTZ(phone);
-    const callbackUrl = buildCallbackUrl(providerName);
+    // E19 FIX: Use caller-supplied callbackUrl (e.g. from HotspotSettings.backendUrl) if
+    // provided; otherwise fall back to the global buildCallbackUrl() which uses APP_URL.
+    const callbackUrl = opts.callbackUrl ?? buildCallbackUrl(providerName);
 
     // Load provider (DB channel config first, env fallback)
     const channel = await this.getChannel(tenantId, providerName);
