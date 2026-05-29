@@ -217,8 +217,6 @@ export async function POST(req: NextRequest) {
             phone: result.tenant.phone,
         });
 
-        const isSecure = env.NODE_ENV === "production";
-        const sameSiteStr = isSecure ? 'None; Secure' : 'Lax';
         
         const response = jsonResponse({
             message: "Registration successful. Please wait for an administrator to approve your account setup.",
