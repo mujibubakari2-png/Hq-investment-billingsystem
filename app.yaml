@@ -50,6 +50,9 @@ services:
   - key: NODE_ENV
     scope: RUN_AND_BUILD_TIME
     value: production
+  - key: NEXT_PUBLIC_BILLING_SYSTEM_URL
+    scope: RUN_AND_BUILD_TIME
+    value: ${frontend.PUBLIC_URL}
   http_port: 3000
   routes:
   - path: /
