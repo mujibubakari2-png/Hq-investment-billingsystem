@@ -4,10 +4,10 @@ services:
     container_name: hqinvestment-db
     restart: always
     environment:
-      POSTGRES_USER: hqinvestment_user
-      # IMPORTANT: Change this to a secure password before production deployment!
-      POSTGRES_PASSWORD: hqinvestment_password_replace_me
-      POSTGRES_DB: hqinvestment_isp
+      POSTGRES_USER: ${POSTGRES_USER:-hqinvestment_user}
+      # IMPORTANT: Define POSTGRES_PASSWORD in your root .env file!
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hqinvestment_password_replace_me}
+      POSTGRES_DB: ${POSTGRES_DB:-hqinvestment_isp}
     ports:
       - "127.0.0.1:5432:5432"
     volumes:
