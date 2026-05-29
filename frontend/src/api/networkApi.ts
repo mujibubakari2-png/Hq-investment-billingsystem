@@ -3,6 +3,10 @@ import { get, post, put, del } from './httpClient';
 
 export const routersApi = {
     list:   ()                                          => get<Record<string, unknown>[]>('/routers'),
+    listPaginated: (params?: Record<string, string | number>) => {
+        const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
+        return get<{ data: Record<string, unknown>[]; total: number }>(`/routers${qs}`);
+    },
     get:    (id: string)                                => get<Record<string, unknown>>(`/routers/${id}`),
     create: (data: Record<string, unknown>)             => post<Record<string, unknown>>('/routers', data),
     update: (id: string, data: Record<string, unknown>) => put<Record<string, unknown>>(`/routers/${id}`, data),

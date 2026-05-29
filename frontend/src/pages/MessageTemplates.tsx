@@ -8,7 +8,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import SyncIcon from '@mui/icons-material/Sync';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import { smsApi } from '../api';
+import { smsTemplatesApi } from '../api';
 import AddMessageTemplateModal from '../modals/AddMessageTemplateModal';
 import EditMessageTemplateModal from '../modals/EditMessageTemplateModal';
 import ConfirmDeleteModal from '../modals/ConfirmDeleteModal';
@@ -46,7 +46,7 @@ export default function MessageTemplates() {
     const fetchTemplates = async () => {
         setLoading(true);
         try {
-            const data = await smsApi.templates.list();
+            const data = await smsTemplatesApi.list();
             setTemplates(data as unknown as Template[]);
         } catch (err) {
             console.error('Failed to load templates:', err);
@@ -70,7 +70,7 @@ export default function MessageTemplates() {
 
     const handleAddTemplate = async (data: object) => {
         try {
-            await smsApi.templates.create(data as Record<string, unknown>);
+            await smsTemplatesApi.create(data as Record<string, unknown>);
             setShowAddModal(false);
             setFeedback({ type: 'success', message: 'Template created successfully!' });
             fetchTemplates();
@@ -83,7 +83,7 @@ export default function MessageTemplates() {
     const handleDelete = async () => {
         if (!deleteId) return;
         try {
-            await smsApi.templates.delete(deleteId);
+            await smsTemplatesApi.delete(deleteId);
             setDeleteId(null);
             setFeedback({ type: 'success', message: 'Template deleted.' });
             fetchTemplates();
@@ -100,7 +100,7 @@ export default function MessageTemplates() {
 
     const handleEditTemplate = async (updated: Template) => {
         try {
-            await smsApi.templates.update(updated.id, updated as unknown as Record<string, unknown>);
+            await smsTemplatesApi.update(updated.id, updated as unknown as Record<string, unknown>);
             setEditTemplate(null);
             setFeedback({ type: 'success', message: 'Template updated successfully!' });
             fetchTemplates();

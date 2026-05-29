@@ -23,8 +23,8 @@ export const voucherCodesApi = {
 };
 
 export const settingsApi = {
-    get: () => get<Record<string, string>>('/settings'),
-    update: (data: Record<string, string>) => put<{ message: string }>('/settings', data),
+    get: () => get<Record<string, string>>('/system-settings'),
+    update: (data: Record<string, string>) => put<{ message: string }>('/system-settings', data),
 };
 
 export const dashboardApi = {
