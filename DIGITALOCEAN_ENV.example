@@ -78,3 +78,6 @@ VITE_GOOGLE_CLIENT_ID=your-google-client-id-here.apps.googleusercontent.com
 # ─── LANDING PAGE SERVICE ─────────────────────────────────────────────────────
 
 NODE_ENV=production
+
+# The URL to the frontend billing system (used for Login/Register buttons)
+NEXT_PUBLIC_BILLING_SYSTEM_URL=${frontend.PUBLIC_URL}
