@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import SmsIcon from '@mui/icons-material/Sms';
 import CloseIcon from '@mui/icons-material/Close';
 import SendIcon from '@mui/icons-material/Send';
 import type { MessageTemplate } from '../types';
+import { getPhoneError } from '../utils/validators';
 
 interface SendSmsModalProps {
     templates?: MessageTemplate[];
@@ -16,6 +17,14 @@ export default function SendSmsModal({ templates = [], onClose, onSend, defaultR
     const [recipientPhone, setRecipientPhone] = useState(defaultRecipient || '');
     const [templateId, setTemplateId] = useState('');
     const [message, setMessage] = useState('');
+    const [loading, setLoading] = useState(false);
+
+    // ESC key handler
+    useEffect(() => {
+        const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+        document.addEventListener('keydown', handler);
+        return () => document.removeEventListener('keydown', handler);
+    }, [onClose]);
 
     const handleTemplateChange = (id: string) => {
         setTemplateId(id);
@@ -23,10 +32,19 @@ export default function SendSmsModal({ templates = [], onClose, onSend, defaultR
         if (tmpl) setMessage(tmpl.content);
     };
 
+    // Phone validation for individual recipient
+    const phoneError = recipientType === 'individual' ? getPhoneError(recipientPhone) : '';
+
     const handleSend = () => {
+        setLoading(true);
         if (onSend) onSend({ recipientType, recipientPhone, message });
         onClose();
     };
+
+    // Disable send button when individual recipient has no valid phone
+    const isSendDisabled = loading
+        || !message.trim()
+        || (recipientType === 'individual' && (!recipientPhone.trim() || !!phoneError));
 
     return (
         <div className="modal-overlay" onClick={onClose}>
@@ -64,13 +82,17 @@ export default function SendSmsModal({ templates = [], onClose, onSend, defaultR
                             ))}
                         </div>
                         {recipientType === 'individual' && (
-                            <input
-                                type="text"
-                                className="form-input"
-                                placeholder="Phone number e.g. 255XXXXXXXXX"
-                                value={recipientPhone}
-                                onChange={e => setRecipientPhone(e.target.value)}
-                            />
+                            <>
+                                <input
+                                    type="text"
+                                    className="form-input"
+                                    placeholder="Phone number e.g. 255XXXXXXXXX"
+                                    value={recipientPhone}
+                                    onChange={e => setRecipientPhone(e.target.value)}
+                                />
+                                {/* Phone validation feedback */}
+                                {phoneError && <div className="form-hint" style={{ color: 'var(--danger)' }}>{phoneError}</div>}
+                            </>
                         )}
                     </div>
 
@@ -104,8 +126,8 @@ export default function SendSmsModal({ templates = [], onClose, onSend, defaultR
                     <div className="modal-footer-left" />
                     <div className="modal-footer-right">
                         <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
-                        <button className="btn btn-primary" onClick={handleSend} disabled={!message.trim()}>
-                            <SendIcon fontSize="small" /> Send SMS
+                        <button className="btn btn-primary" onClick={handleSend} disabled={isSendDisabled}>
+                            <SendIcon fontSize="small" /> {loading ? 'Sending...' : 'Send SMS'}
                         </button>
                     </div>
                 </div>

@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
 
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
         const tenantFilter = { tenantId: userPayload.tenantId };
-        
+
         const { searchParams } = new URL(req.url);
         const search = searchParams.get("search") || "";
         const status = searchParams.get("status") || "";
@@ -92,7 +92,7 @@ export async function POST(req: NextRequest) {
 
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
         const tenantFilter = { tenantId: userPayload.tenantId };
-        
+
         const body = await req.json();
 
         // Resolve client ID natively if a username was provided instead
@@ -131,7 +131,7 @@ export async function POST(req: NextRequest) {
             data: {
                 clientId: clientId,
                 planName: planName || "Manual Transaction",
-                amount: parseFloat(body.amount),
+                amount: Math.round(parseFloat(body.amount)), // TZS has no subdivisions — always integer
                 type: (body.type || "MANUAL").toUpperCase(),
                 method: body.method || "Cash",
                 status: (body.status || "COMPLETED").toUpperCase(),

@@ -87,8 +87,14 @@ export async function request<T>(path: string, init?: RequestInit): Promise<T> {
             forceLogout();
         }
 
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Request failed');
+        // Safely parse JSON — handle non-JSON responses (e.g., nginx HTML error pages)
+        let data: any;
+        try {
+            data = await res.json();
+        } catch {
+            throw new Error(`Server error: ${res.status} ${res.statusText}`);
+        }
+        if (!res.ok) throw new Error(data?.error || data?.message || 'Request failed');
         return data as T;
     } catch (error: unknown) {
         const err = error as Error;
@@ -102,8 +108,8 @@ export async function request<T>(path: string, init?: RequestInit): Promise<T> {
     }
 }
 
-export const get   = <T>(path: string)                    => request<T>(path);
-export const post  = <T>(path: string, body: unknown)     => request<T>(path, { method: 'POST', body: JSON.stringify(body) });
-export const put   = <T>(path: string, body: unknown)     => request<T>(path, { method: 'PUT',  body: JSON.stringify(body) });
-export const patch = <T>(path: string, body: unknown)     => request<T>(path, { method: 'PATCH', body: JSON.stringify(body) });
-export const del   = <T>(path: string)                    => request<T>(path, { method: 'DELETE' });
+export const get = <T>(path: string) => request<T>(path);
+export const post = <T>(path: string, body: unknown) => request<T>(path, { method: 'POST', body: JSON.stringify(body) });
+export const put = <T>(path: string, body: unknown) => request<T>(path, { method: 'PUT', body: JSON.stringify(body) });
+export const patch = <T>(path: string, body: unknown) => request<T>(path, { method: 'PATCH', body: JSON.stringify(body) });
+export const del = <T>(path: string) => request<T>(path, { method: 'DELETE' });

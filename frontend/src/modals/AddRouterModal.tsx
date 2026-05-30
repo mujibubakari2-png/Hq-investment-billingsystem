@@ -338,25 +338,38 @@ export default function AddRouterModal({ onClose, onSave, initialData }: AddRout
                                     </div>
                                 </div>
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                                    {/* apiPort and port are now independent fields */}
                                     <div className="form-group">
                                         <label className="form-label" style={{ fontSize: '0.8rem', fontWeight: 700, marginBottom: 8, display: 'block' }}>
-                                            API Port (Optional)
+                                            API Port (default: 8728)
                                         </label>
                                         <input
                                             type="number"
                                             className="form-input"
-                                            placeholder="e.g., 8728"
+                                            placeholder="8728"
                                             value={apiPort || ''}
                                             onChange={e => {
                                                 const val = e.target.value ? parseInt(e.target.value) : undefined;
                                                 setApiPort(val);
-                                                setPort(val);
                                             }}
                                             style={{ height: 44, fontSize: '0.9rem' }}
                                         />
                                     </div>
-                                    <div style={{ display: 'flex', alignItems: 'center', fontSize: '0.75rem', color: 'var(--text-secondary)', paddingTop: 20 }}>
-                                        Leave blank for defaults.
+                                    <div className="form-group">
+                                        <label className="form-label" style={{ fontSize: '0.8rem', fontWeight: 700, marginBottom: 8, display: 'block' }}>
+                                            WinBox Port (default: 8291)
+                                        </label>
+                                        <input
+                                            type="number"
+                                            className="form-input"
+                                            placeholder="8291"
+                                            value={port || ''}
+                                            onChange={e => {
+                                                const val = e.target.value ? parseInt(e.target.value) : undefined;
+                                                setPort(val);
+                                            }}
+                                            style={{ height: 44, fontSize: '0.9rem' }}
+                                        />
                                     </div>
                                 </div>
                             </div>

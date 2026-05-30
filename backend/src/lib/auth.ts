@@ -50,7 +50,7 @@ export function comparePassword(password: string, hash: string): Promise<boolean
 }
 
 export function signToken(payload: JwtPayload): string {
-    return jwt.sign(payload, getJwtSecret(), { expiresIn: "30m" });
+    return jwt.sign(payload, getJwtSecret(), { expiresIn: "2h" }); // Extended from 30m for long ISP agent sessions
 }
 
 export function signRefreshToken(payload: JwtPayload): string {
@@ -77,7 +77,7 @@ export function getTokenFromRequest(req: NextRequest): string | null {
     if (authHeader?.startsWith("Bearer ")) {
         return authHeader.slice(7);
     }
-    
+
     return null;
 }
 

@@ -31,8 +31,12 @@ export const routersApi = {
     createProfile:       (id: string, data: Record<string, unknown>)           => post<Record<string, unknown>>(`/routers/${id}/bandwidth-profiles`, data),
 
     // WireGuard VPN
-    getWireguardConfig: (id: string)                                      => get<Record<string, unknown>>(`/routers/${id}/wireguard-config`),
-    pushWireguardConfig:(id: string, data: Record<string, unknown>)       => post<Record<string, unknown>>(`/routers/${id}/push-wireguard`, data),
+    wireguard: {
+        getConfig: (id: string) => get<Record<string, unknown>>(`/routers/${id}/wireguard`),
+        activate: (id: string) => post<Record<string, unknown>>(`/routers/${id}/wireguard`, { action: 'activate' }),
+        deactivate: (id: string) => post<Record<string, unknown>>(`/routers/${id}/wireguard`, { action: 'deactivate' }),
+        pushConfig: (id: string) => post<Record<string, unknown>>(`/routers/${id}/wireguard`, { action: 'push-config' }),
+    },
 
     // Hotspot portal customization
     getHotspotTemplate: (id: string)                                      => get<Record<string, unknown>>(`/routers/${id}/hotspot-template`),

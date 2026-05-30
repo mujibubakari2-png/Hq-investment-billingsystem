@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import EditIcon from '@mui/icons-material/Edit';
 import CloseIcon from '@mui/icons-material/Close';
 import CheckIcon from '@mui/icons-material/Check';
-import { routersApi, packagesApi } from '../api';
+import { routersApi, packagesApi, clientsApi } from '../api';
 import type { Client, Router, Package } from '../types';
+import { getPhoneError } from '../utils/validators';
 
 interface EditClientModalProps {
     client: Client;
@@ -21,21 +22,65 @@ export default function EditClientModal({ client, onClose, onSave }: EditClientM
     const [plan, setPlan] = useState(client.plan || '');
     const [routersList, setRoutersList] = useState<Router[]>([]);
     const [packagesList, setPackagesList] = useState<Package[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+    const [loadError, setLoadError] = useState('');
+    const [loadingData, setLoadingData] = useState(true);
 
+    // ESC key handler
     useEffect(() => {
-        routersApi.list().then(d => setRoutersList(d as unknown as Router[])).catch(console.error);
-        packagesApi.list().then(d => setPackagesList(d as unknown as Package[])).catch(console.error);
+        const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') handleClose(); };
+        document.addEventListener('keydown', handler);
+        return () => document.removeEventListener('keydown', handler);
+    }, [onClose]);
+
+    // Proper error handling for data loading
+    useEffect(() => {
+        Promise.all([
+            routersApi.list(),
+            packagesApi.list(),
+        ]).then(([routers, packages]) => {
+            setRoutersList(routers as unknown as Router[]);
+            setPackagesList(packages as unknown as Package[]);
+        }).catch(() => {
+            setLoadError('Failed to load data. Check your network connection.');
+        }).finally(() => setLoadingData(false));
     }, []);
 
-    const handleSave = () => {
-        if (onSave) {
-            onSave({ ...client, fullName, email, phone, accountType, status, router, plan });
-        }
+    const phoneError = getPhoneError(phone);
+
+    // Unsaved changes warning
+    const isDirty = fullName !== client.fullName || email !== (client.email || '') || phone !== client.phone
+        || accountType !== client.accountType || status !== client.status;
+
+    const handleClose = () => {
+        if (isDirty && !confirm('You have unsaved changes. Are you sure you want to close?')) return;
         onClose();
     };
 
+    // Send data directly to API instead of relying on parent callback
+    const handleSave = async () => {
+        setLoading(true);
+        setError('');
+        try {
+            await clientsApi.update(client.id, {
+                fullName,
+                email: email || undefined,
+                phone: phone || undefined,
+                accountType: accountType.toUpperCase(),
+                status: status.toUpperCase(),
+            });
+            onSave?.({ ...client, fullName, email, phone, accountType, status, router, plan });
+            onClose();
+        } catch (err: any) {
+            setError(err.message || 'Failed to update client');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
-        <div className="modal-overlay" onClick={onClose}>
+        <div className="modal-overlay" onClick={handleClose}>
             <div className="modal" style={{ maxWidth: 600 }} onClick={e => e.stopPropagation()}>
                 <div className="modal-header">
                     <div className="modal-header-left">
@@ -47,10 +92,33 @@ export default function EditClientModal({ client, onClose, onSave }: EditClientM
                             <div className="modal-subtitle">Update client information – @{client.username}</div>
                         </div>
                     </div>
-                    <button className="modal-close" onClick={onClose}><CloseIcon fontSize="small" /></button>
+                    <button className="modal-close" onClick={handleClose}><CloseIcon fontSize="small" /></button>
                 </div>
 
                 <div className="modal-body">
+                    {/* Error display */}
+                    {error && (
+                        <div style={{
+                            background: '#fee2e2', color: '#dc2626', padding: '10px 14px',
+                            borderRadius: 8, marginBottom: 16, fontSize: '0.82rem', fontWeight: 500,
+                            border: '1px solid #fecaca'
+                        }}>
+                            {error}
+                        </div>
+                    )}
+                    {loadError && (
+                        <div style={{
+                            background: '#fee2e2', color: '#dc2626', padding: '10px 14px',
+                            borderRadius: 8, marginBottom: 16, fontSize: '0.82rem', fontWeight: 500,
+                            border: '1px solid #fecaca'
+                        }}>
+                            {loadError}
+                        </div>
+                    )}
+                    {loadingData && (
+                        <div style={{ textAlign: 'center', padding: '10px 0', color: 'var(--text-secondary)' }}>Loading...</div>
+                    )}
+
                     <div className="form-row">
                         <div className="form-group">
                             <label className="form-label">Username</label>
@@ -71,6 +139,8 @@ export default function EditClientModal({ client, onClose, onSave }: EditClientM
                         <div className="form-group">
                             <label className="form-label">Phone Number</label>
                             <input type="text" className="form-input" value={phone} onChange={e => setPhone(e.target.value)} />
+                            {/* Phone validation */}
+                            {phoneError && <div className="form-hint" style={{ color: 'var(--danger)' }}>{phoneError}</div>}
                         </div>
                     </div>
 
@@ -115,9 +185,9 @@ export default function EditClientModal({ client, onClose, onSave }: EditClientM
                 <div className="modal-footer">
                     <div className="modal-footer-left" />
                     <div className="modal-footer-right">
-                        <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
-                        <button className="btn btn-primary" onClick={handleSave}>
-                            <CheckIcon fontSize="small" /> Save Changes
+                        <button className="btn btn-secondary" onClick={handleClose}>Cancel</button>
+                        <button className="btn btn-primary" onClick={handleSave} disabled={loading || !!phoneError}>
+                            <CheckIcon fontSize="small" /> {loading ? 'Saving...' : 'Save Changes'}
                         </button>
                     </div>
                 </div>

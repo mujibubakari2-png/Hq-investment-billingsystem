@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
 
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
         const tenantFilter = { tenantId: userPayload.tenantId };
-        
+
         const { searchParams } = new URL(req.url);
         const search = searchParams.get("search") || "";
         const status = searchParams.get("status") || "";
@@ -130,16 +130,14 @@ export async function POST(req: NextRequest) {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
 
-        const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
-        
-        // Tenant isolation: always use token's tenantId unless super admin
-        const tenantIdValue = isSuperAdmin ? (body.tenantId || body.tenant_id || userPayload.tenantId) : userPayload.tenantId;
+        //  Always use token's tenantId — SUPER_ADMIN should use /api/admin/clients for cross-tenant ops
+        const tenantIdValue = userPayload.tenantId;
 
         const existing = await prisma.client.findUnique({ where: { username } });
-        const isDev = process.env.NODE_ENV !== "production";
-        
-        if (existing && !isDev) {
-            return errorResponse("Username already exists");
+
+        // Always reject duplicate usernames — removed unsafe dev-mode bypass
+        if (existing) {
+            return errorResponse("Username already exists", 409);
         }
 
         const clientData = {
@@ -155,9 +153,7 @@ export async function POST(req: NextRequest) {
             tenantId: tenantIdValue
         };
 
-        const client = existing 
-            ? await prisma.client.update({ where: { id: existing.id }, data: clientData })
-            : await prisma.client.create({ data: clientData });
+        const client = await prisma.client.create({ data: clientData });
 
         return jsonResponse({
             id: client.id,

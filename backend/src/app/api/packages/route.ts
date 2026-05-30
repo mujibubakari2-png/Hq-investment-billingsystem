@@ -178,10 +178,12 @@ export async function POST(req: NextRequest) {
                         status: "error",
                     }
                 });
-                
-                // Rollback package creation if sync fails
-                await prisma.package.delete({ where: { id: pkg.id } });
-                return errorResponse(`Failed to sync package to MikroTik: ${err?.message}. Package creation was cancelled.`, 400);
+
+                // Don't delete package on sync failure — return success with warning
+                return jsonResponse({
+                    ...pkg,
+                    warning: 'Package was created but MikroTik sync failed. Try syncing again later.'
+                }, 201);
             }
         }
 
@@ -191,7 +193,7 @@ export async function POST(req: NextRequest) {
         // Expose meaningful error to client (never expose raw stack in prod but give useful message)
         const msg = e?.message?.includes('Unique constraint') ? 'A package with that name already exists.'
             : e?.message?.includes('Foreign key') ? 'Invalid router reference.'
-            : e?.message || 'Internal server error';
+                : e?.message || 'Internal server error';
         return errorResponse(msg, 500);
     }
 }

@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import CloseIcon from '@mui/icons-material/Close';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -17,9 +18,18 @@ export default function ConfirmDeleteModal({
     onClose,
     onConfirm,
 }: ConfirmDeleteModalProps) {
+    // ESC key handler
+    useEffect(() => {
+        const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+        document.addEventListener('keydown', handler);
+        return () => document.removeEventListener('keydown', handler);
+    }, [onClose]);
+
+    // Close modal first, then execute confirm via setTimeout
+    // This prevents React state update warnings if parent unmounts the component
     const handleConfirm = () => {
-        onConfirm();
         onClose();
+        setTimeout(() => onConfirm(), 0);
     };
 
     return (

@@ -8,9 +8,29 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import { routersApi } from '../api';
 import type { Router } from '../types';
 
+// Typed interface instead of `object`
+interface PackageFormData {
+    packageType: string;
+    category: string;
+    name: string;
+    price: number;
+    duration: number;
+    durationUnit: string;
+    router: string;
+    uploadSpeed: string;
+    uploadUnit: string;
+    downloadSpeed: string;
+    downloadUnit: string;
+    burstEnabled: boolean;
+    hotspotType: string;
+    devices: number;
+    paymentType: string;
+    status: string;
+}
+
 interface AddPackageModalProps {
     onClose: () => void;
-    onSave?: (data: object) => void;
+    onSave?: (data: PackageFormData) => void;
 }
 
 export default function AddPackageModal({ onClose, onSave }: AddPackageModalProps) {
@@ -28,13 +48,49 @@ export default function AddPackageModal({ onClose, onSave }: AddPackageModalProp
     const [burstEnabled, setBurstEnabled] = useState(false);
     const [hotspotType, setHotspotType] = useState('Unlimited');
     const [devices, setDevices] = useState(1);
-    const [payStatus, setPayStatus] = useState('Prepaid');
+    // Removed duplicate payStatus — replaced with proper package status
+    const [pkgStatus, setPkgStatus] = useState('Active');
     const [paymentType, setPaymentType] = useState('Prepaid');
     const [routersList, setRoutersList] = useState<Router[]>([]);
-    useEffect(() => { routersApi.list().then(d => setRoutersList(d as unknown as Router[])).catch(console.error); }, []);
+
+    const [loadError, setLoadError] = useState('');
+    const [loadingData, setLoadingData] = useState(true);
+
+    //  ESC key handler
+    useEffect(() => {
+        const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+        document.addEventListener('keydown', handler);
+        return () => document.removeEventListener('keydown', handler);
+    }, [onClose]);
+
+    //  Proper error handling for data loading
+    useEffect(() => {
+        routersApi.list()
+            .then(d => setRoutersList(d as unknown as Router[]))
+            .catch(() => setLoadError('Failed to load routers. Check your network connection.'))
+            .finally(() => setLoadingData(false));
+    }, []);
 
     const handleSave = () => {
-        if (onSave) onSave({ packageType, accountType, name, price: Number(price), duration: Number(duration), durationUnit, router, uploadSpeed, uploadUnit, downloadSpeed, downloadUnit, burstEnabled, hotspotType, devices, payStatus, paymentType });
+        if (onSave) onSave({
+            packageType,
+            // Map accountType → category for backend compatibility
+            category: accountType,
+            name,
+            price: Number(price),
+            duration: Number(duration),
+            durationUnit,
+            router,
+            uploadSpeed,
+            uploadUnit,
+            downloadSpeed,
+            downloadUnit,
+            burstEnabled,
+            hotspotType,
+            devices,
+            paymentType,
+            status: pkgStatus,
+        });
         onClose();
     };
 
@@ -55,6 +111,20 @@ export default function AddPackageModal({ onClose, onSave }: AddPackageModalProp
                 </div>
 
                 <div className="modal-body">
+                    {/* Error display for loading failures */}
+                    {loadError && (
+                        <div style={{
+                            background: '#fee2e2', color: '#dc2626', padding: '10px 14px',
+                            borderRadius: 8, marginBottom: 16, fontSize: '0.82rem', fontWeight: 500,
+                            border: '1px solid #fecaca'
+                        }}>
+                            {loadError}
+                        </div>
+                    )}
+                    {loadingData && (
+                        <div style={{ textAlign: 'center', padding: '10px 0', color: 'var(--text-secondary)' }}>Loading...</div>
+                    )}
+
                     {/* Basic Information */}
                     <div className="form-section-title">
                         <SettingsIcon fontSize="small" /> Basic Information
@@ -187,16 +257,16 @@ export default function AddPackageModal({ onClose, onSave }: AddPackageModalProp
                         </>
                     )}
 
-                    {/* Additional Settings */}
+                    {/* Additional Settings — Replaced duplicate payStatus with proper Package Status */}
                     <div className="form-section-title">
                         <SettingsIcon fontSize="small" /> Additional Settings
                     </div>
                     <div className="form-row">
                         <div className="form-group">
-                            <label className="form-label">Pay Status</label>
-                            <select className="form-select" value={payStatus} onChange={e => setPayStatus(e.target.value)}>
-                                <option>Prepaid</option>
-                                <option>Postpaid</option>
+                            <label className="form-label">Package Status</label>
+                            <select className="form-select" value={pkgStatus} onChange={e => setPkgStatus(e.target.value)}>
+                                <option>Active</option>
+                                <option>Inactive</option>
                             </select>
                             <div className="form-hint">Enable or disable this package for customers</div>
                         </div>
@@ -206,7 +276,7 @@ export default function AddPackageModal({ onClose, onSave }: AddPackageModalProp
                                 <option>Prepaid</option>
                                 <option>Postpaid</option>
                             </select>
-                            <div className="form-hint">Choose the GTU method for this package</div>
+                            <div className="form-hint">Prepaid (pay first) or Postpaid (pay later)</div>
                         </div>
                     </div>
                 </div>

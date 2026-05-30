@@ -18,9 +18,22 @@ export default function ExtendSubscriberModal({ subscriber, onClose, onSave }: E
     const [method, setMethod] = useState('Cash');
     const [reference, setReference] = useState('');
     const [amount, setAmount] = useState('');
+    const [loadError, setLoadError] = useState('');
+    const [loadingData, setLoadingData] = useState(true);
 
+    // ESC key handler
     useEffect(() => {
-        packagesApi.list().then(d => setPackagesList(d as unknown as Package[])).catch(console.error);
+        const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+        document.addEventListener('keydown', handler);
+        return () => document.removeEventListener('keydown', handler);
+    }, [onClose]);
+
+    // Proper error handling for data loading
+    useEffect(() => {
+        packagesApi.list()
+            .then(d => setPackagesList(d as unknown as Package[]))
+            .catch(() => setLoadError('Failed to load packages. Check your network connection.'))
+            .finally(() => setLoadingData(false));
     }, []);
 
     const selectedPlan = packagesList.find(p => p.id === planId);
@@ -55,6 +68,20 @@ export default function ExtendSubscriberModal({ subscriber, onClose, onSave }: E
                 </div>
 
                 <div className="modal-body">
+                    {/* Show loading and error states */}
+                    {loadError && (
+                        <div style={{
+                            background: '#fee2e2', color: '#dc2626', padding: '10px 14px',
+                            borderRadius: 8, marginBottom: 16, fontSize: '0.82rem', fontWeight: 500,
+                            border: '1px solid #fecaca'
+                        }}>
+                            {loadError}
+                        </div>
+                    )}
+                    {loadingData && (
+                        <div style={{ textAlign: 'center', padding: '10px 0', color: 'var(--text-secondary)' }}>Loading packages...</div>
+                    )}
+
                     <div style={{ padding: '12px 16px', background: 'var(--bg-hover)', borderRadius: 'var(--radius-sm)', marginBottom: 20, fontSize: '0.85rem' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                             <span style={{ color: 'var(--text-secondary)' }}>Username</span>
@@ -89,7 +116,12 @@ export default function ExtendSubscriberModal({ subscriber, onClose, onSave }: E
                                 value={amount}
                                 onChange={e => setAmount(e.target.value)}
                                 placeholder="0"
+                                min={1}
                             />
+                            {/* Show warning when amount is invalid */}
+                            {amount && Number(amount) <= 0 && (
+                                <div className="form-hint" style={{ color: 'var(--danger)' }}>Amount must be greater than 0</div>
+                            )}
                             {selectedPlan && <div className="form-hint">Plan price: {selectedPlan.price.toLocaleString()} TZS</div>}
                         </div>
                         <div className="form-group">
@@ -114,7 +146,7 @@ export default function ExtendSubscriberModal({ subscriber, onClose, onSave }: E
                     <div className="modal-footer-left" />
                     <div className="modal-footer-right">
                         <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
-                        <button className="btn btn-success" onClick={handleSave} disabled={!planId}>
+                        <button className="btn btn-success" onClick={handleSave} disabled={!planId || Number(amount) <= 0}>
                             <CheckIcon fontSize="small" /> Extend Subscription
                         </button>
                     </div>

@@ -5,6 +5,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import { packagesApi, routersApi } from '../api';
 import type { Package, Router } from '../types';
+import { useAuth } from '../stores/authStore';
 
 interface GenerateVouchersModalProps {
     onClose: () => void;
@@ -39,10 +40,23 @@ export default function GenerateVouchersModal({ onClose, onGenerate }: GenerateV
     const [submitting, setSubmitting] = useState(false);
     const [routersList, setRoutersList] = useState<Router[]>([]);
     const [packagesList, setPackagesList] = useState<Package[]>([]);
+    const [loadError, setLoadError] = useState('');
+    const [loadingData, setLoadingData] = useState(true);
+
+    // Use authStore instead of direct localStorage access
+    const { user } = useAuth();
 
     useEffect(() => {
-        routersApi.list().then(d => setRoutersList(d as unknown as Router[])).catch(console.error);
-        packagesApi.list().then(d => setPackagesList(d as unknown as Package[])).catch(console.error);
+        // Proper error handling for data loading
+        Promise.all([
+            routersApi.list(),
+            packagesApi.list(),
+        ]).then(([routers, packages]) => {
+            setRoutersList(routers as unknown as Router[]);
+            setPackagesList(packages as unknown as Package[]);
+        }).catch(() => {
+            setLoadError('Failed to load data. Check your network connection.');
+        }).finally(() => setLoadingData(false));
     }, []);
 
     const selectedRouter = routersList.find(r => r.id === routerId);
@@ -59,14 +73,12 @@ export default function GenerateVouchersModal({ onClose, onGenerate }: GenerateV
         setError(null);
         setSubmitting(true);
 
-        let currentUserId = undefined;
-        try {
-            const userStr = localStorage.getItem('user');
-            if (userStr) {
-                currentUserId = JSON.parse(userStr).id;
-            }
-        } catch {
-            // Ignore parsing errors
+        // Use authStore user instead of localStorage
+        const createdById = user?.id;
+        if (!createdById) {
+            setError('Session expired. Please log in again.');
+            setSubmitting(false);
+            return;
         }
 
         if (!onGenerate) {
@@ -86,7 +98,7 @@ export default function GenerateVouchersModal({ onClose, onGenerate }: GenerateV
                 prefix,
                 smsPhone,
                 sendSms,
-                createdById: currentUserId
+                createdById: createdById
             } as VoucherConfig);
             onClose();
         } catch (e: any) {
@@ -121,6 +133,19 @@ export default function GenerateVouchersModal({ onClose, onGenerate }: GenerateV
                         }}>
                             {error}
                         </div>
+                    )}
+                    {/* Show loading and error states */}
+                    {loadError && (
+                        <div style={{
+                            background: '#fee2e2', color: '#dc2626', padding: '10px 14px',
+                            borderRadius: 8, marginBottom: 16, fontSize: '0.82rem', fontWeight: 500,
+                            border: '1px solid #fecaca'
+                        }}>
+                            {loadError}
+                        </div>
+                    )}
+                    {loadingData && (
+                        <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--text-secondary)' }}>Loading...</div>
                     )}
                     <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr', alignItems: 'center', marginBottom: 20 }}>
                         <label className="form-label" style={{ marginBottom: 0, fontWeight: 500 }}>Package Type</label>
@@ -240,6 +265,17 @@ export default function GenerateVouchersModal({ onClose, onGenerate }: GenerateV
                                     <div className="form-hint" style={{ marginTop: 6 }}>SMS only works for single voucher</div>
                                 </div>
                             </div>
+
+                            {/* Auto-disable sendSms when count > 1 */}
+                            {count > 1 && sendSms && (
+                                <div style={{
+                                    background: '#fef3c7', color: '#92400e', padding: '8px 12px',
+                                    borderRadius: 8, fontSize: '0.8rem', fontWeight: 500,
+                                    border: '1px solid #fde68a', marginTop: 8
+                                }}>
+                                    SMS will be disabled — only works for a single voucher.
+                                </div>
+                            )}
                         </>
                     )}
                 </div>

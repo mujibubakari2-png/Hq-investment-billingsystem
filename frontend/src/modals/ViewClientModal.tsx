@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import PersonIcon from '@mui/icons-material/Person';
 import CloseIcon from '@mui/icons-material/Close';
 import WifiIcon from '@mui/icons-material/Wifi';
@@ -14,6 +15,13 @@ interface ViewClientModalProps {
 }
 
 export default function ViewClientModal({ client, onClose, onEdit }: ViewClientModalProps) {
+    // ESC key handler
+    useEffect(() => {
+        const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+        document.addEventListener('keydown', handler);
+        return () => document.removeEventListener('keydown', handler);
+    }, [onClose]);
+
     const initials = client.fullName?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || client.username.slice(0, 2).toUpperCase();
 
     return (

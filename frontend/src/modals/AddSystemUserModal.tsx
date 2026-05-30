@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import CloseIcon from '@mui/icons-material/Close';
 import CheckIcon from '@mui/icons-material/Check';
@@ -6,6 +6,8 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import { generatePassword } from '../utils/formatters';
+import { getPhoneError } from '../utils/validators';
+import { useAuth } from '../stores/authStore';
 
 interface AddSystemUserModalProps {
     onClose: () => void;
@@ -20,8 +22,22 @@ export default function AddSystemUserModal({ onClose, onSave }: AddSystemUserMod
     const [password, setPassword] = useState(generatePassword());
     const [showPass, setShowPass] = useState(false);
     const [active, setActive] = useState(true);
+    const [loading, setLoading] = useState(false);
+
+    //  Get current user to check if they're a SUPER_ADMIN
+    const { user: currentUser } = useAuth();
+
+    // ESC key handler
+    useEffect(() => {
+        const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+        document.addEventListener('keydown', handler);
+        return () => document.removeEventListener('keydown', handler);
+    }, [onClose]);
+
+    const phoneError = getPhoneError(phone);
 
     const handleSave = () => {
+        setLoading(true);
         if (onSave) onSave({ username, email, phone, role, password, status: active ? 'Active' : 'Inactive' });
         onClose();
     };
@@ -51,7 +67,8 @@ export default function AddSystemUserModal({ onClose, onSave }: AddSystemUserMod
                         <div className="form-group">
                             <label className="form-label">Role <span className="required">*</span></label>
                             <select className="form-select" value={role} onChange={e => setRole(e.target.value)}>
-                                <option>Super Admin</option>
+                                {/* Only show Super Admin option to existing SUPER_ADMIN users */}
+                                {currentUser?.role === 'SUPER_ADMIN' && <option>Super Admin</option>}
                                 <option>Admin</option>
                                 <option>Agent</option>
                                 <option>Viewer</option>
@@ -67,6 +84,8 @@ export default function AddSystemUserModal({ onClose, onSave }: AddSystemUserMod
                         <div className="form-group">
                             <label className="form-label">Phone Number</label>
                             <input type="text" className="form-input" placeholder="255XXXXXXXXX" value={phone} onChange={e => setPhone(e.target.value)} />
+                            {/* Phone validation */}
+                            {phoneError && <div className="form-hint" style={{ color: 'var(--danger)' }}>{phoneError}</div>}
                         </div>
                     </div>
 
@@ -101,8 +120,8 @@ export default function AddSystemUserModal({ onClose, onSave }: AddSystemUserMod
                     <div className="modal-footer-left">Fields marked with <span style={{ color: 'var(--primary)' }}>*</span> are required</div>
                     <div className="modal-footer-right">
                         <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
-                        <button className="btn btn-primary" onClick={handleSave} disabled={!username || !email || !password}>
-                            <CheckIcon fontSize="small" /> Create User
+                        <button className="btn btn-primary" onClick={handleSave} disabled={loading || !username || !email || !password || !!phoneError}>
+                            <CheckIcon fontSize="small" /> {loading ? 'Creating...' : 'Create User'}
                         </button>
                     </div>
                 </div>

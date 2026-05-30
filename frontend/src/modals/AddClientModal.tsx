@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import CloseIcon from '@mui/icons-material/Close';
 import CheckIcon from '@mui/icons-material/Check';
@@ -7,6 +7,8 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import KeyIcon from '@mui/icons-material/Key';
 import PowerSettingsNewIcon from '@mui/icons-material/PowerSettingsNew';
 import { generatePassword, generateUsername } from '../utils/formatters';
+import { clientsApi } from '../api';
+import { getPhoneError } from '../utils/validators';
 
 interface AddClientModalProps {
     onClose: () => void;
@@ -24,24 +26,45 @@ export default function AddClientModal({ onClose, onSave }: AddClientModalProps)
     const [enablePPPoE, setEnablePPPoE] = useState(false);
     const [pppoePassword, setPppoePassword] = useState('');
     const [activateNow, setActivateNow] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+
+    // ESC key handler
+    useEffect(() => {
+        const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+        document.addEventListener('keydown', handler);
+        return () => document.removeEventListener('keydown', handler);
+    }, [onClose]);
 
     const handleRefreshPassword = () => {
         setLoginPassword(generatePassword());
     };
 
-    const handleSave = () => {
-        if (onSave) {
-            onSave({
+    const phoneError = getPhoneError(phoneNumber);
+
+    // Send data directly to API instead of relying on parent callback
+    const handleSave = async () => {
+        if (!fullName) return;
+        setLoading(true);
+        setError('');
+        try {
+            await clientsApi.create({
+                username,
                 fullName,
-                email,
-                phone: phoneNumber,
+                email: email || undefined,
+                phone: phoneNumber || undefined,
                 accountType: accountType === 'Hotspot' ? 'PERSONAL' : accountType.toUpperCase(),
+                serviceType: accountType === 'Hotspot' ? 'HOTSPOT' : (enablePPPoE ? 'PPPOE' : 'HOTSPOT'),
                 password: loginPassword,
-                serviceType: accountType === 'Hotspot' ? 'HOTSPOT' : (enablePPPoE ? 'PPPoE' : 'HOTSPOT'),
-                status: activateNow ? 'Active' : 'Inactive',
+                status: activateNow ? 'ACTIVE' : 'INACTIVE',
             });
+            onSave?.({}); // notify parent to refresh list
+            onClose();
+        } catch (err: any) {
+            setError(err.message || 'Failed to create client');
+        } finally {
+            setLoading(false);
         }
-        onClose();
     };
 
     return (
@@ -65,6 +88,17 @@ export default function AddClientModal({ onClose, onSave }: AddClientModalProps)
 
                 {/* Body */}
                 <div className="modal-body">
+                    {/* Error display */}
+                    {error && (
+                        <div style={{
+                            background: '#fee2e2', color: '#dc2626', padding: '10px 14px',
+                            borderRadius: 8, marginBottom: 16, fontSize: '0.82rem', fontWeight: 500,
+                            border: '1px solid #fecaca'
+                        }}>
+                            {error}
+                        </div>
+                    )}
+
                     {/* Client Information */}
                     <div className="form-section-title">
                         <SettingsIcon fontSize="small" /> Client Information
@@ -137,7 +171,11 @@ export default function AddClientModal({ onClose, onSave }: AddClientModalProps)
                                     onChange={(e) => setPhoneNumber(e.target.value)}
                                 />
                             </div>
-                            <div className="form-hint">For SMS notifications</div>
+                            {/* Phone validation error */}
+                            {phoneError
+                                ? <div className="form-hint" style={{ color: 'var(--danger)' }}>{phoneError}</div>
+                                : <div className="form-hint">For SMS notifications</div>
+                            }
                         </div>
                     </div>
 
@@ -211,8 +249,8 @@ export default function AddClientModal({ onClose, onSave }: AddClientModalProps)
                         <button className="btn btn-secondary" onClick={onClose}>
                             Cancel
                         </button>
-                        <button className="btn btn-primary" onClick={handleSave} disabled={!fullName}>
-                            <CheckIcon fontSize="small" /> Create Client
+                        <button className="btn btn-primary" onClick={handleSave} disabled={loading || !fullName || !!phoneError}>
+                            <CheckIcon fontSize="small" /> {loading ? 'Creating...' : 'Create Client'}
                         </button>
                     </div>
                 </div>
