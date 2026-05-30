@@ -8,7 +8,7 @@
     "build:full": "npx prisma generate && NODE_OPTIONS=--max-old-space-size=1536 next build",
     "start": "bash scripts/droplet-start.sh",
     "start:droplet": "bash scripts/droplet-start.sh",
-    "next:start": "next start --hostname 0.0.0.0 --port ${PORT:-3000}",
+    "next:start": "next start --hostname 127.0.0.1 --port ${PORT:-3000}",
 
     "db:seed": "npx tsx scripts/seed.ts",
     "db:migrate": "npx prisma migrate deploy",
