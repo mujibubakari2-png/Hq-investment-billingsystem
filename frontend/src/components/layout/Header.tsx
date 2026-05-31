@@ -84,7 +84,7 @@ export default function Header({ onToggleSidebar, darkMode, onToggleDarkMode }: 
     };
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', width: '100%', position: 'sticky', top: 0, zIndex: 100 }}>
             {/* License expiry warning banner */}
             {license &&
                 typeof license.daysRemaining === 'number' &&

@@ -191,7 +191,7 @@ export default function AddRouterModal({ onClose, onSave, initialData }: AddRout
                         </div>
 
                         {/* Split Options */}
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                        <div className="responsive-grid-2" style={{ gap: 16 }}>
                             {/* WireGuard Only */}
                             <div
                                 onClick={() => setVpnMode('wireguard')}
@@ -309,7 +309,7 @@ export default function AddRouterModal({ onClose, onSave, initialData }: AddRout
                                 border: '1.5px solid var(--border)', borderRadius: 'var(--radius)',
                                 animation: 'fadeIn 0.3s ease-out'
                             }}>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+                                <div className="responsive-grid-2" style={{ gap: 16, marginBottom: 16 }}>
                                     <div className="form-group">
                                         <label className="form-label" style={{ fontSize: '0.8rem', fontWeight: 700, marginBottom: 8, display: 'block' }}>
                                             Router IP / Host Address
@@ -337,7 +337,7 @@ export default function AddRouterModal({ onClose, onSave, initialData }: AddRout
                                         />
                                     </div>
                                 </div>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                                <div className="responsive-grid-2" style={{ gap: 16 }}>
                                     {/* apiPort and port are now independent fields */}
                                     <div className="form-group">
                                         <label className="form-label" style={{ fontSize: '0.8rem', fontWeight: 700, marginBottom: 8, display: 'block' }}>

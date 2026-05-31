@@ -61,7 +61,7 @@
   --glass-blur: blur(16px);
 
   --sidebar-width: 260px;
-  --sidebar-collapsed: 0px;
+  --sidebar-collapsed-width: 70px;
   --header-height: 64px;
 
   --font: 'Outfit', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -174,8 +174,8 @@ table {
 }
 
 .main-content.sidebar-collapsed {
-  margin-left: 0;
-  width: 100%;
+  margin-left: var(--sidebar-collapsed-width);
+  width: calc(100% - var(--sidebar-collapsed-width));
 }
 
 /* Mobile: no sidebar offset */
@@ -1232,6 +1232,27 @@ table {
   margin-bottom: 20px;
 }
 
+/* Responsive Modal Grids */
+.responsive-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.responsive-grid-3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 16px;
+}
+
+.responsive-form-row {
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  align-items: center;
+  gap: 16px;
+}
+
+
 .card-header {
   display: flex;
   align-items: center;
@@ -1324,8 +1345,15 @@ table {
 
   /* Forms */
   .form-row,
-  .form-row-3 {
+  .form-row-3,
+  .responsive-grid-2,
+  .responsive-grid-3,
+  .responsive-form-row {
     grid-template-columns: 1fr;
+  }
+  
+  .responsive-form-row {
+    align-items: flex-start;
   }
 
   /* Page header */
@@ -1381,6 +1409,36 @@ table {
   .modal-overlay {
     align-items: flex-end;
     padding: 0;
+  }
+
+  .modal-header {
+    padding: 16px 20px;
+  }
+
+  .modal-body {
+    padding: 16px 20px;
+  }
+
+  .modal-footer {
+    padding: 16px 20px;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .modal-footer-left {
+    text-align: center;
+    width: 100%;
+  }
+
+  .modal-footer-right {
+    width: 100%;
+    display: flex;
+    gap: 12px;
+  }
+
+  .modal-footer-right .btn {
+    flex: 1;
+    justify-content: center;
   }
 
   /* Pagination */

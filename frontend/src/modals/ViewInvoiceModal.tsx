@@ -74,7 +74,7 @@ export default function ViewInvoiceModal({ invoice, onClose }: ViewInvoiceModalP
                 </div>
 
                 <div className="modal-body">
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 20 }}>
+                    <div className="responsive-grid-3" style={{ marginBottom: 20 }}>
                         <div>
                             <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Status</div>
                             <span className={`badge ${invoice.status === 'Paid' ? 'active' : invoice.status === 'Overdue' ? 'expired' : 'inactive'}`}>

@@ -334,8 +334,7 @@ PersistentKeepalive = 25`;
                 </div>
 
                 {/* Key Info Bar */}
-                <div style={{
-                    display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12,
+                <div className="responsive-grid-3" style={{
                     padding: '12px 24px', background: '#f8fafc', borderBottom: '1px solid var(--border-light)',
                 }}>
                     <div>

@@ -202,6 +202,7 @@ export default function Sidebar({ isOpen, collapsed = false, onClose }: SidebarP
                                             `nav-item${isActive || location.pathname === item.path ? ' active' : ''}`
                                         }
                                         onClick={onClose}
+                                        title={item.label}
                                     >
                                         <span className="nav-icon">{iconMap[item.icon]}</span>
                                         <span className="nav-label">{item.label}</span>

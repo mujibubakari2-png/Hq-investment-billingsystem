@@ -147,7 +147,7 @@ export default function GenerateVouchersModal({ onClose, onGenerate }: GenerateV
                     {loadingData && (
                         <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--text-secondary)' }}>Loading...</div>
                     )}
-                    <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr', alignItems: 'center', marginBottom: 20 }}>
+                    <div className="responsive-form-row" style={{ marginBottom: 20 }}>
                         <label className="form-label" style={{ marginBottom: 0, fontWeight: 500 }}>Package Type</label>
                         <select className="form-select" value={packageType} onChange={e => setPackageType(e.target.value)}>
                             <option value="">Select Package Type</option>
@@ -156,7 +156,7 @@ export default function GenerateVouchersModal({ onClose, onGenerate }: GenerateV
                         </select>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr', alignItems: 'center', marginBottom: 20 }}>
+                    <div className="responsive-form-row" style={{ marginBottom: 20 }}>
                         <label className="form-label" style={{ marginBottom: 0, fontWeight: 500 }}>Router</label>
                         <select className="form-select" value={routerId} onChange={e => setRouterId(e.target.value)}>
                             <option value="">Select Router</option>
@@ -166,7 +166,7 @@ export default function GenerateVouchersModal({ onClose, onGenerate }: GenerateV
                         </select>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr', alignItems: 'center', marginBottom: 20 }}>
+                    <div className="responsive-form-row" style={{ marginBottom: 20 }}>
                         <label className="form-label" style={{ marginBottom: 0, fontWeight: 500 }}>Package</label>
                         <select className="form-select" value={packageId} onChange={e => setPackageId(e.target.value)}>
                             <option value="">Select Package</option>
@@ -176,18 +176,18 @@ export default function GenerateVouchersModal({ onClose, onGenerate }: GenerateV
                         </select>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr', alignItems: 'center', marginBottom: 20 }}>
+                    <div className="responsive-form-row" style={{ marginBottom: 20 }}>
                         <label className="form-label" style={{ marginBottom: 0, fontWeight: 500 }}>Number of Vouchers</label>
                         <input type="number" className="form-input" min={1} max={500} value={count} onChange={e => setCount(Number(e.target.value))} />
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr', alignItems: 'center', marginBottom: 24 }}>
+                    <div className="responsive-form-row" style={{ marginBottom: 24 }}>
                         <label className="form-label" style={{ marginBottom: 0, fontWeight: 500 }}>Code Length</label>
                         <input type="number" className="form-input" min={4} max={20} value={codeLength} onChange={e => setCodeLength(Number(e.target.value))} />
                     </div>
 
                     {/* Advanced Options Toggle */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr', alignItems: 'center', marginBottom: 20 }}>
+                    <div className="responsive-form-row" style={{ marginBottom: 20 }}>
                         <div />
                         <button
                             className="btn btn-secondary"
@@ -201,7 +201,7 @@ export default function GenerateVouchersModal({ onClose, onGenerate }: GenerateV
 
                     {showAdvanced && (
                         <>
-                            <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr', alignItems: 'center', marginBottom: 20 }}>
+                            <div className="responsive-form-row" style={{ marginBottom: 20 }}>
                                 <label className="form-label" style={{ marginBottom: 0, fontWeight: 500 }}>Code Format</label>
                                 <div style={{ display: 'flex' }}>
                                     {([
@@ -232,12 +232,12 @@ export default function GenerateVouchersModal({ onClose, onGenerate }: GenerateV
                                 </div>
                             </div>
 
-                            <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr', alignItems: 'center', marginBottom: 20 }}>
+                            <div className="responsive-form-row" style={{ marginBottom: 20 }}>
                                 <label className="form-label" style={{ marginBottom: 0, fontWeight: 500 }}>Prefix</label>
                                 <input type="text" className="form-input" placeholder="e.g., WIFI-" value={prefix} onChange={e => setPrefix(e.target.value)} maxLength={10} />
                             </div>
 
-                            <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr', alignItems: 'flex-start', marginBottom: 20 }}>
+                            <div className="responsive-form-row" style={{ marginBottom: 20, alignItems: 'flex-start' }}>
                                 <label className="form-label" style={{ marginBottom: 0, marginTop: 10, fontWeight: 500 }}>SMS Notification</label>
                                 <div>
                                     <div style={{ display: 'flex' }}>

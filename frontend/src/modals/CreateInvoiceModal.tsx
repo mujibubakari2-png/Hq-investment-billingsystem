@@ -157,8 +157,9 @@ export default function CreateInvoiceModal({ onClose, onSave }: CreateInvoiceMod
                             </button>
                         </div>
 
+                        <div style={{ overflowX: 'auto' }}>
                         {items.map((item, i) => (
-                            <div key={i} style={{ display: 'grid', gridTemplateColumns: '2fr 80px 120px 40px', gap: 8, marginBottom: 8, alignItems: 'end' }}>
+                            <div key={i} style={{ display: 'grid', gridTemplateColumns: '2fr 80px 120px 40px', gap: 8, marginBottom: 8, alignItems: 'end', minWidth: 380 }}>
                                 <div className="form-group" style={{ margin: 0 }}>
                                     {i === 0 && <label className="form-label" style={{ fontSize: '0.75rem' }}>Description</label>}
                                     <input type="text" className="form-input" placeholder="Item description" value={item.description} onChange={e => updateItem(i, 'description', e.target.value)} />
@@ -176,6 +177,7 @@ export default function CreateInvoiceModal({ onClose, onSave }: CreateInvoiceMod
                                 </button>
                             </div>
                         ))}
+                        </div>
 
                         <div style={{ textAlign: 'right', fontWeight: 700, fontSize: '1.1rem', marginTop: 12, padding: '12px 0', borderTop: '2px solid var(--border)' }}>
                             Total: {total.toLocaleString()} TZS

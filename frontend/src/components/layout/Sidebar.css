@@ -36,10 +36,42 @@
     }
 }
 
-/* Desktop hidden (collapsed via toggle) */
+/* Desktop mini-sidebar (collapsed via toggle) */
 @media (min-width: 769px) {
     .sidebar.collapsed {
-        transform: translateX(-100%) !important;
+        width: var(--sidebar-collapsed-width) !important;
+    }
+    
+    .sidebar.collapsed .sidebar-header {
+        justify-content: center;
+        padding: 20px 0 16px;
+    }
+
+    .sidebar.collapsed .brand-name {
+        font-size: 1.1rem;
+        text-align: center;
+    }
+
+    .sidebar.collapsed .brand-sub {
+        display: none;
+    }
+
+    .sidebar.collapsed .nav-section-title {
+        display: none;
+    }
+
+    .sidebar.collapsed .nav-item {
+        justify-content: center;
+        padding: 14px 0;
+    }
+
+    .sidebar.collapsed .nav-icon {
+        margin: 0;
+        transform: scale(1.15);
+    }
+
+    .sidebar.collapsed .nav-label {
+        display: none;
     }
 }
 
