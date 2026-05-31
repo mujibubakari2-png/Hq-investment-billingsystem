@@ -9,7 +9,7 @@ import TimerOffIcon from '@mui/icons-material/TimerOff';
 import TodayIcon from '@mui/icons-material/Today';
 import WifiIcon from '@mui/icons-material/Wifi';
 import PersonIcon from '@mui/icons-material/Person';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { expiredSubscribersApi, subscriptionsApi, routersApi } from '../api';
 import { formatDate } from '../utils/formatters';
 import type { ExpiredSubscriber, Router } from '../types';
@@ -137,7 +137,7 @@ export default function ExpiredSubscribers() {
                 </div>
                 <div className="page-header-right">
                     <div className="breadcrumb">
-                        <a href="/">Dashboard</a> <span>/</span> <a href="/active-subscribers">Plans</a>{' '}
+                        <Link to="/">Dashboard</Link> <span>/</span> <Link to="/active-subscribers">Plans</Link>{' '}
                         <span>/</span> Expired
                     </div>
                 </div>

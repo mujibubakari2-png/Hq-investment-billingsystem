@@ -7,7 +7,7 @@ import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import SaveIcon from '@mui/icons-material/Save';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SyncIcon from '@mui/icons-material/Sync';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, Link } from 'react-router-dom';
 import { subscriptionsApi, packagesApi, routersApi } from '../api';
 
 interface SubscriptionDetail {
@@ -235,8 +235,8 @@ export default function EditPlan() {
                 </div>
                 <div className="page-header-right">
                     <div className="breadcrumb">
-                        <a href="/">Dashboard</a> <span>/</span>{' '}
-                        <a href="/active-subscribers">Subscribers</a> <span>/</span> Edit
+                        <Link to="/">Dashboard</Link> <span>/</span>{' '}
+                        <Link to="/active-subscribers">Subscribers</Link> <span>/</span> Edit
                     </div>
                 </div>
             </div>
