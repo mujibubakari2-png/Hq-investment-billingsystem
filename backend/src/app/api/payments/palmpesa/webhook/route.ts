@@ -108,15 +108,16 @@ export async function POST(req: NextRequest) {
                 from: env.SMTP_FROM,
                 to: invoice.tenant.email,
                 subject: "Payment Received & Account Activated",
-                text: `Hello ${invoice.tenant.name},\n\nYour payment of ${Amount} has been received. Your account has been successfully renewed and activated!\n\nLog in here: ${process.env.APP_URL || env.NEXT_PUBLIC_APP_URL || 'http://174.138.42.168'}/`,
-                html: `<div style="font-family: sans-serif; padding: 20px;">
-                        <h2>Account Activated!</h2>
+                text: `Hello ${invoice.tenant.name},\n\nYour payment of ${Amount} has been received. Your account has been successfully renewed and activated!\n\nLog in here: ${process.env.APP_URL || env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001'}/`,
+                html: `
+                    <div style="font-family: sans-serif; padding: 20px;">
+                        <h2>Payment Received - Account Activated</h2>
                         <p>Hello <strong>${invoice.tenant.name}</strong>,</p>
-                        <p>We have successfully received your payment of <strong>${Amount}/=</strong>.</p>
-                        <p>Your subscription has been renewed and your account is now <strong>ACTIVE</strong>.</p>
-                        <a href="${process.env.APP_URL || env.NEXT_PUBLIC_APP_URL || 'http://174.138.42.168'}" style="background-color: #1d4ed8; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin-top: 10px;">Log In to Dashboard</a>
-                       </div>`
-            };
+                        <p>Your payment of <strong>${Amount}</strong> has been received.</p>
+                        <p>Your account has been successfully renewed and activated!</p>
+                        <a href="${process.env.APP_URL || env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001'}" style="background-color: #1d4ed8; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin-top: 10px;">Log In to Dashboard</a>
+                    </div>
+                `,};
 
             await transporter.sendMail(mailOptions);
             console.log("Activation email sent successfully to", invoice.tenant.email);

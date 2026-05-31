@@ -32,8 +32,8 @@ const swaggerOptions = {
         },
         servers: [
             {
-                url: 'http://174.138.42.168',
-                description: 'Production server (DigitalOcean Droplet)',
+                url: process.env.APP_URL || 'https://api.yourdomain.com',
+                description: 'Production server',
             },
             {
                 url: 'http://localhost:3001',

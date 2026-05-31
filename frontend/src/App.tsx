@@ -82,7 +82,7 @@ function PageLoader() {
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename="/billing">
       {/* E18 FIX: ErrorBoundary wraps all routes so a crash in any page */}
       {/* renders a friendly recovery screen instead of a blank white page  */}
       <ErrorBoundary>

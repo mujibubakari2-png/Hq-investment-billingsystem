@@ -22,7 +22,7 @@ function getPortalUrl(): string {
         process.env.ACCOUNT_PORTAL_URL ||
         process.env.APP_URL ||
         process.env.NEXT_PUBLIC_APP_URL ||
-        "http://174.138.42.168/"
+        "http://localhost:3001/"
     );
 }
 
