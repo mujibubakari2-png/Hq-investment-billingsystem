@@ -179,7 +179,7 @@ export default function App() {
               <div style={{ fontSize: '4rem', lineHeight: 1 }}>404</div>
               <strong style={{ fontSize: '1.2rem', color: 'var(--text-primary)' }}>Page Not Found</strong>
               <p style={{ margin: 0, fontSize: '0.9rem' }}>The page you requested does not exist.</p>
-              <a href="/dashboard" style={{
+              <a href="/billing/dashboard" style={{
                 marginTop: '0.5rem',
                 padding: '0.5rem 1.25rem',
                 background: 'var(--primary)',

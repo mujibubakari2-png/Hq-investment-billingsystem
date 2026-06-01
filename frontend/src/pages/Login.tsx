@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
@@ -91,9 +91,9 @@ export default function Login() {
                         </div>
                     </div>
                     <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-                        <a href="/register" style={{ color: '#008ee6', textDecoration: 'none', fontWeight: 500, fontSize: '1rem' }}>
+                        <Link to="/register" style={{ color: '#008ee6', textDecoration: 'none', fontWeight: 500, fontSize: '1rem' }}>
                             Create your free account
-                        </a>
+                        </Link>
                     </div>
 
                     {isGoogleConfigured && (
@@ -166,9 +166,9 @@ export default function Login() {
                                 />
                                 Remember me
                             </label>
-                            <a href="/forgot-password" style={{ color: '#008ee6', textDecoration: 'none', fontSize: '0.95rem', fontWeight: 500 }}>
+                            <Link to="/forgot-password" style={{ color: '#008ee6', textDecoration: 'none', fontSize: '0.95rem', fontWeight: 500 }}>
                                 Forgot password?
-                            </a>
+                            </Link>
                         </div>
 
                         <button

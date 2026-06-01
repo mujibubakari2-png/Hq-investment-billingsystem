@@ -279,7 +279,7 @@ export default function TutorialVideos() {
                             padding: '10px 24px', fontSize: '0.9rem',
                             borderRadius: 8, border: 'none', cursor: 'pointer',
                         }}
-                        onClick={() => window.location.href = '/technical-support'}
+                        onClick={() => window.location.href = '/billing/technical-support'}
                     >
                         Contact Support
                     </button>

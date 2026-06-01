@@ -47,7 +47,8 @@ async function refreshToken(): Promise<boolean> {
 function forceLogout(): never {
     if (typeof window !== 'undefined') {
         try { localStorage.removeItem('user'); } catch { /* ignore */ }
-        window.location.href = '/login';
+        // E18 FIX: Use the correct basename
+        window.location.href = '/billing/login';
     }
     throw new Error('Unauthorized');
 }
