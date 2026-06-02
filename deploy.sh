@@ -113,7 +113,14 @@ if [ "$FRONTEND_ONLY" = false ]; then
     ok "Backend built"
 fi
 
-# ── 5. Build frontend (Vite SPA) ──────────────────────────────────────────────
+# ── 5. Build landing page ─────────────────────────────────────────────────────
+if [ "$BACKEND_ONLY" = false ]; then
+    step "Building landing page"
+    pnpm run build --filter=landing-page 2>&1 | tee -a "$LOG_FILE" || fail "Landing page build failed"
+    ok "Landing page built"
+fi
+
+# ── 6. Build frontend (Vite SPA) ──────────────────────────────────────────────
 if [ "$BACKEND_ONLY" = false ]; then
     step "Building frontend (Vite SPA)"
     pnpm run build --filter=frontend 2>&1 | tee -a "$LOG_FILE" || fail "Frontend build failed"
@@ -134,7 +141,7 @@ if [ "$FRONTEND_ONLY" = false ] && [ "$BACKEND_ONLY" = false ]; then
     ok "Landing page started"
 fi
 
-# ── 8. Save PM2 state ────────────────────────────────────────────────────────
+# ── 9. Save PM2 state ────────────────────────────────────────────────────────
 step "Saving PM2 process list"
 pm2 save
 ok "PM2 state saved"

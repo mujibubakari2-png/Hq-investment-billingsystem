@@ -92,6 +92,9 @@ sudo cp -r frontend/dist/* /var/www/html/billing/
 # Run DB migrations
 pnpm --filter backend prisma migrate deploy
 
+# Build landing page
+pnpm --filter landing-page build
+
 # Start/restart with PM2
 cd /var/www/Hq-investment-billingsystem
 pm2 start ecosystem.config.js --update-env

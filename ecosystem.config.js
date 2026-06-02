@@ -15,7 +15,7 @@ module.exports = {
     {
       name: 'backend',
       cwd: '/var/www/Hq-investment-billingsystem/backend',
-      script: './node_modules/next/dist/bin/next',
+      script: '/var/www/Hq-investment-billingsystem/backend/node_modules/next/dist/bin/next',
       interpreter: 'node',
       args: 'start --hostname 127.0.0.1 --port 3000',
       instances: 1,                        // single instance for single-core server
@@ -35,13 +35,13 @@ module.exports = {
       }
     },
 
-    // ─── Landing Page (Next.js / static server) ───────────────────────────────
-    // If landing-page is pure static HTML served by Nginx, remove this block
-    // and point Nginx root to /var/www/Hq-investment-billingsystem/landing-page/public
+    // ─── Landing Page (Next.js / PM2 managed) ───────────────────────────────
+    // This landing page is a Next.js app and should be served via PM2 on port 3001.
+    // If you later switch to a static export, remove this block and update Nginx.
     {
       name: 'landing-page',
       cwd: '/var/www/Hq-investment-billingsystem/landing-page',
-      script: './node_modules/next/dist/bin/next',
+      script: '/var/www/Hq-investment-billingsystem/landing-page/node_modules/next/dist/bin/next',
       interpreter: 'node',
       args: 'start --hostname 127.0.0.1 --port 3001',
       instances: 1,                        // single instance is fine for landing page
@@ -78,6 +78,7 @@ module.exports = {
       'post-deploy':
         'pnpm install --frozen-lockfile && ' +
         'pnpm run build --filter=backend && ' +
+        'pnpm run build --filter=landing-page && ' +
         'pnpm run build --filter=frontend && ' +
         'pm2 reload ecosystem.config.js --env production',
       'pre-setup': ''

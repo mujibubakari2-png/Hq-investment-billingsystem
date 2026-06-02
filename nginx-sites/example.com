@@ -36,8 +36,22 @@ server {
     include             /etc/letsencrypt/options-ssl-nginx.conf;
     ssl_dhparam         /etc/letsencrypt/ssl-dhparams.pem;
 
-    root  /var/www/Hq-investment-billingsystem/landing-page/public;
-    index index.html;
+    # This landing page is a Next.js app managed by PM2 on port 3001.
+    # Nginx proxy passes all requests to the landing-page process.
+
+    location / {
+        proxy_pass http://127.0.0.1:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade          $http_upgrade;
+        proxy_set_header Connection       "upgrade";
+        proxy_cache_bypass $http_upgrade;
+        proxy_read_timeout 120s;
+        proxy_send_timeout 120s;
+    }
 
     # ── Security Headers ──────────────────────────────────────────────────────
     add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
