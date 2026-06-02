@@ -4,21 +4,21 @@
   "private": true,
   "scripts": {
     "dev": "next dev --hostname 0.0.0.0 --port 3001",
-    "build": "npx prisma generate && node --max-old-space-size=1536 node_modules/next/dist/bin/next build",
-    "build:full": "npx prisma generate && node --max-old-space-size=1536 node_modules/next/dist/bin/next build",
+    "build": "prisma generate && node --max-old-space-size=1536 node_modules/next/dist/bin/next build",
+    "build:full": "prisma generate && node --max-old-space-size=1536 node_modules/next/dist/bin/next build",
     "start": "next start --hostname 127.0.0.1 --port ${PORT:-3000}",
     "start:droplet": "bash scripts/droplet-start.sh",
     "next:start": "next start --hostname 127.0.0.1 --port ${PORT:-3000}",
 
-    "db:seed": "npx tsx scripts/seed.ts",
-    "db:migrate": "npx prisma migrate deploy",
+    "db:seed": "tsx scripts/seed.ts",
+    "db:migrate": "prisma migrate deploy",
 
-    "db:check-migrations": "npx tsx scripts/check-migrations.js",
-    "db:fix-migrations": "npx tsx scripts/fix-migrations.js",
-    "db:generate": "npx prisma generate"
+    "db:check-migrations": "tsx scripts/check-migrations.js",
+    "db:fix-migrations": "tsx scripts/fix-migrations.js",
+    "db:generate": "prisma generate"
   },
   "prisma": {
-    "seed": "npx tsx scripts/seed.ts"
+    "seed": "tsx scripts/seed.ts"
   },
   "engines": {
     "node": ">=22.12.0"
@@ -30,8 +30,9 @@
     ]
   },
   "dependencies": {
-    "@prisma/adapter-pg": "^7.4.2",
-    "@prisma/client": "^7.4.2",
+    "@prisma/adapter-pg": "7.7.0",
+    "@prisma/client": "7.7.0",
+    "@prisma/client-runtime-utils": "7.7.0",
     "@types/nodemailer": "^7.0.11",
     "bcryptjs": "^3.0.3",
     "dotenv": "^17.3.1",
@@ -54,7 +55,7 @@
     "@types/react-dom": "^18.3.1",
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
-    "prisma": "^7.4.2",
+    "prisma": "7.7.0",
     "typescript": "^5"
   }
 }

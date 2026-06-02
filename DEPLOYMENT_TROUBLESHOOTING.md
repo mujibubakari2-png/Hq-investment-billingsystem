@@ -115,11 +115,11 @@ Backend:
 ```json
 {
   "scripts": {
-    "build": "npx prisma generate && node --max-old-space-size=1536 node_modules/next/dist/bin/next build",
+    "build": "prisma generate && node --max-old-space-size=1536 node_modules/next/dist/bin/next build",
     "start": "next start --hostname 127.0.0.1 --port ${PORT:-3000}",
     "start:droplet": "bash scripts/droplet-start.sh",
     "next:start": "next start --hostname 127.0.0.1 --port ${PORT:-3000}",
-    "db:migrate": "npx prisma migrate deploy"
+    "db:migrate": "prisma migrate deploy"
   }
 }
 ```
@@ -167,8 +167,8 @@ corepack enable
 pnpm install --frozen-lockfile
 
 cd /var/www/Hq-investment-billingsystem/backend
-pnpm exec prisma generate
-pnpm exec prisma migrate deploy
+pnpm --filter backend exec prisma generate
+pnpm --filter backend exec prisma migrate deploy
 
 cd /var/www/Hq-investment-billingsystem
 pnpm --filter backend build

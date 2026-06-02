@@ -11,11 +11,14 @@ importers:
   backend:
     dependencies:
       '@prisma/adapter-pg':
-        specifier: ^7.4.2
+        specifier: 7.7.0
         version: 7.7.0
       '@prisma/client':
-        specifier: ^7.4.2
+        specifier: 7.7.0
         version: 7.7.0(prisma@7.7.0(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.9.3))(typescript@5.9.3)
+      '@prisma/client-runtime-utils':
+        specifier: 7.7.0
+        version: 7.7.0
       '@types/nodemailer':
         specifier: ^7.0.11
         version: 7.0.11
@@ -78,7 +81,7 @@ importers:
         specifier: ^16.4.0
         version: 16.4.0
       prisma:
-        specifier: ^7.4.2
+        specifier: 7.7.0
         version: 7.7.0(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.9.3)
       typescript:
         specifier: ^5
