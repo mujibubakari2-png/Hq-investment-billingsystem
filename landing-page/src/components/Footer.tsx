@@ -27,8 +27,8 @@ export default function Footer() {
               <li><Link href="#features" className="text-blue-100 hover:text-white transition-colors">Features</Link></li>
               <li><Link href="#pricing" className="text-blue-100 hover:text-white transition-colors">Pricing</Link></li>
               <li><Link href="#contact" className="text-blue-100 hover:text-white transition-colors">Contact</Link></li>
-              <li><Link href={`${process.env.NEXT_PUBLIC_BILLING_SYSTEM_URL}/login`} className="text-blue-100 hover:text-white transition-colors">Login</Link></li>
-              <li><Link href={`${process.env.NEXT_PUBLIC_BILLING_SYSTEM_URL}/register`} className="text-blue-100 hover:text-white transition-colors">Register</Link></li>
+              <li><Link href={`${process.env.NEXT_PUBLIC_BILLING_SYSTEM_URL}/billing/login`} className="text-blue-100 hover:text-white transition-colors">Login</Link></li>
+              <li><Link href={`${process.env.NEXT_PUBLIC_BILLING_SYSTEM_URL}/billing/register`} className="text-blue-100 hover:text-white transition-colors">Register</Link></li>
             </ul>
           </div>
           <div>

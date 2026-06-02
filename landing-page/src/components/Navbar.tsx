@@ -20,15 +20,15 @@ export default function Navbar() {
             <Link href="#features" className="text-gray-700 hover:text-primary transition-colors">Features</Link>
             <Link href="#pricing" className="text-gray-700 hover:text-primary transition-colors">Pricing</Link>
             <Link href="#contact" className="text-gray-700 hover:text-primary transition-colors">Contact</Link>
-            <Link 
-              href={`${process.env.NEXT_PUBLIC_BILLING_SYSTEM_URL}/login`}
+            <Link
+              href={`${process.env.NEXT_PUBLIC_BILLING_SYSTEM_URL}/billing/login`}
               className="text-gray-700 hover:text-primary transition-colors font-medium border-l pl-8 ml-8"
             >
               Login
             </Link>
           </div>
           <div className="hidden md:block">
-            <Link 
+            <Link
               href="#pricing"
               className="bg-primary text-white px-6 py-2 rounded-full font-medium hover:bg-accent transition-all inline-block"
             >
@@ -50,16 +50,16 @@ export default function Navbar() {
           <Link href="#features" onClick={() => setIsOpen(false)} className="block text-gray-700 font-medium">Features</Link>
           <Link href="#pricing" onClick={() => setIsOpen(false)} className="block text-gray-700 font-medium">Pricing</Link>
           <Link href="#contact" onClick={() => setIsOpen(false)} className="block text-gray-700 font-medium">Contact</Link>
-          <Link 
-            href={`${process.env.NEXT_PUBLIC_BILLING_SYSTEM_URL}/login`}
-            onClick={() => setIsOpen(false)} 
+          <Link
+            href={`${process.env.NEXT_PUBLIC_BILLING_SYSTEM_URL}/billing/login`}
+            onClick={() => setIsOpen(false)}
             className="block text-gray-700 font-medium border-t pt-4 mt-4"
           >
             Login
           </Link>
-          <Link 
+          <Link
             href="#pricing"
-            onClick={() => setIsOpen(false)} 
+            onClick={() => setIsOpen(false)}
             className="block w-full bg-primary text-white px-6 py-2 rounded-lg font-medium text-center"
           >
             Choose Plan
