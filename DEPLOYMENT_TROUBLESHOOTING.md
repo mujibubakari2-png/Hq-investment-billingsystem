@@ -230,6 +230,43 @@ curl -sS http://127.0.0.1:3000/api/health
 sudo nginx -t
 ```
 
+## Nginx error: "user" directive is not allowed here
+
+If Nginx reports:
+
+```text
+"user" directive is not allowed here in /etc/nginx/sites-enabled/hqinvestment
+```
+
+then the global `nginx.conf` file was copied or symlinked as a site config.
+The `user www-data;` directive belongs only in `/etc/nginx/nginx.conf`, near the
+top of the file, before `events {}` and `http {}`. Files in
+`/etc/nginx/sites-enabled/` are included inside `http {}` and should contain
+site-level `server {}` blocks only.
+
+Repair it from the project root. This removes the bad `hqinvestment` enabled
+site and restores the intended three-vhost structure:
+
+```bash
+sudo cp -a /etc/nginx/sites-enabled/hqinvestment "/tmp/hqinvestment.nginx.bad.$(date +%Y%m%d%H%M%S)" 2>/dev/null || true
+sudo unlink /etc/nginx/sites-enabled/hqinvestment 2>/dev/null || sudo rm -f /etc/nginx/sites-enabled/hqinvestment
+sudo cp -a /etc/nginx/nginx.conf "/tmp/nginx.conf.backup.$(date +%Y%m%d%H%M%S)"
+sudo cp nginx.conf /etc/nginx/nginx.conf
+sudo cp nginx-sites/yourdomain.com /etc/nginx/sites-available/yourdomain.com
+sudo cp nginx-sites/app.yourdomain.com /etc/nginx/sites-available/app.yourdomain.com
+sudo cp nginx-sites/api.yourdomain.com /etc/nginx/sites-available/api.yourdomain.com
+sudo ln -sf /etc/nginx/sites-available/yourdomain.com /etc/nginx/sites-enabled/yourdomain.com
+sudo ln -sf /etc/nginx/sites-available/app.yourdomain.com /etc/nginx/sites-enabled/app.yourdomain.com
+sudo ln -sf /etc/nginx/sites-available/api.yourdomain.com /etc/nginx/sites-enabled/api.yourdomain.com
+sudo nginx -t
+sudo systemctl restart nginx
+sudo systemctl status nginx --no-pager
+```
+
+Before using the templates, replace `yourdomain.com` with your real domain and
+make sure Certbot has created matching certificate files for `yourdomain.com`,
+`app.yourdomain.com`, and `api.yourdomain.com`.
+
 Expected:
 
 - PM2 status is `online`.

@@ -100,6 +100,10 @@ sudo nginx -t
 sudo systemctl restart nginx
 ```
 
+If you previously enabled a broken `/etc/nginx/sites-enabled/hqinvestment` file,
+remove it before enabling the three vhosts above. The `hqinvestment` file should
+not be part of the final production Nginx structure.
+
 ## Step 9: SSL (HTTPS)
 Use Certbot to get a free SSL certificate:
 ```bash

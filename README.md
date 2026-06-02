@@ -112,6 +112,18 @@ pm2 start ecosystem.config.js --env production --update-env
 pm2 save
 ```
 
+Production Nginx should use these three vhost files:
+
+```text
+/etc/nginx/sites-available/yourdomain.com
+/etc/nginx/sites-available/app.yourdomain.com
+/etc/nginx/sites-available/api.yourdomain.com
+```
+
+Keep `nginx.conf` only at `/etc/nginx/nginx.conf`; do not copy it into
+`/etc/nginx/sites-enabled/`, or Nginx will fail with `"user" directive is not
+allowed here`.
+
 ### 3. CI/CD (GitHub Actions)
 Push to `main` → automatically builds and deploys via SSH.
 
