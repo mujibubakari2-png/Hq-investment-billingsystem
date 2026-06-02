@@ -26,7 +26,7 @@ module.exports = {
       min_uptime: '10s',                   // must stay alive 10s to count as "stable"
       watch: false,                        // never watch files in production
       error_file: '/var/www/Hq-investment-billingsystem/logs/backend-error.log',
-      out_file:   '/var/www/Hq-investment-billingsystem/logs/backend-out.log',
+      out_file: '/var/www/Hq-investment-billingsystem/logs/backend-out.log',
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
       merge_logs: true,
       env: {
@@ -52,7 +52,7 @@ module.exports = {
       min_uptime: '10s',
       watch: false,
       error_file: '/var/www/Hq-investment-billingsystem/logs/landing-error.log',
-      out_file:   '/var/www/Hq-investment-billingsystem/logs/landing-out.log',
+      out_file: '/var/www/Hq-investment-billingsystem/logs/landing-out.log',
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
       merge_logs: true,
       env: {
