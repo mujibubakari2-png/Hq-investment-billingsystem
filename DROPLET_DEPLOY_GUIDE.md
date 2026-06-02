@@ -55,11 +55,14 @@ pnpm install
 pnpm build:all
 ```
 
-## Step 6: Deploy Frontend Static Files
-Copy the frontend build files to the Nginx web root:
-```bash
-cp -r frontend/dist/* /var/www/html/billing/
+## Step 6: Frontend Static Files
+The Vite frontend is built into:
+```text
+/var/www/Hq-investment-billingsystem/frontend/dist
 ```
+
+Do not copy it to `/var/www/html`. The `nginx-sites/app.yourdomain.com`
+vhost serves it directly at `/billing/`.
 
 ## Step 7: Start Backend and Landing Page
 Start with PM2:
@@ -70,10 +73,29 @@ pm2 startup
 ```
 
 ## Step 8: Configure Nginx
-Copy the provided Nginx config to the system:
+There are two different kinds of Nginx files:
+
+- `nginx.conf` is the global config and belongs only at `/etc/nginx/nginx.conf`.
+- Files in `nginx-sites/` are vhosts and belong in `/etc/nginx/sites-available/`.
+
+Do not copy `nginx.conf` into `sites-available` or `sites-enabled`. If you do,
+Nginx will fail with: `"user" directive is not allowed here`.
+
+Install the global config:
 ```bash
-sudo cp nginx.conf /etc/nginx/sites-available/hqinvestment
-sudo ln -s /etc/nginx/sites-available/hqinvestment /etc/nginx/sites-enabled/
+sudo cp nginx.conf /etc/nginx/nginx.conf
+```
+
+Install the vhosts:
+```bash
+sudo cp nginx-sites/yourdomain.com /etc/nginx/sites-available/yourdomain.com
+sudo cp nginx-sites/app.yourdomain.com /etc/nginx/sites-available/app.yourdomain.com
+sudo cp nginx-sites/api.yourdomain.com /etc/nginx/sites-available/api.yourdomain.com
+
+sudo ln -sf /etc/nginx/sites-available/yourdomain.com /etc/nginx/sites-enabled/yourdomain.com
+sudo ln -sf /etc/nginx/sites-available/app.yourdomain.com /etc/nginx/sites-enabled/app.yourdomain.com
+sudo ln -sf /etc/nginx/sites-available/api.yourdomain.com /etc/nginx/sites-enabled/api.yourdomain.com
+
 sudo nginx -t
 sudo systemctl restart nginx
 ```
@@ -82,7 +104,9 @@ sudo systemctl restart nginx
 Use Certbot to get a free SSL certificate:
 ```bash
 sudo apt install certbot python3-certbot-nginx
-sudo certbot --nginx -d your-domain.com
+sudo certbot --nginx -d yourdomain.com -d www.yourdomain.com
+sudo certbot --nginx -d app.yourdomain.com
+sudo certbot --nginx -d api.yourdomain.com
 ```
 
 ## Troubleshooting Build Failures (Exit 137 / OOM)
@@ -125,8 +149,9 @@ echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
 # Rebuild only the frontend
 pnpm --filter frontend build
 
-# Deploy static files
-cp -r frontend/dist/* /var/www/html/billing/
+# Nginx serves frontend/dist directly at /billing/
+sudo nginx -t
+sudo systemctl reload nginx
 ```
 
 

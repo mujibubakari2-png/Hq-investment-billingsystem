@@ -75,29 +75,40 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ### 1. Set up SSL (required)
 ```bash
 sudo apt install certbot python3-certbot-nginx
-sudo certbot --nginx -d yourdomain.com
+sudo certbot --nginx -d yourdomain.com -d www.yourdomain.com
+sudo certbot --nginx -d app.yourdomain.com
+sudo certbot --nginx -d api.yourdomain.com
 ```
 
 ### 2. Deploy
 ```bash
-# Build backend
-pnpm --filter backend next:build
-
-# Build frontend
-pnpm --filter frontend build
-
-# Copy frontend to nginx web root
-sudo cp -r frontend/dist/* /var/www/html/billing/
+# Install dependencies
+corepack enable
+pnpm install --frozen-lockfile
 
 # Run DB migrations
-pnpm --filter backend prisma migrate deploy
+pnpm --filter backend exec prisma migrate deploy
 
-# Build landing page
+# Build apps
+pnpm --filter backend build
 pnpm --filter landing-page build
+pnpm --filter frontend build
+
+# Nginx serves frontend/dist directly at /billing/
+sudo cp nginx.conf /etc/nginx/nginx.conf
+sudo cp nginx-sites/yourdomain.com /etc/nginx/sites-available/yourdomain.com
+sudo cp nginx-sites/app.yourdomain.com /etc/nginx/sites-available/app.yourdomain.com
+sudo cp nginx-sites/api.yourdomain.com /etc/nginx/sites-available/api.yourdomain.com
+
+sudo ln -sf /etc/nginx/sites-available/yourdomain.com /etc/nginx/sites-enabled/yourdomain.com
+sudo ln -sf /etc/nginx/sites-available/app.yourdomain.com /etc/nginx/sites-enabled/app.yourdomain.com
+sudo ln -sf /etc/nginx/sites-available/api.yourdomain.com /etc/nginx/sites-enabled/api.yourdomain.com
+
+sudo nginx -t
+sudo systemctl reload nginx
 
 # Start/restart with PM2
-cd /var/www/Hq-investment-billingsystem
-pm2 start ecosystem.config.js --update-env
+pm2 start ecosystem.config.js --env production --update-env
 pm2 save
 ```
 
