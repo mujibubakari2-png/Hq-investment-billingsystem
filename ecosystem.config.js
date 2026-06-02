@@ -15,10 +15,10 @@ module.exports = {
     {
       name: 'backend',
       cwd: '/var/www/Hq-investment-billingsystem/backend',
-      script: './node_modules/.bin/next',
-      args: ['start', '--hostname', '127.0.0.1', '--port', '3000'],
-      instances: 'max',                    // use all CPU cores → scale automatically
-      exec_mode: 'cluster',                // enables pm2 reload (zero downtime)
+      script: 'node_modules/.bin/next',
+      args: 'start --hostname 127.0.0.1 --port 3000',
+      instances: 1,                        // single instance for single-core server
+      exec_mode: 'fork',                   // fork mode: simple, stable, no port conflicts
       max_memory_restart: '512M',          // auto-restart if memory exceeds 512 MB
       exp_backoff_restart_delay: 100,      // delay grows exponentially on crash loops
       max_restarts: 10,                    // give up after 10 consecutive crashes
@@ -40,8 +40,8 @@ module.exports = {
     {
       name: 'landing-page',
       cwd: '/var/www/Hq-investment-billingsystem/landing-page',
-      script: 'pnpm',
-      args: 'start',
+      script: 'node_modules/.bin/next',
+      args: 'start --hostname 127.0.0.1 --port 3001',
       instances: 1,                        // single instance is fine for landing page
       exec_mode: 'fork',
       max_memory_restart: '256M',
