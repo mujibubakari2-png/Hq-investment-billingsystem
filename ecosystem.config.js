@@ -15,8 +15,8 @@ module.exports = {
     {
       name: 'backend',
       cwd: '/var/www/Hq-investment-billingsystem/backend',
-      script: 'pnpm',
-      args: 'start',                       // maps to "start" in backend/package.json
+      script: './node_modules/.bin/next',
+      args: ['start', '--hostname', '127.0.0.1', '--port', '3000'],
       instances: 'max',                    // use all CPU cores → scale automatically
       exec_mode: 'cluster',                // enables pm2 reload (zero downtime)
       max_memory_restart: '512M',          // auto-restart if memory exceeds 512 MB

@@ -93,6 +93,7 @@ sudo cp -r frontend/dist/* /var/www/html/billing/
 pnpm --filter backend prisma migrate deploy
 
 # Start/restart with PM2
+cd /var/www/Hq-investment-billingsystem
 pm2 start ecosystem.config.js --update-env
 pm2 save
 ```
