@@ -42,6 +42,12 @@ module.exports = {
         NEXT_TELEMETRY_DISABLED: '1',
         HOSTNAME: '127.0.0.1',
         PORT: '3000'
+      },
+      env_production: {
+        NODE_ENV: 'production',
+        NEXT_TELEMETRY_DISABLED: '1',
+        HOSTNAME: '127.0.0.1',
+        PORT: '3000'
       }
     },
     {
@@ -62,6 +68,12 @@ module.exports = {
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
       merge_logs: true,
       env: {
+        NODE_ENV: 'production',
+        NEXT_TELEMETRY_DISABLED: '1',
+        HOSTNAME: '127.0.0.1',
+        PORT: '3001'
+      },
+      env_production: {
         NODE_ENV: 'production',
         NEXT_TELEMETRY_DISABLED: '1',
         HOSTNAME: '127.0.0.1',
