@@ -1,86 +1,92 @@
 /**
  * PM2 Ecosystem Configuration
- * HQ Investment Billing System — Production
+ * HQ Investment Billing System - Production
+ *
+ * Important:
+ * - Do not point PM2 at node_modules/.bin/next with interpreter: 'node'.
+ *   On Linux that file can be a shell shim, and Node will parse it as
+ *   JavaScript, causing: SyntaxError: missing ) after argument list.
+ * - Use Next's real JavaScript CLI: node_modules/next/dist/bin/next.
+ * - Keep production in fork mode unless you intentionally design a multi-port
+ *   Nginx upstream or have tested cluster mode on your VPS.
  *
  * Commands:
- *   pm2 start ecosystem.config.js          → start all apps
- *   pm2 reload ecosystem.config.js         → zero-downtime reload (cluster mode)
- *   pm2 restart ecosystem.config.js        → hard restart all apps
- *   pm2 reload ecosystem.config.js --only backend --update-env
+ *   pm2 start ecosystem.config.js --env production
+ *   pm2 reload ecosystem.config.js --env production --update-env
+ *   pm2 logs backend --lines 100
  */
+
+const PROJECT_DIR = '/var/www/Hq-investment-billingsystem';
 
 module.exports = {
   apps: [
-    // ─── Backend API (Node.js / Express) ─────────────────────────────────────
     {
       name: 'backend',
-      cwd: '/var/www/Hq-investment-billingsystem/backend',
-      script: '/var/www/Hq-investment-billingsystem/backend/node_modules/next/dist/bin/next',
+      cwd: `${PROJECT_DIR}/backend`,
+      script: 'node_modules/next/dist/bin/next',
       interpreter: 'node',
       args: 'start --hostname 127.0.0.1 --port 3000',
-      instances: 1,                        // single instance for single-core server
-      exec_mode: 'fork',                   // fork mode: simple, stable, no port conflicts
-      max_memory_restart: '512M',          // auto-restart if memory exceeds 512 MB
-      exp_backoff_restart_delay: 100,      // delay grows exponentially on crash loops
-      max_restarts: 10,                    // give up after 10 consecutive crashes
-      min_uptime: '10s',                   // must stay alive 10s to count as "stable"
-      watch: false,                        // never watch files in production
-      error_file: '/var/www/Hq-investment-billingsystem/logs/backend-error.log',
-      out_file: '/var/www/Hq-investment-billingsystem/logs/backend-out.log',
+      instances: 1,
+      exec_mode: 'fork',
+      watch: false,
+      max_memory_restart: '512M',
+      exp_backoff_restart_delay: 100,
+      max_restarts: 10,
+      min_uptime: '10s',
+      error_file: `${PROJECT_DIR}/logs/backend-error.log`,
+      out_file: `${PROJECT_DIR}/logs/backend-out.log`,
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
       merge_logs: true,
       env: {
         NODE_ENV: 'production',
-        PORT: 3000
+        NEXT_TELEMETRY_DISABLED: '1',
+        HOSTNAME: '127.0.0.1',
+        PORT: '3000'
       }
     },
-
-    // ─── Landing Page (Next.js / PM2 managed) ───────────────────────────────
-    // This landing page is a Next.js app and should be served via PM2 on port 3001.
-    // If you later switch to a static export, remove this block and update Nginx.
     {
       name: 'landing-page',
-      cwd: '/var/www/Hq-investment-billingsystem/landing-page',
-      script: '/var/www/Hq-investment-billingsystem/landing-page/node_modules/next/dist/bin/next',
+      cwd: `${PROJECT_DIR}/landing-page`,
+      script: 'node_modules/next/dist/bin/next',
       interpreter: 'node',
       args: 'start --hostname 127.0.0.1 --port 3001',
-      instances: 1,                        // single instance is fine for landing page
+      instances: 1,
       exec_mode: 'fork',
+      watch: false,
       max_memory_restart: '256M',
       exp_backoff_restart_delay: 100,
       max_restarts: 10,
       min_uptime: '10s',
-      watch: false,
-      error_file: '/var/www/Hq-investment-billingsystem/logs/landing-error.log',
-      out_file: '/var/www/Hq-investment-billingsystem/logs/landing-out.log',
+      error_file: `${PROJECT_DIR}/logs/landing-error.log`,
+      out_file: `${PROJECT_DIR}/logs/landing-out.log`,
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
       merge_logs: true,
       env: {
         NODE_ENV: 'production',
-        PORT: 3001
+        NEXT_TELEMETRY_DISABLED: '1',
+        HOSTNAME: '127.0.0.1',
+        PORT: '3001'
       }
     }
 
-    // NOTE: The frontend (Vite SPA) is served directly by Nginx from
-    // /var/www/Hq-investment-billingsystem/frontend/dist/
-    // No PM2 process is needed — only rebuild and Nginx picks it up.
+    // The Vite frontend is served by Nginx from frontend/dist.
+    // It does not need a PM2 process.
   ],
 
-  // ─── PM2 Deploy (optional — for pm2 deploy workflow) ─────────────────────
   deploy: {
     production: {
       user: 'ubuntu',
       host: ['YOUR_VPS_IP'],
       ref: 'origin/main',
       repo: 'git@github.com:YOUR_ORG/Hq-investment-billingsystem.git',
-      path: '/var/www/Hq-investment-billingsystem',
+      path: PROJECT_DIR,
       'pre-deploy-local': '',
       'post-deploy':
         'pnpm install --frozen-lockfile && ' +
-        'pnpm run build --filter=backend && ' +
-        'pnpm run build --filter=landing-page && ' +
-        'pnpm run build --filter=frontend && ' +
-        'pm2 reload ecosystem.config.js --env production',
+        'pnpm --filter backend build && ' +
+        'pnpm --filter landing-page build && ' +
+        'pnpm --filter frontend build && ' +
+        'pm2 reload ecosystem.config.js --env production --update-env',
       'pre-setup': ''
     }
   }

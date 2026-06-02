@@ -1,133 +1,284 @@
-# PM2 Deployment Troubleshooting Guide
+# PM2 and Next.js Production Troubleshooting
 
-## Problem: "Process X not found" or EADDRINUSE errors
+## The error
 
-### Root Causes
-1. **Single-core server with cluster mode** — Multiple Next.js instances try to bind same port
-2. **Stale PM2 dump file** — Old process IDs remain after crashes  
-3. **Startup script runs per-process** — Migrations/checks running multiple times
-4. **pnpm/shell wrapper** — PM2 can't properly manage subprocess lifecycles
+If PM2 logs show:
 
-### Solution Implemented
-
-#### 1. **ecosystem.config.js** — Fork mode for single-core
-```javascript
-// Before: instances: 'max', exec_mode: 'cluster'
-// After: instances: 1, exec_mode: 'fork'
+```text
+SyntaxError: missing ) after argument list
 ```
-- Fork mode = one simple process per app
-- No port conflicts on 1-CPU systems
-- Simpler, more stable
 
-#### 2. **Direct Next.js execution**
-```javascript
-// Before: script: 'pnpm', args: 'start'
-// After: script: 'node_modules/.bin/next', args: 'next start --hostname 127.0.0.1 --port 3000'
+and the stack points to:
+
+```text
+/node_modules/.bin/next
 ```
-- Removes shell wrapper complexity
-- PM2 can monitor and restart cleanly
-- Better signal handling
 
-#### 3. **Separate startup checks from PM2**
+with shell lines like:
+
+```sh
+basedir=$(dirname "$(echo "$0" | sed -e 's,\\,/,g')")
+```
+
+PM2 is trying to run a shell wrapper as JavaScript.
+
+## Why it happens
+
+`node_modules/.bin/next` is not the best PM2 target when `interpreter: 'node'` is set. On Linux/package-manager installs, `.bin/next` can be a shell shim that locates and launches the real Next.js binary.
+
+When PM2 is configured like this:
+
+```js
+{
+  script: 'node_modules/.bin/next',
+  interpreter: 'node',
+  args: 'start --port 3000'
+}
+```
+
+PM2 effectively runs:
+
+```sh
+node node_modules/.bin/next start --port 3000
+```
+
+Node then parses shell syntax such as `basedir=$(dirname ...)` as JavaScript and throws the syntax error.
+
+Your app can still show `Ready` if another PM2 process, a previous `npm start`, or a manually started process is already running correctly. That is why the server may work while PM2 keeps logging errors from a stale or misconfigured process.
+
+## Correct PM2 target
+
+Use the real Next.js JavaScript CLI:
+
+```text
+node_modules/next/dist/bin/next
+```
+
+with:
+
+```js
+interpreter: 'node'
+```
+
+Do not use `node_modules/.bin/next` with the Node interpreter.
+
+## What to use
+
+| Option | Production PM2 recommendation | Notes |
+| --- | --- | --- |
+| `npm start` / `pnpm start` | OK for manual testing | PM2 manages a package manager subprocess, not the Next process directly. |
+| `next start` | OK inside package scripts | Good for local/manual production checks after `next build`. |
+| `node_modules/.bin/next` | Avoid with `interpreter: 'node'` | Can be a shell shim and cause the syntax error. |
+| `node_modules/next/dist/bin/next` | Best for PM2 | Real JavaScript CLI, cleanly managed by Node/PM2. |
+
+## Correct ecosystem.config.js
+
+The project root has a production-ready `ecosystem.config.js` using:
+
+```js
+script: 'node_modules/next/dist/bin/next',
+interpreter: 'node',
+args: 'start --hostname 127.0.0.1 --port 3000',
+instances: 1,
+exec_mode: 'fork'
+```
+
+Backend runs on `127.0.0.1:3000`.
+Landing page runs on `127.0.0.1:3001`.
+
+The Vite frontend should be served by Nginx from `frontend/dist`; it does not need PM2.
+
+## Fork mode vs cluster mode
+
+Use fork mode by default:
+
+```js
+instances: 1,
+exec_mode: 'fork'
+```
+
+This is the most stable setup for a small Ubuntu VPS, especially a single-core droplet.
+
+Avoid this unless you have tested it:
+
+```js
+instances: 'max',
+exec_mode: 'cluster'
+```
+
+Cluster mode can create port conflicts or confusing reload behavior with Next.js if the app and proxy are not designed for it. If you need horizontal scaling, a safer pattern is multiple explicit app instances on different ports and an Nginx upstream.
+
+## Package scripts
+
+Backend:
+
+```json
+{
+  "scripts": {
+    "build": "npx prisma generate && node --max-old-space-size=1536 node_modules/next/dist/bin/next build",
+    "start": "next start --hostname 127.0.0.1 --port ${PORT:-3000}",
+    "start:droplet": "bash scripts/droplet-start.sh",
+    "next:start": "next start --hostname 127.0.0.1 --port ${PORT:-3000}",
+    "db:migrate": "npx prisma migrate deploy"
+  }
+}
+```
+
+Landing page:
+
+```json
+{
+  "scripts": {
+    "build": "next build",
+    "start": "next start --hostname 127.0.0.1 --port ${PORT:-3001}"
+  }
+}
+```
+
+## Clean PM2 state
+
+Use this when old/stale PM2 processes are still logging errors:
+
 ```bash
-# Old: droplet-start.sh runs migrations per-PM2-process
-# New: deploy.sh runs migrations ONCE before PM2 starts
-```
-- Migrations only run once during deployment
-- FreeRADIUS/WireGuard checks only run once
-- PM2 just manages the running process
-
-#### 4. **Clean PM2 state on each deploy**
-```bash
-# Added at deploy.sh step 0:
-pm2 kill 2>/dev/null || true  # Kill daemon to remove stale processes
-sleep 1
-# Then fresh start with pm2 start
-```
-
-## Quick Fix for Running Servers
-
-### If you see "Process X not found":
-```bash
-# On the VPS (dangerous — kills all apps):
-pm2 delete all
+cd /var/www/Hq-investment-billingsystem
+pm2 list
+pm2 delete backend landing-page || true
+pm2 delete all || true
 pm2 kill
 sleep 2
-
-# Then redeploy:
-./deploy.sh
+pm2 flush
 ```
 
-### If backend won't start:
+Then start fresh:
+
 ```bash
-# Check logs
-pm2 logs backend --lines 100
-
-# Verify port is free
-ss -tlnp | grep :3000
-
-# Check if Next.js can build
-cd /var/www/Hq-investment-billingsystem/backend
-pnpm exec next build
-
-# Manually test
-pnpm run next:start
+cd /var/www/Hq-investment-billingsystem
+mkdir -p logs
+pm2 start ecosystem.config.js --env production
+pm2 save
 ```
 
-### If database migrations fail:
+## Clean rebuild
+
 ```bash
-# Run from backend directory
+cd /var/www/Hq-investment-billingsystem
+git pull
+corepack enable
+pnpm install --frozen-lockfile
+
 cd /var/www/Hq-investment-billingsystem/backend
-source ../.env  # load DATABASE_URL
+pnpm exec prisma generate
 pnpm exec prisma migrate deploy
 
-# If stuck, reset (dev only!):
-pnpm exec prisma db push  # WARNING: loses data
+cd /var/www/Hq-investment-billingsystem
+pnpm --filter backend build
+pnpm --filter landing-page build
+pnpm --filter frontend build
+
+pm2 reload ecosystem.config.js --env production --update-env
+pm2 save
 ```
 
-## Key Changes Summary
+If the PM2 process list is polluted with bad old commands, use `pm2 delete all` and `pm2 start ecosystem.config.js --env production` instead of reload.
 
-| Component | Before | After |
-|-----------|--------|-------|
-| **Exec mode** | cluster (instances: max) | fork (instances: 1) |
-| **Script** | pnpm → script | Direct node_modules/.bin/next |
-| **Migrations** | Per PM2 instance | Once during deploy |
-| **PM2 startup** | reload/restart | kill + start fresh |
-| **Checks** | Per process | Once during deploy |
+## Nginx reverse proxy checks
 
-## Prevention
+Next.js should listen only on localhost:
 
-1. **Always deploy from repo root:**
-   ```bash
-   cd /var/www/Hq-investment-billingsystem
-   ./deploy.sh
-   ```
+```text
+127.0.0.1:3000
+127.0.0.1:3001
+```
 
-2. **Monitor PM2:**
-   ```bash
-   pm2 monit              # Live dashboard
-   pm2 logs backend       # Tail backend logs
-   pm2 show backend       # Process details
-   ```
+Nginx should expose public HTTP/HTTPS and proxy to those local ports.
 
-3. **Backup PM2 config:**
-   ```bash
-   pm2 save               # Save current state (for resurrect on reboot)
-   pm2 startup systemd    # Auto-start on boot
-   ```
+Useful checks:
 
-4. **Single-core considerations:**
-   - Don't use `instances: 'max'` — set to 1
-   - Fork mode (simple) not cluster mode
-   - One app instance per server
-
-## Testing Locally
-
-Before deploying, test ecosystem config:
 ```bash
-# List what PM2 would start
-pm2 list ecosystem.config.js
+sudo nginx -t
+sudo systemctl reload nginx
+sudo systemctl status nginx --no-pager
+```
 
-# Dry run (don't actually start)
-pm2 describe ecosystem.config.js
+Local app checks:
+
+```bash
+curl -I http://127.0.0.1:3000
+curl -sS http://127.0.0.1:3000/api/health
+curl -I http://127.0.0.1:3001
+```
+
+Public checks:
+
+```bash
+curl -I https://your-domain.com
+curl -I https://app.your-domain.com
+```
+
+When Cloudflare is enabled, first verify the origin directly with localhost/127.0.0.1 checks on the VPS. Then verify public HTTPS through Cloudflare.
+
+## Healthy deployment checklist
+
+```bash
+pm2 list
+pm2 show backend
+pm2 show landing-page
+pm2 logs backend --lines 50
+pm2 logs landing-page --lines 50
+ss -tlnp | grep -E ':3000|:3001'
+curl -sS http://127.0.0.1:3000/api/health
+sudo nginx -t
+```
+
+Expected:
+
+- PM2 status is `online`.
+- No `.bin/next` syntax errors appear in new logs.
+- Ports `3000` and `3001` listen on `127.0.0.1`.
+- `/api/health` returns successfully.
+- Nginx config test passes.
+
+## Common mistakes
+
+- Starting PM2 with `script: 'node_modules/.bin/next'` and `interpreter: 'node'`.
+- Running both an old PM2 process and a new correct process at the same time.
+- Using `npm start` when that script runs migrations/seeding every restart.
+- Using cluster mode on a single-core VPS.
+- Forgetting to run `next build` before `next start`.
+- Letting Next listen publicly on `0.0.0.0` when Nginx should be the public entry point.
+- Not using `--update-env` after changing environment variables.
+- Forgetting `pm2 save` after fixing the process list.
+
+## Copy-paste recovery
+
+```bash
+cd /var/www/Hq-investment-billingsystem
+
+pm2 delete all || true
+pm2 kill
+sleep 2
+pm2 flush
+
+corepack enable
+pnpm install --frozen-lockfile
+
+cd backend
+pnpm exec prisma generate
+pnpm exec prisma migrate deploy
+
+cd ..
+pnpm --filter backend build
+pnpm --filter landing-page build
+pnpm --filter frontend build
+
+mkdir -p logs
+pm2 start ecosystem.config.js --env production
+pm2 save
+
+sudo nginx -t
+sudo systemctl reload nginx
+
+pm2 list
+pm2 logs backend --lines 50
+curl -sS http://127.0.0.1:3000/api/health
 ```

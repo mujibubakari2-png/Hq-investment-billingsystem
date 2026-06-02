@@ -24,6 +24,8 @@ LOG_FILE="$PROJECT_DIR/logs/deploy.log"
 GIT_BRANCH="main"
 TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S %Z')
 
+mkdir -p "$PROJECT_DIR/logs"
+
 # ── Argument parsing ──────────────────────────────────────────────────────────
 BACKEND_ONLY=false
 FRONTEND_ONLY=false
@@ -109,21 +111,21 @@ fi
 # ── 4. Build backend ─────────────────────────────────────────────────────────
 if [ "$FRONTEND_ONLY" = false ]; then
     step "Building backend"
-    pnpm run build --filter=backend 2>&1 | tee -a "$LOG_FILE" || fail "Backend build failed"
+    pnpm --filter backend build 2>&1 | tee -a "$LOG_FILE" || fail "Backend build failed"
     ok "Backend built"
 fi
 
 # ── 5. Build landing page ─────────────────────────────────────────────────────
 if [ "$BACKEND_ONLY" = false ]; then
     step "Building landing page"
-    pnpm run build --filter=landing-page 2>&1 | tee -a "$LOG_FILE" || fail "Landing page build failed"
+    pnpm --filter landing-page build 2>&1 | tee -a "$LOG_FILE" || fail "Landing page build failed"
     ok "Landing page built"
 fi
 
 # ── 6. Build frontend (Vite SPA) ──────────────────────────────────────────────
 if [ "$BACKEND_ONLY" = false ]; then
     step "Building frontend (Vite SPA)"
-    pnpm run build --filter=frontend 2>&1 | tee -a "$LOG_FILE" || fail "Frontend build failed"
+    pnpm --filter frontend build 2>&1 | tee -a "$LOG_FILE" || fail "Frontend build failed"
     ok "Frontend built → frontend/dist/"
 fi
 
