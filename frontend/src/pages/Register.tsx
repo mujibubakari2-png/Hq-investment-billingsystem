@@ -17,6 +17,10 @@ import { GoogleLogin } from '@react-oauth/google';
 import { authApi, saasPlansApi } from '../api';
 import authStore from '../stores/authStore';
 
+// Google signup is only shown when a real Client ID is configured.
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
+const isGoogleConfigured = !!GOOGLE_CLIENT_ID && GOOGLE_CLIENT_ID.length > 20;
+
 // Helper for step icons
 const StepIcon = ({ step, currentStep, label }: any) => {
     const isCompleted = step < currentStep;
@@ -229,20 +233,24 @@ export default function Register() {
                         {/* ── STEP 1: Account Details ── */}
                         {step === 1 && (
                             <div className="fade-in">
-                                <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'center' }}>
-                                    <GoogleLogin
-                                        onSuccess={handleGoogleSuccess}
-                                        onError={() => setError('Google Login Failed')}
-                                        useOneTap
-                                        width="350"
-                                    />
-                                </div>
+                                {isGoogleConfigured && (
+                                    <>
+                                        <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'center' }}>
+                                            <GoogleLogin
+                                                onSuccess={handleGoogleSuccess}
+                                                onError={() => setError('Google Login Failed')}
+                                                useOneTap
+                                                width="350"
+                                            />
+                                        </div>
 
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '24px 0', color: '#94a3b8', fontSize: '0.85rem' }}>
-                                    <div style={{ flex: 1, height: '1px', backgroundColor: '#e2e8f0' }} />
-                                    or register manually
-                                    <div style={{ flex: 1, height: '1px', backgroundColor: '#e2e8f0' }} />
-                                </div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '24px 0', color: '#94a3b8', fontSize: '0.85rem' }}>
+                                            <div style={{ flex: 1, height: '1px', backgroundColor: '#e2e8f0' }} />
+                                            or register manually
+                                            <div style={{ flex: 1, height: '1px', backgroundColor: '#e2e8f0' }} />
+                                        </div>
+                                    </>
+                                )}
 
                                 <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#0f172a', margin: '0 0 24px 0', fontSize: '1.1rem' }}>
                                     <PersonIcon style={{ color: '#0ea5e9' }} /> Personal Information
