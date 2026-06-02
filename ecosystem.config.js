@@ -15,8 +15,8 @@ module.exports = {
     {
       name: 'backend',
       cwd: '/var/www/Hq-investment-billingsystem/backend',
-      script: 'node_modules/.bin/next',
-      args: 'start --hostname 127.0.0.1 --port 3000',
+      script: 'node',
+      args: ['node_modules/next/dist/bin/next', 'start', '--hostname', '127.0.0.1', '--port', '3000'],
       instances: 1,                        // single instance for single-core server
       exec_mode: 'fork',                   // fork mode: simple, stable, no port conflicts
       max_memory_restart: '512M',          // auto-restart if memory exceeds 512 MB
@@ -40,8 +40,8 @@ module.exports = {
     {
       name: 'landing-page',
       cwd: '/var/www/Hq-investment-billingsystem/landing-page',
-      script: 'node_modules/.bin/next',
-      args: 'start --hostname 127.0.0.1 --port 3001',
+      script: 'node',
+      args: ['node_modules/next/dist/bin/next', 'start', '--hostname', '127.0.0.1', '--port', '3001'],
       instances: 1,                        // single instance is fine for landing page
       exec_mode: 'fork',
       max_memory_restart: '256M',
