@@ -1364,10 +1364,7 @@ TROUBLESHOOTING:
                                         gap: 5, marginBottom: 10,
                                     }}>
                                         {(routerPackages.length > 0 ? routerPackages.slice(0, 4) : [
-                                            { name: 'MASAA 6', price: 450, duration: 6, durationUnit: 'Hrs' },
-                                            { name: 'MASAA 24', price: 950, duration: 24, durationUnit: 'Hrs' },
-                                            { name: 'SIKU 3', price: 2450, duration: 3, durationUnit: 'Days' },
-                                            { name: 'SIKU 7', price: 5000, duration: 7, durationUnit: 'Days' },
+
                                         ]).map((pkg: any, i: number) => (
                                             <div key={i}
                                                 onClick={() => {
