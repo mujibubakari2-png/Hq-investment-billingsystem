@@ -68,11 +68,10 @@ export default function PricingCard({
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay }}
             viewport={{ once: true }}
-            className={`relative rounded-3xl bg-gradient-to-br ${cfg.gradient} shadow-lg flex flex-col border ${
-                isPopular
-                    ? "border-2 ring-2 ring-offset-2 scale-[1.03] z-10"
-                    : "border-gray-200 hover:scale-[1.02]"
-            } transition-transform duration-300`}
+            className={`relative rounded-3xl bg-gradient-to-br ${cfg.gradient} shadow-lg flex flex-col border ${isPopular
+                ? "border-2 ring-2 ring-offset-2 scale-[1.03] z-10"
+                : "border-gray-200 hover:scale-[1.02]"
+                } transition-transform duration-300`}
             style={isPopular ? { borderColor: cfg.accent, ringColor: cfg.accent } as React.CSSProperties : {}}
         >
             {/* Popular Badge */}
@@ -112,9 +111,7 @@ export default function PricingCard({
                     </span>
                     <span className="text-gray-400 text-sm">/month</span>
                 </div>
-                <p className="text-xs text-gray-400 mt-1">
-                    10-day free trial • Cancel anytime
-                </p>
+
 
                 {/* Key plan metrics — PPPoE limit & Hotspot */}
                 <div className="mt-4 grid grid-cols-2 gap-2">
@@ -169,13 +166,13 @@ export default function PricingCard({
             {/* CTA Button */}
             <div className="p-7 pt-0">
                 <a
-                    href={`${billingUrl}/register?planId=${encodeURIComponent(id)}&plan=${encodeURIComponent(name)}`}
+                    href={`${billingUrl}billing/register?planId=${encodeURIComponent(id)}&plan=${encodeURIComponent(name)}`}
                     className={`block w-full text-center py-3.5 rounded-xl font-semibold text-sm transition-all shadow-sm ${cfg.btn}`}
                 >
                     Start Free Trial with {name} →
                 </a>
                 <p className="text-center text-xs text-gray-400 mt-3">
-                    No setup fees · 10-day free trial included
+                    10-day free trial included
                 </p>
             </div>
         </motion.div>

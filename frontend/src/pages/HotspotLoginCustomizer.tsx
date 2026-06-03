@@ -69,13 +69,14 @@ export default function HotspotLoginCustomizer() {
             setLoadingRouters(true);
             try {
                 const data = await routersApi.list();
-                setRouters(data as unknown as Router[]);
+                const routers = data as unknown as Router[];
+                setRouters(routers);
                 // Auto-select router from URL param or first router
                 const routerIdParam = searchParams.get('routerId');
-                if (routerIdParam && data.some(r => r.id === routerIdParam)) {
+                if (routerIdParam && routers.some(r => r.id === routerIdParam)) {
                     setSelectedRouterId(routerIdParam);
-                } else if (data.length > 0) {
-                    setSelectedRouterId(data[0].id);
+                } else if (routers.length > 0) {
+                    setSelectedRouterId(routers[0].id);
                 }
             } catch (err) {
                 console.error('Failed to load routers:', err);
@@ -489,10 +490,6 @@ export default function HotspotLoginCustomizer() {
                     validity: p.validity || (p.duration ? p.duration + ' ' + (p.durationUnit || '') : ''),
                 }))
                 : [
-                    { id: 'p1', name: 'MASAA 6', price: 450, validity: '6 Hours' },
-                    { id: 'p2', name: 'MASAA 24', price: 950, validity: '24 Hours' },
-                    { id: 'p3', name: 'SIKU 3', price: 2450, validity: '3 Days' },
-                    { id: 'p4', name: 'SIKU 7', price: 5000, validity: '7 Days' },
                 ]
         )};
 
@@ -749,17 +746,17 @@ export default function HotspotLoginCustomizer() {
             alert('Please select a router first.');
             return;
         }
-        
+
         try {
             // Fetch the base template files from backend
             const cleanUrl = backendUrl ? (backendUrl.endsWith('/') ? backendUrl.slice(0, -1) : backendUrl) : '';
             const backendApi = cleanUrl ? (cleanUrl.endsWith('/api') ? cleanUrl : `${cleanUrl}/api`) : '/api';
             const res = await fetch(`${backendApi}/hotspot/download?routerId=${selectedRouterId}`);
             if (!res.ok) throw new Error('Failed to fetch hotspot files from backend');
-            
+
             const data = await res.json();
             const zip = new JSZip();
-            
+
             // Debugging alert to help user
             alert(`Debug Info:\nAPI: ${backendApi}\nFound Files: ${data.files ? data.files.length : 0}\nStatus: ${res.status}`);
 
@@ -790,7 +787,7 @@ $(if remain-bytes-total)
 $(endif)
    "can-extend-session": true
 }`);
-        zip.file("errors.txt", `# ERRORS
+            zip.file("errors.txt", `# ERRORS
 # This file contains error messages which are shown to user, when http/https
 # login is used.
 # These messages can be changed to make user interface more friendly, including
@@ -895,7 +892,7 @@ auth-in-progress = already authorizing, retry later
 # Radius server returned some custom error message
 
 radius-reply = $(error-orig)`);
-        zip.file("WISPAaccessGatewaParam.xsd", `<?xml version="1.0" encoding="UTF-8"?>
+            zip.file("WISPAaccessGatewaParam.xsd", `<?xml version="1.0" encoding="UTF-8"?>
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified" attributeFormDefault="unqualified">
 	<xs:element name="WISPAccessGatewayParam">
 		<xs:complexType>
@@ -996,7 +993,7 @@ radius-reply = $(error-orig)`);
 		</xs:sequence>
 	</xs:complexType>
 </xs:schema>`);
-        zip.file("README.txt", `HQINVESTMENT HOTSPOT LOGIN PAGE
+            zip.file("README.txt", `HQINVESTMENT HOTSPOT LOGIN PAGE
 ========================
 
 Generated on: ${new Date().toLocaleString()}
@@ -1028,16 +1025,16 @@ TROUBLESHOOTING:
 - IMPORTANT: You MUST allow Walled Garden access to your billing host/IP otherwise payments will fail!
 - Check that the M-Pesa integration endpoints are accessible
 - Verify that JavaScript is enabled on client devices`);
-        const content = await zip.generateAsync({ type: "blob" });
-        const safeZipName = (selectedRouter?.name || 'template')
-            .trim()
-            .replace(/\s+/g, '-')
-            .replace(/[^a-zA-Z0-9\-]/g, '')
-            .replace(/-+/g, '-')
-            .replace(/^-+|-+$/g, '')
-            .toLowerCase();
-        saveAs(content, `hotspot-${safeZipName}.zip`);
-        
+            const content = await zip.generateAsync({ type: "blob" });
+            const safeZipName = (selectedRouter?.name || 'template')
+                .trim()
+                .replace(/\s+/g, '-')
+                .replace(/[^a-zA-Z0-9\-]/g, '')
+                .replace(/-+/g, '-')
+                .replace(/^-+|-+$/g, '')
+                .toLowerCase();
+            saveAs(content, `hotspot-${safeZipName}.zip`);
+
         } catch (err: any) {
             console.error("Download zip error:", err);
             alert("Error downloading hotspot files: " + err.message);
@@ -1260,11 +1257,11 @@ TROUBLESHOOTING:
                             </div>
                             <div className="form-group">
                                 <label className="form-label" style={{ fontSize: '0.82rem' }}>Backend API URL Override</label>
-                                <input 
-                                    type="text" 
-                                    className="form-input" 
-                                    value={backendUrl} 
-                                    onChange={e => setBackendUrl(e.target.value)} 
+                                <input
+                                    type="text"
+                                    className="form-input"
+                                    value={backendUrl}
+                                    onChange={e => setBackendUrl(e.target.value)}
                                     placeholder="https://api.yourdomain.com"
                                 />
                                 <div className="form-hint" style={{ fontSize: '0.72rem', marginTop: 4 }}>
