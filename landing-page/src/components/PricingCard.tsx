@@ -166,7 +166,7 @@ export default function PricingCard({
             {/* CTA Button */}
             <div className="p-7 pt-0">
                 <a
-                    href={`${billingUrl}billing/register?planId=${encodeURIComponent(id)}&plan=${encodeURIComponent(name)}`}
+                    href={`${billingUrl}/billing/register?planId=${encodeURIComponent(id)}&plan=${encodeURIComponent(name)}`}
                     className={`block w-full text-center py-3.5 rounded-xl font-semibold text-sm transition-all shadow-sm ${cfg.btn}`}
                 >
                     Start Free Trial with {name} →
