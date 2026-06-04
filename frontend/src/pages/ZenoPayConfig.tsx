@@ -10,7 +10,6 @@ import LinkIcon from '@mui/icons-material/Link';
 export default function ZenoPayConfig() {
     const navigate = useNavigate();
     const [apiKey, setApiKey] = useState('');
-    const [webhookUrl, setWebhookUrl] = useState('');
     const [saved, setSaved] = useState(false);
     const [saving, setSaving] = useState(false);
 
@@ -21,7 +20,6 @@ export default function ZenoPayConfig() {
                 try {
                     const parsed = JSON.parse(data.payment_config_zenopay);
                     if (parsed.apiKey) setApiKey(parsed.apiKey);
-                    if (parsed.webhookUrl) setWebhookUrl(parsed.webhookUrl);
                 } catch (e) { }
             }
         }).catch(console.error);
@@ -31,7 +29,7 @@ export default function ZenoPayConfig() {
         setSaving(true);
         try {
             await settingsApi.update({
-                payment_config_zenopay: JSON.stringify({ apiKey, webhookUrl })
+                payment_config_zenopay: JSON.stringify({ apiKey })
             });
             setSaved(true);
             setTimeout(() => navigate('/payment-channels'), 1500);
@@ -95,7 +93,7 @@ export default function ZenoPayConfig() {
 
                 <div className="form-group" style={{ marginBottom: 4 }}>
                     <label className="form-label" style={{ fontWeight: 600 }}>
-                        ✏️ Webhook URL (Optional)
+                        🔗 Webhook URL (Copy this to ZenoPay dashboard)
                     </label>
                     <div style={{ position: 'relative' }}>
                         <div style={{
@@ -107,16 +105,15 @@ export default function ZenoPayConfig() {
                         <input
                             type="text"
                             className="form-input"
-                            placeholder="https://yourdomain.com/webhook"
-                            value={webhookUrl}
-                            onChange={e => setWebhookUrl(e.target.value)}
-                            style={{ paddingLeft: 34 }}
+                            readOnly
+                            value={`${window.location.origin}/api/webhooks/zenopay`}
+                            style={{ paddingLeft: 34, background: '#f8f9fa', color: '#6b7280', cursor: 'text' }}
                         />
                     </div>
                 </div>
                 <div className="form-hint" style={{ marginBottom: 24 }}>
                     <InfoOutlinedIcon style={{ fontSize: 12, marginRight: 4 }} />
-                    Optional: URL to receive payment notifications. Default callback URL: <span style={{ color: '#2563eb' }}>https://portal.hq-investment-billingsytem.com/app.php?drt=callback/zenopay</span>
+                    Copy this URL and paste it into your ZenoPay dashboard Webhook settings. The backend will automatically handle payment verifications via this route.
                 </div>
 
                 {/* Integration Information */}

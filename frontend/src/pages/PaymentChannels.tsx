@@ -19,11 +19,10 @@ interface Gateway {
 export default function PaymentChannels() {
     const [gateways, setGateways] = useState<Gateway[]>([
         { id: '1', name: 'Bank Deposit', description: 'Enable direct bank deposit payments', isDefault: false, enabled: false, number: 1 },
-        { id: '2', name: 'Mpesa Buy Goods Till', description: 'Collect payments directly through M-pesa Buy Goods Till number', isDefault: false, enabled: false, number: 2 },
-        { id: '3', name: 'Harakapay', description: 'Additional payment gateway', isDefault: false, enabled: false, number: 3 },
-        { id: '4', name: 'Mpesa Paybill', description: 'Collect payments through M-Pesa Paybill number', isDefault: false, enabled: false, number: 4 },
-        { id: '5', name: 'Palmpesa', description: 'Additional payment gateway', isDefault: true, enabled: false, number: 5 },
-        { id: '6', name: 'Zenopay', description: 'Additional payment gateway', isDefault: false, enabled: false, number: 6 },
+        { id: '3', name: 'Harakapay', description: 'Additional payment gateway', isDefault: false, enabled: false, number: 2 },
+        { id: '5', name: 'Palmpesa', description: 'Additional payment gateway', isDefault: true, enabled: false, number: 3 },
+        { id: '6', name: 'Zenopay', description: 'Additional payment gateway', isDefault: false, enabled: false, number: 4 },
+        { id: '7', name: 'Mongike', description: 'Mongike payment gateway integration', isDefault: false, enabled: false, number: 5 },
     ]);
 
     const [saving, setSaving] = useState(false);
@@ -87,11 +86,10 @@ export default function PaymentChannels() {
 
     const configRoutes: Record<string, string> = {
         '1': '/bank-payment-config',
-        '2': '/mpesa-till-config',
         '3': '/harakapay-config',
-        '4': '/mpesa-paybill-config',
         '5': '/palmpesa-config',
         '6': '/zenopay-config',
+        '7': '/mongike-config',
     };
 
     return (

@@ -38,11 +38,10 @@ const RouterSetupWizard = lazy(() => import('./pages/RouterSetupWizard'));
 const SendBulkMessage = lazy(() => import('./pages/SendBulkMessage'));
 const HotspotLoginCustomizer = lazy(() => import('./pages/HotspotLoginCustomizer'));
 const BankPaymentConfig = lazy(() => import('./pages/BankPaymentConfig'));
-const MpesaTillConfig = lazy(() => import('./pages/MpesaTillConfig'));
 const HarakaPayConfig = lazy(() => import('./pages/HarakaPayConfig'));
-const MpesaPaybillConfig = lazy(() => import('./pages/MpesaPaybillConfig'));
 const PalmPesaConfig = lazy(() => import('./pages/PalmPesaConfig'));
 const ZenoPayConfig = lazy(() => import('./pages/ZenoPayConfig'));
+const MongikeConfig = lazy(() => import('./pages/MongikeConfig'));
 const Login = lazy(() => import('./pages/Login'));
 const Register = lazy(() => import('./pages/Register'));
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
@@ -155,11 +154,10 @@ export default function App() {
                 <Route path="/router-setup/:id" element={<RouterSetupWizard />} />
                 <Route path="/hotspot-customizer" element={<HotspotLoginCustomizer />} />
                 <Route path="/bank-payment-config" element={<BankPaymentConfig />} />
-                <Route path="/mpesa-till-config" element={<MpesaTillConfig />} />
                 <Route path="/harakapay-config" element={<HarakaPayConfig />} />
-                <Route path="/mpesa-paybill-config" element={<MpesaPaybillConfig />} />
                 <Route path="/palmpesa-config" element={<PalmPesaConfig />} />
                 <Route path="/zenopay-config" element={<ZenoPayConfig />} />
+                <Route path="/mongike-config" element={<MongikeConfig />} />
               </Route>
             </Route>
           </Route>

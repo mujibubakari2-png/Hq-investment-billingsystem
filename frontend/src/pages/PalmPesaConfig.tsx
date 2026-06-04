@@ -12,8 +12,6 @@ export default function PalmPesaConfig() {
     const [apiKey, setApiKey] = useState('');
     const [apiToken, setApiToken] = useState('');
     const [secretKey, setSecretKey] = useState('');
-    const [callbackUrl, setCallbackUrl] = useState('');
-    const [cancelUrl, setCancelUrl] = useState('');
     const [saved, setSaved] = useState(false);
     const [saving, setSaving] = useState(false);
 
@@ -26,8 +24,6 @@ export default function PalmPesaConfig() {
                     if (parsed.apiKey) setApiKey(parsed.apiKey);
                     if (parsed.apiToken) setApiToken(parsed.apiToken);
                     if (parsed.secretKey) setSecretKey(parsed.secretKey);
-                    if (parsed.callbackUrl) setCallbackUrl(parsed.callbackUrl);
-                    if (parsed.cancelUrl) setCancelUrl(parsed.cancelUrl);
                 } catch (e) {}
             }
         }).catch(console.error);
@@ -37,7 +33,7 @@ export default function PalmPesaConfig() {
         setSaving(true);
         try {
             await settingsApi.update({
-                payment_config_palmpesa: JSON.stringify({ apiKey, apiToken, secretKey, callbackUrl, cancelUrl })
+                payment_config_palmpesa: JSON.stringify({ apiKey, apiToken, secretKey })
             });
             setSaved(true);
             setTimeout(() => navigate('/payment-channels'), 1500);
@@ -116,8 +112,14 @@ export default function PalmPesaConfig() {
                 </h3>
 
                 <div className="form-group" style={{ marginBottom: 4 }}>
-                    <label className="form-label" style={{ fontWeight: 600 }}>🔗 callbackURL</label>
-                    <input type="text" className="form-input" value={callbackUrl} onChange={e => setCallbackUrl(e.target.value)} placeholder="https://yourdomain.com/callback" />
+                    <label className="form-label" style={{ fontWeight: 600 }}>🔗 Webhook / Callback URL</label>
+                    <input 
+                        type="text" 
+                        className="form-input" 
+                        readOnly
+                        value={`${window.location.origin}/api/webhooks/palmpesa`} 
+                        style={{ background: '#f8f9fa', color: '#6b7280', cursor: 'text' }}
+                    />
                 </div>
 
                 <div style={{
@@ -125,31 +127,10 @@ export default function PalmPesaConfig() {
                     padding: '10px 14px', fontSize: '0.78rem', color: '#065f46', marginBottom: 16,
                 }}>
                     <InfoOutlinedIcon style={{ fontSize: 12, marginRight: 4 }} />
-                    This webhook URL will receive payment notifications on callback. Set in the app callback section
+                    Copy this Webhook URL and paste it into the PalmPesa dashboard callback settings. The backend will automatically handle payment verifications via this route.
                 </div>
 
-                <div className="grid-2 gap-16" style={{ marginBottom: 20 }}>
-                    <div className="form-group">
-                        <label className="form-label" style={{ fontWeight: 600 }}>
-                            🔗 Success Return URL
-                        </label>
-                        <input type="text" className="form-input" placeholder="e.g. https://example.com/success" />
-                        <div className="form-hint">
-                            <InfoOutlinedIcon style={{ fontSize: 12, marginRight: 4 }} />
-                            URL to redirect if payment is successful (for redirection)
-                        </div>
-                    </div>
-                    <div className="form-group">
-                        <label className="form-label" style={{ fontWeight: 600 }}>
-                            ❌ Cancel URL
-                        </label>
-                        <input type="text" className="form-input" value={cancelUrl} onChange={e => setCancelUrl(e.target.value)} placeholder="e.g. https://example.com/cancel" />
-                        <div className="form-hint">
-                            <InfoOutlinedIcon style={{ fontSize: 12, marginRight: 4 }} />
-                            URL to redirect if payment is cancelled (for redirection)
-                        </div>
-                    </div>
-                </div>
+
 
                 {/* Integration Information */}
                 <h3 style={{ color: '#e11d48', fontWeight: 700, fontSize: '0.95rem', marginBottom: 12 }}>

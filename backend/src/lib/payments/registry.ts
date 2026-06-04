@@ -10,8 +10,7 @@ import { PalmPesaProvider } from "@/lib/payments/providers/palmpesa";
 import { ZenoPayProvider } from "@/lib/payments/providers/zenopay";
 import { MongikeProvider } from "@/lib/payments/providers/mongike";
 import { HarakaPayProvider } from "@/lib/payments/providers/harakapay";
-// E11 FIX: Import the new MpesaProvider that was missing from the registry
-import { MpesaProvider } from "@/lib/payments/providers/mpesa";
+// E11 FIX: Removed MPESA
 import { env } from "@/lib/env";
 
 // ─── Build ProviderConfig from environment variables (fallback) ───────────────
@@ -59,15 +58,6 @@ function envConfigFor(provider: ProviderName): ProviderConfig {
         apiSecret: env.HARAKAPAY_API_SECRET,
         apiUrl: env.HARAKAPAY_API_URL,
         webhookSecret: env.HARAKAPAY_WEBHOOK_SECRET,
-        environment,
-      };
-    // E11 FIX: Added MPESA env config — was missing from the registry
-    case "MPESA":
-      return {
-        apiKey: process.env.MPESA_API_KEY,
-        apiSecret: process.env.MPESA_API_SECRET,
-        apiUrl: process.env.MPESA_API_URL,
-        webhookSecret: env.MPESA_WEBHOOK_SECRET,
         environment,
       };
   }
@@ -129,9 +119,6 @@ export function getPaymentProvider(
       return new MongikeProvider(config);
     case "HARAKAPAY":
       return new HarakaPayProvider(config);
-    // E11 FIX: Added MPESA factory case
-    case "MPESA":
-      return new MpesaProvider(config);
     default:
       throw new Error(`Unknown payment provider: "${providerName}"`);
   }
@@ -140,13 +127,12 @@ export function getPaymentProvider(
 /**
  * Returns all supported provider names.
  */
-// E11 FIX: Added MPESA to supported providers list
+// E11 FIX: Removed MPESA from supported providers list
 export const SUPPORTED_PROVIDERS: ProviderName[] = [
   "PALMPESA",
   "ZENOPAY",
   "MONGIKE",
   "HARAKAPAY",
-  "MPESA",
 ];
 
 export function isSupportedProvider(name: string): name is ProviderName {

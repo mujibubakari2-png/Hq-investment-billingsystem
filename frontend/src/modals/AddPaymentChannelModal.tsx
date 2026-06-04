@@ -10,13 +10,13 @@ interface AddPaymentChannelModalProps {
 
 export default function AddPaymentChannelModal({ onClose, onSave }: AddPaymentChannelModalProps) {
     const [name, setName] = useState('');
-    const [provider, setProvider] = useState('M-Pesa');
+    const [provider, setProvider] = useState('PalmPesa');
     const [accountNumber, setAccountNumber] = useState('');
     const [apiKey, setApiKey] = useState('');
     const [apiSecret, setApiSecret] = useState('');
     const [active, setActive] = useState(true);
 
-    const showApiFields = provider === 'M-Pesa' || provider === 'Airtel Money';
+    const showApiFields = provider === 'PalmPesa' || provider === 'ZenoPay' || provider === 'HarakaPay' || provider === 'Mongike';
 
     const handleSave = () => {
         if (onSave) onSave({ name, provider, accountNumber, apiKey, apiSecret, status: active ? 'Active' : 'Inactive' });
@@ -48,8 +48,10 @@ export default function AddPaymentChannelModal({ onClose, onSave }: AddPaymentCh
                         <div className="form-group">
                             <label className="form-label">Provider <span className="required">*</span></label>
                             <select className="form-select" value={provider} onChange={e => setProvider(e.target.value)}>
-                                <option>M-Pesa</option>
-                                <option>Airtel Money</option>
+                                <option>PalmPesa</option>
+                                <option>ZenoPay</option>
+                                <option>HarakaPay</option>
+                                <option>Mongike</option>
                                 <option>Cash</option>
                                 <option>Bank Transfer</option>
                                 <option>Other</option>

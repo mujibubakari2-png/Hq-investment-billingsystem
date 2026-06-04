@@ -91,6 +91,28 @@ export default function HarakaPayConfig() {
                     </div>
                 </div>
 
+                {/* Webhook Configuration */}
+                <h3 style={{ color: '#d97706', fontWeight: 700, fontSize: '0.95rem', marginBottom: 16 }}>
+                    🔗 Webhook Configuration
+                </h3>
+
+                <div className="form-group" style={{ marginBottom: 4 }}>
+                    <label className="form-label" style={{ fontWeight: 600 }}>
+                        🔗 Webhook URL (Copy this to HarakaPay dashboard)
+                    </label>
+                    <input
+                        type="text"
+                        className="form-input"
+                        readOnly
+                        value={`${window.location.origin}/api/webhooks/harakapay`}
+                        style={{ background: '#f8f9fa', color: '#6b7280', cursor: 'text' }}
+                    />
+                </div>
+                <div className="form-hint" style={{ marginBottom: 24 }}>
+                    <InfoOutlinedIcon style={{ fontSize: 12, marginRight: 4 }} />
+                    Copy this URL and paste it into your HarakaPay dashboard Webhook/Callback settings. The backend will automatically handle payment verifications via this route.
+                </div>
+
                 {/* Integration Information */}
                 <h3 style={{ color: '#e11d48', fontWeight: 700, fontSize: '0.95rem', marginBottom: 12 }}>
                     🔔 Integration Information
