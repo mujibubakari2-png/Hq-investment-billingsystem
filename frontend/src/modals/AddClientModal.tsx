@@ -162,7 +162,7 @@ export default function AddClientModal({ onClose, onSave }: AddClientModalProps)
                         <div className="form-group">
                             <label className="form-label">Phone Number</label>
                             <div className="phone-input">
-                                <span className="phone-prefix">254</span>
+                                <span className="phone-prefix">255</span>
                                 <input
                                     type="text"
                                     className="form-input"

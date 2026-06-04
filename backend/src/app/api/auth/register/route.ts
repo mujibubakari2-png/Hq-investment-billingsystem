@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
-import { errorResponse, jsonResponse, hashPassword, signToken, isAutomationRequest } from "@/lib/auth";
+import { errorResponse, jsonResponse, hashPassword, signToken } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/rateLimiter";
 import logger from "@/lib/logger";
 import { sendAccountCreatedNotifications } from "@/lib/accountNotifications";
@@ -82,67 +82,6 @@ export async function POST(req: NextRequest) {
             return errorResponse("User already exists with this email", 409);
         }
 
-        // Automation bypass for CI/test tooling in development/test environments only.
-        const isAutomation = isAutomationRequest(req);
-
-        if (isAutomation) {
-            const hashedPassword = await hashPassword(password);
-            const result = await prisma.$transaction(async (tx) => {
-                const trialStart = new Date();
-                const trialEnd = new Date();
-                trialEnd.setDate(trialEnd.getDate() + 10);
-
-                const tenant = await tx.tenant.create({
-                    data: {
-                        name: companyName,
-                        email,
-                        phone,
-                        status: "PENDING_APPROVAL",
-                        planId: actualPlanId,
-                        // trialStart and trialEnd will be populated by the SuperAdmin upon approval
-                    }
-                });
-
-                const newUser = await tx.user.create({
-                    data: {
-                        fullName: fullName || companyName,
-                        email,
-                        username: email,
-                        phone,
-                        password: hashedPassword,
-                        role: "ADMIN",
-                        status: "ACTIVE",
-                        tenantId: tenant.id
-                    }
-                });
-
-                return { user: newUser, tenant };
-            });
-
-            const token = signToken({
-                userId: result.user.id,
-                username: result.user.username,
-                role: result.user.role,
-                tenantId: result.tenant.id,
-            });
-
-            return jsonResponse({
-                message: "User registered successfully (Automation)",
-                token,
-                id: result.user.id, // Alias for tests
-                user_id: result.user.id, // Alias for tests
-                tenant_id: result.tenant.id, // Alias for tests
-                user: {
-                    id: result.user.id,
-                    username: result.user.username,
-                    email: result.user.email,
-                    role: result.user.role,
-                    fullName: result.user.fullName,
-                    tenantId: result.tenant.id
-                },
-                tenant: result.tenant
-            }, 201);
-        }
 
         const inputOtp = body.otp;
         const isProd = env.NODE_ENV === "production";

@@ -18,7 +18,8 @@ export async function GET(req: NextRequest) {
         const status = searchParams.get("status") || "";
         const search = searchParams.get("search") || "";
         const page = parseInt(searchParams.get("page") || "1");
-        const limit = parseInt(searchParams.get("limit") || "50");
+        // PERF-001: Clamp limit to 200 to prevent clients requesting unbounded data
+        const limit = Math.min(parseInt(searchParams.get("limit") || "50"), 200);
         const skip = (page - 1) * limit;
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -39,7 +40,9 @@ export async function GET(req: NextRequest) {
                 include: {
                     client: true,
                     package: true,
-                    router: true,
+                    // DB-006 / SEC-002 FIX: Never return router.password, wgPrivateKey, or wgPresharedKey
+                    // to the frontend. Use select to return only safe display fields.
+                    router: { select: { id: true, name: true, host: true, status: true } },
                 },
                 orderBy: { createdAt: "desc" },
                 skip,
@@ -187,7 +190,25 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        return jsonResponse(sub, 201);
+        // DB-006 FIX: Return a safe mapped response — never expose router credentials or
+        // client sensitive fields (password hash, phone) to the browser.
+        return jsonResponse({
+            id: sub.id,
+            clientId: sub.clientId,
+            packageId: sub.packageId,
+            routerId: sub.routerId,
+            status: sub.status,
+            syncStatus: sub.syncStatus,
+            method: sub.method,
+            activatedAt: sub.activatedAt,
+            expiresAt: sub.expiresAt,
+            tenantId: sub.tenantId,
+            createdAt: sub.createdAt,
+            // Safe subset of related records
+            client: sub.client ? { id: sub.client.id, username: sub.client.username, fullName: sub.client.fullName } : null,
+            package: sub.package ? { id: sub.package.id, name: sub.package.name } : null,
+            router: sub.router ? { id: sub.router.id, name: sub.router.name, host: sub.router.host, status: sub.router.status } : null,
+        }, 201);
     } catch (e) {
         console.error("SUBSCRIPTION POST ERROR:", e);
         return errorResponse("Internal server error", 500);

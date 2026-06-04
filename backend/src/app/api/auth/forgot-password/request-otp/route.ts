@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { randomInt } from "node:crypto";
 import prisma from "@/lib/prisma";
-import { errorResponse, jsonResponse, isAutomationRequest } from "@/lib/auth";
+import { errorResponse, jsonResponse } from "@/lib/auth";
 import { sendOtpEmail } from "@/lib/email";
 
 export async function POST(req: NextRequest) {
@@ -50,12 +50,8 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // For TestSprite/Automation only when explicit automation key is supplied.
-        const isAutomation = isAutomationRequest(req);
-
         return jsonResponse({ 
-            message: "Password reset OTP sent to your email.", 
-            otp: isAutomation ? otp : undefined 
+            message: "Password reset OTP sent to your email.",
         });
     } catch (e) {
         console.error("FORGOT PASSWORD OTP ERROR:", e);

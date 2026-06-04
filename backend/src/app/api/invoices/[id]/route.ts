@@ -34,6 +34,26 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         const { id } = await params;
         const body = await req.json();
 
+        // INV-002 FIX: Prevent invalid status transitions.
+        // A PAID invoice must not be reverted to DRAFT/SENT — this would corrupt billing records.
+        if (body.status) {
+            const current = await prisma.invoice.findUnique({ where: { id }, select: { status: true } });
+            if (!current) return errorResponse("Invoice not found", 404);
+
+            const FORBIDDEN_REGRESSIONS: Record<string, string[]> = {
+                PAID: ["DRAFT", "SENT", "OVERDUE"],
+                CANCELLED: ["PAID", "DRAFT", "SENT", "OVERDUE"],
+            };
+            const forbidden = FORBIDDEN_REGRESSIONS[current.status];
+            const newStatus = body.status.toUpperCase();
+            if (forbidden?.includes(newStatus)) {
+                return errorResponse(
+                    `Cannot change status from ${current.status} to ${newStatus}`,
+                    409
+                );
+            }
+        }
+
         const invoice = await prisma.invoice.update({
             where: { id },
             data: {

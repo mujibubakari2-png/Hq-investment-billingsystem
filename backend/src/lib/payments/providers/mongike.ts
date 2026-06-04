@@ -166,8 +166,10 @@ export class MongikeProvider implements PaymentProvider {
     rawBody: string
   ): Promise<WebhookVerification> {
     if (!this.webhookSecret) {
-      console.warn("[MONGIKE] No webhook secret configured — skipping verification");
-      return { verified: true, reason: "No secret configured" };
+      // PAY-003/PAY-004 FIX: Reject webhooks when no secret is configured.
+      // Previously this returned verified:true which allowed anyone to forge payment confirmations.
+      console.error("[MONGIKE] Webhook secret not configured — rejecting webhook. Set webhookSecret on the PaymentChannel record.");
+      return { verified: false, reason: "Webhook secret not configured" };
     }
 
     // Try HMAC-SHA256 signature first

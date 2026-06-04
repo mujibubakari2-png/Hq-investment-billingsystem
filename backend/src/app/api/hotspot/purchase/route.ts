@@ -48,14 +48,12 @@ export async function POST(req: NextRequest) {
     });
 
     if (!pkg) {
+      // API-006 FIX: Only allow fallback by exact package NAME match.
+      // The previous fallback included `status: "ACTIVE"` as a standalone OR condition,
+      // meaning any invalid/non-UUID packageId could match the FIRST active package in the
+      // system — assigning the completely wrong plan to the customer.
       pkg = await prisma.package.findFirst({
-        where: {
-          OR: [
-            { name: packageId },
-            ...(/^\d+$/.test(packageId) ? [{ status: "ACTIVE" as const }] : []),
-            ...(process.env.NODE_ENV !== "production" ? [{ status: "ACTIVE" as const }] : []),
-          ],
-        },
+        where: { name: packageId },
         include: { router: true },
       });
     }
@@ -191,7 +189,21 @@ export async function POST(req: NextRequest) {
             ...(pkg.tenantId ? { tenantId: pkg.tenantId } : {}),
           },
         });
-        provider = channel?.provider?.toUpperCase() ?? "ZENOPAY";
+        if (channel?.provider) {
+          provider = channel.provider.toUpperCase();
+        } else {
+          // PAY-001 FIX: No provider configured — return error instead of defaulting to ZENOPAY.
+          // Silently defaulting causes payment initiation to fail for tenants using other providers,
+          // and would mark the transaction as PENDING with no way to recover.
+          await prisma.transaction.update({
+            where: { id: transaction.id },
+            data: { status: "FAILED" },
+          });
+          return errorResponse(
+            "No payment provider is configured for this tenant. Please contact support.",
+            503
+          );
+        }
       }
     }
 

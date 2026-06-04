@@ -11,6 +11,7 @@ import https from "https";
 import { isIPv4 } from "net";
 import { env } from "@/lib/env";
 import prisma from "./prisma";
+import { decryptRouterFields } from "./encryption";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -737,6 +738,11 @@ export class MikroTikService {
      * Activate a customer's service after payment
      */
     async activateService(username: string, password: string, profileName: string, serviceType: "pppoe" | "hotspot", expiresAt?: Date): Promise<void> {
+        // MK-002 FIX: Sanitize profileName to match the name created by createProfileFromPackage().
+        // createProfileFromPackage() uses sanitizeMikroTikName() but callers often pass the raw
+        // pkg.name (e.g. "50 Mbps / Home"). Without this, MikroTik rejects with "profile not found".
+        profileName = sanitizeMikroTikName(profileName);
+
         let limitUptime: string | undefined = undefined;
         if (expiresAt) {
             const seconds = Math.floor((expiresAt.getTime() - Date.now()) / 1000);
@@ -948,15 +954,20 @@ export async function getMikroTikService(routerId: string, tenantId?: string | n
         throw new Error("Unauthorized: This router belongs to another tenant");
     }
 
+    // MK-004 / SEC-001 FIX: Decrypt router credentials before use.
+    // Without this, if the password was stored via encryptRouterFields(), the raw ciphertext
+    // ("enc:v1:...") would be used as the Basic Auth password — MikroTik returns 401 on every call.
+    const decryptedRouter = decryptRouterFields(router);
+
     return new MikroTikService(
         {
-            host: router.host,
+            host: decryptedRouter.host,
             port: router.apiPort || router.port || 8728,
             // E22 FIX: Pass the stored restPort so the constructor uses it directly
             // instead of the generic 8728→80 auto-mapping. Falls back to auto-mapping when null.
             restPort: (router as any).restPort ?? undefined,
             username: router.username || "admin",
-            password: router.password || "",
+            password: decryptedRouter.password || "",
         },
         routerId,
         router.tenantId,

@@ -147,9 +147,18 @@ model Transaction {
   createdAt  DateTime          @default(now())
   updatedAt  DateTime          @updatedAt
   tenantId   String?
+  // INV-001/PAY-002: Link transaction back to the invoice that triggered the payment
+  invoiceId  String?
   client     Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
   tenant     Tenant?           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  invoice    Invoice?          @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
 
+  // DB-001: Indexes for common query patterns (status filtering, tenant scoping, date sorting)
+  @@index([tenantId, status])
+  @@index([clientId])
+  @@index([createdAt])
+  @@index([status, createdAt])
+  @@index([invoiceId])
   @@map("transactions")
 }
 
@@ -309,10 +318,18 @@ model Invoice {
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
   tenantId      String?
+  // INV-001/PAY-002: Track when invoice was paid and which transaction paid it
+  paidAt        DateTime?
+  transactionId String?       @unique
   items         InvoiceItem[]
+  transactions  Transaction[]
   client        Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
   tenant        Tenant?       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
+  // DB-002: Indexes for common query patterns
+  @@index([tenantId, status])
+  @@index([dueDate])
+  @@index([clientId])
   @@map("invoices")
 }
 

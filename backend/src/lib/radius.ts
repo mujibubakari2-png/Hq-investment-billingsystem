@@ -32,9 +32,10 @@ async function upsertRadCheck(
     op: string,
     tenantId: string | null
 ) {
-    // Use findFirst + update/create instead of upsert to correctly handle
-    // NULL tenantId. Prisma's compound unique upsert requires non-null values
-    // in the WHERE clause, which caused a NULL vs "" mismatch (Bug #2).
+    // RAD-001 FIX: Wrap create() in try/catch to handle the findFirst→create race condition.
+    // Under concurrent payment webhooks for the same user, two goroutines may both reach
+    // the create() branch simultaneously, causing a unique constraint violation.
+    // On conflict: fall back to update by re-querying the now-existing row.
     const existing = await prisma.radCheck.findFirst({
         where: { username, attribute, tenantId: tenantId || null },
     });
@@ -45,15 +46,29 @@ async function upsertRadCheck(
             data: { value, op },
         });
     } else {
-        await prisma.radCheck.create({
-            data: {
-                username,
-                attribute,
-                op,
-                value,
-                tenantId: tenantId || null,
-            },
-        });
+        try {
+            await prisma.radCheck.create({
+                data: {
+                    username,
+                    attribute,
+                    op,
+                    value,
+                    tenantId: tenantId || null,
+                },
+            });
+        } catch (err: any) {
+            // P2002 = Prisma unique constraint violation — race condition, row created concurrently
+            if (err?.code === 'P2002') {
+                const race = await prisma.radCheck.findFirst({
+                    where: { username, attribute, tenantId: tenantId || null },
+                });
+                if (race) {
+                    await prisma.radCheck.update({ where: { id: race.id }, data: { value, op } });
+                }
+            } else {
+                throw err;
+            }
+        }
     }
 }
 
@@ -64,7 +79,7 @@ async function upsertRadReply(
     op: string,
     tenantId: string | null
 ) {
-    // Bug #2 FIX: same findFirst pattern as upsertRadCheck above
+    // RAD-001 FIX: Same race-condition guard as upsertRadCheck above.
     const existing = await prisma.radReply.findFirst({
         where: { username, attribute, tenantId: tenantId || null },
     });
@@ -75,15 +90,28 @@ async function upsertRadReply(
             data: { value, op },
         });
     } else {
-        await prisma.radReply.create({
-            data: {
-                username,
-                attribute,
-                op,
-                value,
-                tenantId: tenantId || null,
-            },
-        });
+        try {
+            await prisma.radReply.create({
+                data: {
+                    username,
+                    attribute,
+                    op,
+                    value,
+                    tenantId: tenantId || null,
+                },
+            });
+        } catch (err: any) {
+            if (err?.code === 'P2002') {
+                const race = await prisma.radReply.findFirst({
+                    where: { username, attribute, tenantId: tenantId || null },
+                });
+                if (race) {
+                    await prisma.radReply.update({ where: { id: race.id }, data: { value, op } });
+                }
+            } else {
+                throw err;
+            }
+        }
     }
 }
 

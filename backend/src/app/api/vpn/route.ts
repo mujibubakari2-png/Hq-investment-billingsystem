@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
+import { encrypt, decrypt } from "@/lib/encryption";
 
 // GET /api/vpn – list VPN users (from ppp secrets stored in a table)
 export async function GET(req: NextRequest) {
@@ -34,6 +35,8 @@ export async function GET(req: NextRequest) {
             bytesOut: v.bytesOut || "0 B",
             connectedAt: v.connectedAt ? new Date(v.connectedAt).toLocaleString() : "Never",
             createdAt: new Date(v.createdAt).toLocaleDateString(),
+            // VPN-001: Never return the raw or decrypted password to the client
+            hasPassword: !!v.password,
         }));
 
         return jsonResponse(result);
@@ -75,7 +78,9 @@ export async function POST(req: NextRequest) {
         const vpnUser = await prisma.vpnUser.create({
             data: {
                 username,
-                password,
+                // VPN-001 FIX: Encrypt password at rest. For WireGuard, 'password' holds
+                // the public key which is not a secret, so encryption is safe either way.
+                password: encrypt(password) ?? password,
                 fullName: fullName || null,
                 protocol: protocol || "L2TP",
                 profile: profile || "default",
@@ -118,7 +123,8 @@ export async function POST(req: NextRequest) {
             } else {
                 await mt.createVpnUser({
                     name: username,
-                    password: password,
+                    // VPN-001: Decrypt before sending to MikroTik — the router needs plaintext
+                    password: decrypt(vpnUser.password) ?? password,
                     service: service || "any",
                     profile: profile || "default",
                     localAddress: localAddress,

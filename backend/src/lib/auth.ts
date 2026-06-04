@@ -2,7 +2,6 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { NextRequest } from "next/server";
 
-let jwtSecret: string | null = null;
 
 function isNextBuild(): boolean {
     return (
@@ -13,17 +12,17 @@ function isNextBuild(): boolean {
 }
 
 function getJwtSecret(): string {
-    if (!jwtSecret) {
-        const secret = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET;
-        if (!secret) {
-            throw new Error("FATAL: JWT_SECRET or NEXTAUTH_SECRET environment variable is required. Add it to your .env file.");
-        }
-        if (secret.length < 32) {
-            throw new Error("FATAL: JWT_SECRET or NEXTAUTH_SECRET must be at least 32 characters long for security.");
-        }
-        jwtSecret = secret;
+    // SEC-008 FIX: Do NOT cache the secret at module level.
+    // Module-level caching in Next.js serverless can return a stale secret after
+    // env rotation or in edge environments where modules are reloaded between requests.
+    const secret = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET;
+    if (!secret) {
+        throw new Error("FATAL: JWT_SECRET or NEXTAUTH_SECRET environment variable is required. Add it to your .env file.");
     }
-    return jwtSecret;
+    if (secret.length < 32) {
+        throw new Error("FATAL: JWT_SECRET or NEXTAUTH_SECRET must be at least 32 characters long for security.");
+    }
+    return secret;
 }
 
 export interface JwtPayload {
@@ -81,38 +80,9 @@ export function getTokenFromRequest(req: NextRequest): string | null {
     return null;
 }
 
-function isAutomationEnv(): boolean {
-    return process.env.NODE_ENV === "test";
-}
-
-function isAutomationBypassEnabled(): boolean {
-    return process.env.ALLOW_AUTOMATION_BYPASS === "true";
-}
-
-export function isAutomationRequest(req: NextRequest): boolean {
-    const automationKey = process.env.AUTOMATION_KEY;
-    if (!isAutomationEnv() || !isAutomationBypassEnabled() || !automationKey) return false;
-
-    const explicitKey = req.headers.get("x-automation-key") ?? req.headers.get("x-api-key");
-    const bearerToken = getTokenFromRequest(req);
-    return explicitKey === automationKey || bearerToken === automationKey;
-}
-
 export function getUserFromRequest(req: NextRequest): JwtPayload | null {
     const token = getTokenFromRequest(req);
     if (!token) return null;
-
-    // Automation key bypass for CI/test tooling only when explicitly enabled.
-    if (isAutomationRequest(req)) {
-        return {
-            userId: "automation-id",
-            username: "automation",
-            role: "ADMIN",
-            tenantId: "test-tenant-id-123",
-            tenant_id: "test-tenant-id-123"
-        };
-    }
-
     return verifyToken(token);
 }
 

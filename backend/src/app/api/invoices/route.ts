@@ -13,7 +13,10 @@ export async function GET(req: NextRequest) {
         }
 
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
-        const tenantFilter = { tenantId: userPayload.tenantId };
+        // API-003 FIX: Use empty filter for SUPER_ADMIN so they see all invoices.
+        // Previously tenantFilter was unconditionally set to { tenantId: userPayload.tenantId }
+        // which caused SUPER_ADMIN to only see their own tenant's invoices.
+        const tenantFilter = isSuperAdmin ? {} : { tenantId: userPayload.tenantId };
 
         const { searchParams } = new URL(req.url);
         const status = searchParams.get("status") || "";
@@ -84,6 +87,17 @@ export async function POST(req: NextRequest) {
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
         const body = await req.json();
         const tenantIdValue = userPayload.tenantId;
+
+        // API-002 FIX: Validate that clientId belongs to the requesting tenant.
+        // Without this check, a tenant ADMIN can create invoices against any client UUID
+        // from any other tenant, leaking cross-tenant billing data.
+        if (body.clientId) {
+            const client = await prisma.client.findUnique({ where: { id: body.clientId } });
+            if (!client) return errorResponse("Client not found", 404);
+            if (!isSuperAdmin && client.tenantId !== userPayload.tenantId) {
+                return errorResponse("Forbidden: client does not belong to your tenant", 403);
+            }
+        }
 
         const invoice = await prisma.invoice.create({
             data: {

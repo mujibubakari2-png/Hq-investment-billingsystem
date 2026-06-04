@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { randomInt } from "node:crypto";
 import prisma from "@/lib/prisma";
-import { errorResponse, jsonResponse, isAutomationRequest } from "@/lib/auth";
+import { errorResponse, jsonResponse } from "@/lib/auth";
 import { sendOtpEmail } from "@/lib/email";
 
 export async function POST(req: NextRequest) {
@@ -44,7 +44,6 @@ export async function POST(req: NextRequest) {
 
         return jsonResponse({
             message: "Verification code sent to your email.",
-            otp: isAutomationRequest(req) ? otp : undefined
         });
     } catch (e: any) {
         console.error("REGISTER OTP ERROR:", e);

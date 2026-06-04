@@ -136,8 +136,11 @@ export class PalmPesaProvider implements PaymentProvider {
     _rawBody: string
   ): Promise<WebhookVerification> {
     if (!this.webhookSecret) {
-      console.warn("[PALMPESA] No webhook secret configured — skipping verification");
-      return { verified: true, reason: "No secret configured" };
+      // PAY-003/PAY-004 FIX: Reject webhooks when no secret is configured.
+      // Previously this returned verified:true which allowed anyone to forge payment confirmations.
+      // Require webhookSecret to be set on the PaymentChannel record before accepting any callbacks.
+      console.error("[PALMPESA] Webhook secret not configured — rejecting webhook. Set webhookSecret on the PaymentChannel record.");
+      return { verified: false, reason: "Webhook secret not configured" };
     }
 
     const provided =

@@ -155,8 +155,10 @@ export class ZenoPayProvider implements PaymentProvider {
     rawBody: string
   ): Promise<WebhookVerification> {
     if (!this.webhookSecret) {
-      console.warn("[ZENOPAY] No webhook secret configured — skipping verification");
-      return { verified: true, reason: "No secret configured" };
+      // PAY-003/PAY-004 FIX: Reject webhooks when no secret is configured.
+      // Previously this returned verified:true which allowed anyone to forge payment confirmations.
+      console.error("[ZENOPAY] Webhook secret not configured — rejecting webhook. Set webhookSecret on the PaymentChannel record.");
+      return { verified: false, reason: "Webhook secret not configured" };
     }
 
     // ZenoPay may send x-zeno-signature (HMAC-SHA256) or x-api-key

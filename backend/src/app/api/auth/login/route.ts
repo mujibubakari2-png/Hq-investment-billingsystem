@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
-import { comparePassword, signToken, signRefreshToken, jsonResponse, errorResponse, isAutomationRequest } from "@/lib/auth";
+import { comparePassword, signToken, signRefreshToken, jsonResponse, errorResponse } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/rateLimiter";
 import logger from "@/lib/logger";
 

@@ -50,11 +50,14 @@ export class PaymentService {
    * Load the active PaymentChannel record for a tenant + provider from DB.
    */
   async getChannel(tenantId: string | null, providerName: string) {
+    // MT-003 FIX: Explicitly match tenantId=null for global channels when tenantId is null.
+    // The previous `...(tenantId ? { tenantId } : {})` pattern omitted the tenantId filter
+    // entirely when tenantId was null/falsy, allowing any tenant's channel to be returned.
     return prisma.paymentChannel.findFirst({
       where: {
         provider: providerName.toUpperCase(),
         status: "ACTIVE",
-        ...(tenantId ? { tenantId } : {}),
+        tenantId: tenantId ?? null,
       },
     });
   }
@@ -184,10 +187,11 @@ export class PaymentService {
     }
 
     // 4. Idempotency — find existing transaction
-    const transaction = await prisma.transaction.findFirst({
+    // NOTE: include { client, invoice } — `invoice` is a new relation pending prisma generate
+    const transaction = await (prisma.transaction.findFirst as any)({
       where: { reference: parsed.transactionRef },
-      include: { client: true },
-    });
+      include: { client: true, invoice: true },
+    }) as any;
 
     if (!transaction) {
       await prisma.webhookLog.update({
@@ -283,29 +287,67 @@ export class PaymentService {
       }
     }
 
-    // DB transaction: mark paid, create subscription, activate client
+    // DB transaction: mark paid, create/extend subscription, activate client
     const [, newSub] = await prisma.$transaction(async (tx) => {
       const updatedTx = await tx.transaction.update({
         where: { id: transaction.id },
         data: { status: "COMPLETED", expiryDate: expiresAt },
       });
 
-      let sub = null;
-      if (pkg) {
-        sub = await tx.subscription.create({
+      // PAY-002 FIX: If this transaction was initiated from an invoice payment,
+      // mark the invoice as PAID and record the paidAt timestamp.
+      // NOTE: invoiceId, paidAt, transactionId are new schema fields — cast to any until
+      // `prisma generate` runs after the migration is applied to the database.
+      if ((transaction as any).invoiceId) {
+        await (tx.invoice.update as any)({
+          where: { id: (transaction as any).invoiceId },
           data: {
-            clientId: transaction.clientId,
-            packageId: pkg.id,
-            routerId: pkg.routerId ?? undefined,
-            status: "ACTIVE",
-            method: "MOBILE",
-            activatedAt: now,
-            expiresAt,
-            onlineStatus: "ONLINE",
-            syncStatus: "PENDING",
-            tenantId: transaction.tenantId,
+            status: "PAID",
+            paidAt: now,
+            transactionId: transaction.id,
           },
         });
+      }
+
+      let sub = null;
+      if (pkg) {
+        // PAY-005 FIX: If an active subscription already exists for this client + package,
+        // EXTEND it instead of creating a new one. Creating new subs on every renewal causes
+        // duplicate ACTIVE rows to accumulate, corrupting billing state.
+        const existingSub = await tx.subscription.findFirst({
+          where: {
+            clientId: transaction.clientId,
+            packageId: pkg.id,
+            status: "ACTIVE",
+          },
+        });
+
+        if (existingSub) {
+          sub = await tx.subscription.update({
+            where: { id: existingSub.id },
+            data: {
+              expiresAt,
+              updatedAt: new Date(),
+              syncStatus: "PENDING",
+              onlineStatus: "ONLINE",
+            },
+          });
+        } else {
+          sub = await tx.subscription.create({
+            data: {
+              clientId: transaction.clientId,
+              packageId: pkg.id,
+              routerId: pkg.routerId ?? undefined,
+              status: "ACTIVE",
+              method: "MOBILE",
+              activatedAt: now,
+              expiresAt,
+              onlineStatus: "ONLINE",
+              syncStatus: "PENDING",
+              tenantId: transaction.tenantId,
+            },
+          });
+        }
       }
 
       await tx.client.update({
@@ -328,7 +370,10 @@ export class PaymentService {
         }
         await syncRadiusUser({
           username: client.username,
-          password: client.phone || undefined,
+          // RAD-002 FIX: Use client.phone || client.username as RADIUS password fallback.
+          // If phone is null, syncRadiusUser throws "Cannot create RadiusUser without a password".
+          // Using username as secondary fallback ensures RADIUS sync never fails due to missing phone.
+          password: client.phone || client.username,
           tenantId: pkg.tenantId || null,
           fullName: client.fullName || undefined,
           expiresAt,
