@@ -216,21 +216,20 @@ PersistentKeepalive = 25`;
         <div className="modal-overlay" onClick={onClose}>
             <div className="modal" style={{ maxWidth: 780 }} onClick={e => e.stopPropagation()}>
                 {/* Header */}
-                <div style={{
+                <div className="modal-header" style={{
                     background: 'linear-gradient(135deg, #15803d 0%, #22c55e 100%)', color: '#fff',
-                    padding: '16px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <VpnLockIcon />
-                        <div>
-                            <div style={{ fontWeight: 700, fontSize: '1.05rem' }}>WireGuard VPN Configuration</div>
-                            <div style={{ fontSize: '0.8rem', opacity: 0.85 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                        <VpnLockIcon style={{ flexShrink: 0 }} />
+                        <div style={{ minWidth: 0 }}>
+                            <div style={{ fontWeight: 700, fontSize: '1.05rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>WireGuard VPN Configuration</div>
+                            <div style={{ fontSize: '0.8rem', opacity: 0.85, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                 {router.name} — {router.host}
                                 {config.enabled && <span style={{ marginLeft: 8, background: 'rgba(255,255,255,0.25)', padding: '2px 8px', borderRadius: 10, fontSize: '0.72rem' }}>✅ ACTIVE</span>}
                             </div>
                         </div>
                     </div>
-                    <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', cursor: 'pointer', borderRadius: 6, padding: '6px 8px' }}>
+                    <button onClick={onClose} className="modal-close" style={{ color: '#fff', background: 'rgba(255,255,255,0.15)', flexShrink: 0 }}>
                         <CloseIcon fontSize="small" />
                     </button>
                 </div>
@@ -238,48 +237,48 @@ PersistentKeepalive = 25`;
                 {/* Status + Action Buttons */}
                 <div style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    padding: '10px 24px', background: config.tunnelActive ? '#f0fdf4' : config.enabled ? '#fff7ed' : '#fef3c7',
+                    padding: '10px 16px', background: config.tunnelActive ? '#f0fdf4' : config.enabled ? '#fff7ed' : '#fef3c7',
                     borderBottom: '1px solid var(--border-light)', gap: 8, flexWrap: 'wrap',
                 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: 1 }}>
                         <div style={{
-                            width: 10, height: 10, borderRadius: '50%',
+                            width: 10, height: 10, borderRadius: '50%', flexShrink: 0,
                             background: config.tunnelActive ? '#16a34a' : config.enabled ? '#ea580c' : '#d97706',
                             boxShadow: config.tunnelActive ? '0 0 6px #16a34a' : 'none',
                         }} />
-                        <span style={{ fontSize: '0.82rem', fontWeight: 600, color: config.tunnelActive ? '#15803d' : config.enabled ? '#c2410c' : '#92400e' }}>
+                        <span style={{ fontSize: '0.82rem', fontWeight: 600, color: config.tunnelActive ? '#15803d' : config.enabled ? '#c2410c' : '#92400e', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                             {config.tunnelStatusMessage || (config.enabled
                                 ? `WireGuard Active — Connected via tunnel ${config.routerTunnelIp}`
                                 : 'WireGuard Not Configured — Paste script or auto-push')}
                         </span>
                     </div>
 
-                    <div style={{ display: 'flex', gap: 6 }}>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', flexShrink: 0 }}>
                         {!config.enabled ? (
                             <>
                                 <button
                                     className="btn"
-                                    style={{ background: '#15803d', color: '#fff', fontWeight: 600, fontSize: '0.78rem', padding: '6px 14px', display: 'flex', alignItems: 'center', gap: 4 }}
+                                    style={{ background: '#15803d', color: '#fff', fontWeight: 600, fontSize: '0.78rem', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: 4 }}
                                     onClick={() => handleAction('push-config')}
                                     disabled={actionLoading !== null}
                                 >
                                     {actionLoading === 'push-config' ? <SyncIcon style={{ fontSize: 14, animation: 'spin 1s linear infinite' }} /> : <SendIcon style={{ fontSize: 14 }} />}
-                                    Auto-Push to Router
+                                    Auto-Push
                                 </button>
                                 <button
                                     className="btn"
-                                    style={{ background: '#2563eb', color: '#fff', fontWeight: 600, fontSize: '0.78rem', padding: '6px 14px', display: 'flex', alignItems: 'center', gap: 4 }}
+                                    style={{ background: '#2563eb', color: '#fff', fontWeight: 600, fontSize: '0.78rem', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: 4 }}
                                     onClick={() => handleAction('activate')}
                                     disabled={actionLoading !== null}
                                 >
                                     {actionLoading === 'activate' ? <SyncIcon style={{ fontSize: 14, animation: 'spin 1s linear infinite' }} /> : <CheckCircleIcon style={{ fontSize: 14 }} />}
-                                    I Pasted It — Activate
+                                    Activate
                                 </button>
                             </>
                         ) : (
                             <button
                                 className="btn"
-                                style={{ background: '#dc2626', color: '#fff', fontWeight: 600, fontSize: '0.78rem', padding: '6px 14px', display: 'flex', alignItems: 'center', gap: 4 }}
+                                style={{ background: '#dc2626', color: '#fff', fontWeight: 600, fontSize: '0.78rem', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: 4 }}
                                 onClick={() => handleAction('deactivate')}
                                 disabled={actionLoading !== null}
                             >
@@ -383,25 +382,25 @@ PersistentKeepalive = 25`;
                 </div>
 
                 {/* Footer */}
-                <div style={{
-                    display: 'flex', justifyContent: 'flex-end', alignItems: 'center',
-                    padding: '14px 24px', borderTop: '1px solid var(--border-light)', gap: 8,
-                }}>
-                    <button className="btn btn-secondary" onClick={() => handleCopy(activeConfig, activeLabel)} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        {copied === activeLabel ? <CheckCircleIcon style={{ fontSize: 16, color: '#16a34a' }} /> : <ContentCopyIcon style={{ fontSize: 16 }} />}
-                        {copied === activeLabel ? 'Copied!' : `Copy ${activeTab === 'server' ? 'Script' : 'Config'}`}
-                    </button>
-                    <button className="btn" style={{ background: '#15803d', color: '#fff', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}
-                        onClick={() => handleDownload(
-                            activeConfig,
-                            activeTab === 'server'
-                                ? `wg-server-${sanitizeMikroTikName(router.name)}.rsc`
-                                : `wg-client-${sanitizeMikroTikName(router.name)}.conf`
-                        )}
-                    >
-                        <DownloadIcon style={{ fontSize: 16 }} />
-                        Download {activeTab === 'server' ? '.rsc' : '.conf'}
-                    </button>
+                <div className="modal-footer">
+                    <div className="modal-footer-left" />
+                    <div className="modal-footer-right">
+                        <button className="btn btn-secondary" onClick={() => handleCopy(activeConfig, activeLabel)} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            {copied === activeLabel ? <CheckCircleIcon style={{ fontSize: 16, color: '#16a34a' }} /> : <ContentCopyIcon style={{ fontSize: 16 }} />}
+                            {copied === activeLabel ? 'Copied!' : `Copy ${activeTab === 'server' ? 'Script' : 'Config'}`}
+                        </button>
+                        <button className="btn" style={{ background: '#15803d', color: '#fff', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}
+                            onClick={() => handleDownload(
+                                activeConfig,
+                                activeTab === 'server'
+                                    ? `wg-server-${sanitizeMikroTikName(router.name)}.rsc`
+                                    : `wg-client-${sanitizeMikroTikName(router.name)}.conf`
+                            )}
+                        >
+                            <DownloadIcon style={{ fontSize: 16 }} />
+                            Download {activeTab === 'server' ? '.rsc' : '.conf'}
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

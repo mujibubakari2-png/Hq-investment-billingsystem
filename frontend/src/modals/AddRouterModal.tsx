@@ -53,23 +53,13 @@ export default function AddRouterModal({ onClose, onSave, initialData }: AddRout
     };
 
     return (
-        <div className="modal-overlay" onClick={onClose} style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            zIndex: 1100, backdropFilter: 'blur(4px)', background: 'var(--bg-modal-overlay)'
-        }}>
+        <div className="modal-overlay" onClick={onClose}>
             <div className="modal" style={{ maxWidth: 600 }} onClick={e => e.stopPropagation()}>
 
                 {/* Header */}
-                <div style={{
-                    padding: '24px 28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    borderBottom: '1px solid var(--border-light)', background: 'transparent'
-                }}>
-                    <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, letterSpacing: '-0.02em' }}>Add Router</h2>
-                    <button onClick={onClose} style={{
-                        background: 'var(--bg-hover)', border: 'none', borderRadius: '50%',
-                        width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        cursor: 'pointer', color: 'var(--text-secondary)', transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
-                    }}>
+                <div className="modal-header">
+                    <h2 style={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, letterSpacing: '-0.02em' }}>Add Router</h2>
+                    <button onClick={onClose} className="modal-close">
                         <CloseIcon fontSize="small" />
                     </button>
                 </div>
@@ -381,7 +371,7 @@ export default function AddRouterModal({ onClose, onSave, initialData }: AddRout
                         <label className="form-label" style={{ fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.9rem', marginBottom: 16 }}>
                             <PowerSettingsNewIcon style={{ fontSize: 18, color: 'var(--primary)' }} /> Initial Status
                         </label>
-                        <div style={{ display: 'flex', gap: 32 }}>
+                        <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
                             <div
                                 onClick={() => setStatus('Online')}
                                 style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', transition: 'all 0.2s' }}
@@ -425,30 +415,24 @@ export default function AddRouterModal({ onClose, onSave, initialData }: AddRout
                 </div>
 
                 {/* Footer */}
-                <div style={{
-                    padding: '24px 28px', background: 'var(--bg-hover)', borderTop: '1px solid var(--border-light)',
-                    display: 'flex', justifyContent: 'flex-end', gap: 16
-                }}>
-                    <button
-                        className="btn btn-secondary"
-                        onClick={onClose}
-                        style={{ background: 'var(--bg-card)', padding: '0 28px', height: 48, borderRadius: 'var(--radius-sm)' }}
-                    >
-                        ✕ Cancel
-                    </button>
-                    <button
-                        className="btn btn-primary"
-                        onClick={handleSave}
-                        style={{
-                            padding: '0 32px', height: 48,
-                            fontWeight: 800, borderRadius: 'var(--radius-sm)',
-                            display: 'flex', alignItems: 'center', gap: 10,
-                            boxShadow: '0 10px 15px -3px rgba(79, 70, 229, 0.4)'
-                        }}
-                        disabled={!routerName || (!accessCode && !initialData?.id)}
-                    >
-                        <AddTaskIcon style={{ fontSize: 20 }} /> Create Router
-                    </button>
+                <div className="modal-footer">
+                    <div className="modal-footer-left" />
+                    <div className="modal-footer-right">
+                        <button
+                            className="btn btn-secondary"
+                            onClick={onClose}
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            className="btn btn-primary"
+                            onClick={handleSave}
+                            style={{ fontWeight: 800 }}
+                            disabled={!routerName || (!accessCode && !initialData?.id)}
+                        >
+                            <AddTaskIcon style={{ fontSize: 20 }} /> Create Router
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

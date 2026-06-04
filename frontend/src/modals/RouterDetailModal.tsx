@@ -62,15 +62,12 @@ export default function RouterDetailModal({ router, onClose, onDelete }: RouterD
         <div className="modal-overlay" onClick={onClose}>
             <div className="modal" style={{ maxWidth: 520 }} onClick={e => e.stopPropagation()}>
                 {/* Green Header */}
-                <div style={{
-                    background: '#16a34a', color: '#fff', padding: '14px 20px',
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <RouterIcon fontSize="small" />
-                        <span style={{ fontWeight: 700, fontSize: '1rem' }}>{router.name}</span>
+                <div className="modal-header" style={{ background: '#16a34a', color: '#fff' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                        <RouterIcon fontSize="small" style={{ flexShrink: 0 }} />
+                        <span style={{ fontWeight: 700, fontSize: '1rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{router.name}</span>
                     </div>
-                    <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer' }}>
+                    <button onClick={onClose} className="modal-close" style={{ color: '#fff', background: 'rgba(255,255,255,0.15)' }}>
                         <CloseIcon fontSize="small" />
                     </button>
                 </div>
@@ -79,19 +76,20 @@ export default function RouterDetailModal({ router, onClose, onDelete }: RouterD
                     {/* Router Info */}
                     <div style={{
                         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        flexWrap: 'wrap', gap: 8,
                         padding: '12px 16px', background: '#f8fafc', borderRadius: 'var(--radius-sm)',
                         marginBottom: 20,
                     }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                            <RouterIcon style={{ color: '#d97706' }} />
-                            <span style={{ fontWeight: 600 }}>{router.name}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                            <RouterIcon style={{ color: '#d97706', flexShrink: 0 }} />
+                            <span style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{router.name}</span>
                         </div>
                         <span style={{
                             display: 'inline-flex', alignItems: 'center', gap: 6,
                             padding: '4px 12px', borderRadius: 20,
                             background: router.status === 'Online' ? '#d1fae5' : '#fee2e2',
                             color: router.status === 'Online' ? '#065f46' : '#dc2626',
-                            fontWeight: 500, fontSize: '0.8rem',
+                            fontWeight: 500, fontSize: '0.8rem', flexShrink: 0,
                         }}>
                             <CheckCircleIcon style={{ fontSize: 14 }} />
                             {router.status === 'Online' ? 'Connected' : 'Disconnected'}

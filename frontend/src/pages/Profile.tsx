@@ -99,36 +99,38 @@ export default function Profile() {
 
             {/* Profile Card */}
             <div className="card" style={{ marginBottom: 24 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 20, padding: '24px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 20, padding: '20px 24px', flexWrap: 'wrap' }}>
                     <div style={{
                         width: 80, height: 80, borderRadius: '50%',
                         background: 'linear-gradient(135deg, #e53935, #c62828)',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         color: '#fff', fontSize: '1.8rem', fontWeight: 700,
                         boxShadow: '0 4px 14px rgba(229, 57, 53, 0.35)',
+                        flexShrink: 0,
                     }}>
                         {initials}
                     </div>
-                    <div>
-                        <h2 style={{ fontSize: '1.3rem', fontWeight: 700, marginBottom: 4 }}>{displayName}</h2>
-                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: 4 }}>{user?.email}</p>
+                    <div style={{ minWidth: 0 }}>
+                        <h2 style={{ fontSize: '1.3rem', fontWeight: 700, marginBottom: 4, wordBreak: 'break-word' }}>{displayName}</h2>
+                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: 4, wordBreak: 'break-all' }}>{user?.email}</p>
                         <span className="badge active" style={{ fontSize: '0.75rem' }}>{user?.role || 'User'}</span>
                     </div>
                 </div>
             </div>
 
             {/* Tabs */}
-            <div style={{ display: 'flex', gap: 0, borderBottom: '2px solid var(--border-light)', marginBottom: 24 }}>
+            <div style={{ display: 'flex', gap: 0, borderBottom: '2px solid var(--border-light)', marginBottom: 24, overflowX: 'auto', WebkitOverflowScrolling: 'touch' as any }}>
                 {tabs.map(tab => (
                     <button
                         key={tab.key}
                         onClick={() => setActiveTab(tab.key)}
                         style={{
-                            padding: '10px 24px', border: 'none', background: 'transparent', cursor: 'pointer',
+                            padding: '10px 20px', border: 'none', background: 'transparent', cursor: 'pointer',
                             fontWeight: activeTab === tab.key ? 700 : 400,
                             color: activeTab === tab.key ? 'var(--primary)' : 'var(--text-secondary)',
                             borderBottom: activeTab === tab.key ? '2px solid var(--primary)' : '2px solid transparent',
-                            marginBottom: -2, fontSize: '0.95rem', transition: 'all 0.2s',
+                            marginBottom: -2, fontSize: '0.9rem', transition: 'all 0.2s',
+                            whiteSpace: 'nowrap', flexShrink: 0, minHeight: 44,
                         }}
                     >
                         {tab.label}

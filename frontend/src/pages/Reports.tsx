@@ -137,22 +137,24 @@ export default function Reports() {
                 {/* Expense Breakdown */}
                 <div className="card card-body">
                     <h3 style={{ marginBottom: 16, fontWeight: 600 }}>Expense by Category</h3>
-                    <div style={{ display: 'flex', gap: 20, alignItems: 'center' }}>
-                        <ResponsiveContainer width="59%" height={200} minWidth={1} minHeight={1} initialDimension={{ width: 10, height: 10 }} debounce={50}>
-                            <PieChart>
-                                <Pie data={expensePieData} cx="50%" cy="50%" outerRadius={80} dataKey="value">
-                                    {expensePieData.map((_, index) => (
-                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                    ))}
-                                </Pie>
-                                <Tooltip />
-                            </PieChart>
-                        </ResponsiveContainer>
-                        <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', gap: 20, alignItems: 'center', flexWrap: 'wrap' }}>
+                        <div style={{ minWidth: 160, flex: '1 1 160px' }}>
+                            <ResponsiveContainer width="100%" height={180} minWidth={1} minHeight={1} debounce={50}>
+                                <PieChart>
+                                    <Pie data={expensePieData} cx="50%" cy="50%" outerRadius={70} dataKey="value">
+                                        {expensePieData.map((_, index) => (
+                                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                        ))}
+                                    </Pie>
+                                    <Tooltip />
+                                </PieChart>
+                            </ResponsiveContainer>
+                        </div>
+                        <div style={{ flex: '1 1 140px', minWidth: 120 }}>
                             {expensePieData.map((item, i) => (
-                                <div key={item.name} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: '0.82rem' }}>
+                                <div key={item.name} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: '0.82rem', gap: 8 }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                        <span style={{ width: 10, height: 10, borderRadius: '50%', background: COLORS[i % COLORS.length], display: 'inline-block' }} />
+                                        <span style={{ width: 10, height: 10, borderRadius: '50%', background: COLORS[i % COLORS.length], display: 'inline-block', flexShrink: 0 }} />
                                         {item.name}
                                     </div>
                                     <strong>{item.value.toLocaleString()}</strong>

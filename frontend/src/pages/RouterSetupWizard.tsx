@@ -82,7 +82,7 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                 setConnectionStatus('online');
             } else {
                 setConnectionStatus('offline');
-                setConnectionError(res.message);
+                setConnectionError(res.message as string);
             }
         } catch (err: any) {
             setConnectionStatus('offline');
@@ -94,7 +94,7 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
         if (!routerId) return;
         setLoadingInterfaces(true);
         try {
-            const data = await routersApi.listInterfaces(routerId);
+            const data = await (routersApi as any).listInterfaces(routerId);
             setInterfaces(data);
         } catch (err) {
             console.error('Failed to fetch interfaces:', err);
@@ -133,7 +133,7 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                 .then(res => {
                     if (res.success) {
                         // Router is reachable — check if specific service interfaces/pools exist
-                        routersApi.listInterfaces(routerId)
+                        (routersApi as any).listInterfaces(routerId)
                             .then(() => {
                                 // If we can list interfaces, the router API is fully working.
                                 // (Note: backend listInterfaces only returns ethernet ports, so we assume success if reachable)
@@ -272,7 +272,7 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
         } else {
             if (vpnEnabled && vpnSecrets.length > 0 && routerId) {
                 vpnSecrets.forEach(s => {
-                    vpnApi.create({
+                    (vpnApi as any).create({
                         username: s.username,
                         password: s.password,
                         protocol: s.protocol,
@@ -983,7 +983,9 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                                                     <div style={{ fontSize: '0.78rem', marginTop: 4 }}>Click "Add Secret" to create VPN user credentials</div>
                                                 </div>
                                             ) : (
+                                                <div className="table-container">
                                                 <table style={{ width: '100%', fontSize: '0.85rem', borderCollapse: 'collapse' }}>
+
                                                     <thead>
                                                         <tr style={{ borderBottom: '1px solid var(--border-light)' }}>
                                                             <th style={{ padding: '8px 12px', textAlign: 'left', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>USERNAME</th>
@@ -1016,6 +1018,7 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                                                         ))}
                                                     </tbody>
                                                 </table>
+                                                </div>
                                             )}
                                         </div>
                                     </div>
@@ -1433,7 +1436,7 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
 
             {/* Stepper */}
             <div style={{ overflowX: 'auto', width: '100%' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '24px 0', margin: '0 auto', maxWidth: 800, minWidth: 760 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '24px 0', margin: '0 auto', maxWidth: 800 }}>
                     {steps.map((step, i) => (
                         <div key={i} style={{ display: 'flex', alignItems: 'center', flex: i < steps.length - 1 ? 1 : 0 }}>
                             <div style={{ textAlign: 'center', minWidth: 60 }}>
@@ -1493,7 +1496,7 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                                     const result = await routersApi.testConnection(routerId);
                                     if (result.success) {
                                         try {
-                                            const ifaces = await routersApi.listInterfaces(routerId);
+                                            const ifaces = await (routersApi as any).listInterfaces(routerId);
                                             const hasBridge = ifaces.some((i: any) =>
                                                 i.type === 'bridge' || i.name?.toLowerCase().includes('bridge')
                                             );

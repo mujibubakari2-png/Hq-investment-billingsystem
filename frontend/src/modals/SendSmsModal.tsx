@@ -65,7 +65,7 @@ export default function SendSmsModal({ templates = [], onClose, onSend, defaultR
                 <div className="modal-body">
                     <div className="form-group">
                         <label className="form-label">Recipient</label>
-                        <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                        <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
                             {[
                                 { value: 'all', label: 'All Clients' },
                                 { value: 'active', label: 'Active' },
@@ -76,6 +76,7 @@ export default function SendSmsModal({ templates = [], onClose, onSend, defaultR
                                     key={opt.value}
                                     className={`btn btn-sm ${recipientType === opt.value ? 'btn-primary' : 'btn-secondary'}`}
                                     onClick={() => setRecipientType(opt.value)}
+                                    style={{ flexShrink: 0 }}
                                 >
                                     {opt.label}
                                 </button>

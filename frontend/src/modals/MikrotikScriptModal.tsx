@@ -68,28 +68,27 @@ export default function MikrotikScriptModal({ router, onClose }: MikrotikScriptM
         <div className="modal-overlay" onClick={onClose}>
             <div className="modal" style={{ maxWidth: 750 }} onClick={e => e.stopPropagation()}>
                 {/* Header */}
-                <div style={{
+                <div className="modal-header" style={{
                     background: 'linear-gradient(135deg, #4338ca 0%, #6366f1 100%)', color: '#fff',
-                    padding: '16px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <DescriptionIcon />
-                        <div>
-                            <div style={{ fontWeight: 700, fontSize: '1.05rem' }}>MikroTik Configuration Script</div>
-                            <div style={{ fontSize: '0.8rem', opacity: 0.85 }}>{router.name} — {routerIdCode}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                        <DescriptionIcon style={{ flexShrink: 0 }} />
+                        <div style={{ minWidth: 0 }}>
+                            <div style={{ fontWeight: 700, fontSize: '1.05rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>MikroTik Configuration Script</div>
+                            <div style={{ fontSize: '0.8rem', opacity: 0.85, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{router.name} — {routerIdCode}</div>
                         </div>
                     </div>
-                    <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', cursor: 'pointer', borderRadius: 6, padding: '6px 8px' }}>
+                    <button onClick={onClose} className="modal-close" style={{ color: '#fff', background: 'rgba(255,255,255,0.15)', flexShrink: 0 }}>
                         <CloseIcon fontSize="small" />
                     </button>
                 </div>
 
                 {/* Info Banner */}
                 <div style={{
-                    background: '#eef2ff', padding: '10px 24px', fontSize: '0.82rem', color: '#4338ca',
-                    display: 'flex', alignItems: 'center', gap: 8, borderBottom: '1px solid #c7d2fe',
+                    background: '#eef2ff', padding: '10px 16px', fontSize: '0.82rem', color: '#4338ca',
+                    display: 'flex', alignItems: 'flex-start', gap: 8, borderBottom: '1px solid #c7d2fe', flexWrap: 'wrap',
                 }}>
-                    <CheckCircleIcon style={{ fontSize: 16 }} />
+                    <CheckCircleIcon style={{ fontSize: 16, flexShrink: 0, marginTop: 2 }} />
                     <span>This script auto-configures your MikroTik router for HQInvestment ISP billing. Paste into <strong>Terminal</strong> or upload as <strong>.rsc</strong> file.</span>
                 </div>
 
@@ -107,14 +106,11 @@ export default function MikrotikScriptModal({ router, onClose }: MikrotikScriptM
                 </div>
 
                 {/* Footer */}
-                <div style={{
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                    padding: '14px 24px', borderTop: '1px solid var(--border-light)', gap: 8,
-                }}>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                <div className="modal-footer">
+                    <div className="modal-footer-left" style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                         💡 Run in MikroTik → System → Terminal
                     </div>
-                    <div style={{ display: 'flex', gap: 8 }}>
+                    <div className="modal-footer-right">
                         <button className="btn btn-secondary" onClick={handleCopy} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                             {copied ? <CheckCircleIcon style={{ fontSize: 16, color: '#16a34a' }} /> : <ContentCopyIcon style={{ fontSize: 16 }} />}
                             {copied ? 'Copied!' : 'Copy Script'}

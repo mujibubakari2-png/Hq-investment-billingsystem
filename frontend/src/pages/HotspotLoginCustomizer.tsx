@@ -1053,14 +1053,14 @@ TROUBLESHOOTING:
     return (
         <div>
             {/* Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
                 <div>
-                    <h1 style={{ fontSize: '1.3rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <h1 style={{ fontSize: 'clamp(1rem, 2.5vw, 1.3rem)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                         <WifiIcon style={{ color: '#16a34a' }} /> Hotspot Login Customizer
                     </h1>
                     <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Customize and download your hotspot login page</p>
                 </div>
-                <div style={{ textAlign: 'right', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                <div style={{ textAlign: 'right', fontSize: '0.8rem', color: 'var(--text-secondary)', flexShrink: 0 }}>
                     <div>Company: <strong style={{ color: 'var(--text-primary)' }}>{companyName}</strong></div>
                     <div>User: <strong style={{ color: 'var(--text-primary)' }}>{user?.username || 'Admin'}</strong></div>
                     <div>Role: <strong style={{ color: 'var(--text-primary)' }}>{user?.role || 'User'}</strong></div>
@@ -1079,7 +1079,7 @@ TROUBLESHOOTING:
                     ) : (
                         <select
                             className="select-field"
-                            style={{ minWidth: 280, fontWeight: 500 }}
+                            style={{ width: '100%', maxWidth: 400, minWidth: 0, fontWeight: 500 }}
                             value={selectedRouterId}
                             onChange={e => setSelectedRouterId(e.target.value)}
                         >

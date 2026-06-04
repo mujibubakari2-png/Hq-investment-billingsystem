@@ -188,7 +188,7 @@ export default function VoucherCodes() {
                         <p className="page-subtitle">Manage voucher codes for customer plans</p>
                     </div>
                 </div>
-                <div className="page-header-right">
+                <div className="page-header-right" style={{ flexWrap: 'wrap', rowGap: 8 }}>
                     <button className="btn btn-primary" onClick={() => setShowGenerateModal(true)}>
                         <AddIcon fontSize="small" /> Add Voucher
                     </button>
@@ -213,15 +213,15 @@ export default function VoucherCodes() {
                     }}>
                         <PrintIcon fontSize="small" /> Print
                     </button>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <select className="select-field" value={bulkDeleteStatus} onChange={(e) => setBulkDeleteStatus(e.target.value)} style={{ height: 36, padding: '4px 8px' }} disabled={selected.length > 0}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        <select className="select-field" value={bulkDeleteStatus} onChange={(e) => setBulkDeleteStatus(e.target.value)} style={{ minWidth: 80, padding: '4px 8px' }} disabled={selected.length > 0}>
                             <option value="Used">Used</option>
                             <option value="Unused">Unused</option>
                             <option value="Expired">Expired</option>
                             <option value="Revoked">Revoked</option>
                         </select>
                         <button className="btn btn-secondary" style={{ color: 'var(--danger)' }} onClick={() => setShowDeleteAllModal(true)}>
-                            <DeleteIcon fontSize="small" /> {selected.length > 0 ? `Delete Selected (${selected.length})` : `Delete All ${bulkDeleteStatus}`}
+                            <DeleteIcon fontSize="small" /> {selected.length > 0 ? `Delete (${selected.length})` : `Delete ${bulkDeleteStatus}`}
                         </button>
                     </div>
                 </div>

@@ -92,42 +92,35 @@ export default function MobileTransactions() {
 
     return (
         <div>
-            {/* Summary Row - pink/red theme */}
+            {/* Summary Row - responsive card grid */}
             <h3 style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8, marginTop: 4 }}>Period Summaries</h3>
-            <div style={{ overflowX: 'auto', marginBottom: 16 }}>
-            <div style={{
-                display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1px 1fr 1fr 1fr',
-                border: '1px solid #fecdd3', borderRadius: 'var(--radius-md)',
-                overflow: 'hidden', background: '#fff', minWidth: 900,
-            }}>
-                <div style={{ textAlign: 'center', padding: '14px 0', position: 'relative' }}>
-                    <div style={{ position: 'absolute', top: 6, left: 10, fontSize: '0.65rem', fontWeight: 700, color: '#e11d48', textTransform: 'uppercase', background: '#ffe4e6', padding: '2px 6px', borderRadius: 4 }}>Today</div>
-                    <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#e11d48', marginTop: 10 }}>{todayTotal}</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 16 }}>
+                <div style={{ background: '#fff', borderRadius: 10, padding: '14px 12px', border: '1px solid #fecdd3', textAlign: 'center', position: 'relative' }}>
+                    <div style={{ position: 'absolute', top: 6, left: 8, fontSize: '0.6rem', fontWeight: 700, color: '#e11d48', textTransform: 'uppercase', background: '#ffe4e6', padding: '2px 6px', borderRadius: 4 }}>Today</div>
+                    <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#e11d48', marginTop: 14 }}>{todayTotal}</div>
                     <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Total transactions</div>
                 </div>
-                <div style={{ textAlign: 'center', padding: '14px 0', marginTop: 10 }}>
-                    <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#16a34a' }}>{todayPaid}</div>
-                    <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Paid transactions</div>
+                <div style={{ background: '#fff', borderRadius: 10, padding: '14px 12px', border: '1px solid #bbf7d0', textAlign: 'center' }}>
+                    <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#16a34a', marginTop: 6 }}>{todayPaid}</div>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Today Paid</div>
                 </div>
-                <div style={{ textAlign: 'center', padding: '14px 0', marginTop: 10 }}>
-                    <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#0ea5e9' }}>TSH {todayRevenue.toLocaleString()}</div>
-                    <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Revenue generated</div>
+                <div style={{ background: '#fff', borderRadius: 10, padding: '14px 12px', border: '1px solid #bae6fd', textAlign: 'center' }}>
+                    <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#0ea5e9', marginTop: 6 }}>TSH {todayRevenue.toLocaleString()}</div>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Today Revenue</div>
                 </div>
-                <div style={{ background: '#e5e7eb', width: 1 }} />
-                <div style={{ textAlign: 'center', padding: '14px 0', position: 'relative' }}>
-                    <div style={{ position: 'absolute', top: 6, left: 10, fontSize: '0.65rem', fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', background: '#f3f4f6', padding: '2px 6px', borderRadius: 4 }}>This Month</div>
-                    <div style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: 10 }}>{monthTotal}</div>
+                <div style={{ background: '#fff', borderRadius: 10, padding: '14px 12px', border: '1px solid #e5e7eb', textAlign: 'center', position: 'relative' }}>
+                    <div style={{ position: 'absolute', top: 6, left: 8, fontSize: '0.6rem', fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', background: '#f3f4f6', padding: '2px 6px', borderRadius: 4 }}>Month</div>
+                    <div style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: 14 }}>{monthTotal}</div>
                     <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Total transactions</div>
                 </div>
-                <div style={{ textAlign: 'center', padding: '14px 0', marginTop: 10 }}>
-                    <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#16a34a' }}>{monthPaidCount}</div>
-                    <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Paid transactions</div>
+                <div style={{ background: '#fff', borderRadius: 10, padding: '14px 12px', border: '1px solid #bbf7d0', textAlign: 'center' }}>
+                    <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#16a34a', marginTop: 6 }}>{monthPaidCount}</div>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Month Paid</div>
                 </div>
-                <div style={{ textAlign: 'center', padding: '14px 0', marginTop: 10 }}>
-                    <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#0ea5e9' }}>TSH {monthRevenue.toLocaleString()}</div>
-                    <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Revenue generated</div>
+                <div style={{ background: '#fff', borderRadius: 10, padding: '14px 12px', border: '1px solid #bae6fd', textAlign: 'center' }}>
+                    <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#0ea5e9', marginTop: 6 }}>TSH {monthRevenue.toLocaleString()}</div>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Month Revenue</div>
                 </div>
-            </div>
             </div>
 
             <h3 style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8 }}>This Month's Breakdown</h3>
@@ -203,14 +196,14 @@ export default function MobileTransactions() {
             {/* Transaction Table */}
             <div className="card">
                 {/* Table header with title */}
-                <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
+                <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+                    <div style={{ minWidth: 0 }}>
                         <h3 style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '1rem', marginBottom: 2 }}>
-                            <PhoneAndroidIcon style={{ color: 'var(--text-secondary)' }} /> Payment Channel Transaction Logs
+                            <PhoneAndroidIcon style={{ color: 'var(--text-secondary)', flexShrink: 0 }} /> Payment Channel Transaction Logs
                         </h3>
                         <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Record of all mobile and gateway transactions</p>
                     </div>
-                    <div style={{ display: 'flex', gap: 8 }}>
+                    <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
                         <button className="btn" onClick={handleExport} style={{ background: '#e11d48', color: '#fff', fontWeight: 600, fontSize: '0.8rem', padding: '6px 14px', display: 'flex', alignItems: 'center', gap: 4 }}>
                             <FileDownloadIcon fontSize="small" /> Export CSV
                         </button>

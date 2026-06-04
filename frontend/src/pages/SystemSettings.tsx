@@ -168,19 +168,21 @@ export default function SystemSettings() {
             <div style={{
                 display: 'flex', gap: 0, borderBottom: '2px solid var(--border-light)',
                 marginBottom: 24, background: 'var(--bg-card)', borderRadius: '8px 8px 0 0',
-                overflow: 'hidden',
+                overflow: 'hidden', overflowX: 'auto', WebkitOverflowScrolling: 'touch' as any,
+                scrollbarWidth: 'none' as any,
             }}>
                 {tabs.map(tab => (
                     <button
                         key={tab.key}
                         onClick={() => { setActiveTab(tab.key); setFeedback(null); }}
                         style={{
-                            padding: '12px 24px', border: 'none', background: 'transparent', cursor: 'pointer',
+                            padding: '12px 20px', border: 'none', background: 'transparent', cursor: 'pointer',
                             fontWeight: activeTab === tab.key ? 700 : 400,
                             color: activeTab === tab.key ? 'var(--primary)' : 'var(--text-secondary)',
                             borderBottom: activeTab === tab.key ? '2px solid var(--primary)' : '2px solid transparent',
-                            marginBottom: -2, fontSize: '0.95rem', transition: 'all 0.2s',
-                            display: 'flex', alignItems: 'center', gap: 8,
+                            marginBottom: -2, fontSize: '0.9rem', transition: 'all 0.2s',
+                            display: 'flex', alignItems: 'center', gap: 6,
+                            whiteSpace: 'nowrap', flexShrink: 0,
                         }}
                     >
                         {tab.icon} {tab.label}

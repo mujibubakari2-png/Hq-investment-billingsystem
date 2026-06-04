@@ -24,8 +24,8 @@ export default function RemoteAccessModal({ router, onClose }: RemoteAccessModal
         <div className="modal-overlay" onClick={onClose}>
             <div className="modal" style={{ maxWidth: 500 }} onClick={e => e.stopPropagation()}>
                 <div className="modal-header">
-                    <h2>Remote Access - {router.name}</h2>
-                    <button className="btn-icon" onClick={onClose}><CloseIcon /></button>
+                    <h2 style={{ fontSize: '1rem', fontWeight: 700, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>Remote Access - {router.name}</h2>
+                    <button className="modal-close" onClick={onClose}><CloseIcon /></button>
                 </div>
                 <div className="modal-body">
                     <div style={{ marginBottom: 20, color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
@@ -46,11 +46,11 @@ export default function RemoteAccessModal({ router, onClose }: RemoteAccessModal
                                 <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Access router configuration via web browser</div>
                             </div>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#f8fafc', padding: '10px 14px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-light)' }}>
-                            <div style={{ fontFamily: 'monospace', fontSize: '0.9rem', color: '#334155' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, background: '#f8fafc', padding: '10px 14px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-light)' }}>
+                            <div style={{ fontFamily: 'monospace', fontSize: '0.85rem', color: '#334155', wordBreak: 'break-all' }}>
                                 http://{router.host}
                             </div>
-                            <a href={`http://${router.host}`} target="_blank" rel="noopener noreferrer" className="btn btn-sm" style={{ background: '#4338ca', color: '#fff', textDecoration: 'none', padding: '6px 12px', fontSize: '0.8rem' }}>
+                            <a href={`http://${router.host}`} target="_blank" rel="noopener noreferrer" className="btn btn-sm" style={{ background: '#4338ca', color: '#fff', textDecoration: 'none', padding: '6px 12px', fontSize: '0.8rem', flexShrink: 0 }}>
                                 Open WebFig
                             </a>
                         </div>

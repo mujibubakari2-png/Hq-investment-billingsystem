@@ -63,6 +63,7 @@
   --sidebar-width: 260px;
   --sidebar-collapsed-width: 70px;
   --header-height: 64px;
+  --content-max-width: 1600px;
 
   --font: 'Outfit', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
@@ -102,6 +103,8 @@
 html {
   font-size: 14px;
   scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
@@ -190,7 +193,7 @@ table {
   padding: 20px;
   min-height: calc(100vh - var(--header-height));
   width: 100%;
-  max-width: 1440px;
+  max-width: var(--content-max-width);
   margin: 0 auto;
   overflow-x: hidden;
   box-sizing: border-box;
@@ -388,6 +391,9 @@ table {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   white-space: nowrap;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+  min-height: 40px;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .btn:active {
@@ -431,19 +437,23 @@ table {
 }
 
 .btn-sm {
-  padding: 4px 10px;
+  padding: 6px 12px;
   font-size: 0.8rem;
+  min-height: 32px;
 }
 
 .btn-icon {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border-radius: var(--radius);
   transition: all 0.2s ease;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  flex-shrink: 0;
 }
 
 .btn-icon.edit {
@@ -568,11 +578,13 @@ table {
 .table-container {
   overflow-x: auto;
   border-radius: var(--radius);
-  padding: 4px;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
 }
 
 .data-table {
   width: 100%;
+  min-width: 500px;
   border-collapse: separate;
   border-spacing: 0 8px;
 }
@@ -615,6 +627,23 @@ table {
   box-shadow: var(--shadow-md);
   z-index: 10;
   position: relative;
+}
+
+/* Disable hover transforms on touch devices */
+@media (hover: none) {
+  .data-table tbody tr:hover {
+    transform: none;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .stat-card:hover {
+    transform: none;
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.05);
+  }
+
+  .stat-card:hover .stat-card-icon {
+    transform: translateY(-50%);
+  }
 }
 
 .data-table tbody td {
@@ -692,7 +721,8 @@ table {
   border-radius: var(--radius);
   background: var(--bg-input);
   font-size: 0.85rem;
-  width: clamp(160px, 45vw, 240px);
+  width: clamp(140px, 40vw, 240px);
+  min-height: 36px;
   transition: border-color 0.2s;
 }
 
@@ -717,7 +747,8 @@ table {
   background: var(--bg-input);
   font-size: 0.85rem;
   color: var(--text-primary);
-  min-width: 120px;
+  min-width: 100px;
+  min-height: 36px;
   cursor: pointer;
 }
 
@@ -735,12 +766,13 @@ table {
 }
 
 .status-dropdown select {
-  padding: 6px 12px;
+  padding: 6px 10px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--bg-input);
   font-size: 0.85rem;
-  min-width: 100px;
+  min-width: 90px;
+  min-height: 34px;
 }
 
 /* Pagination */
@@ -750,6 +782,8 @@ table {
   justify-content: space-between;
   padding: 12px 20px;
   border-top: 1px solid var(--border-light);
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .pagination-info {
@@ -884,10 +918,13 @@ table {
   font-size: 0.9rem;
   color: var(--text-primary);
   transition: border-color 0.2s;
+  min-height: 42px;
+  box-sizing: border-box;
 }
 
 .form-input:focus {
   border-color: var(--primary);
+  outline: none;
 }
 
 .form-input::placeholder {
@@ -903,6 +940,8 @@ table {
   font-size: 0.9rem;
   color: var(--text-primary);
   cursor: pointer;
+  min-height: 42px;
+  box-sizing: border-box;
 }
 
 .form-row {
@@ -1030,19 +1069,25 @@ table {
   display: flex;
   align-items: center;
   justify-content: center;
-  animation: fadeIn 0.2s ease;
+  animation: fadeInOverlay 0.2s ease;
   padding: 16px;
+  overflow-y: auto;
 }
 
 .modal {
   background: var(--bg-card);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border-radius: var(--radius-xl);
   width: 100%;
   max-width: 600px;
-  max-height: calc(100vh - 32px);
+  max-height: calc(100dvh - 32px);
   display: flex;
   flex-direction: column;
-  animation: slideUp 0.3s ease;
+  animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: var(--shadow-lg);
+  border: 1px solid var(--border);
+  overflow: hidden;
 }
 
 .modal-header {
@@ -1195,25 +1240,19 @@ table {
 }
 
 /* Animations */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-
-  to {
-    opacity: 1;
-  }
+@keyframes fadeInOverlay {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 @keyframes slideUp {
   from {
     opacity: 0;
-    transform: translateY(20px);
+    transform: translateY(24px) scale(0.98);
   }
-
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
   }
 }
 
@@ -1247,7 +1286,7 @@ table {
 
 .responsive-form-row {
   display: grid;
-  grid-template-columns: 160px 1fr;
+  grid-template-columns: minmax(120px, 160px) 1fr;
   align-items: center;
   gap: 16px;
 }
@@ -1310,6 +1349,23 @@ table {
    RESPONSIVE BREAKPOINTS
    =========================== */
 
+/* Ultra-wide: 2560px+ */
+@media (min-width: 2560px) {
+  :root {
+    --content-max-width: 2000px;
+  }
+  html {
+    font-size: 15px;
+  }
+}
+
+/* Large desktop: 1920px */
+@media (max-width: 1920px) {
+  :root {
+    --content-max-width: 1600px;
+  }
+}
+
 @media (max-width: 1200px) {
   .stat-cards {
     grid-template-columns: repeat(3, 1fr);
@@ -1328,6 +1384,10 @@ table {
 
   .stat-cards {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .responsive-grid-3 {
+    grid-template-columns: 1fr 1fr;
   }
 }
 
@@ -1351,7 +1411,7 @@ table {
   .responsive-form-row {
     grid-template-columns: 1fr;
   }
-  
+
   .responsive-form-row {
     align-items: flex-start;
   }
@@ -1366,6 +1426,8 @@ table {
   .page-header-right {
     width: 100%;
     justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 8px;
   }
 
   /* Table toolbar */
@@ -1373,11 +1435,13 @@ table {
     flex-direction: column;
     align-items: flex-start;
     gap: 10px;
+    padding: 10px 12px;
   }
 
   .table-toolbar-left,
   .table-toolbar-right {
     width: 100%;
+    flex-wrap: wrap;
   }
 
   .table-toolbar-right {
@@ -1392,18 +1456,20 @@ table {
 
   .search-input {
     width: 100%;
+    flex: 1;
   }
 
-  /* Modal: full width on mobile */
+  /* Modal: bottom sheet on mobile */
   .modal {
     width: 100% !important;
     max-width: 100% !important;
-    max-height: 95dvh !important;
+    max-height: 92dvh !important;
     margin: 0 !important;
     border-radius: var(--radius-lg) var(--radius-lg) 0 0 !important;
-    position: fixed;
-    bottom: 0;
-    left: 0;
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    animation: slideUpSheet 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
   }
 
   .modal-overlay {
@@ -1422,18 +1488,20 @@ table {
   .modal-footer {
     padding: 16px 20px;
     flex-direction: column;
-    gap: 16px;
+    gap: 10px;
   }
 
   .modal-footer-left {
     text-align: center;
     width: 100%;
+    order: 2;
   }
 
   .modal-footer-right {
     width: 100%;
     display: flex;
-    gap: 12px;
+    gap: 10px;
+    order: 1;
   }
 
   .modal-footer-right .btn {
@@ -1446,19 +1514,30 @@ table {
     flex-direction: column;
     gap: 8px;
     align-items: center;
-    padding: 12px;
+    padding: 10px 12px;
   }
 
-  /* Tables: horizontal scroll */
+  .pagination-buttons {
+    justify-content: center;
+  }
+
+  /* Tables: horizontal scroll with momentum */
   .table-container {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+  }
+
+  /* Card body tighter on mobile */
+  .card-body {
+    padding: 16px;
   }
 }
 
+/* Mobile 480px */
 @media (max-width: 480px) {
   .stat-cards {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr 1fr;
     gap: 10px;
   }
 
@@ -1467,8 +1546,8 @@ table {
   }
 
   .btn {
-    padding: 9px 12px;
-    font-size: 0.82rem;
+    padding: 9px 14px;
+    font-size: 0.83rem;
   }
 
   .card-body {
@@ -1476,11 +1555,90 @@ table {
   }
 
   .page-content {
-    padding: 10px 8px;
+    padding: 10px 10px;
   }
 
   .page-title {
-    font-size: 1.25rem;
+    font-size: 1.2rem;
+  }
+
+  .page-subtitle {
+    font-size: 0.78rem;
+  }
+
+  .table-toolbar-left {
+    gap: 8px;
+  }
+}
+
+/* Mobile 375px and below */
+@media (max-width: 375px) {
+  html {
+    font-size: 12.5px;
+  }
+
+  .page-content {
+    padding: 8px 8px;
+  }
+
+  .stat-cards {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .btn {
+    padding: 8px 12px;
+    font-size: 0.82rem;
+  }
+
+  .modal-header {
+    padding: 14px 16px;
+  }
+
+  .modal-body {
+    padding: 12px 16px;
+  }
+
+  .modal-footer {
+    padding: 12px 16px;
+  }
+}
+
+/* Mobile 320px - smallest supported */
+@media (max-width: 320px) {
+  html {
+    font-size: 12px;
+  }
+
+  .page-content {
+    padding: 6px 6px;
+  }
+
+  .stat-cards {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .btn {
+    padding: 8px 10px;
+    font-size: 0.8rem;
+    gap: 5px;
+  }
+
+  .page-title {
+    font-size: 1.1rem;
+  }
+
+  .modal-header {
+    padding: 12px 14px;
+  }
+
+  .modal-body {
+    padding: 10px 14px;
+  }
+
+  .modal-footer {
+    padding: 10px 14px;
   }
 }
 
@@ -1489,50 +1647,39 @@ table {
 .grid-2 {
   display: grid;
   grid-template-columns: 1fr 1fr;
+  gap: 16px;
 }
 
 .grid-3 {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
 }
 
 .grid-4 {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-}
-
-.gap-8 {
-  gap: 8px;
-}
-
-.gap-10 {
-  gap: 10px;
-}
-
-.gap-12 {
-  gap: 12px;
-}
-
-.gap-16 {
   gap: 16px;
 }
 
-.gap-20 {
-  gap: 20px;
-}
-
-.gap-24 {
-  gap: 24px;
-}
+.gap-4  { gap: 4px; }
+.gap-8  { gap: 8px; }
+.gap-10 { gap: 10px; }
+.gap-12 { gap: 12px; }
+.gap-16 { gap: 16px; }
+.gap-20 { gap: 20px; }
+.gap-24 { gap: 24px; }
 
 @media (max-width: 1024px) {
   .grid-4 {
     grid-template-columns: repeat(2, 1fr);
   }
+  .grid-3 {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
 @media (max-width: 768px) {
-
   .grid-2,
   .grid-3,
   .grid-4 {
@@ -1568,13 +1715,8 @@ table {
 
 /* Animations */
 @keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-
-  to {
-    transform: rotate(360deg);
-  }
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
 }
 
 .spin {
@@ -1586,7 +1728,17 @@ table {
     opacity: 0;
     transform: translateY(10px);
   }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 
+@keyframes slideUpSheet {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
   to {
     opacity: 1;
     transform: translateY(0);
@@ -1595,4 +1747,261 @@ table {
 
 .fade-in {
   animation: fadeIn 0.3s ease-out forwards;
+}
+
+/* Utility: hide on mobile */
+@media (max-width: 768px) {
+  .hide-mobile { display: none !important; }
+}
+
+/* Utility: hide on desktop */
+@media (min-width: 769px) {
+  .hide-desktop { display: none !important; }
+}
+
+/* Utility: full width on mobile */
+@media (max-width: 768px) {
+  .mobile-full-width { width: 100% !important; }
+}
+
+/* Touch-friendly tap targets */
+a, button, [role="button"], input[type="checkbox"], input[type="radio"] {
+  touch-action: manipulation;
+}
+
+/* Prevent horizontal overflow at root */
+body {
+  overflow-x: hidden;
+}
+
+/* ============================================================
+   FINAL RESPONSIVE AUDIT ADDITIONS
+   Covers: form-rows, modal footer, responsive grids, pre tags
+   ============================================================ */
+
+/* Form row collapses on mobile */
+@media (max-width: 600px) {
+  .form-row,
+  .form-row-3 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Responsive grid utilities used in modals */
+.responsive-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.responsive-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 600px) {
+  .responsive-grid-2 {
+    grid-template-columns: 1fr;
+  }
+
+  .responsive-grid-3 {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 400px) {
+  .responsive-grid-3 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Responsive two-column form row used in modals (label | input) */
+.responsive-form-row {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+@media (max-width: 540px) {
+  .responsive-form-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Modal footer: stack vertically and full-width on very small screens */
+@media (max-width: 480px) {
+  .modal-footer {
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px 16px;
+  }
+
+  .modal-footer-right {
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .modal-footer-right .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .modal-footer-left {
+    display: none;
+  }
+}
+
+/* Modal: bottom-sheet on mobile */
+@media (max-width: 480px) {
+  .modal-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .modal {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    max-height: 92dvh;
+    animation: slideUpSheet 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+}
+
+/* Pre tags inside modals: prevent horizontal overflow */
+.modal pre,
+.modal-body pre {
+  white-space: pre-wrap;
+  word-break: break-all;
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+/* Modal header: prevent long names from overflowing */
+.modal-header {
+  min-width: 0;
+}
+
+.modal-header-left {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.modal-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Responsive stat cards for smaller widths */
+@media (max-width: 540px) {
+  .grid-3.gap-16 {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* Responsive stat cards for smaller widths */
+@media (max-width: 540px) {
+  .grid-3.gap-16 {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 360px) {
+  .grid-3.gap-16 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ============================================================
+   FINAL POLISH — Typography, Touch, Pagination, Card Headers
+   ============================================================ */
+
+/* Fluid page title — scales between 1.1rem (320px) and 1.5rem (1200px+) */
+.page-title {
+  font-size: clamp(1.1rem, 2.5vw, 1.5rem);
+}
+
+/* Ensure buttons meet 44px minimum touch target on mobile */
+@media (max-width: 768px) {
+  .btn {
+    min-height: 40px;
+  }
+
+  .btn-sm {
+    min-height: 34px;
+  }
+
+  /* Pagination wraps on very small screens */
+  .pagination {
+    flex-direction: column;
+    gap: 10px;
+    align-items: flex-start;
+  }
+
+  .pagination-buttons {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  /* Card header rows wrap */
+  .card-header,
+  .card > div:first-child {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+}
+
+/* Stat value text: scale down on very small screens */
+@media (max-width: 380px) {
+  .dash-stat-value,
+  .stat-value {
+    font-size: clamp(1.1rem, 5vw, 1.5rem) !important;
+  }
+
+  .page-title {
+    font-size: 1.05rem;
+  }
+
+  .modal-title {
+    font-size: 0.95rem;
+  }
+}
+
+/* Ensure select elements are full-width on mobile in toolbars */
+@media (max-width: 480px) {
+  .select-field {
+    width: 100%;
+  }
+
+  .show-entries {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+}
+
+/* Prevent content areas from causing body scroll on mobile */
+@media (max-width: 768px) {
+  .content-area,
+  .main-content {
+    overflow-x: hidden;
+  }
+
+  /* Make badge text not overflow */
+  .badge {
+    white-space: nowrap;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+/* 2560px wide screens — limit max content width for readability */
+@media (min-width: 2000px) {
+  .main-content > *:not(.full-bleed) {
+    max-width: 1800px;
+    margin-left: auto;
+    margin-right: auto;
+  }
 }
