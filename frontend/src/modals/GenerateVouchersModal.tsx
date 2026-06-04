@@ -203,33 +203,11 @@ export default function GenerateVouchersModal({ onClose, onGenerate }: GenerateV
                         <>
                             <div className="responsive-form-row" style={{ marginBottom: 20 }}>
                                 <label className="form-label" style={{ marginBottom: 0, fontWeight: 500 }}>Code Format</label>
-                                <div style={{ display: 'flex' }}>
-                                    {([
-                                        { value: 'alphanumeric-upper', label: 'ABC123' },
-                                        { value: 'alphanumeric-lower', label: 'abc123' },
-                                        { value: 'numeric', label: '123456' },
-                                    ] as const).map((f, i) => (
-                                        <button
-                                            key={f.value}
-                                            style={{
-                                                padding: '8px 16px',
-                                                border: '1px solid var(--border)',
-                                                background: codeFormat === f.value ? '#333' : '#fff',
-                                                color: codeFormat === f.value ? '#fff' : 'var(--text-primary)',
-                                                fontWeight: 600,
-                                                fontSize: '0.85rem',
-                                                borderRight: i < 2 ? 'none' : '1px solid var(--border)',
-                                                borderTopLeftRadius: i === 0 ? 'var(--radius-sm)' : 0,
-                                                borderBottomLeftRadius: i === 0 ? 'var(--radius-sm)' : 0,
-                                                borderTopRightRadius: i === 2 ? 'var(--radius-sm)' : 0,
-                                                borderBottomRightRadius: i === 2 ? 'var(--radius-sm)' : 0,
-                                            }}
-                                            onClick={() => setCodeFormat(f.value)}
-                                        >
-                                            {f.label}
-                                        </button>
-                                    ))}
-                                </div>
+                                <select className="form-select" value={codeFormat} onChange={e => setCodeFormat(e.target.value as any)}>
+                                    <option value="alphanumeric-upper">ABC123</option>
+                                    <option value="alphanumeric-lower">abc123</option>
+                                    <option value="numeric">123456</option>
+                                </select>
                             </div>
 
                             <div className="responsive-form-row" style={{ marginBottom: 20 }}>
@@ -240,21 +218,20 @@ export default function GenerateVouchersModal({ onClose, onGenerate }: GenerateV
                             <div className="responsive-form-row" style={{ marginBottom: 20, alignItems: 'flex-start' }}>
                                 <label className="form-label" style={{ marginBottom: 0, marginTop: 10, fontWeight: 500 }}>SMS Notification</label>
                                 <div>
-                                    <div style={{ display: 'flex' }}>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 0, borderRadius: 'var(--radius)', overflow: 'hidden', border: '1px solid var(--border)' }}>
                                         <input
                                             type="text"
                                             className="form-input"
                                             placeholder="Phone number"
                                             value={smsPhone}
                                             onChange={e => setSmsPhone(e.target.value)}
-                                            style={{ flex: 1, borderTopRightRadius: 0, borderBottomRightRadius: 0 }}
+                                            style={{ flex: '1 1 150px', border: 'none', borderRadius: 0, borderRight: '1px solid var(--border)' }}
                                         />
                                         <div
                                             style={{
                                                 display: 'flex', alignItems: 'center', gap: 6,
-                                                padding: '0 14px', border: '1px solid var(--border)',
-                                                borderLeft: 'none', background: '#f9fafb',
-                                                borderTopRightRadius: 'var(--radius)', borderBottomRightRadius: 'var(--radius)'
+                                                padding: '10px 14px', background: '#f9fafb',
+                                                cursor: 'pointer', flex: '0 0 auto'
                                             }}
                                             onClick={() => setSendSms(!sendSms)}
                                         >

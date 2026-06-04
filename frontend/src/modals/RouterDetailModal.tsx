@@ -114,9 +114,10 @@ export default function RouterDetailModal({ router, onClose, onDelete }: RouterD
                             <div key={row.label} style={{
                                 display: 'flex', justifyContent: 'space-between', padding: '8px 14px',
                                 borderBottom: '1px solid var(--border-light)', fontSize: '0.83rem',
+                                flexWrap: 'wrap', gap: 8
                             }}>
                                 <span style={{ color: 'var(--text-secondary)' }}>{row.label}</span>
-                                <strong style={row.mono ? { fontFamily: 'monospace' } : undefined}>{row.value}</strong>
+                                <strong style={{ ...(row.mono ? { fontFamily: 'monospace' } : {}), wordBreak: 'break-all', textAlign: 'right' }}>{row.value}</strong>
                             </div>
                         ))}
                     </div>
@@ -126,7 +127,7 @@ export default function RouterDetailModal({ router, onClose, onDelete }: RouterD
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, color: 'var(--primary)', fontWeight: 600, fontSize: '0.85rem' }}>
                             <VpnLockIcon style={{ fontSize: 16 }} /> VPN CONFIGURATION
                         </div>
-                        <div className="grid-2 gap-8">
+                        <div className="responsive-grid-2" style={{ gap: 8 }}>
                             <button className="btn" style={{
                                 background: '#fef3c7', color: '#d97706', fontWeight: 600, border: '1px solid #fbbf24',
                                 padding: '10px 16px', borderRadius: 'var(--radius-sm)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,

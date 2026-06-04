@@ -219,7 +219,10 @@ export class MikroTikService {
             clearTimeout(timeout);
 
             if (!res.ok) {
-                const errText = await res.text();
+                let errText = await res.text();
+                if (errText.trim().toLowerCase().startsWith('<!doctype html>') || errText.trim().toLowerCase().startsWith('<html')) {
+                    errText = "Received unexpected HTML response. Ensure the router REST API is enabled and the port is correct.";
+                }
                 throw new Error(`RouterOS API error (${res.status}): ${errText}`);
             }
 

@@ -303,7 +303,7 @@ PersistentKeepalive = 25`;
                 )}
 
                 {/* Tabs */}
-                <div style={{ display: 'flex', borderBottom: '1px solid var(--border-light)' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', borderBottom: '1px solid var(--border-light)' }}>
                     <button
                         onClick={() => setActiveTab('server')}
                         style={{
@@ -334,7 +334,7 @@ PersistentKeepalive = 25`;
 
                 {/* Key Info Bar */}
                 <div className="responsive-grid-3" style={{
-                    padding: '12px 24px', background: '#f8fafc', borderBottom: '1px solid var(--border-light)',
+                    padding: '12px 16px', background: '#f8fafc', borderBottom: '1px solid var(--border-light)', gap: 12
                 }}>
                     <div>
                         <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 2 }}>Tunnel Address</div>
@@ -351,7 +351,7 @@ PersistentKeepalive = 25`;
                 </div>
 
                 {/* Config Content */}
-                <div style={{ flex: 1, overflow: 'auto', padding: '0 24px 16px' }}>
+                <div style={{ flex: 1, overflow: 'auto', padding: '0 16px 16px' }}>
                     <pre style={{
                         background: '#1e1e2e', color: '#a6e3a1',
                         padding: 20, borderRadius: 10, fontSize: '0.78rem',
@@ -382,9 +382,9 @@ PersistentKeepalive = 25`;
                 </div>
 
                 {/* Footer */}
-                <div className="modal-footer">
+                <div className="modal-footer" style={{ flexWrap: 'wrap' }}>
                     <div className="modal-footer-left" />
-                    <div className="modal-footer-right">
+                    <div className="modal-footer-right" style={{ flexWrap: 'wrap' }}>
                         <button className="btn btn-secondary" onClick={() => handleCopy(activeConfig, activeLabel)} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                             {copied === activeLabel ? <CheckCircleIcon style={{ fontSize: 16, color: '#16a34a' }} /> : <ContentCopyIcon style={{ fontSize: 16 }} />}
                             {copied === activeLabel ? 'Copied!' : `Copy ${activeTab === 'server' ? 'Script' : 'Config'}`}
