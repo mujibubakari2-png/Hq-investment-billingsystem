@@ -98,6 +98,11 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button, a, input, select, textarea {
+  touch-action: manipulation;
 }
 
 html {
@@ -2005,3 +2010,85 @@ body {
     margin-right: auto;
   }
 }
+
+/* ============================================================
+   RESPONSIVE AUDIT FIXES (MOBILE & TABLET)
+   ============================================================ */
+   
+/* Force table scrollability on tablets and below to prevent overflow */
+@media (max-width: 1024px) {
+  table, .data-table {
+    display: block;
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    white-space: nowrap;
+  }
+}
+
+/* Fix Dashboard Stat Grid and stat-cards: Strictly 1 column below 480px */
+@media (max-width: 480px) {
+  .dash-stat-grid, 
+  .dash-stat-grid.voucher-row, 
+  .stat-cards,
+  .dashboard-grid,
+  .dashboard-grid-3,
+  .responsive-grid-2,
+  .responsive-grid-3,
+  .grid-2,
+  .grid-3,
+  .grid-4 {
+    grid-template-columns: 1fr !important;
+  }
+  
+  .dash-two-col {
+    grid-template-columns: 1fr !important;
+  }
+
+  .connection-grid {
+    grid-template-columns: 1fr !important;
+  }
+  
+  .conn-counts {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Force modal to utilize full width and height properly on small screens */
+  .modal {
+    width: 100% !important;
+    height: 100% !important;
+    max-height: 100dvh !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+  }
+
+  .modal-overlay {
+    padding: 0 !important;
+  }
+}
+
+/* Ultra small screens (320px - 360px) safety */
+@media (max-width: 360px) {
+  .modal-body {
+    padding: 12px 14px !important;
+  }
+  
+  .modal-footer {
+    padding: 12px 14px !important;
+  }
+  
+  .modal-header {
+    padding: 12px 14px !important;
+  }
+  
+  .form-input, .form-select, .btn {
+    font-size: 0.85rem !important;
+  }
+
+  .page-title {
+    font-size: 1.1rem !important;
+  }
+}

@@ -153,7 +153,7 @@ export default function RenewLicense() {
                 td { padding: 16px 0; border-bottom: 1px solid #eee; }
                 td.right { text-align: right; }
                 .totals { display: flex; justify-content: flex-end; margin-bottom: 32px; }
-                .totals-box { width: 300px; }
+                .totals-box { width: 100%; max-width: 300px; }
                 .total-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee; }
                 .balance-due { display: flex; justify-content: space-between; padding: 8px 0; font-weight: 700; font-size: 1.1rem; }
                 .notes { font-size: 0.85rem; color: #666; line-height: 1.5; margin-bottom: 32px; }
