@@ -13,7 +13,7 @@ export default function RenewLicense() {
     const navigate = useNavigate();
     const location = useLocation();
     const { user } = authStore.useAuth();
-    
+
     const [license, setLicense] = useState<LicenseResponse | null>(null);
     const [allPlans, setAllPlans] = useState<SaasPlan[]>([]);
     const [selectedPlanId, setSelectedPlanId] = useState<string>('');
@@ -40,7 +40,7 @@ export default function RenewLicense() {
                 setSelectedPlanId(data.plan.id);
             }
         }).catch(console.error);
-        
+
         saasPlansApi.list().then(data => {
             setAllPlans(data);
         }).catch(console.error);
@@ -65,7 +65,7 @@ export default function RenewLicense() {
     };
 
     const activePlan = allPlans.find(p => p.id === selectedPlanId) || license?.plan;
-    const basePrice = activePlan?.price || 20000;
+    const basePrice = activePlan?.price || 0;
 
     const packages = [
         { months: 1, title: '1 Month License', subtitle: 'Standard 30-day license', price: basePrice, save: 0 },
@@ -88,7 +88,7 @@ export default function RenewLicense() {
         try {
             let amount = balanceAmount;
             let months = 0;
-            
+
             if (selectedPackage > 0) {
                 const pkg = packages.find(p => p.months === selectedPackage);
                 if (pkg) {
@@ -108,7 +108,7 @@ export default function RenewLicense() {
                 amount: amount,
                 invoiceId: selectedPackage === 0 ? license?.outstandingInvoices?.[0]?.id : undefined
             });
-            
+
             if (res.success) {
                 setPaymentMessage(res.message || 'STK push sent! Please enter your mobile money PIN to complete the payment.');
                 setPaymentSent(true);
@@ -132,7 +132,7 @@ export default function RenewLicense() {
         const periodFrom = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
         const periodTo = new Date(Date.now() + (selectedPackage || 1) * 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
         const dueDate = license?.outstandingInvoices?.[0]?.dueDate || 'Immediately';
-        const invoiceRef = license?.outstandingInvoices?.[0]?.id || 'INV-RENEWAL';
+        const invoiceRef = license?.outstandingInvoices?.[0]?.invoiceNumber || 'INV-RENEWAL';
         const description = selectedPackage === 0 ? 'Outstanding Invoice Balance' : `${currentPlanName} — License Fee (${selectedPackage} Month${selectedPackage > 1 ? 's' : ''})`;
         const amount = getAmountToPay().toLocaleString(undefined, { maximumFractionDigits: 0 });
 
@@ -241,9 +241,9 @@ export default function RenewLicense() {
             </body></html>
         `;
         const w = window.open('', '_blank');
-        if (w) { 
-            w.document.write(printContent); 
-            w.document.close(); 
+        if (w) {
+            w.document.write(printContent);
+            w.document.close();
             setTimeout(() => { w.print(); }, 250);
         }
     };
@@ -316,9 +316,9 @@ export default function RenewLicense() {
                     <div style={{ padding: '1.5rem', flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                             <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 600 }}>SaaS Subscription Plan:</label>
-                            <select 
-                                className="form-select" 
-                                value={selectedPlanId} 
+                            <select
+                                className="form-select"
+                                value={selectedPlanId}
                                 onChange={e => setSelectedPlanId(e.target.value)}
                                 style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-light)', outline: 'none', backgroundColor: '#f0f9ff', fontWeight: 600, color: '#0369a1' }}
                             >
@@ -335,16 +335,16 @@ export default function RenewLicense() {
                             </div>
                         )}
                         <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Choose Renewal Duration:</div>
-                        
+
                         {packages.map(pkg => (
-                            <div 
-                                key={pkg.months} 
+                            <div
+                                key={pkg.months}
                                 onClick={() => setSelectedPackage(pkg.months)}
-                                style={{ 
-                                    border: `2px solid ${selectedPackage === pkg.months ? '#1a1a2e' : 'var(--border-light)'}`, 
+                                style={{
+                                    border: `2px solid ${selectedPackage === pkg.months ? '#1a1a2e' : 'var(--border-light)'}`,
                                     background: selectedPackage === pkg.months ? '#f8f9fa' : 'white',
-                                    padding: '1rem', 
-                                    borderRadius: '8px', 
+                                    padding: '1rem',
+                                    borderRadius: '8px',
                                     cursor: 'pointer',
                                     display: 'flex',
                                     justifyContent: 'space-between',
@@ -363,14 +363,14 @@ export default function RenewLicense() {
                         ))}
 
                         {isPayingBalance && balanceAmount > 0 && (
-                            <div 
+                            <div
                                 onClick={() => setSelectedPackage(0)}
-                                style={{ 
-                                    border: `2px solid ${selectedPackage === 0 ? '#1976d2' : 'var(--border-light)'}`, 
+                                style={{
+                                    border: `2px solid ${selectedPackage === 0 ? '#1976d2' : 'var(--border-light)'}`,
                                     background: selectedPackage === 0 ? '#1976d2' : 'white',
                                     color: selectedPackage === 0 ? 'white' : 'var(--text-primary)',
-                                    padding: '1rem', 
-                                    borderRadius: '8px', 
+                                    padding: '1rem',
+                                    borderRadius: '8px',
                                     cursor: 'pointer',
                                     display: 'flex',
                                     justifyContent: 'space-between',
@@ -412,8 +412,8 @@ export default function RenewLicense() {
                             <input type="email" className="form-control" value={email} onChange={e => setEmail(e.target.value)} />
                         </div>
 
-                        <button 
-                            className="btn btn-primary" 
+                        <button
+                            className="btn btn-primary"
                             style={{ background: '#1a1a2e', color: 'white', padding: '1rem', width: '100%', marginTop: '0.5rem' }}
                             onClick={handlePayment}
                             disabled={submitting}
@@ -434,13 +434,15 @@ export default function RenewLicense() {
                         <div>
                             <h2 style={{ fontSize: '1.2rem', fontWeight: 700, margin: '0 0 0.5rem 0' }}>{license?.companyName || 'Our Company'}</h2>
                             <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                                support@{license?.companyName ? license.companyName.toLowerCase().replace(/\s+/g, '') : 'company'}.com<br/>
-                                +255787109988
+                                support@{license?.companyName ? license.companyName.toLowerCase().replace(/\s+/g, '') : 'company'}.com<br />
+                                +255621085215
                             </div>
                         </div>
                         <div style={{ textAlign: 'right' }}>
                             <h1 style={{ fontSize: '1.5rem', fontWeight: 300, color: 'var(--text-secondary)', letterSpacing: 2, margin: '0 0 0.5rem 0' }}>INVOICE</h1>
-                            <div style={{ fontWeight: 600 }}>{license?.outstandingInvoices?.[0]?.id || 'INV-RENEWAL'}</div>
+                            <div style={{ fontWeight: 600 }}>
+                                {license?.outstandingInvoices?.[0]?.invoiceNumber || 'INV-RENEWAL'}
+                            </div>
                         </div>
                     </div>
 
@@ -449,17 +451,17 @@ export default function RenewLicense() {
                             <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>BILL TO</div>
                             <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>{name.toUpperCase()}</div>
                             <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                                {email}<br/>
+                                {email}<br />
                                 {phone}
                             </div>
                         </div>
                         <div>
                             <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>ISSUED</div>
                             <div style={{ fontWeight: 500, marginBottom: '1rem' }}>{new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
-                            
+
                             <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>PERIOD</div>
                             <div style={{ fontWeight: 500 }}>
-                                {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} - 
+                                {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} -
                                 {new Date(Date.now() + (selectedPackage || 1) * 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                             </div>
                         </div>

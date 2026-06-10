@@ -13,12 +13,14 @@ const envSchema = z.object({
   JWT_SECRET: z.string().min(32).optional(),
   NEXTAUTH_SECRET: z.string().min(32).optional(),
 
-  // SMTP Settings
-  SMTP_HOST: z.string().default("smtp.ethereal.email"),
-  SMTP_PORT: z.string().default("587").transform(Number),
-  SMTP_SECURE: z.string().default("false").transform((v) => v === "true"),
-  SMTP_USER: z.string().optional(),
-  SMTP_PASS: z.string().optional(),
+  // ─── Email — Resend API ────────────────────────────────────────────────────
+  // EMAIL-001: SMTP replaced with Resend HTTP API (see src/lib/email.ts).
+  // Get your key at https://resend.com → API Keys.
+  RESEND_API_KEY: z.string().optional(),
+  // Full "From" address, e.g. "HQ INVESTMENT <noreply@yourdomain.com>"
+  // Falls back to SMTP_FROM for backward-compat, then onboarding@resend.dev for testing.
+  RESEND_FROM: z.string().optional(),
+  // Kept as a fallback alias so existing .env files still work without changes.
   SMTP_FROM: z.string().optional(),
 
   // ─── Webhook Secrets ──────────────────────────────────────────────────────

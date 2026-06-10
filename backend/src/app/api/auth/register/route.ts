@@ -5,6 +5,7 @@ import { checkRateLimit } from "@/lib/rateLimiter";
 import logger from "@/lib/logger";
 import { sendAccountCreatedNotifications } from "@/lib/accountNotifications";
 import { env } from "@/lib/env";
+import { createUniqueTenantSlug } from "@/lib/tenantSlug";
 
 export async function POST(req: NextRequest) {
     const rateLimitResponse = await checkRateLimit(req);
@@ -113,19 +114,35 @@ export async function POST(req: NextRequest) {
             const trialStart = new Date();
             const trialEnd = new Date();
             trialEnd.setDate(trialEnd.getDate() + 10);
+            const slug = await createUniqueTenantSlug(tx, companyName);
+            const companyLogo = body.companyLogo || body.logoUrl || null;
 
-            // 2. Create the Tenant (Status PENDING_APPROVAL)
+            // 2. Create the Tenant. The account creator is now the tenant owner.
             const tenant = await tx.tenant.create({
                 data: {
                     name: companyName,
                     email,
                     phone,
-                    status: "PENDING_APPROVAL",
+                    slug,
+                    logoUrl: companyLogo,
+                    status: "TRIALLING",
                     planId: actualPlanId,
+                    trialStart,
+                    trialEnd,
+                    branding: {
+                        create: {
+                            companyName,
+                            companyLogo,
+                            companyEmail: email,
+                        },
+                    },
+                    settings: {
+                        create: {},
+                    },
                 }
             });
 
-            // 3. Create the User assigned to the Tenant
+            // 3. Create the owner user assigned to the Tenant
             const newUser = await tx.user.create({
                 data: {
                     fullName: fullName || companyName,
@@ -133,13 +150,28 @@ export async function POST(req: NextRequest) {
                     username: email, // use email as username for login
                     phone,
                     password: hashedPassword,
-                    role: "ADMIN",
+                    role: "SUPER_ADMIN",
                     status: "ACTIVE",
                     tenantId: tenant.id
                 }
             });
 
-            return { user: newUser, tenant };
+            const ownedTenant = await tx.tenant.update({
+                where: { id: tenant.id },
+                data: {
+                    ownerUserId: newUser.id,
+                    tenantLicenses: {
+                        create: {
+                            planId: actualPlanId,
+                            status: "PAID",
+                            startsAt: trialStart,
+                            expiresAt: trialEnd,
+                        },
+                    },
+                },
+            });
+
+            return { user: newUser, tenant: ownedTenant };
         });
 
         const token = signToken({
@@ -158,7 +190,7 @@ export async function POST(req: NextRequest) {
 
         
         const response = jsonResponse({
-            message: "Registration successful. Please wait for an administrator to approve your account setup.",
+            message: "Registration successful. Your tenant workspace is ready.",
             token,
             id: result.user.id, // Alias for tests
             user_id: result.user.id, // Alias for tests
@@ -169,7 +201,12 @@ export async function POST(req: NextRequest) {
                 email: result.user.email,
                 role: result.user.role,
                 fullName: result.user.fullName,
-                tenantId: result.tenant.id
+                tenantId: result.tenant.id,
+                isPlatformAdmin: false,
+                companyName: result.tenant.name,
+                companyLogo: result.tenant.logoUrl,
+                companyEmail: result.tenant.email,
+                tenantSlug: result.tenant.slug,
             },
             tenant: result.tenant
         }, 201);

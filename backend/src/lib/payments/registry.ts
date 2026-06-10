@@ -12,6 +12,10 @@ import { MongikeProvider } from "@/lib/payments/providers/mongike";
 import { HarakaPayProvider } from "@/lib/payments/providers/harakapay";
 // E11 FIX: Removed MPESA
 import { env } from "@/lib/env";
+// CRED-001 FIX: Import decrypt so DB-stored credentials are decrypted before being
+// handed to provider instances. Without this, providers receive raw "enc:v1:..." strings
+// as their API keys and every payment call fails with an auth/invalid-key error.
+import { decrypt } from "@/lib/encryption";
 
 // ─── Build ProviderConfig from environment variables (fallback) ───────────────
 
@@ -74,18 +78,33 @@ export interface ChannelRecord {
   config?: unknown;
 }
 
+/**
+ * CRED-001 FIX: Decrypt sensitive channel fields before building ProviderConfig.
+ *
+ * PaymentChannel rows store apiKey / apiSecret / webhookSecret encrypted as
+ * "enc:v1:<iv>:<tag>:<ciphertext>" strings (written by encryptPaymentChannelFields).
+ * Previously these were passed raw to provider instances, causing every API call to
+ * be rejected by the payment gateway because the key was an unreadable cipher string.
+ *
+ * decrypt() is idempotent — plaintext (unencrypted legacy rows) pass through unchanged.
+ */
 function channelToConfig(channel: ChannelRecord): ProviderConfig {
   const cfg = (channel.config ?? {}) as Record<string, unknown>;
   const environment = (channel.environment ?? env.PAYMENT_ENVIRONMENT ?? "sandbox") as
     | "sandbox"
     | "live";
 
+  // Decrypt each sensitive field; decrypt() returns null for null/undefined inputs,
+  // so we coerce null → undefined to satisfy ProviderConfig (optional fields).
+  const apiKey       = decrypt(channel.apiKey)       ?? decrypt(cfg.apiKey as string | null)       ?? undefined;
+  const apiSecret    = decrypt(channel.apiSecret)    ?? decrypt(cfg.apiSecret as string | null)    ?? undefined;
+  const webhookSecret= decrypt(channel.webhookSecret)?? decrypt(cfg.webhookSecret as string | null)?? undefined;
+
   return {
-    apiKey: channel.apiKey ?? (cfg.apiKey as string) ?? undefined,
-    apiSecret: channel.apiSecret ?? (cfg.apiSecret as string) ?? undefined,
+    apiKey,
+    apiSecret,
     apiUrl: (cfg.apiUrl as string) ?? undefined,
-    webhookSecret:
-      channel.webhookSecret ?? (cfg.webhookSecret as string) ?? undefined,
+    webhookSecret,
     accountId: (cfg.accountId as string) ?? undefined,
     environment,
   };
@@ -97,7 +116,7 @@ function channelToConfig(channel: ChannelRecord): ProviderConfig {
  * Get a fully configured PaymentProvider instance.
  *
  * Priority:
- *   1. channel record from DB (per-tenant credentials)
+ *   1. channel record from DB (per-tenant credentials, decrypted)
  *   2. environment variables (global fallback)
  */
 export function getPaymentProvider(

@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 
-// GET /api/settings
+// GET /api/settings — all roles can read (branding, company name, etc.)
 export async function GET(req: NextRequest) {
     try {
         const userPayload = getUserFromRequest(req);
@@ -29,15 +29,19 @@ export async function GET(req: NextRequest) {
     }
 }
 
-// PUT /api/settings - update settings (accepts key-value pairs)
+// PUT /api/settings — SUPER_ADMIN only: update tenant system settings
 export async function PUT(req: NextRequest) {
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
 
-        const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
+        // RBAC-001: Only Super Admin can change system settings.
+        // Admins, Agents, and Viewers inherit settings from the tenant owner.
+        if (userPayload.role !== "SUPER_ADMIN") {
+            return errorResponse("Forbidden: Only the tenant Super Admin can update system settings", 403);
+        }
+
         const tenantIdValue = userPayload.tenantId;
-        
         const body = await req.json();
 
         for (const [key, value] of Object.entries(body)) {

@@ -94,6 +94,7 @@ export async function POST(req: NextRequest) {
                 const tenant = await tx.tenant.create({
                     data: {
                         name: companyName,
+                        slug: "company-" + Date.now().toString(36),
                         email,
                         // New registrations start PENDING_APPROVAL — SuperAdmin activates them
                         status: "PENDING_APPROVAL",

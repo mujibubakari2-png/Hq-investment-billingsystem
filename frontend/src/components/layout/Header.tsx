@@ -11,30 +11,43 @@ import './Header.css';
 
 // Map paths to friendly page titles
 const pageTitles: Record<string, string> = {
-    '/dashboard': 'Dashboard',
-    '/clients': 'Clients',
-    '/active-subscribers': 'Active Subscribers',
+    '/dashboard':           'Dashboard',
+    '/clients':             'Clients',
+    '/active-subscribers':  'Active Subscribers',
     '/expired-subscribers': 'Expired Subscribers',
-    '/packages': 'Packages',
-    '/voucher-codes': 'Voucher Codes',
-    '/all-transactions': 'Payment Records',
+    '/packages':            'Packages',
+    '/voucher-codes':       'Voucher Codes',
+    '/all-transactions':    'Payment Records',
     '/mobile-transactions': 'Mobile Transactions',
-    '/expense-tracking': 'Expense Tracking',
-    '/invoices': 'Invoices',
-    '/mikrotiks': 'Mikrotiks',
-    '/equipments': 'Equipments',
-    '/sms-messages': 'SMS Messages',
-    '/message-templates': 'Message Templates',
-    '/system-settings': 'System Settings',
-    '/payment-channels': 'Payment Channels',
-    '/system-users': 'System Users',
-    '/license-management': 'License Management',
-    '/reports': 'Reports & Analytics',
-    '/tutorial-videos': 'Tutorial Videos',
-    '/technical-support': 'Technical Support',
-    '/profile': 'My Profile',
-    '/system-tenants': 'System Tenants',
+    '/expense-tracking':    'Expense Tracking',
+    '/invoices':            'Invoices',
+    '/mikrotiks':           'Mikrotiks',
+    '/equipments':          'Equipments',
+    '/sms-messages':        'SMS Messages',
+    '/message-templates':   'Message Templates',
+    '/system-settings':     'System Settings',
+    '/payment-channels':    'Payment Channels',
+    '/system-users':        'System Users',
+    '/license-management':  'License Management',
+    '/reports':             'Reports & Analytics',
+    '/tutorial-videos':     'Tutorial Videos',
+    '/technical-support':   'Technical Support',
+    '/profile':             'My Profile',
+    '/system-tenants':      'System Tenants',
+    '/hotspot-customizer':  'Hotspot Customizer',
+    '/vpn-management':      'VPN Management',
 };
+
+// Human-readable role label shown in the header dropdown
+function roleLabel(role: string): string {
+    switch (role) {
+        case 'SUPER_ADMIN': return 'Super Admin';
+        case 'ADMIN':  return 'Admin';
+        case 'AGENT':  return 'Agent';
+        case 'VIEWER': return 'Viewer';
+        default: return role;
+    }
+}
 
 interface HeaderProps {
     onToggleSidebar: () => void;
@@ -50,6 +63,7 @@ export default function Header({ onToggleSidebar, darkMode, onToggleDarkMode }: 
     const [license, setLicense] = useState<LicenseResponse | null>(null);
     const menuRef = useRef<HTMLDivElement>(null);
 
+    // Fetch license expiry only for non-SUPER_ADMIN users (they're always active)
     useEffect(() => {
         if (user && user.role !== 'SUPER_ADMIN') {
             licenseApi.getLicense().then(setLicense).catch(console.error);
@@ -77,6 +91,10 @@ export default function Header({ onToggleSidebar, darkMode, onToggleDarkMode }: 
 
     const pageTitle = pageTitles[location.pathname] || 'Dashboard';
 
+    // BRAND-001: Company name comes from the auth user object (set at login/register),
+    // so we never need an extra API call just to render the header.
+    const companyName = user?.companyName || 'HQ INVESTMENT';
+
     const handleLogout = () => {
         setShowMenu(false);
         authStore.logout();
@@ -85,7 +103,7 @@ export default function Header({ onToggleSidebar, darkMode, onToggleDarkMode }: 
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', width: '100%', position: 'sticky', top: 0, zIndex: 100 }}>
-            {/* License expiry warning banner */}
+            {/* License expiry warning banner — only for non-SUPER_ADMIN nearing expiry */}
             {license &&
                 typeof license.daysRemaining === 'number' &&
                 license.daysRemaining > 0 &&
@@ -134,6 +152,27 @@ export default function Header({ onToggleSidebar, darkMode, onToggleDarkMode }: 
                 </div>
 
                 <div className="header-right">
+                    {/* Company name badge — BRAND-001 */}
+                    <span style={{
+                        fontSize: '0.78rem',
+                        fontWeight: 600,
+                        color: 'var(--text-secondary)',
+                        display: 'none', // hidden on mobile (too narrow)
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        maxWidth: 200,
+                        alignItems: 'center',
+                        gap: 6
+                    }}
+                        className="header-company-name"
+                    >
+                        {user?.companyLogo && (
+                            <img src={user.companyLogo} alt="Logo" style={{ height: 20, width: 'auto', borderRadius: 4 }} />
+                        )}
+                        <span>{companyName}</span>
+                    </span>
+
                     <button
                         className="header-icon-btn"
                         onClick={onToggleDarkMode}
@@ -158,7 +197,13 @@ export default function Header({ onToggleSidebar, darkMode, onToggleDarkMode }: 
                             <div className="header-dropdown">
                                 <div className="header-dropdown-info">
                                     <div className="header-dropdown-name">{displayName}</div>
-                                    <div className="header-dropdown-role">{user?.role}</div>
+                                    <div className="header-dropdown-role">{roleLabel(user?.role ?? '')}</div>
+                                    {/* Show company name in dropdown for context */}
+                                    {companyName && companyName !== 'HQ INVESTMENT' && (
+                                        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 2 }}>
+                                            {companyName}
+                                        </div>
+                                    )}
                                 </div>
                                 <button
                                     className="header-dropdown-btn"
@@ -179,6 +224,13 @@ export default function Header({ onToggleSidebar, darkMode, onToggleDarkMode }: 
                     </div>
                 </div>
             </header>
+
+            {/* Show company name on tablets and up */}
+            <style>{`
+                @media (min-width: 600px) {
+                    .header-company-name { display: flex !important; }
+                }
+            `}</style>
         </div>
     );
 }

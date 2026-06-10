@@ -3,6 +3,7 @@ import { z } from "zod";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { encryptPaymentChannelFields, decryptPaymentChannelFields } from "@/lib/encryption";
+import { getJwtTenantId, getTenantFilter, isPlatformSuperAdmin } from "@/lib/tenant";
 
 // ── Validation schema (API-001) ───────────────────────────────────────────────
 const PROVIDERS = ["PALMPESA", "ZENOPAY", "MONGIKE", "HARAKAPAY", "CASH", "BANK_TRANSFER", "OTHER"] as const;
@@ -35,13 +36,13 @@ export async function GET(req: NextRequest) {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
 
-        const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
-        const tenantFilter = isSuperAdmin ? {} : { tenantId: userPayload.tenantId };
+        const platformAdmin = isPlatformSuperAdmin(userPayload);
+        const { filter: tenantFilter } = getTenantFilter(userPayload);
 
         const channels = await prisma.paymentChannel.findMany({
             where: { ...tenantFilter },
             orderBy: { createdAt: "desc" },
-            include: isSuperAdmin ? { tenant: { select: { id: true, name: true } } } : undefined,
+            include: platformAdmin ? { tenant: { select: { id: true, name: true } } } : undefined,
         });
 
         const mapped = channels.map((ch: any) => {
@@ -63,8 +64,8 @@ export async function GET(req: NextRequest) {
                 hasApiKey: !!decrypted.apiKey,
                 hasApiSecret: !!decrypted.apiSecret,
                 hasWebhookSecret: !!decrypted.webhookSecret,
-                tenantId: isSuperAdmin ? ch.tenantId : undefined,
-                tenantName: isSuperAdmin ? ch.tenant?.name : undefined,
+                tenantId: platformAdmin ? ch.tenantId : undefined,
+                tenantName: platformAdmin ? ch.tenant?.name : undefined,
             };
         });
 
@@ -81,9 +82,8 @@ export async function POST(req: NextRequest) {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
 
-        // API-005: Only ADMIN/SUPER_ADMIN can create channels
-        if (!["SUPER_ADMIN", "ADMIN"].includes(userPayload.role)) {
-            return errorResponse("Forbidden: Only admins can manage payment channels", 403);
+        if (userPayload.role !== "SUPER_ADMIN") {
+            return errorResponse("Forbidden: Only the tenant Super Admin can manage payment channels", 403);
         }
 
         const body = await req.json();
@@ -96,10 +96,14 @@ export async function POST(req: NextRequest) {
         }
         const data = parsed.data;
 
-        const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
-        const tenantIdValue = isSuperAdmin
+        const platformAdmin = isPlatformSuperAdmin(userPayload);
+        const tenantIdValue = platformAdmin
             ? (data.tenantId || body.tenant_id || null)
-            : userPayload.tenantId;
+            : getJwtTenantId(userPayload);
+
+        if (!tenantIdValue && !platformAdmin) {
+            return errorResponse("Tenant ID missing", 400);
+        }
 
         // MT-002: Validate tenantId exists before creating
         if (tenantIdValue) {
@@ -129,6 +133,31 @@ export async function POST(req: NextRequest) {
                 ...encryptedFields,
             },
         });
+
+        if (tenantIdValue) {
+            await prisma.tenantPaymentGateway.upsert({
+                where: {
+                    tenantId_provider: {
+                        tenantId: tenantIdValue,
+                        provider: channel.provider,
+                    },
+                },
+                update: {
+                    name: channel.name,
+                    enabled: channel.status === "ACTIVE",
+                    status: channel.status,
+                    config: channel.config ?? undefined,
+                },
+                create: {
+                    tenantId: tenantIdValue,
+                    provider: channel.provider,
+                    name: channel.name,
+                    enabled: channel.status === "ACTIVE",
+                    status: channel.status,
+                    config: channel.config ?? undefined,
+                },
+            });
+        }
 
         return jsonResponse({
             id: channel.id,

@@ -106,7 +106,7 @@ export default function PaymentCheckout({
       setTransactionRef(data.reference);
       setProviderRef(data.providerRef ?? "");
       setStep("waiting");
-    } catch (err) {
+    } catch {
       setApiError("Network error. Please check your connection.");
     } finally {
       setLoading(false);
@@ -267,7 +267,7 @@ export default function PaymentCheckout({
               <>
                 <span>📲</span>
                 Pay Now — TZS{" "}
-                {(initialAmount ?? Number(amount) || 0).toLocaleString()}
+                {((initialAmount ?? Number(amount)) || 0).toLocaleString()}
               </>
             )}
           </button>

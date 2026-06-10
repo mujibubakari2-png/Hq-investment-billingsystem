@@ -2,20 +2,22 @@ import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { toISOSafe } from "@/lib/dateUtils";
+import { getJwtTenantId, isPlatformSuperAdmin } from "@/lib/tenant";
+import { getSubUserLimitForPlan } from "@/lib/userLimits";
 
 export async function GET(req: NextRequest) {
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
 
-        if (userPayload.role === "SUPER_ADMIN") {
+        if (isPlatformSuperAdmin(userPayload)) {
             return jsonResponse({
                 isSuperAdmin: true,
                 message: "Super Admin does not require a SaaS license.",
             });
         }
 
-        const tenantId = userPayload.tenantId;
+        const tenantId = getJwtTenantId(userPayload);
         if (!tenantId) return errorResponse("Tenant ID missing", 400);
 
         const tenant = await prisma.tenant.findUnique({
@@ -23,7 +25,17 @@ export async function GET(req: NextRequest) {
             include: {
                 plan: true,
                 clients: { select: { id: true } },
-                tenantInvoices: { orderBy: { createdAt: "desc" } }
+                users: {
+                    where: { role: { in: ["ADMIN", "AGENT", "VIEWER"] } },
+                    select: { id: true },
+                },
+                tenantInvoices: {
+                    orderBy: { createdAt: "desc" },
+                    include: {
+                        plan: true,
+                        payments: { orderBy: { createdAt: "desc" } },
+                    },
+                }
             }
         });
 
@@ -70,12 +82,16 @@ export async function GET(req: NextRequest) {
         const payload = {
             isSuperAdmin: false,
             companyName: tenant.name,
+            companyLogo: tenant.logoUrl,
+            tenantSlug: tenant.slug,
             licenseKey: tenant.id.split('-')[0].toUpperCase() + "-" + tenant.id.substring(0, 8),
             status: currentStatus,
             daysRemaining,
             expiresAt: toISOSafe(expiresAt),
             customersCount: tenant.clients.length,
             clientLimit: tenant.plan.clientLimit,
+            subUsersCount: tenant.users.length,
+            subUsersLimit: getSubUserLimitForPlan(tenant.plan.name),
             paidThisMonth,
             plan: {
                 id: tenant.plan.id,
@@ -84,9 +100,22 @@ export async function GET(req: NextRequest) {
             },
             outstandingInvoices: outstandingInvoices.map(i => ({
                 id: i.id,
+                invoiceNumber: i.invoiceNumber,
+                invoiceDate: toISOSafe(i.createdAt),
+                paymentDate: toISOSafe(i.payments.find(p => p.status === "COMPLETED")?.createdAt ?? null),
+                licensePackage: i.plan.name,
                 amount: i.amount,
                 dueDate: toISOSafe(i.dueDate),
                 status: i.status
+            })),
+            billingHistory: tenant.tenantInvoices.map(i => ({
+                id: i.id,
+                invoiceNumber: i.invoiceNumber,
+                invoiceDate: toISOSafe(i.createdAt),
+                paymentDate: toISOSafe(i.payments.find(p => p.status === "COMPLETED")?.createdAt ?? null),
+                licensePackage: i.plan.name,
+                amount: i.amount,
+                status: i.status,
             })),
             hasOutstanding: outstandingInvoices.length > 0
         };

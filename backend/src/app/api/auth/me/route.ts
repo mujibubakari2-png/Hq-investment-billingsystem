@@ -17,9 +17,26 @@ export async function GET(req: NextRequest) {
                 email: true,
                 role: true,
                 phone: true,
+                fullName: true,
                 status: true,
                 lastLogin: true,
                 tenantId: true,
+                tenant: {
+                    select: {
+                        id: true,
+                        name: true,
+                        slug: true,
+                        logoUrl: true,
+                        email: true,
+                        branding: {
+                            select: {
+                                companyName: true,
+                                companyLogo: true,
+                                companyEmail: true,
+                            },
+                        },
+                    },
+                },
             },
         });
 
@@ -30,6 +47,11 @@ export async function GET(req: NextRequest) {
         return jsonResponse({
             ...user,
             tenant_id: user.tenantId, // Alias for tests
+            isPlatformAdmin: user.role === "SUPER_ADMIN" && !user.tenantId,
+            companyName: user.tenant?.branding?.companyName || user.tenant?.name,
+            companyLogo: user.tenant?.branding?.companyLogo || user.tenant?.logoUrl,
+            companyEmail: user.tenant?.branding?.companyEmail || user.tenant?.email,
+            tenantSlug: user.tenant?.slug,
         });
     } catch {
         return errorResponse("Internal server error", 500);

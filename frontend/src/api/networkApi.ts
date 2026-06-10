@@ -51,11 +51,14 @@ export const routersApi = {
 };
 
 export const vpnApi = {
+    list:          ()                              => get<Record<string, unknown>[]>('/vpn'),
+    create:        (data: Record<string, unknown>) => post<Record<string, unknown>>('/vpn', data),
+    delete:        (id: string)                    => del<{ message: string }>(`/vpn/${encodeURIComponent(id)}`),
     getStatus:     ()                              => get<Record<string, unknown>>('/vpn/status'),
     getConfig:     ()                              => get<Record<string, unknown>>('/vpn/config'),
     addPeer:       (data: Record<string, unknown>) => post<Record<string, unknown>>('/vpn', data),
     getPeers:      ()                              => get<Record<string, unknown>[]>('/vpn'),
-    deletePeer:    (publicKey: string)             => del<{ message: string }>(`/vpn/${encodeURIComponent(publicKey)}`),
+    deletePeer:    (id: string)                    => del<{ message: string }>(`/vpn/${encodeURIComponent(id)}`),
 };
 
 export const equipmentsApi = {
@@ -84,7 +87,7 @@ export interface HotspotSettings {
 
 export const hotspotSettingsApi = {
     get: (routerId: string) => get<HotspotSettings>(`/hotspot-settings?routerId=${routerId}`),
-    update: (data: Partial<HotspotSettings> & { routerId: string }) => post<HotspotSettings>('/hotspot-settings', data),
+    update: (data: Partial<HotspotSettings> & { routerId: string }) => post<{ settings: HotspotSettings; saved: boolean; synced?: boolean; syncError?: string; syncMessage?: string }>('/hotspot-settings', data),
 };
 
 export const radiusSyncApi = {

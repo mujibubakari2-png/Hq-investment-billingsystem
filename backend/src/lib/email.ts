@@ -1,134 +1,161 @@
-import nodemailer from "nodemailer";
-import { env } from "@/lib/env";
-
 /**
- * Centralized email service for HQ Investment ISP Billing System.
- * Handles OTP and system notifications using SMTP.
+ * Centralized Email Service — HQ Investment ISP Billing System
+ *
+ * EMAIL-001: Replaced nodemailer/SMTP transport with Resend HTTP API.
+ *
+ * Why the change:
+ *   Cloud VPS providers (DigitalOcean, AWS, etc.) block outbound SMTP ports 25/465/587
+ *   by default. nodemailer connections were timing out or being refused at the network
+ *   level, making OTP and notification emails completely non-functional in production.
+ *   Resend uses HTTPS (port 443 — always open) and requires zero server-side SMTP config.
+ *
+ * Public API is unchanged — all callers (sendOtpEmail, accountNotifications, etc.)
+ * continue to call sendEmail({ to, subject, text, html }) with no modifications needed.
+ *
+ * Setup (one-time):
+ *   1. Create a free account at https://resend.com
+ *   2. Verify your sending domain (or use the onboarding sandbox address for testing)
+ *   3. Generate an API key: Resend Dashboard → API Keys → Create API Key
+ *   4. Add to backend/.env:
+ *        RESEND_API_KEY="re_xxxxxxxxxxxxxxxxxxxx"
+ *        RESEND_FROM="HQ INVESTMENT <noreply@yourdomain.com>"
+ *        # For testing before domain is verified use: onboarding@resend.dev
+ *
+ *   Free tier: 3 000 emails/month, 100/day — sufficient for most ISP deployments.
  */
 
-export const emailConfig: any = {
-    // If SMTP_HOST is not provided, default to smtp.gmail.com
-    host: env.SMTP_HOST || "smtp.gmail.com",
-    port: Number(env.SMTP_PORT) || 587,
-    // Port 465 is always secure (SSL/TLS). Port 587 uses STARTTLS so secure MUST be false
-    secure: Number(env.SMTP_PORT) === 465 || env.SMTP_SECURE,
-    auth: {
-        user: env.SMTP_USER,
-        pass: env.SMTP_PASS,
-    },
-    tls: {
-        rejectUnauthorized: false
-    },
-    family: 4,
-    // Add a timeout to fail faster if the network is blocked
-    connectionTimeout: 10000, 
-    greetingTimeout: 10000
-};
+const RESEND_API_URL = "https://api.resend.com/emails";
 
-console.log(`[EMAIL] SMTP Default Configuration: Host=${emailConfig.host}, Port=${emailConfig.port}, Secure=${emailConfig.secure}`);
-
-export async function sendEmail({
-    to,
-    subject,
-    text,
-    html,
-}: {
-    to: string;
-    subject: string;
-    text: string;
-    html: string;
-}) {
-    const from = env.SMTP_FROM || `"${env.APP_NAME || "HQ INVESTMENT"}" <${env.SMTP_USER || "no-reply@billing-system.local"}>`;
-
-    console.log(`[EMAIL] Attempting to send email to ${to} (Host: ${emailConfig.host})`);
-
-    let currentPort = Number(env.SMTP_PORT) || 587;
-    let alternatePort = currentPort === 587 ? 465 : 587;
-    
-    let activeTransporter = nodemailer.createTransport({
-        ...emailConfig,
-        port: currentPort,
-        secure: currentPort === 465 || env.SMTP_SECURE
-    });
-
-    try {
-        // Test connection before sending
-        if (env.SMTP_HOST && env.SMTP_HOST !== "smtp.ethereal.email") {
-            console.log(`[EMAIL] Verifying connection to ${emailConfig.host}:${currentPort}...`);
-            try {
-                await activeTransporter.verify();
-            } catch (verifyError: any) {
-                const networkErrors = ['ECONNREFUSED', 'ETIMEDOUT', 'ENETUNREACH'];
-                if (networkErrors.includes(verifyError.code)) {
-                    console.warn(`[EMAIL] Connection failed on port ${currentPort}. Retrying with fallback port ${alternatePort}...`);
-                    activeTransporter = nodemailer.createTransport({
-                        ...emailConfig,
-                        port: alternatePort,
-                        secure: alternatePort === 465
-                    });
-                    await activeTransporter.verify();
-                    currentPort = alternatePort;
-                } else {
-                    throw verifyError;
-                }
-            }
-        }
-
-        const info = await activeTransporter.sendMail({
-            from,
-            to,
-            subject,
-            text,
-            html,
-        });
-
-        console.log(`[EMAIL] Email sent successfully via port ${currentPort}: ${info.messageId}`);
-        return { success: true, messageId: info.messageId };
-    } catch (error: any) {
-        console.error("[EMAIL] Failed to send email:", error.message);
-        console.error("[EMAIL] Error Code:", error.code);
-        
-        let userFriendlyError = error.message;
-        if (error.code === 'EAUTH') {
-            userFriendlyError = "Authentication failed. Please verify your SMTP_USER and SMTP_PASS (App Password).";
-        } else if (error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT' || error.code === 'ENETUNREACH') {
-            userFriendlyError = `Could not connect to ${emailConfig.host} on ports 587 or 465. Both are blocked. Check your firewall or DigitalOcean settings.`;
-        }
-
-        return { 
-            success: false, 
-            error: userFriendlyError,
-            code: error.code
-        };
-    }
+function getResendKey(): string | undefined {
+  return process.env.RESEND_API_KEY;
 }
 
-export async function sendOtpEmail(email: string, otp: string, type: 'registration' | 'password-reset' = 'registration') {
-    const isRegistration = type === 'registration';
-    const subject = isRegistration ? "Your Registration Verification Code" : "Your Password Reset Code";
-    const title = isRegistration ? "HQ INVESTMENT Verification" : "HQ INVESTMENT Password Reset";
-    const message = isRegistration 
-        ? "Thank you for registering. Your 6-digit verification code is:" 
-        : "We received a request to reset your password. Your 6-digit verification code is:";
+function getFromAddress(): string {
+  return (
+    process.env.RESEND_FROM ||
+    process.env.SMTP_FROM ||           // fall back to old env var so existing configs still work
+    `"${process.env.APP_NAME || "HQ INVESTMENT"}" <onboarding@resend.dev>`
+  );
+}
 
-    const html = `
-        <div style="font-family: sans-serif; padding: 20px; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #eee; border-radius: 10px;">
-            <h2 style="color: #1a1a2e;">${title}</h2>
-            <p>${message}</p>
-            <div style="background-color: #f4f4f7; padding: 20px; text-align: center; border-radius: 5px; margin: 20px 0;">
-                <h1 style="margin: 0; letter-spacing: 5px; font-size: 32px; color: #6366f1;">${otp}</h1>
-            </div>
-            <p style="font-size: 14px; color: #666;">This code will expire in 30 minutes.</p>
-            <p style="font-size: 12px; color: #999; margin-top: 30px; border-top: 1px solid #eee; padding-top: 10px;">
-                If you did not request this code, please ignore this email.
-            </p>
-        </div>
-    `;
+// ─── Core send function ───────────────────────────────────────────────────────
 
-    return sendEmail({
-        to: email,
+export async function sendEmail({
+  to,
+  subject,
+  text,
+  html,
+}: {
+  to: string;
+  subject: string;
+  text: string;
+  html: string;
+}): Promise<{ success: boolean; messageId?: string; error?: string; code?: string }> {
+  const apiKey = getResendKey();
+
+  // EMAIL-002: Graceful degradation — if no API key is configured, log and skip.
+  // This prevents hard crashes during local development when email is not set up.
+  if (!apiKey) {
+    console.warn(
+      "[EMAIL] RESEND_API_KEY is not set — skipping email send.\n" +
+      "        To enable email: add RESEND_API_KEY to your .env file.\n" +
+      `        Would have sent: subject="${subject}" to=${to}`
+    );
+    // Return success=false but with a clear dev-friendly message so callers can warn the user.
+    return {
+      success: false,
+      error: "Email service is not configured. Set RESEND_API_KEY in your .env file.",
+      code: "EMAIL_NOT_CONFIGURED",
+    };
+  }
+
+  const from = getFromAddress();
+  console.log(`[EMAIL] Sending via Resend API: to=${to}, subject="${subject}"`);
+
+  try {
+    const response = await fetch(RESEND_API_URL, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from,
+        to: [to],
         subject,
-        text: `${message} ${otp}. It will expire in 30 minutes.`,
+        text,
         html,
+      }),
     });
+
+    const data = await response.json().catch(() => ({})) as any;
+
+    if (!response.ok) {
+      // Resend returns { name, message, statusCode } on error
+      const errMsg = data?.message || data?.name || `HTTP ${response.status}`;
+      console.error(`[EMAIL] Resend API error (${response.status}):`, errMsg, data);
+
+      return {
+        success: false,
+        error: errMsg,
+        code: data?.name || `HTTP_${response.status}`,
+      };
+    }
+
+    // Success: Resend returns { id: "..." }
+    console.log(`[EMAIL] Sent successfully. Resend message id: ${data?.id}`);
+    return { success: true, messageId: data?.id };
+
+  } catch (err: any) {
+    // Network-level failure (DNS, connection refused, timeout)
+    console.error("[EMAIL] Network error reaching Resend API:", err.message);
+    return {
+      success: false,
+      error: `Network error: ${err.message}`,
+      code: err.code || "NETWORK_ERROR",
+    };
+  }
+}
+
+// ─── OTP helper (unchanged public interface) ──────────────────────────────────
+
+export async function sendOtpEmail(
+  email: string,
+  otp: string,
+  type: "registration" | "password-reset" = "registration"
+) {
+  const isRegistration = type === "registration";
+  const subject = isRegistration
+    ? "Your Registration Verification Code"
+    : "Your Password Reset Code";
+  const title = isRegistration
+    ? "HQ INVESTMENT Verification"
+    : "HQ INVESTMENT Password Reset";
+  const message = isRegistration
+    ? "Thank you for registering. Your 6-digit verification code is:"
+    : "We received a request to reset your password. Your 6-digit verification code is:";
+
+  const html = `
+    <div style="font-family: sans-serif; padding: 20px; color: #333; max-width: 600px;
+                margin: 0 auto; border: 1px solid #eee; border-radius: 10px;">
+      <h2 style="color: #1a1a2e;">${title}</h2>
+      <p>${message}</p>
+      <div style="background-color: #f4f4f7; padding: 20px; text-align: center;
+                  border-radius: 5px; margin: 20px 0;">
+        <h1 style="margin: 0; letter-spacing: 5px; font-size: 32px; color: #6366f1;">${otp}</h1>
+      </div>
+      <p style="font-size: 14px; color: #666;">This code will expire in 30 minutes.</p>
+      <p style="font-size: 12px; color: #999; margin-top: 30px; border-top: 1px solid #eee;
+                padding-top: 10px;">
+        If you did not request this code, please ignore this email.
+      </p>
+    </div>
+  `;
+
+  return sendEmail({
+    to: email,
+    subject,
+    text: `${message} ${otp}. It will expire in 30 minutes.`,
+    html,
+  });
 }

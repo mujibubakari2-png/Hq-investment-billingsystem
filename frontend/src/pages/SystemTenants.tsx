@@ -47,7 +47,7 @@ export default function SystemTenants() {
     const handleSuspend = async (id: string, name: string) => {
         if (!window.confirm(`Suspend tenant "${name}"? They will lose access immediately.`)) return;
         try {
-            await superAdminTenantsApi.action(id, 'suspend');
+            await superAdminTenantsApi.suspend(id);
             fetchTenants();
         } catch (err: any) {
             alert(err.message || "Failed to suspend tenant.");
@@ -57,7 +57,7 @@ export default function SystemTenants() {
     const handleReactivate = async (id: string) => {
         if (!window.confirm("Reactivate this tenant account?")) return;
         try {
-            await superAdminTenantsApi.action(id, 'reactivate');
+            await superAdminTenantsApi.activate(id);
             fetchTenants();
         } catch (err: any) {
             alert(err.message || "Failed to reactivate tenant.");

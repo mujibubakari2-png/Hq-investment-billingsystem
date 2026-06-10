@@ -37,8 +37,8 @@ export async function POST(req: NextRequest) {
 
         // ── Send notification email to admin ──────────────────────────────────
         const recipientEmail =
+            env.RESEND_FROM?.match(/<(.+?)>/)?.[1] ||
             env.SMTP_FROM?.match(/<(.+?)>/)?.[1] ||
-            env.SMTP_USER ||
             "support@hqinvestment.local";
 
         const appName = env.APP_NAME || "HQ INVESTMENT";

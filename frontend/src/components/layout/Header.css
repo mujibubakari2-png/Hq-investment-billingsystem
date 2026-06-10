@@ -42,8 +42,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 40px;
-    height: 40px;
+    width: 44px;
+    height: 44px;
     border-radius: var(--radius-sm);
     background: none;
     color: var(--text-secondary);
@@ -69,8 +69,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 38px;
-    height: 38px;
+    width: 44px;
+    height: 44px;
     border-radius: 50%;
     background: none;
     color: var(--text-secondary);
@@ -94,8 +94,8 @@
 }
 
 .header-avatar {
-    width: 36px;
-    height: 36px;
+    width: 40px;
+    height: 40px;
     border-radius: 50%;
     background: linear-gradient(135deg, var(--primary), #6366f1);
     color: white;
@@ -219,8 +219,8 @@
     }
 
     .header-icon-btn {
-        width: 34px;
-        height: 34px;
+        width: 44px;
+        height: 44px;
     }
 
     .header-avatar {
@@ -247,8 +247,8 @@
     }
 
     .hamburger-btn {
-        width: 36px;
-        height: 36px;
+        width: 44px;
+        height: 44px;
     }
 }
 

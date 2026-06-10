@@ -1,14 +1,18 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
+import { getJwtTenantId, isPlatformSuperAdmin } from "@/lib/tenant";
 
 // POST /api/license/change-plan
 export async function POST(req: NextRequest) {
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        if (userPayload.role !== "SUPER_ADMIN" || isPlatformSuperAdmin(userPayload)) {
+            return errorResponse("Forbidden: Only the tenant Super Admin can change plans", 403);
+        }
 
-        const tenantId = userPayload.tenantId;
+        const tenantId = getJwtTenantId(userPayload);
         if (!tenantId) return errorResponse("Tenant ID missing", 400);
 
         const body = await req.json();

@@ -38,7 +38,25 @@ export async function POST(req: NextRequest) {
                     { username },
                     { email: username }
                 ]
-            }
+            },
+            include: {
+                tenant: {
+                    select: {
+                        id: true,
+                        name: true,
+                        slug: true,
+                        logoUrl: true,
+                        email: true,
+                        branding: {
+                            select: {
+                                companyName: true,
+                                companyLogo: true,
+                                companyEmail: true,
+                            },
+                        },
+                    },
+                },
+            },
         });
         if (!user) {
             return errorResponse("Invalid credentials", 401);
@@ -82,6 +100,11 @@ export async function POST(req: NextRequest) {
                 phone: user.phone,
                 tenantId: user.tenantId,
                 tenant_id: user.tenantId, // Alias for tests
+                isPlatformAdmin: user.role === "SUPER_ADMIN" && !user.tenantId,
+                companyName: user.tenant?.branding?.companyName || user.tenant?.name,
+                companyLogo: user.tenant?.branding?.companyLogo || user.tenant?.logoUrl,
+                companyEmail: user.tenant?.branding?.companyEmail || user.tenant?.email,
+                tenantSlug: user.tenant?.slug,
             },
         });
 

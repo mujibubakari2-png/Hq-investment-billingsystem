@@ -7,480 +7,574 @@ import SearchIcon from '@mui/icons-material/Search';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import GroupIcon from '@mui/icons-material/Group';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 
 import { systemUsersApi } from '../api';
-import type { SystemUser } from '../types';
 import { formatDateTime } from '../utils/formatters';
 
+interface SystemUser {
+    id: string;
+    username: string;
+    fullName?: string | null;
+    email: string;
+    role: string;
+    rawRole?: string;
+    status: string;
+    phone?: string | null;
+    lastLogin?: string | null;
+    createdAt?: string | null;
+}
+
+interface UsersMeta {
+    subUserCount: number;
+    subUserLimit: number;
+    planName: string | null;
+}
+
+const ROLE_COLORS: Record<string, { bg: string; color: string }> = {
+    'Super Admin': { bg: '#ede9fe', color: '#6d28d9' },
+    'Admin':       { bg: '#dbeafe', color: '#1d4ed8' },
+    'Agent':       { bg: '#d1fae5', color: '#065f46' },
+    'Viewer':      { bg: '#fef3c7', color: '#92400e' },
+};
+
+const SESSION_TIMEOUT_MINUTES = 30;
+
+function isUserOnline(lastLogin: string | null | undefined): boolean {
+    if (!lastLogin) return false;
+    return (Date.now() - new Date(lastLogin).getTime()) < SESSION_TIMEOUT_MINUTES * 60000;
+}
+
+const defaultNewUser = {
+    fullName:     '',
+    phone:        '',
+    email:        '',
+    role:         'Agent',
+    status:       'Active',
+    username:     '',
+};
+
 export default function SystemUsers() {
-    const [showAddUser, setShowAddUser] = useState(false);
-    const [searchTerm, setSearchTerm] = useState('');
-    const [entriesPerPage, setEntriesPerPage] = useState(10);
-    const [filterRoles, setFilterRoles] = useState('all');
+    const [showAddUser, setShowAddUser]   = useState(false);
+    const [searchTerm, setSearchTerm]     = useState('');
+    const [filterRole, setFilterRole]     = useState('all');
     const [filterStatus, setFilterStatus] = useState('all');
-    const [currentTime, setCurrentTime] = useState(new Date().toLocaleTimeString());
     const [isRefreshing, setIsRefreshing] = useState(false);
 
-    const [users, setUsers] = useState<SystemUser[]>([]);
-
-    const defaultNewUser = {
-        fullName: '',
-        phone: '',
-        email: '',
-        city: '',
-        subDistrict: '',
-        ward: '',
-        role: 'Admin',
-        status: 'Active',
-        username: '',
-        password: '123456',
-        sendNotification: "Don't Send"
-    };
-    const [newUser, setNewUser] = useState(defaultNewUser);
-    const [editingUserId, setEditingUserId] = useState<string | null>(null);
+    const [users, setUsers]       = useState<SystemUser[]>([]);
+    const [meta, setMeta]         = useState<UsersMeta | null>(null);
+    const [newUser, setNewUser]   = useState({ ...defaultNewUser });
+    const [editingId, setEditingId] = useState<string | null>(null);
     const [isSaving, setIsSaving] = useState(false);
-    const [error, setError] = useState('');
+    const [error, setError]       = useState('');
+    const [successMsg, setSuccessMsg] = useState('');
+    const [currentTime, setCurrentTime] = useState(new Date().toLocaleTimeString());
 
     const fetchUsers = async () => {
         try {
             setIsRefreshing(true);
-            const data = await systemUsersApi.list();
-            setUsers(data as unknown as SystemUser[]);
+            const data: any = await systemUsersApi.list();
+            // New API returns { users, meta }; old API returned an array
+            if (Array.isArray(data)) {
+                setUsers(data);
+                setMeta(null);
+            } else {
+                setUsers(data.users ?? []);
+                setMeta(data.meta ?? null);
+            }
         } catch (err) {
             console.error('Failed to load users:', err);
         } finally {
-            // Add a tiny delay so the refresh animation is visible even if local
             setTimeout(() => setIsRefreshing(false), 500);
         }
     };
 
     useEffect(() => {
         fetchUsers();
-
-        // Start the real-time clock for Status Update
         const timer = setInterval(() => setCurrentTime(new Date().toLocaleTimeString()), 1000);
         return () => clearInterval(timer);
     }, []);
 
-    const SESSION_TIMEOUT_MINUTES = 30;
-    const isUserOnline = (lastLogin: string | null) => {
-        if (!lastLogin) return false;
-        return (new Date().getTime() - new Date(lastLogin).getTime()) < SESSION_TIMEOUT_MINUTES * 60000;
-    };
-    const onlineUsersCount = users.filter(u => isUserOnline(u.lastLogin)).length;
+    const subUsers = users.filter(u => u.rawRole !== 'SUPER_ADMIN' && u.role !== 'Super Admin');
+    const onlineCount = users.filter(u => isUserOnline(u.lastLogin)).length;
 
     const filtered = users.filter(u => {
-        const matchesSearch = (u.username || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (u.email || '').toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesRole = filterRoles === 'all' || u.role === filterRoles;
-        const matchesStatus = filterStatus === 'all' || u.status === filterStatus;
-        return matchesSearch && matchesRole && matchesStatus;
+        const matchSearch = (u.username || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (u.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (u.fullName || '').toLowerCase().includes(searchTerm.toLowerCase());
+        const matchRole   = filterRole === 'all' || u.role === filterRole;
+        const matchStatus = filterStatus === 'all' || u.status === filterStatus;
+        return matchSearch && matchRole && matchStatus;
     });
 
-    const handleDelete = async (id: string) => {
-        if (!window.confirm('Are you sure you want to delete this user? This cannot be undone.')) return;
+    const handleDelete = async (id: string, role: string) => {
+        if (role === 'Super Admin') {
+            alert('The Super Admin account owner cannot be deleted.');
+            return;
+        }
+        if (!window.confirm('Delete this user? This cannot be undone.')) return;
         try {
             await systemUsersApi.delete(id);
             await fetchUsers();
         } catch (err: any) {
-            alert(err.message || 'Failed to delete user. Please make sure you have sufficient permissions.');
+            alert(err.message || 'Failed to delete user.');
         }
     };
 
-    const handleEdit = (user: any) => {
-        setEditingUserId(user.id);
+    const handleEdit = (user: SystemUser) => {
+        setEditingId(user.id);
         setNewUser({
             fullName: user.fullName || '',
-            phone: user.phone || '',
-            email: user.email || '',
-            city: '', subDistrict: '', ward: '',
-            role: user.role === 'SUPER_ADMIN' ? 'Super Admin' : user.role === 'ADMIN' ? 'Admin' : user.role === 'AGENT' ? 'Agent' : user.role === 'VIEWER' ? 'Viewer' : user.role || 'Admin',
-            status: user.status === 'ACTIVE' ? 'Active' : user.status === 'INACTIVE' ? 'Inactive' : user.status || 'Active',
+            phone:    user.phone || '',
+            email:    user.email || '',
+            role:     user.role || 'Agent',
+            status:   user.status || 'Active',
             username: user.username || '',
-            password: '', // Blank password implies no change
-            sendNotification: "Don't Send"
         });
+        setError('');
+        setSuccessMsg('');
         setShowAddUser(true);
     };
 
-    const handleView = (user: any) => {
+    const handleView = (user: SystemUser) => {
         alert(
-            `User Details:\n\n` +
-            `Username: ${user.username || 'N/A'}\n` +
-            `Email: ${user.email || 'N/A'}\n` +
-            `Phone: ${user.phone || 'N/A'}\n` +
-            `Role: ${user.role || 'N/A'}\n` +
-            `Status: ${user.status || 'N/A'}\n` +
-            `Last Login: ${formatDateTime(user.lastLogin) === 'N/A' ? 'Never' : formatDateTime(user.lastLogin)}`
+            `User Details\n\n` +
+            `Name:       ${user.fullName || 'N/A'}\n` +
+            `Username:   ${user.username || 'N/A'}\n` +
+            `Email:      ${user.email || 'N/A'}\n` +
+            `Phone:      ${user.phone || 'N/A'}\n` +
+            `Role:       ${user.role || 'N/A'}\n` +
+            `Status:     ${user.status || 'N/A'}\n` +
+            `Last Login: ${user.lastLogin ? formatDateTime(user.lastLogin) : 'Never'}`
         );
     };
 
     const handleSaveUser = async () => {
+        setIsSaving(true);
+        setError('');
+        setSuccessMsg('');
         try {
-            setIsSaving(true);
-            setError('');
-
-            const payload: any = { ...newUser };
-            if (editingUserId && !payload.password) {
-                delete payload.password; // Do not send blank password when editing
+            if (!newUser.username || !newUser.email) {
+                setError('Username and email are required.');
+                setIsSaving(false);
+                return;
             }
 
-            if (editingUserId) {
-                await systemUsersApi.update(editingUserId, payload);
+            if (editingId) {
+                await systemUsersApi.update(editingId, newUser);
+                setSuccessMsg('User updated successfully.');
             } else {
-                await systemUsersApi.create(payload);
+                const res: any = await systemUsersApi.create(newUser);
+                setSuccessMsg(res?.message || 'User created. A welcome email with login credentials has been sent.');
             }
 
             await fetchUsers();
-            setShowAddUser(false);
-            setEditingUserId(null);
-            setNewUser({ ...defaultNewUser });
+
+            // Keep the form open briefly to show success message, then close
+            setTimeout(() => {
+                setShowAddUser(false);
+                setEditingId(null);
+                setNewUser({ ...defaultNewUser });
+                setSuccessMsg('');
+            }, 2500);
         } catch (err: any) {
-            setError(err.message || 'Failed to save user');
+            setError(err.message || 'Failed to save user. Please try again.');
         } finally {
             setIsSaving(false);
         }
     };
 
+    const limitPct = meta ? Math.min(100, Math.round((meta.subUserCount / meta.subUserLimit) * 100)) : 0;
+    const limitReached = meta ? meta.subUserCount >= meta.subUserLimit : false;
+
+    // ── Add / Edit Form ─────────────────────────────────────────────────────────
     if (showAddUser) {
         return (
-            <div>
-                <div className="grid-2 gap-24">
-                    {/* Profile Section */}
+            <div style={{ maxWidth: 720, margin: '0 auto' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+                    <button
+                        onClick={() => { setShowAddUser(false); setEditingId(null); setNewUser({ ...defaultNewUser }); setError(''); }}
+                        style={{ background: '#f1f5f9', border: 'none', borderRadius: 8, padding: '6px 16px', cursor: 'pointer', fontWeight: 600, color: '#475569' }}
+                    >
+                        ← Back
+                    </button>
+                    <h2 style={{ margin: 0, fontWeight: 700, fontSize: '1.1rem' }}>
+                        {editingId ? 'Edit User' : 'Add New Team Member'}
+                    </h2>
+                </div>
+
+                {/* Temp password info banner — only on create */}
+                {!editingId && (
+                    <div style={{
+                        background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 10,
+                        padding: '12px 16px', marginBottom: 20, display: 'flex', gap: 10, alignItems: 'flex-start',
+                    }}>
+                        <InfoOutlinedIcon style={{ color: '#3b82f6', fontSize: 20, flexShrink: 0, marginTop: 2 }} />
+                        <div>
+                            <div style={{ fontWeight: 600, color: '#1d4ed8', fontSize: '0.88rem' }}>Temporary Password Will Be Sent</div>
+                            <div style={{ fontSize: '0.82rem', color: '#3b82f6', marginTop: 2 }}>
+                                A secure temporary password will be auto-generated and emailed to the user.
+                                They will be prompted to change it on first login.
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* User limit warning */}
+                {!editingId && limitReached && (
+                    <div style={{
+                        background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10,
+                        padding: '12px 16px', marginBottom: 20, color: '#dc2626', fontWeight: 600, fontSize: '0.88rem',
+                    }}>
+                        ⚠️ User limit reached ({meta?.subUserCount}/{meta?.subUserLimit} on {meta?.planName} plan).
+                        Please upgrade your plan to add more team members.
+                    </div>
+                )}
+
+                {error && (
+                    <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '10px 14px', marginBottom: 16, color: '#dc2626', fontSize: '0.85rem' }}>
+                        {error}
+                    </div>
+                )}
+                {successMsg && (
+                    <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '10px 14px', marginBottom: 16, color: '#16a34a', fontSize: '0.85rem', fontWeight: 600 }}>
+                        ✅ {successMsg}
+                    </div>
+                )}
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20 }}>
+                    {/* Profile Card */}
                     <div className="card" style={{ padding: 24 }}>
-                        <h3 style={{ color: 'var(--primary)', fontWeight: 600, fontSize: '0.9rem', marginBottom: 16 }}>Profile</h3>
-                        {error && <div style={{ color: 'red', marginBottom: 10, fontSize: '0.8rem' }}>{error}</div>}
-                        <div className="form-group" style={{ marginBottom: 16 }}>
-                            <label className="form-label" style={{ color: 'var(--primary)', fontWeight: 600 }}>Full Name</label>
-                            <input type="text" className="form-input" value={newUser.fullName} onChange={e => setNewUser({ ...newUser, fullName: e.target.value })} />
+                        <h3 style={{ color: 'var(--primary)', fontWeight: 700, fontSize: '0.9rem', marginBottom: 18, borderBottom: '1px solid var(--border-light)', paddingBottom: 8 }}>
+                            👤 Profile Information
+                        </h3>
+                        <div className="form-group" style={{ marginBottom: 14 }}>
+                            <label className="form-label">Full Name</label>
+                            <input type="text" className="form-input" value={newUser.fullName}
+                                onChange={e => setNewUser({ ...newUser, fullName: e.target.value })}
+                                placeholder="e.g. John Mwangi" />
                         </div>
-                        <div className="form-group" style={{ marginBottom: 16 }}>
-                            <label className="form-label" style={{ color: 'var(--primary)', fontWeight: 600 }}>Phone</label>
-                            <input type="text" className="form-input" value={newUser.phone} onChange={e => setNewUser({ ...newUser, phone: e.target.value })} />
+                        <div className="form-group" style={{ marginBottom: 14 }}>
+                            <label className="form-label">Phone Number</label>
+                            <input type="text" className="form-input" value={newUser.phone}
+                                onChange={e => setNewUser({ ...newUser, phone: e.target.value })}
+                                placeholder="e.g. 0712345678" />
                         </div>
-                        <div className="form-group" style={{ marginBottom: 16 }}>
-                            <label className="form-label" style={{ color: 'var(--primary)', fontWeight: 600 }}>Email</label>
-                            <input type="email" className="form-input" value={newUser.email} onChange={e => setNewUser({ ...newUser, email: e.target.value })} />
-                        </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
-                            <div className="form-group">
-                                <label className="form-label" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>City</label>
-                                <input type="text" className="form-input" placeholder="City" value={newUser.city} onChange={e => setNewUser({ ...newUser, city: e.target.value })} />
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Sub District</label>
-                                <input type="text" className="form-input" placeholder="Sub District" value={newUser.subDistrict} onChange={e => setNewUser({ ...newUser, subDistrict: e.target.value })} />
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Ward</label>
-                                <input type="text" className="form-input" placeholder="Ward" value={newUser.ward} onChange={e => setNewUser({ ...newUser, ward: e.target.value })} />
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                            <label className="form-label">Email Address <span style={{ color: '#e11d48' }}>*</span></label>
+                            <input type="email" className="form-input" value={newUser.email}
+                                onChange={e => setNewUser({ ...newUser, email: e.target.value })}
+                                placeholder="user@example.com" />
+                            <div style={{ fontSize: '0.73rem', color: 'var(--text-muted)', marginTop: 4 }}>
+                                Temporary password will be sent to this email
                             </div>
                         </div>
                     </div>
 
-                    {/* Credentials Section */}
+                    {/* Credentials Card */}
                     <div className="card" style={{ padding: 24 }}>
-                        <h3 style={{ color: 'var(--info)', fontWeight: 600, fontSize: '0.9rem', marginBottom: 16 }}>Credentials</h3>
-                        <div className="form-group" style={{ marginBottom: 16 }}>
-                            <label className="form-label" style={{ color: 'var(--primary)', fontWeight: 600 }}>User Type</label>
-                            <select className="form-select" value={newUser.role} onChange={e => setNewUser({ ...newUser, role: e.target.value })}>
-                                <option>Viewer</option>
-                                <option>Agent</option>
-                                <option>Admin</option>
-                                <option>Super Admin</option>
+                        <h3 style={{ color: 'var(--info, #0ea5e9)', fontWeight: 700, fontSize: '0.9rem', marginBottom: 18, borderBottom: '1px solid var(--border-light)', paddingBottom: 8 }}>
+                            🔑 Credentials & Role
+                        </h3>
+                        <div className="form-group" style={{ marginBottom: 14 }}>
+                            <label className="form-label">Username <span style={{ color: '#e11d48' }}>*</span></label>
+                            <input type="text" className="form-input" value={newUser.username}
+                                onChange={e => setNewUser({ ...newUser, username: e.target.value })}
+                                placeholder="e.g. johnmwangi" />
+                        </div>
+                        <div className="form-group" style={{ marginBottom: 14 }}>
+                            <label className="form-label">Role <span style={{ color: '#e11d48' }}>*</span></label>
+                            <select className="form-select" value={newUser.role}
+                                onChange={e => setNewUser({ ...newUser, role: e.target.value })}>
+                                {/* SUPER_ADMIN cannot be created here — only 1 per tenant */}
+                                <option value="Admin">Admin — Full access (no billing/settings)</option>
+                                <option value="Agent">Agent — Operational access</option>
+                                <option value="Viewer">Viewer — Same as Admin/Agent operational access</option>
                             </select>
+                            <div style={{ fontSize: '0.73rem', color: 'var(--text-muted)', marginTop: 4 }}>
+                                Super Admin is the account owner. Sub-users cannot be promoted to Super Admin.
+                            </div>
                         </div>
-                        <div className="form-group" style={{ marginBottom: 16 }}>
-                            <label className="form-label" style={{ color: 'var(--primary)', fontWeight: 600 }}>Username</label>
-                            <input type="text" className="form-input" value={newUser.username} onChange={e => setNewUser({ ...newUser, username: e.target.value })} />
-                        </div>
-                        <div className="form-group" style={{ marginBottom: 16 }}>
-                            <label className="form-label" style={{ color: 'var(--primary)', fontWeight: 600 }}>Password {editingUserId && "(Leave blank to keep current)"}</label>
-                            <input type="password" className="form-input" placeholder={editingUserId ? "••••••••" : ""} value={newUser.password} onChange={e => setNewUser({ ...newUser, password: e.target.value })} />
-                        </div>
-                        <div className="form-group" style={{ marginBottom: 16 }}>
-                            <label className="form-label" style={{ color: 'var(--primary)', fontWeight: 600 }}>Status</label>
-                            <select className="form-select" value={newUser.status} onChange={e => setNewUser({ ...newUser, status: e.target.value })}>
-                                <option>Active</option>
-                                <option>Inactive</option>
-                            </select>
-                        </div>
-                        <div className="form-group" style={{ marginBottom: 16 }}>
-                            <label className="form-label" style={{ color: 'var(--primary)', fontWeight: 600 }}>Send Notification</label>
-                            <select className="form-select" value={newUser.sendNotification} onChange={e => setNewUser({ ...newUser, sendNotification: e.target.value })}>
-                                <option>Don't Send</option>
-                                <option>By SMS</option>
-                                <option>By WhatsApp</option>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                            <label className="form-label">Status</label>
+                            <select className="form-select" value={newUser.status}
+                                onChange={e => setNewUser({ ...newUser, status: e.target.value })}>
+                                <option value="Active">Active</option>
+                                <option value="Inactive">Inactive</option>
                             </select>
                         </div>
                     </div>
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'center', marginTop: 20, gap: 12 }}>
-                    <button className="btn" style={{
-                        background: '#f1f5f9', color: '#475569', fontWeight: 600,
-                        padding: '10px 32px', fontSize: '0.95rem',
-                    }} onClick={() => {
-                        setShowAddUser(false);
-                        setEditingUserId(null);
-                        setNewUser({ ...defaultNewUser });
-                    }}>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 20, gap: 12 }}>
+                    <button
+                        onClick={() => { setShowAddUser(false); setEditingId(null); setNewUser({ ...defaultNewUser }); setError(''); }}
+                        style={{ background: '#f1f5f9', color: '#475569', fontWeight: 600, padding: '10px 28px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: '0.95rem' }}
+                    >
                         Cancel
                     </button>
-                    <button className="btn" style={{
-                        background: 'var(--primary)', color: '#fff', fontWeight: 700,
-                        padding: '10px 32px', fontSize: '0.95rem',
-                    }} onClick={handleSaveUser} disabled={isSaving}>
-                        {isSaving ? 'Saving...' : (editingUserId ? 'Update User' : 'Save User')}
+                    <button
+                        onClick={handleSaveUser}
+                        disabled={isSaving || (!editingId && limitReached)}
+                        style={{
+                            background: (!editingId && limitReached) ? '#9ca3af' : 'var(--primary)',
+                            color: '#fff', fontWeight: 700, padding: '10px 28px', borderRadius: 8,
+                            border: 'none', cursor: isSaving ? 'wait' : 'pointer', fontSize: '0.95rem',
+                        }}
+                    >
+                        {isSaving ? 'Saving...' : editingId ? 'Update User' : 'Create User & Send Email'}
                     </button>
                 </div>
             </div>
         );
     }
 
+    // ── Main List View ───────────────────────────────────────────────────────────
     return (
         <div>
-            {/* Breadcrumb and Title */}
-            <div style={{ marginBottom: 4 }}>
-                <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Administration</span>
-                <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}> ♦ </span>
-                <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Real-time Session Management</span>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
-                <h1 style={{ fontSize: '1.3rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <AdminPanelSettingsIcon /> User Management
-                </h1>
-                <div style={{ display: 'flex', gap: 8 }}>
-                    <button className="btn" onClick={fetchUsers} disabled={isRefreshing} style={{
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
+                <div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: 2 }}>
+                        Administration ♦ Team Management
+                    </div>
+                    <h1 style={{ fontSize: '1.3rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}>
+                        <AdminPanelSettingsIcon /> System Users
+                    </h1>
+                </div>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <button onClick={fetchUsers} disabled={isRefreshing} style={{
                         background: '#fff', color: '#e11d48', border: '1px solid #fecdd3',
-                        fontWeight: 600, padding: '6px 14px', display: 'flex', alignItems: 'center', gap: 4,
-                        opacity: isRefreshing ? 0.7 : 1, cursor: isRefreshing ? 'wait' : 'pointer'
+                        fontWeight: 600, padding: '7px 14px', borderRadius: 8, cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.85rem',
                     }}>
-                        <RefreshIcon fontSize="small" style={{ animation: isRefreshing ? 'spin 1s linear infinite' : 'none' }} /> {isRefreshing ? 'Refreshing...' : 'Refresh'}
+                        <RefreshIcon fontSize="small" style={{ animation: isRefreshing ? 'spin 1s linear infinite' : 'none' }} />
+                        {isRefreshing ? 'Refreshing...' : 'Refresh'}
                     </button>
-                    <button className="btn" style={{
-                        background: '#16a34a', color: '#fff', fontWeight: 600,
-                        padding: '6px 14px', display: 'flex', alignItems: 'center', gap: 4,
-                    }} onClick={() => setShowAddUser(true)}>
-                        <AddIcon fontSize="small" /> Add New User
+                    <button
+                        onClick={() => setShowAddUser(true)}
+                        disabled={limitReached}
+                        title={limitReached ? `User limit reached (${meta?.subUserCount}/${meta?.subUserLimit})` : 'Add new team member'}
+                        style={{
+                            background: limitReached ? '#9ca3af' : '#16a34a',
+                            color: '#fff', fontWeight: 600, padding: '7px 16px', borderRadius: 8,
+                            border: 'none', cursor: limitReached ? 'not-allowed' : 'pointer',
+                            display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.85rem',
+                        }}
+                    >
+                        <AddIcon fontSize="small" /> Add User
                     </button>
                 </div>
             </div>
 
-            {/* Online Status Bar */}
-            <div style={{
-                background: '#16a34a', borderRadius: 'var(--radius-sm)', padding: '6px 16px',
-                color: '#fff', fontWeight: 600, fontSize: '0.8rem', textAlign: 'center', marginBottom: 4,
-            }}>
-                Online
-            </div>
-            <div style={{ marginBottom: 16 }}>
-                <span style={{
-                    display: 'inline-block', background: '#16a34a', color: '#fff',
-                    padding: '2px 12px', borderRadius: '0 0 6px 6px', fontSize: '0.72rem', fontWeight: 500,
-                }}>
-                    {onlineUsersCount} Sessions
-                </span>
-            </div>
+            {/* User Limit Bar */}
+            {meta && (
+                <div className="card" style={{ padding: '14px 20px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+                    <GroupIcon style={{ color: 'var(--primary)', fontSize: 22 }} />
+                    <div style={{ flex: 1, minWidth: 200 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                            <span style={{ fontSize: '0.83rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                                Team Members ({meta.planName} Plan)
+                            </span>
+                            <span style={{ fontSize: '0.83rem', fontWeight: 700, color: limitReached ? '#dc2626' : 'var(--primary)' }}>
+                                {meta.subUserCount} / {meta.subUserLimit}
+                            </span>
+                        </div>
+                        <div style={{ background: '#e5e7eb', borderRadius: 99, height: 8, overflow: 'hidden' }}>
+                            <div style={{
+                                width: `${limitPct}%`, height: '100%', borderRadius: 99,
+                                background: limitPct >= 100 ? '#dc2626' : limitPct >= 80 ? '#f59e0b' : '#16a34a',
+                                transition: 'width 0.4s ease',
+                            }} />
+                        </div>
+                    </div>
+                    {limitReached && (
+                        <span style={{ fontSize: '0.78rem', color: '#dc2626', fontWeight: 600, background: '#fef2f2', padding: '3px 10px', borderRadius: 20, border: '1px solid #fecaca' }}>
+                            Limit reached — upgrade plan
+                        </span>
+                    )}
+                </div>
+            )}
 
             {/* Stats Row */}
             <div style={{
-                display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-                gap: 0, border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)',
+                display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+                gap: 0, border: '1px solid var(--border-light)', borderRadius: 10,
                 overflow: 'hidden', marginBottom: 20, background: '#fff',
             }}>
-                <div style={{ textAlign: 'center', padding: '16px 0', borderRight: '1px solid var(--border-light)' }}>
-                    <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Online Users</div>
+                <div style={{ textAlign: 'center', padding: '14px 0', borderRight: '1px solid var(--border-light)' }}>
+                    <div style={{ fontSize: '1.3rem', fontWeight: 700, color: 'var(--primary)' }}>{users.length}</div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Total Users</div>
                 </div>
-                <div style={{ textAlign: 'center', padding: '16px 0', borderRight: '1px solid var(--border-light)' }}>
-                    <div style={{ fontSize: '1.2rem', fontWeight: 700 }}>{onlineUsersCount}</div>
-                    <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Active Sessions</div>
+                <div style={{ textAlign: 'center', padding: '14px 0', borderRight: '1px solid var(--border-light)' }}>
+                    <div style={{ fontSize: '1.3rem', fontWeight: 700, color: '#16a34a' }}>{onlineCount}</div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Online Now</div>
                 </div>
-                <div style={{ textAlign: 'center', padding: '16px 0', borderRight: '1px solid var(--border-light)' }}>
-                    <div style={{ fontSize: '1.2rem', fontWeight: 700 }}>{SESSION_TIMEOUT_MINUTES}</div>
-                    <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Session Timeout (min)</div>
+                <div style={{ textAlign: 'center', padding: '14px 0', borderRight: '1px solid var(--border-light)' }}>
+                    <div style={{ fontSize: '1.3rem', fontWeight: 700, color: '#f59e0b' }}>{subUsers.length}</div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Sub-Users</div>
                 </div>
-                <div style={{ textAlign: 'center', padding: '16px 0' }}>
-                    <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#e11d48' }}>{currentTime}</div>
-                    <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Status Update</div>
+                <div style={{ textAlign: 'center', padding: '14px 0' }}>
+                    <div style={{ fontSize: '1rem', fontWeight: 700, color: '#e11d48', letterSpacing: '0.5px' }}>{currentTime}</div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Server Time</div>
                 </div>
             </div>
 
-
-
-            {/* User Table */}
+            {/* Table Card */}
             <div className="card">
-                <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-light)' }}>
-                    <h3 style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '1rem' }}>
-                        <AdminPanelSettingsIcon style={{ fontSize: 18 }} /> All Users
-                        <span style={{ fontSize: '0.85rem', fontWeight: 400, color: 'var(--text-secondary)' }}>
-                            with real-time session monitoring
-                        </span>
-                    </h3>
-                </div>
-
-                {/* Filters Row */}
+                {/* Filters */}
                 <div style={{
                     padding: '10px 16px', borderBottom: '1px solid var(--border-light)',
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8,
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    flexWrap: 'wrap', gap: 8,
                 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ fontSize: '0.82rem' }}>Show</span>
-                        <select className="select-field" value={entriesPerPage} onChange={e => setEntriesPerPage(Number(e.target.value))} style={{ width: 60 }}>
-                            <option value={10}>10</option>
-                            <option value={25}>25</option>
-                        </select>
-                        <span style={{ fontSize: '0.82rem' }}>entries</span>
-                    </div>
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                        <select className="select-field" value={filterRoles} onChange={e => setFilterRoles(e.target.value)} style={{ fontSize: '0.8rem', padding: '4px 8px' }}>
+                    <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.95rem' }}>
+                        <AdminPanelSettingsIcon style={{ fontSize: 18 }} /> All Team Members
+                    </h3>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                        <select value={filterRole} onChange={e => setFilterRole(e.target.value)}
+                            style={{ fontSize: '0.8rem', padding: '5px 8px', border: '1px solid var(--border)', borderRadius: 6, background: '#fff' }}>
                             <option value="all">All Roles</option>
                             <option value="Super Admin">Super Admin</option>
                             <option value="Admin">Admin</option>
                             <option value="Agent">Agent</option>
                             <option value="Viewer">Viewer</option>
                         </select>
-                        <select className="select-field" value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={{ fontSize: '0.8rem', padding: '4px 8px' }}>
+                        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
+                            style={{ fontSize: '0.8rem', padding: '5px 8px', border: '1px solid var(--border)', borderRadius: 6, background: '#fff' }}>
                             <option value="all">All Status</option>
                             <option value="Active">Active</option>
                             <option value="Inactive">Inactive</option>
                         </select>
-                        <input
-                            placeholder="Search users..."
-                            value={searchTerm}
-                            onChange={e => setSearchTerm(e.target.value)}
-                            style={{
-                                fontSize: '0.8rem', padding: '4px 8px', border: '1px solid var(--border)',
-                                borderRadius: 'var(--radius-sm)', width: 120,
-                            }}
-                        />
-                        <button style={{
-                            background: 'transparent', border: '1px solid var(--border)',
-                            borderRadius: 'var(--radius-sm)', padding: '4px 8px', cursor: 'pointer',
-                        }}>
-                            <SearchIcon style={{ fontSize: 14 }} />
-                        </button>
+                        <div style={{ position: 'relative' }}>
+                            <SearchIcon style={{ position: 'absolute', left: 7, top: '50%', transform: 'translateY(-50%)', fontSize: 15, color: 'var(--text-muted)' }} />
+                            <input
+                                value={searchTerm}
+                                onChange={e => setSearchTerm(e.target.value)}
+                                placeholder="Search users..."
+                                style={{
+                                    paddingLeft: 26, fontSize: '0.8rem', padding: '5px 8px 5px 26px',
+                                    border: '1px solid var(--border)', borderRadius: 6, width: 140, background: '#fff',
+                                }}
+                            />
+                        </div>
                     </div>
                 </div>
-
 
                 <div className="table-container">
                     <table className="data-table">
                         <thead>
                             <tr>
-                                <th>↕</th>
                                 <th>Avatar</th>
                                 <th>User</th>
-                                <th>↕ Contact</th>
+                                <th>Contact</th>
                                 <th>Role</th>
-                                <th>↕ Status</th>
-                                <th>↕ Online Status</th>
-                                <th>↕ Sessions</th>
+                                <th>Status</th>
+                                <th>Session</th>
                                 <th>Last Activity</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {filtered.map(user => (
-                                <tr key={user.id}>
-                                    <td></td>
-                                    <td>
-                                        <div style={{
-                                            width: 32, height: 32, borderRadius: '50%',
-                                            background: '#e5e7eb', display: 'flex',
-                                            alignItems: 'center', justifyContent: 'center',
-                                        }}>
-                                            <span style={{ fontSize: '0.7rem', color: '#6b7280' }}>👤</span>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <div>
-                                            <div style={{ fontWeight: 500 }}>{user.username}</div>
-                                            <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
-                                                📧 {user.email}
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <div style={{ fontSize: '0.82rem' }}>
-                                            <div>📱 {user.phone}</div>
-                                            <div>📧 {user.email}</div>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <span style={{
-                                            padding: '3px 10px', borderRadius: 4, fontWeight: 600, fontSize: '0.72rem',
-                                            background: '#7c3aed', color: '#fff',
-                                        }}>
-                                            {user.role}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <span style={{
-                                            padding: '3px 10px', borderRadius: 4, fontWeight: 500, fontSize: '0.72rem',
-                                            background: user.status === 'Active' ? '#d1fae5' : '#fee2e2',
-                                            color: user.status === 'Active' ? '#065f46' : '#dc2626',
-                                        }}>
-                                            {user.status === 'Active' ? '✓ Active' : '✕ Inactive'}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <span style={{
-                                            padding: '3px 10px', borderRadius: 4, fontWeight: 500, fontSize: '0.72rem',
-                                            background: isUserOnline(user.lastLogin) ? '#d1fae5' : '#fee2e2',
-                                            color: isUserOnline(user.lastLogin) ? '#065f46' : '#dc2626',
-                                        }}>
-                                            {isUserOnline(user.lastLogin) ? '1 Online' : '0 Offline'}
-                                        </span>
-                                    </td>
-                                    <td style={{ textAlign: 'center' }}>
-                                        <div style={{ fontWeight: 700, fontSize: '1.1rem' }}>{isUserOnline(user.lastLogin) ? 1 : 0}</div>
-                                        <div style={{ fontSize: '0.68rem', color: 'var(--text-secondary)' }}>SESSION</div>
-                                    </td>
-                                    <td>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                                            <AccessTimeIcon style={{ fontSize: 14 }} /> {user.lastLogin ? (formatDateTime(user.lastLogin) === 'N/A' ? 'Never' : formatDateTime(user.lastLogin)) : 'Never Logged In'}
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <div style={{ display: 'flex', gap: 4 }}>
-                                            <button className="btn-icon" style={{ background: '#f3f4f6' }} title="View" onClick={() => handleView(user)}>
-                                                <VisibilityIcon style={{ fontSize: 14 }} />
-                                            </button>
-                                            <button className="btn-icon edit" title="Edit" onClick={() => handleEdit(user)}>
-                                                <EditIcon style={{ fontSize: 14 }} />
-                                            </button>
-                                            <button
-                                                className="btn-icon delete"
-                                                title="Delete"
-                                                onClick={() => handleDelete(user.id)}
-                                            >
-                                                <DeleteIcon style={{ fontSize: 14 }} />
-                                            </button>
-                                        </div>
+                            {filtered.length === 0 && (
+                                <tr>
+                                    <td colSpan={8} style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '2rem', fontSize: '0.85rem' }}>
+                                        No users found
                                     </td>
                                 </tr>
-                            ))}
+                            )}
+                            {filtered.map(user => {
+                                const online = isUserOnline(user.lastLogin);
+                                const roleStyle = ROLE_COLORS[user.role] || { bg: '#f3f4f6', color: '#374151' };
+                                const initials = (user.fullName || user.username || '?')
+                                    .split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase();
+                                const isSuperAdmin = user.role === 'Super Admin';
+
+                                return (
+                                    <tr key={user.id}>
+                                        <td>
+                                            <div style={{
+                                                width: 36, height: 36, borderRadius: '50%',
+                                                background: roleStyle.bg, color: roleStyle.color,
+                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                fontWeight: 700, fontSize: '0.8rem',
+                                            }}>{initials}</div>
+                                        </td>
+                                        <td>
+                                            <div style={{ fontWeight: 600, fontSize: '0.88rem' }}>{user.fullName || user.username}</div>
+                                            <div style={{ fontSize: '0.73rem', color: 'var(--text-secondary)' }}>@{user.username}</div>
+                                        </td>
+                                        <td>
+                                            <div style={{ fontSize: '0.8rem' }}>
+                                                {user.email && <div>✉ {user.email}</div>}
+                                                {user.phone && <div>📱 {user.phone}</div>}
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <span style={{
+                                                padding: '3px 10px', borderRadius: 20, fontWeight: 600, fontSize: '0.72rem',
+                                                background: roleStyle.bg, color: roleStyle.color,
+                                            }}>
+                                                {user.role}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span style={{
+                                                padding: '3px 10px', borderRadius: 20, fontWeight: 500, fontSize: '0.72rem',
+                                                background: user.status === 'Active' ? '#d1fae5' : '#fee2e2',
+                                                color: user.status === 'Active' ? '#065f46' : '#dc2626',
+                                            }}>
+                                                {user.status === 'Active' ? '✓ Active' : '✕ Inactive'}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span style={{
+                                                padding: '3px 10px', borderRadius: 20, fontWeight: 500, fontSize: '0.72rem',
+                                                background: online ? '#d1fae5' : '#f3f4f6',
+                                                color: online ? '#065f46' : '#9ca3af',
+                                            }}>
+                                                {online ? '🟢 Online' : '⚪ Offline'}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                                                <AccessTimeIcon style={{ fontSize: 13 }} />
+                                                {user.lastLogin ? formatDateTime(user.lastLogin) : 'Never'}
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div style={{ display: 'flex', gap: 4 }}>
+                                                <button className="btn-icon" style={{ background: '#f3f4f6' }} title="View details" onClick={() => handleView(user)}>
+                                                    <VisibilityIcon style={{ fontSize: 14 }} />
+                                                </button>
+                                                <button className="btn-icon edit" title="Edit user" onClick={() => handleEdit(user)}>
+                                                    <EditIcon style={{ fontSize: 14 }} />
+                                                </button>
+                                                {!isSuperAdmin && (
+                                                    <button className="btn-icon delete" title="Delete user"
+                                                        onClick={() => handleDelete(user.id, user.role)}>
+                                                        <DeleteIcon style={{ fontSize: 14 }} />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
                         </tbody>
                     </table>
                 </div>
 
                 <div className="pagination">
                     <div className="pagination-info">
-                        Showing <span style={{ color: 'var(--primary)' }}>{filtered.length > 0 ? 1 : 0}</span> to <span style={{ color: 'var(--primary)' }}>{filtered.length}</span> of {users.length} entries
+                        Showing {filtered.length > 0 ? 1 : 0}–{filtered.length} of {users.length} users
                     </div>
                     <div className="pagination-buttons">
                         <button className="pagination-btn">Previous</button>
                         <button className="pagination-btn active">1</button>
                         <button className="pagination-btn">Next</button>
                     </div>
-                </div>
-
-                <div style={{ padding: '10px 16px', display: 'flex', gap: 4 }}>
-                    <button className="pagination-btn">Prev</button>
-                    <button className="pagination-btn active">1</button>
-                    <button className="pagination-btn">Next</button>
                 </div>
             </div>
         </div>

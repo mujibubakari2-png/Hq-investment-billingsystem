@@ -9,6 +9,13 @@ export interface AuthUser {
     role: string;
     phone?: string;
     fullName?: string;
+    tenantId?: string | null;
+    // BRAND-001: Tenant branding fields — set at login/register, used throughout UI
+    // so we never need a separate settings API call just to show the company name.
+    companyName?: string | null;
+    companyLogo?: string | null;
+    companyEmail?: string | null;
+    tenantSlug?: string | null;
 }
 
 export interface AuthState {
@@ -97,7 +104,7 @@ function logout() {
     notify();
 }
 
-/** Update the current user in-place (e.g. after profile edit) */
+/** Update the current user in-place (e.g. after profile edit or branding update) */
 function updateUser(partial: Partial<AuthUser>) {
     if (!state.user) return;
     const updated = { ...state.user, ...partial };

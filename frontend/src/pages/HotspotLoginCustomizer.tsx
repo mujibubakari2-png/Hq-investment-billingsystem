@@ -56,6 +56,7 @@ export default function HotspotLoginCustomizer() {
     const [saving, setSaving] = useState(false);
     const [saveSuccess, setSaveSuccess] = useState(false);
     const [saveError, setSaveError] = useState<string | null>(null);
+    const [syncStatus, setSyncStatus] = useState<{status: 'success' | 'error', message: string} | null>(null);
 
     // Live preview
     const [showPreview, setShowPreview] = useState(true);
@@ -716,8 +717,9 @@ export default function HotspotLoginCustomizer() {
         setSaving(true);
         setSaveSuccess(false);
         setSaveError(null);
+        setSyncStatus(null);
         try {
-            await hotspotSettingsApi.update({
+            const res = await hotspotSettingsApi.update({
                 routerId: selectedRouterId,
                 primaryColor,
                 accentColor,
@@ -730,7 +732,18 @@ export default function HotspotLoginCustomizer() {
                 customerCareNumber,
                 backendUrl
             });
+            
             setSaveSuccess(true);
+            
+            if (res.synced !== undefined) {
+                setSyncStatus({
+                    status: res.synced ? 'success' : 'error',
+                    message: res.synced 
+                        ? (res.syncMessage || 'Synced to MikroTik successfully.') 
+                        : (res.syncError ? `Sync failed: ${res.syncError}` : 'Failed to sync to MikroTik.')
+                });
+            }
+
             setTimeout(() => setSaveSuccess(false), 3000);
         } catch (err: any) {
             console.error('Failed to save settings:', err);
@@ -1291,6 +1304,33 @@ TROUBLESHOOTING:
                         {saveError && (
                             <div style={{ marginTop: 10, padding: '10px 14px', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, color: '#dc2626', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: 6 }}>
                                 ❌ {saveError}
+                            </div>
+                        )}
+                        {syncStatus && (
+                            <div style={{ 
+                                marginTop: 10, 
+                                padding: '10px 14px', 
+                                background: syncStatus.status === 'success' ? '#f0fdf4' : '#fffbeb', 
+                                border: `1px solid ${syncStatus.status === 'success' ? '#86efac' : '#fde68a'}`, 
+                                borderRadius: 8, 
+                                color: syncStatus.status === 'success' ? '#15803d' : '#b45309', 
+                                fontSize: '0.85rem', 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                justifyContent: 'space-between',
+                                gap: 6 
+                            }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    {syncStatus.status === 'success' ? '✅' : '⚠️'} {syncStatus.message}
+                                </div>
+                                {syncStatus.status === 'error' && (
+                                    <button 
+                                        onClick={handleSaveSettings}
+                                        style={{ background: 'transparent', border: '1px solid #fcd34d', borderRadius: 4, padding: '4px 8px', fontSize: '0.75rem', cursor: 'pointer', color: '#92400e', fontWeight: 600 }}
+                                    >
+                                        Retry Sync
+                                    </button>
+                                )}
                             </div>
                         )}
 

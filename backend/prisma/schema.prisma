@@ -20,11 +20,20 @@ model User {
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
   tenantId  String?
+  createdById String?
+  // isPlatformAdmin: true for HQ INVESTMENT platform operators (no tenantId).
+  // false (default) for all tenant owners and sub-users.
+  isPlatformAdmin Boolean @default(false)
+  auditLogs    AuditLog[]
+  createdUsers User[]  @relation("UserCreatedBy")
+  ownedTenants Tenant[] @relation("TenantOwner")
   expenses  Expense[]
+  createdBy User?      @relation("UserCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   tenant    Tenant?    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   vouchers  Voucher[]
 
   @@index([tenantId])
+  @@index([createdById])
   @@index([role])
   @@index([status])
   @@map("users")
@@ -437,6 +446,9 @@ model Tenant {
   name             String
   email            String            @unique
   phone            String?
+  slug             String            @unique
+  logoUrl          String?
+  ownerUserId      String?
   status           TenantStatus      @default(ACTIVE)
   planId           String
   trialStart       DateTime?
@@ -444,6 +456,7 @@ model Tenant {
   licenseExpiresAt DateTime?
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
+  branding         TenantBranding?
   clients          Client[]
   equipments       Equipment[]
   expenses         Expense[]
@@ -463,8 +476,12 @@ model Tenant {
   smsMessages      SmsMessage[]
   subscriptions    Subscription[]
   systemSettings   SystemSetting[]
+  settings         TenantSettings?
   tenantInvoices   TenantInvoice[]
+  tenantLicenses   TenantLicense[]
   tenantPayments   TenantPayment[]
+  tenantPaymentGateways TenantPaymentGateway[]
+  owner            User?             @relation("TenantOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
   plan             SaasPlan          @relation(fields: [planId], references: [id])
   transactions     Transaction[]
   userOtps         UserOtp[]
@@ -472,8 +489,91 @@ model Tenant {
   vouchers         Voucher[]
   vpnUsers         VpnUser[]
   webhookLogs      WebhookLog[]
+  auditLogs        AuditLog[]
 
+  @@index([ownerUserId])
   @@map("tenants")
+}
+
+model TenantBranding {
+  id           String   @id @default(cuid())
+  tenantId     String   @unique
+  companyName  String
+  companyLogo  String?
+  companyEmail String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("tenant_branding")
+}
+
+model TenantSettings {
+  id                 String   @id @default(cuid())
+  tenantId           String   @unique
+  defaultLocale      String   @default("en")
+  defaultTimezone    String   @default("Africa/Dar_es_Salaam")
+  enableSubdomain    Boolean  @default(true)
+  hotspotAutoSync    Boolean  @default(true)
+  settings           Json?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  tenant             Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("tenant_settings")
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  tenantId   String
+  userId     String
+  action     String   // e.g. "CREATE_USER", "DELETE_SUBSCRIBER", "UPDATE_SETTINGS"
+  resource   String   // e.g. "User", "Client", "Package"
+  resourceId String?  // ID of the affected resource
+  details    Json?    // Extra context (old values, new values, etc.)
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@index([userId])
+  @@index([action])
+  @@map("audit_logs")
+}
+
+
+model TenantPaymentGateway {
+  id          String        @id @default(cuid())
+  tenantId    String
+  provider    String
+  name        String
+  enabled     Boolean       @default(false)
+  status      ChannelStatus @default(INACTIVE)
+  config      Json?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  tenant      Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, provider])
+  @@map("tenant_payment_gateways")
+}
+
+model TenantLicense {
+  id        String              @id @default(cuid())
+  tenantId  String
+  planId    String
+  status    TenantInvoiceStatus @default(PENDING)
+  startsAt  DateTime?
+  expiresAt DateTime?
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+  tenant    Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  plan      SaasPlan            @relation(fields: [planId], references: [id])
+
+  @@index([tenantId, status])
+  @@map("tenant_licenses")
 }
 
 model SaasPlan {
@@ -484,6 +584,7 @@ model SaasPlan {
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
   invoices    TenantInvoice[]
+  licenses    TenantLicense[]
   tenants     Tenant[]
 
   @@map("saas_plans")

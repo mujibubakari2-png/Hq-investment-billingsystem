@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { errorResponse, jsonResponse } from "@/lib/auth";
-import nodemailer from "nodemailer";
+import { sendEmail } from "@/lib/email";
 import { env } from "@/lib/env";
 import { rateLimitMiddleware } from "@/middleware/rateLimiter";
 
@@ -93,35 +93,22 @@ export async function POST(req: NextRequest) {
 
         // Send activation email
         try {
-            if (env.SMTP_USER && env.SMTP_PASS) {
-                const transporter = nodemailer.createTransport({
-                    host: env.SMTP_HOST,
-                    port: Number(env.SMTP_PORT) || 587,
-                    secure: env.SMTP_SECURE,
-                    auth: {
-                        user: env.SMTP_USER,
-                        pass: env.SMTP_PASS,
-                    },
-                });
-
-                const mailOptions = {
-                    from: env.SMTP_FROM || '"HQ INVESTMENT Billing" <billing@hqinvestment.co.tz>',
-                    to: invoice.tenant.email,
-                    subject: "Payment Received & Account Activated",
-                    text: `Hello ${invoice.tenant.name},\n\nYour payment has been received. Your account has been successfully renewed and activated!\n\nLog in here: ${process.env.APP_URL || env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001'}/`,
-                    html: `
-                        <div style="font-family: sans-serif; padding: 20px;">
-                            <h2>Payment Received - Account Activated</h2>
-                            <p>Hello <strong>${invoice.tenant.name}</strong>,</p>
-                            <p>Your payment has been received.</p>
-                            <p>Your account has been successfully renewed and activated!</p>
-                            <a href="${process.env.APP_URL || env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001'}" style="background-color: #1d4ed8; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin-top: 10px;">Log In to Dashboard</a>
-                        </div>
-                    `,};
-
-                await transporter.sendMail(mailOptions);
-                console.log("Activation email sent successfully to", invoice.tenant.email);
-            }
+            const appUrl = process.env.APP_URL || env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001';
+            await sendEmail({
+                to: invoice.tenant.email,
+                subject: "Payment Received & Account Activated",
+                text: `Hello ${invoice.tenant.name},\n\nYour payment has been received. Your account has been successfully renewed and activated!\n\nLog in here: ${appUrl}/`,
+                html: `
+                    <div style="font-family: sans-serif; padding: 20px;">
+                        <h2>Payment Received - Account Activated</h2>
+                        <p>Hello <strong>${invoice.tenant.name}</strong>,</p>
+                        <p>Your payment has been received.</p>
+                        <p>Your account has been successfully renewed and activated!</p>
+                        <a href="${appUrl}" style="background-color: #1d4ed8; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin-top: 10px;">Log In to Dashboard</a>
+                    </div>
+                `,
+            });
+            console.log("Activation email sent successfully to", invoice.tenant.email);
         } catch (mailError) {
             console.error("Failed to send activation email:", mailError);
         }

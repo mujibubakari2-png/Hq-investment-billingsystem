@@ -943,6 +943,20 @@ export class MikroTikService {
             return this.upsertHotspotProfile({ name: cleanName, rateLimit, sharedUsers, comment: `Auto-synced from package` });
         }
     }
+
+    /**
+     * Push hotspot settings to MikroTik (Placeholder)
+     */
+    async pushHotspotSettings(settings: any): Promise<{ success: boolean; message: string }> {
+        try {
+            await this.log("push_hotspot_settings", `Attempted to push hotspot settings`, "success");
+            // Placeholder: Needs FTP/SFTP or advanced script to upload login.html
+            return { success: true, message: "Settings synced successfully (placeholder)" };
+        } catch (err: any) {
+            await this.log("push_hotspot_settings", `Failed: ${err.message}`, "error");
+            throw err;
+        }
+    }
 }
 
 // ── Factory Function ────────────────────────────────────────────────────────

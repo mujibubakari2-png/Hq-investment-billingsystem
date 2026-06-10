@@ -1,12 +1,13 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { hashPassword, jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
+import { canAccessTenant } from "@/lib/tenant";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
-        if (userPayload.role !== "SUPER_ADMIN" && userPayload.role !== "ADMIN") {
+        if (userPayload.role !== "SUPER_ADMIN") {
             return errorResponse("Forbidden", 403);
         }
 
@@ -23,9 +24,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
                 phone: true,
                 lastLogin: true,
                 createdAt: true,
+                tenantId: true,
+                createdById: true,
             },
         });
         if (!user) return errorResponse("User not found", 404);
+        if (!canAccessTenant(userPayload, user.tenantId)) return errorResponse("Forbidden", 403);
         return jsonResponse(user);
     } catch {
         return errorResponse("Internal server error", 500);
@@ -36,12 +40,21 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
-        if (userPayload.role !== "SUPER_ADMIN" && userPayload.role !== "ADMIN") {
+        if (userPayload.role !== "SUPER_ADMIN") {
             return errorResponse("Forbidden", 403);
         }
 
         const { id } = await params;
         const body = await req.json();
+        const existing = await prisma.user.findUnique({
+            where: { id },
+            select: { id: true, role: true, tenantId: true },
+        });
+        if (!existing) return errorResponse("User not found", 404);
+        if (!canAccessTenant(userPayload, existing.tenantId)) return errorResponse("Forbidden", 403);
+        if (existing.role === "SUPER_ADMIN" && existing.id !== userPayload.userId) {
+            return errorResponse("Cannot edit another tenant owner", 403);
+        }
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const data: any = {};
@@ -57,9 +70,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
                 Viewer: "VIEWER",
             };
             const mappedRole = roleMap[body.role] || body.role;
-            // Only SUPER_ADMIN can assign SUPER_ADMIN role
-            if (mappedRole === "SUPER_ADMIN" && userPayload.role !== "SUPER_ADMIN") {
-                return errorResponse("Forbidden: Only Super Admin can assign Super Admin role", 403);
+            if (mappedRole === "SUPER_ADMIN") {
+                return errorResponse("Each tenant has exactly one Super Admin owner.", 403);
             }
             data.role = mappedRole;
         }
@@ -79,7 +91,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         const user = await prisma.user.update({
             where: { id },
             data,
-            select: { id: true, username: true, fullName: true, email: true, role: true, status: true, phone: true },
+            select: { id: true, username: true, fullName: true, email: true, role: true, status: true, phone: true, tenantId: true },
         });
 
         return jsonResponse(user);
@@ -92,7 +104,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
-        if (userPayload.role !== "SUPER_ADMIN" && userPayload.role !== "ADMIN") {
+        if (userPayload.role !== "SUPER_ADMIN") {
             return errorResponse("Forbidden", 403);
         }
 
@@ -101,6 +113,16 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
         // Prevent self-deletion
         if (userPayload.userId === id) {
             return errorResponse("Cannot delete your own account", 400);
+        }
+
+        const existing = await prisma.user.findUnique({
+            where: { id },
+            select: { id: true, role: true, tenantId: true },
+        });
+        if (!existing) return errorResponse("User not found", 404);
+        if (!canAccessTenant(userPayload, existing.tenantId)) return errorResponse("Forbidden", 403);
+        if (existing.role === "SUPER_ADMIN") {
+            return errorResponse("Cannot delete the tenant owner", 403);
         }
 
         await prisma.user.delete({ where: { id } });

@@ -1,4 +1,3 @@
-import React from "react";
 import "./PaymentCheckout.css";
 
 export interface ProviderOption {

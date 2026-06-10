@@ -4,13 +4,17 @@ import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { getPaymentProvider } from "@/lib/payments/registry";
 import { formatPhoneTZ } from "@/lib/payments/utils";
+import { getJwtTenantId, isPlatformSuperAdmin } from "@/lib/tenant";
 
 export async function POST(req: NextRequest) {
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        if (userPayload.role !== "SUPER_ADMIN" || isPlatformSuperAdmin(userPayload)) {
+            return errorResponse("Forbidden: Only the tenant Super Admin can renew licenses", 403);
+        }
 
-        const tenantId = userPayload.tenantId;
+        const tenantId = getJwtTenantId(userPayload);
         if (!tenantId) return errorResponse("Tenant ID missing", 400);
 
         const body = await req.json();
@@ -34,6 +38,7 @@ export async function POST(req: NextRequest) {
                 where: { id: invoiceId }
             });
             if (!invoice) return errorResponse("Invoice not found", 404);
+            if (invoice.tenantId !== tenant.id) return errorResponse("Forbidden", 403);
         } else {
             // FIX: Avoid duplicating PENDING invoices. Delete any existing PENDING invoice before creating a new one.
             await prisma.tenantInvoice.deleteMany({
