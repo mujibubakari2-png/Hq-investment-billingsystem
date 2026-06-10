@@ -21,7 +21,6 @@ import BarChartIcon from '@mui/icons-material/BarChart';
 import PlayCircleIcon from '@mui/icons-material/PlayCircle';
 import ReceiptIcon from '@mui/icons-material/Receipt';
 import VpnKeyIcon from '@mui/icons-material/VpnKey';
-import BusinessIcon from '@mui/icons-material/Business';
 import CloseIcon from '@mui/icons-material/Close';
 
 import authStore from '../../stores/authStore';
