@@ -26,15 +26,10 @@ const PREFIX      = 'enc:v1:';
 function getKey(): Buffer {
   const hex = process.env.FIELD_ENCRYPTION_KEY;
   if (!hex) {
-    if (process.env.NODE_ENV === 'production') {
-      throw new Error(
-        'FATAL: FIELD_ENCRYPTION_KEY is required in production. ' +
-        'Generate one with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"'
-      );
-    }
-    // In development fall back to a fixed insecure key so app still starts
-    console.warn('[SECURITY] FIELD_ENCRYPTION_KEY not set — using insecure dev key. Set this in production!');
-    return Buffer.from('0000000000000000000000000000000000000000000000000000000000000000', 'hex');
+    throw new Error(
+      'FATAL: FIELD_ENCRYPTION_KEY is required in all environments. ' +
+      'Generate one with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"'
+    );
   }
   if (hex.length !== 64) {
     throw new Error('FIELD_ENCRYPTION_KEY must be a 64-character hex string (32 bytes).');

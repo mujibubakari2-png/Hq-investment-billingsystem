@@ -3,7 +3,12 @@ import prisma from "@/lib/prisma";
 import { errorResponse, jsonResponse, getUserFromRequest } from "@/lib/auth";
 
 // Environment variables or settings for PalmPesa API
-const PALMPESA_API_URL = process.env.PALMPESA_API_URL || "https://api.palmpesa.com/v1/payments/stk-push";
+const PALMPESA_BASE_URL = process.env.PALMPESA_API_URL;
+const PALMPESA_API_URL = PALMPESA_BASE_URL
+  ? (PALMPESA_BASE_URL.endsWith("/payments/stk-push")
+    ? PALMPESA_BASE_URL
+    : `${PALMPESA_BASE_URL}/payments/stk-push`)
+  : undefined;
 const PALMPESA_API_KEY = process.env.PALMPESA_API_KEY;
 
 export async function POST(req: NextRequest) {
@@ -51,6 +56,9 @@ export async function POST(req: NextRequest) {
             CallbackUrl: `${appUrl}/api/payments/palmpesa/webhook`,
         };
 
+        if (!PALMPESA_API_URL) {
+            return errorResponse("PalmPesa API URL is not configured", 500);
+        }
         if (!PALMPESA_API_KEY) {
             return errorResponse("PalmPesa API key is not configured", 500);
         }

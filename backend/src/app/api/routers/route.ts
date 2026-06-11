@@ -9,8 +9,8 @@ export async function GET(req: NextRequest) {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
 
-        const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
-        const tenantFilter = isSuperAdmin ? {} : { tenantId: userPayload.tenantId };
+        const isPlatformAdmin = userPayload.role === "SUPER_ADMIN" && !userPayload.tenantId;
+        const tenantFilter = isPlatformAdmin ? {} : { tenantId: userPayload.tenantId };
 
         const { searchParams } = new URL(req.url);
         const search = searchParams.get("search")?.toLowerCase() || "";
@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
             host: r.host,
             ip: r.host, // Alias
             username: r.username,
-            password: r.password,
+            // password omitted for security
             port: r.port,
             apiPort: r.apiPort,
             type: r.type,
@@ -79,11 +79,11 @@ export async function POST(req: NextRequest) {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
 
-        const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
+        const isPlatformAdmin = userPayload.role === "SUPER_ADMIN" && !userPayload.tenantId;
         const body = await req.json();
 
-        // Tenant isolation: always use token's tenantId unless super admin
-        const tenantIdValue = isSuperAdmin ? (body.tenantId || body.tenant_id || userPayload.tenantId) : userPayload.tenantId;
+        // Tenant isolation: always use token's tenantId unless platform admin
+        const tenantIdValue = isPlatformAdmin ? (body.tenantId || body.tenant_id || userPayload.tenantId) : userPayload.tenantId;
         const tenantFilter = { tenantId: tenantIdValue };
 
         const name = body.name || body.routerName || body.hostname || body.router_name || body.name;
@@ -153,10 +153,15 @@ export async function POST(req: NextRequest) {
             where: { tenantId: tenantIdValue, nasName: nasIp }
         });
 
+        const nasSecret = router.password || process.env.RADIUS_NAS_SECRET;
+        if (!nasSecret) {
+            return errorResponse("RADIUS NAS Secret cannot be determined. Set RADIUS_NAS_SECRET in environment.");
+        }
+
         if (existingNas) {
             await prisma.radiusNas.update({
                 where: { id: existingNas.id },
-                data: { secret: router.password || process.env.RADIUS_NAS_SECRET || 'hqinvestment_radius_secret', shortName: router.name }
+                data: { secret: nasSecret, shortName: router.name }
             });
         } else {
             // Also clean up old NAS entry if the IP changed
@@ -169,7 +174,7 @@ export async function POST(req: NextRequest) {
                 data: {
                     nasName: nasIp,
                     shortName: router.name,
-                    secret: router.password || process.env.RADIUS_NAS_SECRET || 'hqinvestment_radius_secret',
+                    secret: nasSecret,
                     type: "other",
                     tenantId: tenantIdValue,
                     description: "Auto-synced from Router"

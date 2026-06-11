@@ -36,9 +36,13 @@ export class PalmPesaProvider implements PaymentProvider {
   constructor(config: ProviderConfig) {
     if (!config.apiKey) throw new Error("PalmPesa: apiKey is required");
     this.apiKey = config.apiKey;
-    this.apiUrl = config.apiUrl ?? process.env.PALMPESA_API_URL ?? "https://api.palmpesa.com/v1";
+    const url = config.apiUrl ?? process.env.PALMPESA_API_URL;
+    if (!url) {
+      throw new Error("PalmPesa: API URL is not configured. Set PALMPESA_API_URL in environment variables or channel config.");
+    }
+    this.apiUrl = url;
     this.webhookSecret = config.webhookSecret ?? "";
-    this.environment = config.environment ?? "sandbox";
+    this.environment = process.env.NODE_ENV === 'production' ? "live" : (config.environment ?? "sandbox");
   }
 
   private get headers(): Record<string, string> {

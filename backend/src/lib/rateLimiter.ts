@@ -18,9 +18,14 @@ interface RateLimitConfig {
 
 const endpointLimits: Record<string, { anonymous: RateLimitConfig; user: RateLimitConfig; admin: RateLimitConfig }> = {
   '/api/auth/login': {
-    anonymous: { windowMs: 5 * 60 * 1000, maxRequests: 5,  message: 'Too many login attempts, try again later' },
-    user:      { windowMs: 5 * 60 * 1000, maxRequests: 20 },
-    admin:     { windowMs: 5 * 60 * 1000, maxRequests: 50 },
+    anonymous: { windowMs: 15 * 60 * 1000, maxRequests: 5, message: 'Too many login attempts' },
+    user:      { windowMs: 15 * 60 * 1000, maxRequests: 20 },
+    admin:     { windowMs: 15 * 60 * 1000, maxRequests: 50 },
+  },
+  '/api/auth/register/request-otp': {
+    anonymous: { windowMs: 15 * 60 * 1000, maxRequests: 3, message: 'Too many OTP requests' },
+    user:      { windowMs: 15 * 60 * 1000, maxRequests: 10 },
+    admin:     { windowMs: 15 * 60 * 1000, maxRequests: 20 },
   },
   '/api/auth/register': {
     anonymous: { windowMs: 60 * 60 * 1000, maxRequests: 3, message: 'Registration limit exceeded, try later' },
@@ -31,6 +36,12 @@ const endpointLimits: Record<string, { anonymous: RateLimitConfig; user: RateLim
     anonymous: { windowMs: 15 * 60 * 1000, maxRequests: 3, message: 'Too many password reset attempts' },
     user:      { windowMs: 15 * 60 * 1000, maxRequests: 10 },
     admin:     { windowMs: 15 * 60 * 1000, maxRequests: 20 },
+  },
+  '/api/webhooks': {
+    // Payment gateways can send bursts of webhooks, limit to 200 per minute per IP
+    anonymous: { windowMs: 60 * 1000, maxRequests: 200, message: 'Too many webhooks' },
+    user:      { windowMs: 60 * 1000, maxRequests: 200 },
+    admin:     { windowMs: 60 * 1000, maxRequests: 200 },
   },
 };
 

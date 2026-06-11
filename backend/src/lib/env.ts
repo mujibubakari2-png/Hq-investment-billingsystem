@@ -38,21 +38,21 @@ const envSchema = z.object({
   WEBHOOK_SECRET: z.string().optional(),
 
   // ─── PalmPesa ─────────────────────────────────────────────────────────────
-  PALMPESA_API_URL: z.string().url().default("https://api.palmpesa.com/v1"),
+  PALMPESA_API_URL: z.string().url().optional(),
   PALMPESA_API_KEY: z.string().optional(),
 
   // ─── ZenoPay ──────────────────────────────────────────────────────────────
-  ZENOPAY_API_URL: z.string().url().default("https://zenoapi.com/api"),
+  ZENOPAY_API_URL: z.string().url().optional(),
   ZENOPAY_API_KEY: z.string().optional(),
   ZENOPAY_ACCOUNT_ID: z.string().optional(),
 
   // ─── Mongike ──────────────────────────────────────────────────────────────
-  MONGIKE_API_URL: z.string().url().default("https://api.mongike.com/v1"),
+  MONGIKE_API_URL: z.string().url().optional(),
   MONGIKE_API_KEY: z.string().optional(),
   MONGIKE_API_SECRET: z.string().optional(),
 
   // ─── HarakaPay ────────────────────────────────────────────────────────────
-  HARAKAPAY_API_URL: z.string().url().default("https://api.harakapay.net/v1"),
+  HARAKAPAY_API_URL: z.string().url().optional(),
   HARAKAPAY_API_KEY: z.string().optional(),
   HARAKAPAY_API_SECRET: z.string().optional(),
 

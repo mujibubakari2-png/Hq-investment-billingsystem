@@ -42,12 +42,13 @@ export class MongikeProvider implements PaymentProvider {
     if (!config.apiKey) throw new Error("Mongike: apiKey is required");
     this.apiKey = config.apiKey;
     this.apiSecret = config.apiSecret ?? "";
-    this.apiUrl =
-      config.apiUrl ??
-      process.env.MONGIKE_API_URL ??
-      "https://api.mongike.com/v1";
+    const url = config.apiUrl ?? process.env.MONGIKE_API_URL;
+    if (!url) {
+      throw new Error("Mongike: API URL is not configured. Set MONGIKE_API_URL in environment variables or channel config.");
+    }
+    this.apiUrl = url;
     this.webhookSecret = config.webhookSecret ?? "";
-    this.environment = config.environment ?? "sandbox";
+    this.environment = process.env.NODE_ENV === 'production' ? "live" : (config.environment ?? "sandbox");
   }
 
   private get headers(): Record<string, string> {

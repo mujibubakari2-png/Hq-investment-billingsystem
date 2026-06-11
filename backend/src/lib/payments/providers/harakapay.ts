@@ -41,12 +41,13 @@ export class HarakaPayProvider implements PaymentProvider {
     if (!config.apiKey) throw new Error("HarakaPay: apiKey is required");
     this.apiKey = config.apiKey;
     this.apiSecret = config.apiSecret ?? "";
-    this.apiUrl =
-      config.apiUrl ??
-      process.env.HARAKAPAY_API_URL ??
-      "https://api.harakapay.net/v1";
+    const url = config.apiUrl ?? process.env.HARAKAPAY_API_URL;
+    if (!url) {
+      throw new Error("HarakaPay: API URL is not configured. Set HARAKAPAY_API_URL in environment variables or channel config.");
+    }
+    this.apiUrl = url;
     this.webhookSecret = config.webhookSecret ?? "";
-    this.environment = config.environment ?? "sandbox";
+    this.environment = process.env.NODE_ENV === 'production' ? "live" : (config.environment ?? "sandbox");
   }
 
   private get headers(): Record<string, string> {

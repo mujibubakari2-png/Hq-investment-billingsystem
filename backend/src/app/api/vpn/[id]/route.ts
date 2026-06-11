@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
+import { decrypt } from "@/lib/encryption";
 
 // DELETE /api/vpn/[id]
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -21,7 +22,8 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
             
             if (vpnUser.protocol === "WireGuard") {
                 // Delete peer by public key (stored in password) or comment
-                await mt.deleteWireGuardPeer(vpnUser.password || `VPN:${vpnUser.username}`);
+                const pk = decrypt(vpnUser.password) ?? vpnUser.password;
+                await mt.deleteWireGuardPeer(pk || `VPN:${vpnUser.username}`);
             } else {
                 await mt.deleteVpnUser(vpnUser.username);
             }

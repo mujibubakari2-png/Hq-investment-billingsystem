@@ -254,41 +254,49 @@ export class PaymentService {
         : { name: transaction.planName ?? "" },
     });
 
-    // Calculate expiry
-    // Bug #15 FIX: If the client already has an active, unexpired subscription for this
-    // package, extend from the current expiry date (stack time) instead of starting from
-    // now. This prevents customers losing days they already paid for on early renewal.
-    const now = new Date();
-    let baseDate = now;
 
-    if (pkg) {
-      const existingActiveSub = await prisma.subscription.findFirst({
-        where: {
-          clientId: transaction.clientId,
-          packageId: pkg.id,
-          status: "ACTIVE",
-          expiresAt: { gt: now },
-        },
-        orderBy: { expiresAt: "desc" },
-      });
-
-      if (existingActiveSub) {
-        baseDate = existingActiveSub.expiresAt;
-      }
-    }
-
-    const expiresAt = new Date(baseDate);
-    if (pkg) {
-      switch (pkg.durationUnit) {
-        case "MINUTES": expiresAt.setMinutes(expiresAt.getMinutes() + pkg.duration); break;
-        case "HOURS":   expiresAt.setHours(expiresAt.getHours() + pkg.duration); break;
-        case "DAYS":    expiresAt.setDate(expiresAt.getDate() + pkg.duration); break;
-        case "MONTHS":  expiresAt.setMonth(expiresAt.getMonth() + pkg.duration); break;
-      }
-    }
 
     // DB transaction: mark paid, create/extend subscription, activate client
-    const [, newSub] = await prisma.$transaction(async (tx) => {
+    let duplicateDetected = false;
+    const result = await prisma.$transaction(async (tx) => {
+      // Idempotency Lock: Re-fetch transaction to guarantee it hasn't been processed by a concurrent webhook
+      const currentTx = await tx.transaction.findUnique({
+        where: { id: transaction.id }
+      });
+      if (currentTx?.status === "COMPLETED") {
+        duplicateDetected = true;
+        return { updatedTx: null, sub: null };
+      }
+      const now = new Date();
+      let baseDate = now;
+
+      if (pkg) {
+        // Fetch existing active sub inside the transaction to prevent race conditions (MB-002)
+        const existingActiveSub = await tx.subscription.findFirst({
+          where: {
+            clientId: transaction.clientId,
+            packageId: pkg.id,
+            status: "ACTIVE",
+            expiresAt: { gt: now },
+          },
+          orderBy: { expiresAt: "desc" },
+        });
+
+        if (existingActiveSub) {
+          baseDate = existingActiveSub.expiresAt;
+        }
+      }
+
+      const expiresAt = new Date(baseDate);
+      if (pkg) {
+        switch (pkg.durationUnit) {
+          case "MINUTES": expiresAt.setMinutes(expiresAt.getMinutes() + pkg.duration); break;
+          case "HOURS":   expiresAt.setHours(expiresAt.getHours() + pkg.duration); break;
+          case "DAYS":    expiresAt.setDate(expiresAt.getDate() + pkg.duration); break;
+          case "MONTHS":  expiresAt.setMonth(expiresAt.getMonth() + pkg.duration); break;
+        }
+      }
+
       const updatedTx = await tx.transaction.update({
         where: { id: transaction.id },
         data: { status: "COMPLETED", expiryDate: expiresAt },
@@ -355,8 +363,23 @@ export class PaymentService {
         data: { status: "ACTIVE" },
       });
 
-      return [updatedTx, sub];
+      return { updatedTx, sub };
     });
+
+    if (duplicateDetected) {
+      await prisma.webhookLog.update({
+        where: { id: webhookLog.id },
+        data: { status: "DUPLICATE", processedAt: new Date() },
+      });
+      return {
+        processed: true,
+        transactionRef: parsed.transactionRef,
+        status: "COMPLETED",
+        message: "Already processed concurrently",
+      };
+    }
+
+    const { sub: newSub } = result;
 
     // 7. Sync RADIUS (E09: with compensation on failure)
     if (pkg) {
@@ -376,7 +399,7 @@ export class PaymentService {
           password: client.phone || client.username,
           tenantId: pkg.tenantId || null,
           fullName: client.fullName || undefined,
-          expiresAt,
+          expiresAt: (newSub as any).expiresAt,
           status: "Active",
           rateLimit,
           profileName: pkg.name,
@@ -401,7 +424,7 @@ export class PaymentService {
         const client = transaction.client;
         const pwd = client.phone || "123456";
         const type = client.serviceType === "HOTSPOT" ? "hotspot" : "pppoe";
-        await mikrotik.activateService(client.username, pwd, pkg.name, type, expiresAt);
+        await mikrotik.activateService(client.username, pwd, pkg.name, type, (newSub as any).expiresAt);
 
         if (newSub?.id) {
           await prisma.subscription.update({

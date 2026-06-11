@@ -8,7 +8,7 @@ import { sendAccountApprovedNotifications } from "@/lib/accountNotifications";
 export async function GET(req: NextRequest) {
     try {
         const userPayload = getUserFromRequest(req);
-        if (!userPayload || userPayload.role !== "SUPER_ADMIN") {
+        if (!userPayload || userPayload.role !== "SUPER_ADMIN" || userPayload.tenantId) {
             return errorResponse("Unauthorized", 403);
         }
 
@@ -48,7 +48,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
     try {
         const userPayload = getUserFromRequest(req);
-        if (!userPayload || userPayload.role !== "SUPER_ADMIN") {
+        if (!userPayload || userPayload.role !== "SUPER_ADMIN" || userPayload.tenantId) {
             return errorResponse("Unauthorized", 403);
         }
 
