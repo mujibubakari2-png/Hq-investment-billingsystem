@@ -61,7 +61,7 @@ fi
 
 # ── 2. Install dependencies ───────────────────────────────────────────────────
 step "Installing dependencies"
-pnpm install --frozen-lockfile
+pnpm install --no-frozen-lockfile
 ok "Dependencies installed"
 
 # Prevent Out-Of-Memory (OOM) errors during Next.js and Vite builds on smaller VPS instances
