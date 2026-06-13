@@ -41,13 +41,13 @@ module.exports = {
         NODE_ENV: 'production',
         NEXT_TELEMETRY_DISABLED: '1',
         HOSTNAME: '127.0.0.1',
-        PORT: '3000'
+        PORT: '3001'
       },
       env_production: {
         NODE_ENV: 'production',
         NEXT_TELEMETRY_DISABLED: '1',
         HOSTNAME: '127.0.0.1',
-        PORT: '3000'
+        PORT: '3001'
       }
     },
     {
@@ -71,13 +71,13 @@ module.exports = {
         NODE_ENV: 'production',
         NEXT_TELEMETRY_DISABLED: '1',
         HOSTNAME: '127.0.0.1',
-        PORT: '3001'
+        PORT: '3000'
       },
       env_production: {
         NODE_ENV: 'production',
         NEXT_TELEMETRY_DISABLED: '1',
         HOSTNAME: '127.0.0.1',
-        PORT: '3001'
+        PORT: '3000'
       }
     }
 
