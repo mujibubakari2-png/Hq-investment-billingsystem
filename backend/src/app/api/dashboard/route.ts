@@ -6,7 +6,9 @@ import { isPlatformSuperAdmin } from "@/lib/tenant";
 import { toISOSafe, toTimestampSafe, getStartOfTodayTZ, getStartOfMonthTZ } from "@/lib/dateUtils";
 import { Redis } from 'ioredis';
 
-const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
+  lazyConnect: true,
+});
 
 // Bug #5 FIX: Throttle RADIUS sync to at most once per 60 seconds across all PM2 instances
 const RADIUS_SYNC_INTERVAL_MS = 60_000;
