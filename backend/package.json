@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev --hostname 0.0.0.0 --port 3001",
-    "build": "prisma generate && node --max-old-space-size=1536 node_modules/next/dist/bin/next build",
-    "build:full": "prisma generate && node --max-old-space-size=1536 node_modules/next/dist/bin/next build",
+    "build": "prisma generate && next build",
+    "build:full": "prisma generate && next build",
     "start": "next start --hostname 127.0.0.1 --port ${PORT:-3000}",
     "start:droplet": "bash scripts/droplet-start.sh",
     "next:start": "next start --hostname 127.0.0.1 --port ${PORT:-3000}",

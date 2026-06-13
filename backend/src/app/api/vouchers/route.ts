@@ -116,7 +116,7 @@ export async function POST(req: NextRequest) {
         const tenantIdValue = isSuperAdmin ? pkg.tenantId : currentUser.tenantId;
 
         // Ensure code is unique for friendly error message
-        const exists = await db.voucher.findUnique({ where: { code: finalCode } });
+        const exists = await db.voucher.findFirst({ where: { code: finalCode, tenantId: tenantIdValue } });
         if (exists) return errorResponse("Voucher code already exists", 409);
 
         const voucher = await db.voucher.create({

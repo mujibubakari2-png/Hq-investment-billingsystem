@@ -118,7 +118,7 @@ export async function POST(req: NextRequest) {
       const username = sanitizeMikroTikName(`HS-${cleanPhone.slice(-10)}`);
       let finalUsername = username;
       let suffix = 1;
-      while (await prisma.client.findUnique({ where: { username: finalUsername } })) {
+      while (await prisma.client.findFirst({ where: { username: finalUsername, tenantId: pkg.tenantId } })) {
         finalUsername = `${username}-${suffix}`;
         suffix++;
       }

@@ -19,8 +19,8 @@ export async function POST(req: NextRequest) {
         }
 
         // Find the voucher
-        const voucher = await prisma.voucher.findUnique({
-            where: { code },
+        const voucher = await prisma.voucher.findFirst({
+            where: { code, status: "UNUSED" },
             include: { package: true },
         });
 

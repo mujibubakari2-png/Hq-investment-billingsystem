@@ -134,15 +134,15 @@ export async function POST(req: NextRequest) {
         //  Always use token's tenantId — SUPER_ADMIN should use /api/admin/clients for cross-tenant ops
         const tenantIdValue = userPayload.tenantId;
 
-        const existing = await prisma.client.findUnique({ where: { username } });
+        if (!tenantIdValue) {
+            return errorResponse("Tenant ID is required", 400);
+        }
+
+        const existing = await prisma.client.findFirst({ where: { username, tenantId: tenantIdValue } });
 
         // Always reject duplicate usernames — removed unsafe dev-mode bypass
         if (existing) {
             return errorResponse("Username already exists", 409);
-        }
-
-        if (!tenantIdValue) {
-            return errorResponse("Tenant ID is required", 400);
         }
 
         const tenant = await prisma.tenant.findUnique({
