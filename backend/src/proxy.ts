@@ -15,7 +15,7 @@ export function proxy(request: NextRequest) {
     const origin = request.headers.get("origin");
     const pathname = new URL(request.url).pathname;
     const allowedOrigins = getAllowedOrigins();
-    const isAllowedOrigin = !!origin && allowedOrigins.includes(origin);
+    const isAllowedOrigin = !!origin && (allowedOrigins.includes("*") || allowedOrigins.includes(origin));
     const isPublicHotspotApi = pathname.startsWith("/api/hotspot/");
 
     // Handle preflight requests

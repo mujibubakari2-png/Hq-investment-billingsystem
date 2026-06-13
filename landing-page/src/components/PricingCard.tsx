@@ -6,7 +6,7 @@ interface PricingCardProps {
     id: string;
     name: string;
     price: string;
-    clientLimit: number;
+    pppoeLimit: number;
     features: string[];
     tier: "basic" | "standard" | "professional" | "enterprise";
     isPopular?: boolean;
@@ -52,7 +52,7 @@ export default function PricingCard({
     id,
     name,
     price,
-    clientLimit,
+    pppoeLimit,
     features,
     tier,
     isPopular,
@@ -121,7 +121,7 @@ export default function PricingCard({
                     >
                         <Users size={16} style={{ color: cfg.accent }} className="mb-1" />
                         <span className="text-lg font-extrabold" style={{ color: cfg.accent }}>
-                            {clientLimit.toLocaleString()}
+                            {(pppoeLimit || 0).toLocaleString()}
                         </span>
                         <span className="text-xs text-gray-500 leading-tight">PPPoE connections</span>
                     </div>

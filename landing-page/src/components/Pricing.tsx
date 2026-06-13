@@ -6,7 +6,7 @@ interface SaasPlan {
     id: string;
     name: string;
     price: number;
-    clientLimit: number;
+    pppoeLimit: number;
 }
 
 // ── Feature matrix per tier ─────────────────────────────────────────────────
@@ -75,7 +75,7 @@ function toCardTier(tier: keyof typeof TIER_FEATURES): "basic" | "standard" | "p
 function buildFeatures(plan: SaasPlan, index: number, total: number): string[] {
     const key = getTierKey(index, total);
     return TIER_FEATURES[key].map((f) =>
-        f.replace("{limit}", plan.clientLimit.toLocaleString())
+        f.replace("{limit}", (plan.pppoeLimit || 0).toLocaleString())
     );
 }
 
@@ -128,8 +128,8 @@ export default function Pricing() {
                                     key={plan.id}
                                     id={plan.id}
                                     name={plan.name}
-                                    price={plan.price.toLocaleString()}
-                                    clientLimit={plan.clientLimit}
+                                    price={(plan.price || 0).toLocaleString()}
+                                    pppoeLimit={plan.pppoeLimit || 0}
                                     features={buildFeatures(plan, index, plans.length)}
                                     tier={toCardTier(tier)}
                                     isPopular={index === popularIndex}
