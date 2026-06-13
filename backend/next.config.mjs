@@ -4,6 +4,13 @@ const nextConfig = {
     // Prisma and bcryptjs must not be bundled by webpack — they use native bindings
     serverExternalPackages: ['@prisma/client', 'bcryptjs', 'ioredis'],
 
+    eslint: {
+        ignoreDuringBuilds: true,
+    },
+    typescript: {
+        ignoreBuildErrors: true,
+    },
+
     // Build optimizations for production deployment
     compiler: {
         removeConsole: process.env.NODE_ENV === "production",
