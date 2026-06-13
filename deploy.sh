@@ -124,14 +124,18 @@ fi
 # ── 4. Build backend ─────────────────────────────────────────────────────────
 if [ "$FRONTEND_ONLY" = false ]; then
     step "Building backend"
-    pnpm --filter backend build 2>&1 | tee -a "$LOG_FILE" || fail "Backend build failed"
+    BUILD_DIR=.next-temp pnpm --filter backend build 2>&1 | tee -a "$LOG_FILE" || fail "Backend build failed"
+    rm -rf backend/.next
+    mv backend/.next-temp backend/.next
     ok "Backend built"
 fi
 
 # ── 5. Build landing page ─────────────────────────────────────────────────────
 if [ "$BACKEND_ONLY" = false ]; then
     step "Building landing page"
-    pnpm --filter landing-page build 2>&1 | tee -a "$LOG_FILE" || fail "Landing page build failed"
+    BUILD_DIR=.next-temp pnpm --filter landing-page build 2>&1 | tee -a "$LOG_FILE" || fail "Landing page build failed"
+    rm -rf landing-page/.next
+    mv landing-page/.next-temp landing-page/.next
     ok "Landing page built"
 fi
 

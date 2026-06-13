@@ -1,6 +1,7 @@
 // CORS is handled by src/proxy.ts (the single source of truth).
 // Do not add CORS headers here to avoid conflicting/duplicate headers.
 const nextConfig = {
+    distDir: process.env.BUILD_DIR || '.next',
     // Prisma and bcryptjs must not be bundled by webpack — they use native bindings
     serverExternalPackages: ['@prisma/client', 'bcryptjs', 'ioredis'],
 

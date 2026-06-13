@@ -10,7 +10,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start --hostname 127.0.0.1 --port ${PORT:-3001}",
+    "start": "next start --hostname 127.0.0.1 --port ${PORT:-3000}",
     "lint": "next lint"
   },
   "dependencies": {
