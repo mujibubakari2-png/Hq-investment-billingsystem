@@ -9,6 +9,9 @@ import { Redis } from 'ioredis';
 const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
   lazyConnect: true,
 });
+redis.on('error', (err) => {
+  console.error('[Redis Error in dashboard route]:', err.message);
+});
 
 // Bug #5 FIX: Throttle RADIUS sync to at most once per 60 seconds across all PM2 instances
 const RADIUS_SYNC_INTERVAL_MS = 60_000;

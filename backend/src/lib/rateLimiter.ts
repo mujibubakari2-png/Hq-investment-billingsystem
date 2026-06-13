@@ -13,6 +13,9 @@ import { Redis } from 'ioredis';
 const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
   lazyConnect: true,
 });
+redis.on('error', (err) => {
+  logger.warn('Redis rateLimiter error', { error: err.message });
+});
 
 interface RateLimitConfig {
   windowMs: number;
