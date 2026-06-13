@@ -64,6 +64,9 @@ step "Installing dependencies"
 pnpm install --frozen-lockfile
 ok "Dependencies installed"
 
+# Prevent Out-Of-Memory (OOM) errors during Next.js and Vite builds on smaller VPS instances
+export NODE_OPTIONS="--max-old-space-size=1024"
+
 # ── 2.5. Environment Check ────────────────────────────────────────────────────
 step "Checking for environment variables"
 MISSING_ENV=false
