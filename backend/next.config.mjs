@@ -1,10 +1,6 @@
 // CORS is handled by src/proxy.ts (the single source of truth).
 // Do not add CORS headers here to avoid conflicting/duplicate headers.
 const nextConfig = {
-    // DO-004: Standalone output bundles only the necessary files for Docker
-    // The resulting .next/standalone/server.js is completely self-contained
-    output: 'standalone',
-
     // Prisma and bcryptjs must not be bundled by webpack — they use native bindings
     serverExternalPackages: ['@prisma/client', 'bcryptjs', 'ioredis'],
 
