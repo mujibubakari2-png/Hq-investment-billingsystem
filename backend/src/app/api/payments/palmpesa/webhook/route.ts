@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
 
         // Send activation email
         try {
-            const appUrl = process.env.APP_URL || env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001';
+            const appUrl = process.env.APP_URL || env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
             await sendEmail({
                 to: invoice.tenant.email,
                 subject: "Payment Received & Account Activated",

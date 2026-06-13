@@ -80,7 +80,7 @@ export function buildCallbackUrl(provider: string, req?: Request, baseUrl?: stri
   if (!env.APP_URL && process.env.NODE_ENV === "production" && !baseUrl) {
     console.error(
       "[PAYMENT] CRITICAL: APP_URL is not set in production. " +
-      "Webhook callback URLs will resolve to http://localhost:3001 and payment confirmations " +
+      "Webhook callback URLs will resolve to http://localhost:3000 and payment confirmations " +
       "will never arrive. Set APP_URL=https://yourdomain.com in your production .env file."
     );
   }
@@ -90,11 +90,11 @@ export function buildCallbackUrl(provider: string, req?: Request, baseUrl?: stri
     env.APP_URL ??
     (() => {
       if (req) {
-        const host = req.headers.get("host") || "localhost:3001";
+        const host = req.headers.get("host") || "localhost:3000";
         const proto = req.headers.get("x-forwarded-proto") || "http";
         return `${proto}://${host}`;
       }
-      return "http://localhost:3001";
+      return "http://localhost:3000";
     })();
 
   return `${base}/api/webhooks/${provider.toLowerCase()}`;

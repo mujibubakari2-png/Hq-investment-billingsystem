@@ -25,7 +25,7 @@ module.exports = {
       cwd: `${PROJECT_DIR}/backend`,
       script: 'node_modules/next/dist/bin/next',
       interpreter: 'node',
-      args: 'start --hostname 127.0.0.1 --port 3001',
+      args: 'start --hostname 127.0.0.1 --port 3000',
       instances: 1,
       exec_mode: 'fork',
       watch: false,
@@ -41,13 +41,13 @@ module.exports = {
         NODE_ENV: 'production',
         NEXT_TELEMETRY_DISABLED: '1',
         HOSTNAME: '127.0.0.1',
-        PORT: '3001'
+        PORT: '3000'
       },
       env_production: {
         NODE_ENV: 'production',
         NEXT_TELEMETRY_DISABLED: '1',
         HOSTNAME: '127.0.0.1',
-        PORT: '3001'
+        PORT: '3000'
       }
     },
     {
@@ -55,7 +55,7 @@ module.exports = {
       cwd: `${PROJECT_DIR}/landing-page`,
       script: 'node_modules/next/dist/bin/next',
       interpreter: 'node',
-      args: 'start --hostname 127.0.0.1 --port 3000',
+      args: 'start --hostname 127.0.0.1 --port 3001',
       instances: 1,
       exec_mode: 'fork',
       watch: false,
@@ -71,13 +71,13 @@ module.exports = {
         NODE_ENV: 'production',
         NEXT_TELEMETRY_DISABLED: '1',
         HOSTNAME: '127.0.0.1',
-        PORT: '3000'
+        PORT: '3001'
       },
       env_production: {
         NODE_ENV: 'production',
         NEXT_TELEMETRY_DISABLED: '1',
         HOSTNAME: '127.0.0.1',
-        PORT: '3000'
+        PORT: '3001'
       }
     }
 

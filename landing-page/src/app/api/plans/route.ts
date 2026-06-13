@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 // GET /api/plans — Fetch SaaS plans from backend and expose to landing page
 export async function GET() {
     try {
-        const backendUrl = process.env.BACKEND_API_URL || 'http://localhost:3001';
+        const backendUrl = process.env.BACKEND_API_URL || 'http://localhost:3000';
         const res = await fetch(`${backendUrl}/api/saas-plans`, {
             cache: 'no-store',
             headers: { 'Content-Type': 'application/json' },

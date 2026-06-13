@@ -105,7 +105,7 @@ Webhook URLs to register with each provider:
 | HarakaPay | `https://your-server.com/api/webhooks/harakapay` |
 
 > **⚠️ Important:** Webhooks must be reachable from the internet.  
-> During local development, use [ngrok](https://ngrok.com): `ngrok http 3001`
+> During local development, use [ngrok](https://ngrok.com): `ngrok http 3000`
 
 ---
 
