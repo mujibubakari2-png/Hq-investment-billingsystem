@@ -21,7 +21,7 @@ set -euo pipefail  # exit on error, undefined var, or pipe failure
 # ── Configuration ─────────────────────────────────────────────────────────────
 PROJECT_DIR="/var/www/Hq-investment-billingsystem"
 LOG_FILE="$PROJECT_DIR/logs/deploy.log"
-GIT_BRANCH="main"
+GIT_BRANCH="master"
 TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S %Z')
 
 mkdir -p "$PROJECT_DIR/logs"
