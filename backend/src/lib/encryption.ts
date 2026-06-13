@@ -2,7 +2,7 @@
  * Field-Level Encryption Utility
  *
  * Encrypts sensitive fields before storing in DB (router passwords,
- * payment API keys, WireGuard private keys) and decrypts on read.
+ * payment API keys, WireGuard private keys, VPN user passwords) and decrypts on read.
  *
  * Algorithm: AES-256-GCM (authenticated encryption — detects tampering)
  * Key source: FIELD_ENCRYPTION_KEY env var (32-byte hex string)
@@ -85,7 +85,6 @@ export function isEncrypted(value: string | null | undefined): boolean {
 
 /**
  * Encrypt a Router record's sensitive fields before saving to DB.
- * Usage: const safeData = encryptRouterFields({ password, wgPrivateKey, wgPresharedKey });
  */
 export function encryptRouterFields(data: {
   password?: string | null;
@@ -145,5 +144,34 @@ export function decryptPaymentChannelFields<T extends {
     apiKey:        decrypt(channel.apiKey),
     apiSecret:     decrypt(channel.apiSecret),
     webhookSecret: decrypt(channel.webhookSecret),
+  };
+}
+
+// ── DB-004 FIX: VPN User password encryption ──────────────────────────────────
+//
+// VpnUser.password was previously stored in plaintext. A database dump would
+// expose all VPN credentials. Now encrypted with the same AES-256-GCM scheme.
+
+/**
+ * Encrypt a VpnUser record's sensitive fields before saving to DB.
+ */
+export function encryptVpnUserFields(data: {
+  password?: string | null;
+}) {
+  return {
+    ...data,
+    ...(data.password !== undefined && { password: encrypt(data.password) }),
+  };
+}
+
+/**
+ * Decrypt a VpnUser record's sensitive fields after reading from DB.
+ */
+export function decryptVpnUserFields<T extends {
+  password?: string | null;
+}>(vpnUser: T): T {
+  return {
+    ...vpnUser,
+    password: decrypt(vpnUser.password),
   };
 }

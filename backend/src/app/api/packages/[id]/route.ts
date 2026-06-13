@@ -1,13 +1,18 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
-import { jsonResponse, errorResponse } from "@/lib/auth";
+import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { getMikroTikService } from "@/lib/mikrotik";
+import { getTenantClient } from "@/lib/tenantPrisma";
 
 // GET /api/packages/[id]
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
+        const userPayload = getUserFromRequest(req);
+        if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
+
         const { id } = await params;
-        const pkg = await prisma.package.findUnique({
+        const pkg = await db.package.findUnique({
             where: { id },
             include: { router: true },
         });
@@ -21,15 +26,19 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 // PUT /api/packages/[id]
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
+        const userPayload = getUserFromRequest(req);
+        if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
+
         const { id } = await params;
         const body = await req.json();
 
         const routerId = body.routerId || body.router;
         const router = routerId
-            ? await prisma.router.findFirst({ where: { OR: [{ id: routerId }, { name: routerId }] } })
+            ? await db.router.findFirst({ where: { OR: [{ id: routerId }, { name: routerId }] } })
             : null;
 
-        const pkg = await prisma.package.update({
+        const pkg = await db.package.update({
             where: { id },
             data: {
                 name: body.name,
@@ -64,7 +73,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
                     pkg.type === "PPPOE" ? "pppoe" : "hotspot",
                     pkg.devices || 1,
                 );
-                await prisma.routerLog.create({
+                await db.routerLog.create({
                     data: {
                         routerId: pkg.routerId,
                         tenantId: pkg.tenantId,
@@ -74,7 +83,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
                     }
                 });
             } catch (err: any) {
-                await prisma.routerLog.create({
+                await db.routerLog.create({
                     data: {
                         routerId: pkg.routerId,
                         tenantId: pkg.tenantId,
@@ -93,15 +102,19 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 }
 
 // DELETE /api/packages/[id]
-export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
+        const userPayload = getUserFromRequest(req);
+        if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
+
         const { id } = await params;
         
         // Manual cascade delete to handle foreign key constraints
-        await prisma.$transaction([
-            prisma.subscription.deleteMany({ where: { packageId: id } }),
-            prisma.voucher.deleteMany({ where: { packageId: id } }),
-            prisma.package.delete({ where: { id } })
+        await db.$transaction([
+            db.subscription.deleteMany({ where: { packageId: id } }),
+            db.voucher.deleteMany({ where: { packageId: id } }),
+            db.package.delete({ where: { id } })
         ]);
 
         return jsonResponse({ message: "Package deleted successfully" });

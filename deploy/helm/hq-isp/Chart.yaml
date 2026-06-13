@@ -1,0 +1,6 @@
+apiVersion: v2
+name: hq-isp
+description: A Helm chart for HQ INVESTMENT ISP Platform (Next.js, Vite, Postgres, Redis)
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

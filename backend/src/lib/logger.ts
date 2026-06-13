@@ -1,14 +1,19 @@
 /**
  * Structured Logger
  *
- * Replaces scattered console.log/warn/error calls with a consistent,
- * levelled, JSON-structured logger suitable for production log aggregation
- * (e.g. DigitalOcean Papertrail, Logtail, Datadog).
+ * DO-002 FIX: Added BetterStack (Logtail) transport for production log aggregation.
+ * When LOGTAIL_SOURCE_TOKEN is set, all log entries are streamed to BetterStack
+ * in addition to stdout — providing searchable, persistent logs with alerting.
  *
  * Usage:
  *   import logger from '@/lib/logger';
  *   logger.info('User logged in', { userId, tenantId });
  *   logger.error('Payment failed', { error: err.message, ref });
+ *
+ * Setup:
+ *   1. Create a source in BetterStack → https://betterstack.com/logs
+ *   2. Copy the Source Token → add to .env: LOGTAIL_SOURCE_TOKEN=<token>
+ *   3. Deploy — logs will appear in BetterStack dashboard within seconds
  */
 
 type LogLevel = 'debug' | 'info' | 'warn' | 'error';
@@ -27,14 +32,39 @@ const LEVELS: Record<LogLevel, number> = {
   error: 3,
 };
 
-// In production log at info+; in development log everything
 const MIN_LEVEL: LogLevel =
-  process.env.LOG_LEVEL as LogLevel ??
+  (process.env.LOG_LEVEL as LogLevel) ??
   (process.env.NODE_ENV === 'production' ? 'info' : 'debug');
 
 function shouldLog(level: LogLevel): boolean {
   return LEVELS[level] >= LEVELS[MIN_LEVEL];
 }
+
+// ── BetterStack Transport ─────────────────────────────────────────────────────
+// DO-002 FIX: Send logs to BetterStack (Logtail) when token is configured.
+// Uses fire-and-forget (no await) so it never blocks the request path.
+// Batching and retries are handled server-side by BetterStack's ingest.
+
+const LOGTAIL_TOKEN = process.env.LOGTAIL_SOURCE_TOKEN;
+const LOGTAIL_URL = 'https://in.logtail.com';
+
+function sendToLogtail(entry: LogEntry): void {
+  if (!LOGTAIL_TOKEN || process.env.NODE_ENV !== 'production') return;
+
+  // Fire-and-forget: we intentionally don't await this
+  fetch(LOGTAIL_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${LOGTAIL_TOKEN}`,
+    },
+    body: JSON.stringify(entry),
+  }).catch(() => {
+    // Silently swallow Logtail errors — never break the application for logging
+  });
+}
+
+// ── Core write function ───────────────────────────────────────────────────────
 
 function write(level: LogLevel, message: string, meta?: Record<string, unknown>): void {
   if (!shouldLog(level)) return;
@@ -43,11 +73,13 @@ function write(level: LogLevel, message: string, meta?: Record<string, unknown>)
     timestamp: new Date().toISOString(),
     level,
     message,
+    service: 'hq-investment-isp',
+    env: process.env.NODE_ENV ?? 'development',
     ...meta,
   };
 
+  // 1. Always write to stdout (PM2 captures this)
   const line = JSON.stringify(entry);
-
   switch (level) {
     case 'debug':
     case 'info':
@@ -60,7 +92,12 @@ function write(level: LogLevel, message: string, meta?: Record<string, unknown>)
       console.error(line);
       break;
   }
+
+  // 2. DO-002: Forward to BetterStack in production
+  sendToLogtail(entry);
 }
+
+// ── Logger API ────────────────────────────────────────────────────────────────
 
 const logger = {
   debug: (message: string, meta?: Record<string, unknown>) => write('debug', message, meta),
@@ -87,6 +124,14 @@ const logger = {
   /** Log a MikroTik operation */
   mikrotik: (action: string, host: string, meta?: Record<string, unknown>) =>
     write('info', `[MIKROTIK] ${action} → ${host}`, { type: 'mikrotik', host, ...meta }),
+
+  /** Log a security event (auth failures, RBAC violations, SSRF blocks) */
+  security: (event: string, meta?: Record<string, unknown>) =>
+    write('warn', `[SECURITY] ${event}`, { type: 'security', ...meta }),
+
+  /** Log a RADIUS sync event */
+  radius: (event: string, meta?: Record<string, unknown>) =>
+    write('info', `[RADIUS] ${event}`, { type: 'radius', ...meta }),
 };
 
 export default logger;

@@ -6,9 +6,11 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
 import logger from '@/lib/logger';
 import { getUserFromRequest } from '@/lib/auth';
+import { Redis } from 'ioredis';
+
+const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
 
 interface RateLimitConfig {
   windowMs: number;
@@ -80,7 +82,7 @@ function getConfig(path: string, role: 'admin' | 'user' | 'anonymous'): RateLimi
 }
 
 /**
- * Check rate limit against the database.
+ * Check rate limit against Redis.
  * Returns null if OK, or a 429 NextResponse if the limit is exceeded.
  */
 export async function checkRateLimit(
@@ -92,23 +94,19 @@ export async function checkRateLimit(
     const role   = getRole(req);
     const config = getConfig(path, role);
     const key    = `rl:${path}:${getClientKey(req, userId)}`;
-    const now    = new Date();
-
-    const record = await prisma.rateLimit.findUnique({ where: { key } });
-
-    if (!record || record.resetAt <= now) {
-      await prisma.rateLimit.upsert({
-        where:  { key },
-        create: { key, count: 1, resetAt: new Date(now.getTime() + config.windowMs) },
-        update: { count: 1,      resetAt: new Date(now.getTime() + config.windowMs) },
-      });
-      return null;
+    
+    const count = await redis.incr(key);
+    if (count === 1) {
+      await redis.pexpire(key, config.windowMs);
     }
+    
+    const ttlMs = await redis.pttl(key);
+    const resetAt = Date.now() + (ttlMs > 0 ? ttlMs : config.windowMs);
 
-    if (record.count >= config.maxRequests) {
-      const retryAfter = Math.ceil((record.resetAt.getTime() - now.getTime()) / 1000);
+    if (count > config.maxRequests) {
+      const retryAfter = Math.ceil(ttlMs / 1000);
       const message    = config.message ?? `Rate limit exceeded. Retry in ${retryAfter}s`;
-      logger.warn('Rate limit exceeded', { key, count: record.count, path });
+      logger.warn('Rate limit exceeded', { key, count, path });
       return NextResponse.json(
         { error: message, code: 'RATE_LIMIT_EXCEEDED' },
         {
@@ -117,17 +115,16 @@ export async function checkRateLimit(
             'Retry-After':           String(retryAfter),
             'X-RateLimit-Limit':     String(config.maxRequests),
             'X-RateLimit-Remaining': '0',
-            'X-RateLimit-Reset':     String(Math.ceil(record.resetAt.getTime() / 1000)),
+            'X-RateLimit-Reset':     String(Math.ceil(resetAt / 1000)),
           },
         },
       );
     }
 
-    await prisma.rateLimit.update({ where: { key }, data: { count: { increment: 1 } } });
     return null;
   } catch (err: unknown) {
-    // Fail open or use in-memory fallback if DB is temporarily unavailable
-    logger.error('Rate limiter DB error — using in-memory fallback', {
+    // Fail open or use in-memory fallback if Redis is temporarily unavailable
+    logger.error('Rate limiter Redis error — using in-memory fallback', {
       error: err instanceof Error ? err.message : String(err),
     });
 
@@ -164,7 +161,7 @@ export async function checkRateLimit(
   }
 }
 
-// In-memory fallback map for when DB is down
+// In-memory fallback map for when Redis is down
 const memoryRateLimitStore = new Map<string, { count: number; resetAt: number }>();
 
 // Cleanup in-memory store periodically to avoid memory leaks
@@ -179,13 +176,10 @@ setInterval(() => {
 
 /**
  * Cleanup expired rate limit records.
- * Call this from /api/cron or a scheduled job.
+ * Redis handles expiration automatically, so this is a no-op.
  */
 export async function cleanupExpiredRateLimits(): Promise<number> {
-  const result = await prisma.rateLimit.deleteMany({
-    where: { resetAt: { lte: new Date() } },
-  });
-  return result.count;
+  return 0;
 }
 
 // ── Legacy compatibility exports (used by src/middleware/rateLimiter.ts) ───────

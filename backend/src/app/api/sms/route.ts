@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { getTenantFilter, getAssignTenantId } from "@/lib/tenant";
@@ -8,6 +9,7 @@ export async function GET(req: NextRequest) {
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
 
         const { filter } = getTenantFilter(userPayload);
 
@@ -31,23 +33,23 @@ export async function GET(req: NextRequest) {
         }
 
         const [messages, total] = await Promise.all([
-            prisma.smsMessage.findMany({
+            db.smsMessage.findMany({
                 where,
                 include: { client: { select: { username: true, fullName: true } } },
                 orderBy: { sentAt: "desc" },
                 skip,
                 take: limit,
             }),
-            prisma.smsMessage.count({ where }),
+            db.smsMessage.count({ where }),
         ]);
 
         // Compute summaries
         const allWhere = { ...filter };
         const [totalAll, totalSent, totalFailed, totalPending] = await Promise.all([
-            prisma.smsMessage.count({ where: allWhere }),
-            prisma.smsMessage.count({ where: { ...allWhere, status: "SENT" } }),
-            prisma.smsMessage.count({ where: { ...allWhere, status: "FAILED" } }),
-            prisma.smsMessage.count({ where: { ...allWhere, status: "PENDING" } }),
+            db.smsMessage.count({ where: allWhere }),
+            db.smsMessage.count({ where: { ...allWhere, status: "SENT" } }),
+            db.smsMessage.count({ where: { ...allWhere, status: "FAILED" } }),
+            db.smsMessage.count({ where: { ...allWhere, status: "PENDING" } }),
         ]);
 
         return jsonResponse({
@@ -68,6 +70,7 @@ export async function POST(req: NextRequest) {
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
 
         const tenantId = getAssignTenantId(userPayload);
         const body = await req.json();
@@ -76,7 +79,7 @@ export async function POST(req: NextRequest) {
             return errorResponse("Recipient and message are required");
         }
 
-        const sms = await prisma.smsMessage.create({
+        const sms = await db.smsMessage.create({
             data: {
                 clientId: body.clientId || null,
                 recipient: body.recipient,

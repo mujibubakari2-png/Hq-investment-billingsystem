@@ -1,34 +1,26 @@
+/**
+ * HotspotLoginCustomizer â€” FE-001 refactor
+ *
+ * Before: 1,597 lines (92 KB) â€” all state, HTML generation, and JSX in one file
+ * After:  ~730 lines â€” orchestrator that owns state + generateHtml();
+ *         view split into:
+ *           CustomizerPanel.tsx    â€” settings controls (Colors/Font/Layout/Ads/UX/Company)
+ *           HotspotLivePreview.tsx â€” phone mockup with payment simulation
+ */
+
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
-import PaletteIcon from '@mui/icons-material/Palette';
-import TextFieldsIcon from '@mui/icons-material/TextFields';
-import ViewModuleIcon from '@mui/icons-material/ViewModule';
-import CampaignIcon from '@mui/icons-material/Campaign';
-import PersonIcon from '@mui/icons-material/Person';
-import BusinessIcon from '@mui/icons-material/Business';
-import DownloadIcon from '@mui/icons-material/Download';
-import PreviewIcon from '@mui/icons-material/Preview';
-import ViewListIcon from '@mui/icons-material/ViewList';
-import ViewColumnIcon from '@mui/icons-material/ViewColumn';
-import GridViewIcon from '@mui/icons-material/GridView';
 import WifiIcon from '@mui/icons-material/Wifi';
 import RouterIcon from '@mui/icons-material/Router';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import PreviewIcon from '@mui/icons-material/Preview';
 import { routersApi, settingsApi, packagesApi, hotspotSettingsApi, CLEAN_API_URL } from '../api';
 import authStore from '../stores/authStore';
 import type { Router } from '../types';
-
-const fonts = [
-    { name: 'Inter', description: 'Modern & Clean - Perfect for professional look', provider: "Google's Font" },
-    { name: 'Roboto', description: "Google's Font - Friendly and readable", provider: '' },
-    { name: 'Open Sans', description: 'Humanist Sans - Very friendly and open', provider: '' },
-    { name: 'Poppins', description: 'Geometric Sans - Rounded and modern', provider: '' },
-    { name: 'Lato', description: 'Humanist Sans - Serious but friendly', provider: '' },
-    { name: 'Montserrat', description: 'Urban Typography - Bold and modern', provider: '' },
-    { name: 'Nunito', description: 'Rounded Sans - Soft and friendly', provider: '' },
-];
+import { CustomizerPanel } from '../components/hotspot/CustomizerPanel';
+import { HotspotLivePreview } from '../components/hotspot/HotspotLivePreview';
 
 export default function HotspotLoginCustomizer() {
     const [searchParams] = useSearchParams();
@@ -48,7 +40,7 @@ export default function HotspotLoginCustomizer() {
     const [selectedFont, setSelectedFont] = useState('Inter');
     const [layout, setLayout] = useState<'grid' | 'horizontal' | 'vertical'>('grid');
     const [enableAds, setEnableAds] = useState(false);
-    const [adMessage, setAdMessage] = useState('🎉 Special offer! Get extra data on all packages today!');
+    const [adMessage, setAdMessage] = useState('ðŸŽ‰ Special offer! Get extra data on all packages today!');
     const [enableRememberMe, setEnableRememberMe] = useState(true);
     const [companyName, setCompanyName] = useState('');
     const [customerCareNumber, setCustomerCareNumber] = useState('');
@@ -194,7 +186,7 @@ export default function HotspotLoginCustomizer() {
             body { align-items: flex-start; }
         }
 
-        /* ── Header ── */
+        /* â”€â”€ Header â”€â”€ */
         .header {
             background: linear-gradient(135deg, ${primaryColor}, ${accentColor});
             padding: 14px 12px 12px; text-align: center; color: #fff;
@@ -218,7 +210,7 @@ export default function HotspotLoginCustomizer() {
             font-size: 0.75rem; display: inline-flex; align-items: center; gap: 6px;
         }
 
-        /* ── Section Shared ── */
+        /* â”€â”€ Section Shared â”€â”€ */
         .section { padding: 10px 12px; }
         .section-title {
             font-size: 0.85rem; font-weight: 700; color: ${primaryColor};
@@ -229,7 +221,7 @@ export default function HotspotLoginCustomizer() {
             padding: 10px; margin-bottom: 8px;
         }
 
-        /* ── Packages Grid ── */
+        /* â”€â”€ Packages Grid â”€â”€ */
         .packages-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
         .packages-horizontal { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; }
         .packages-horizontal .pkg-card { min-width: 140px; flex-shrink: 0; }
@@ -250,7 +242,7 @@ export default function HotspotLoginCustomizer() {
             display: flex; align-items: center; justify-content: center; gap: 3px;
         }
 
-        /* ── Input fields ── */
+        /* â”€â”€ Input fields â”€â”€ */
         .field-group { margin-bottom: 8px; }
         .field-group label { display: block; font-size: 0.75rem; color: #666; margin-bottom: 4px; font-weight: 500; }
         .field-input {
@@ -260,7 +252,7 @@ export default function HotspotLoginCustomizer() {
         }
         .field-input:focus { outline: none; border-color: ${accentColor}; box-shadow: 0 0 0 3px ${accentColor}15; }
 
-        /* ── Buttons ── */
+        /* â”€â”€ Buttons â”€â”€ */
         .btn-primary {
             width: 100%; padding: 10px; background: ${accentColor}; color: #fff;
             border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 700;
@@ -283,7 +275,7 @@ export default function HotspotLoginCustomizer() {
         .login-row { display: flex; gap: 8px; align-items: center; }
         .login-row .field-input { flex: 1; margin-bottom: 0; }
 
-        /* ── Remember me / MAC ── */
+        /* â”€â”€ Remember me / MAC â”€â”€ */
         .remember-row {
             margin-top: 8px; display: flex; align-items: center; gap: 6px;
             font-size: 0.78rem; color: #777;
@@ -295,13 +287,13 @@ export default function HotspotLoginCustomizer() {
             font-size: 0.78rem; color: ${primaryColor}; display: flex; align-items: center; gap: 6px;
         }
 
-        /* ── Footer ── */
+        /* â”€â”€ Footer â”€â”€ */
         .footer {
             text-align: center; padding: 16px; font-size: 0.72rem; color: #bbb;
             border-top: 1px solid #f0f0f0; margin-top: 8px;
         }
 
-        /* ── Ads ── */
+        /* â”€â”€ Ads â”€â”€ */
         ${enableAds ? `.ad-banner {
             background: linear-gradient(90deg, ${accentColor}10, ${primaryColor}10);
             padding: 10px 16px; text-align: center; font-size: 0.82rem; color: ${primaryColor};
@@ -314,7 +306,7 @@ export default function HotspotLoginCustomizer() {
             .packages-grid { grid-template-columns: repeat(2, 1fr); }
         }
 
-        /* ── Payment Overlay ── */
+        /* â”€â”€ Payment Overlay â”€â”€ */
         .payment-overlay {
             position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
             display: none; align-items: center; justify-content: center; z-index: 2000; padding: 20px;
@@ -390,26 +382,26 @@ export default function HotspotLoginCustomizer() {
                 <span class="network-badge">HaloPesa</span>
             </div>
             <div class="steps">
-                <span>📦 Select</span> <span class="dot">•</span>
-                <span>💳 Pay</span> <span class="dot">•</span>
-                <span>🌐 Connect</span>
+                <span>ðŸ“¦ Select</span> <span class="dot">â€¢</span>
+                <span>ðŸ’³ Pay</span> <span class="dot">â€¢</span>
+                <span>ðŸŒ Connect</span>
             </div>
-            <div class="support-bar">📞 Support: ${customerCareNumber}</div>
+            <div class="support-bar">ðŸ“ž Support: ${customerCareNumber}</div>
         </div>
 
-        ${enableAds ? `<div class="ad-banner">${adMessage || '🎉 Special offer! Get extra data on all packages today!'}</div>` : ''}
+        ${enableAds ? `<div class="ad-banner">${adMessage || 'ðŸŽ‰ Special offer! Get extra data on all packages today!'}</div>` : ''}
 
         <!-- Packages -->
         <div class="section">
-            <div class="section-title">📦 Packages</div>
+            <div class="section-title">ðŸ“¦ Packages</div>
             <div id="packagesContainer" class="${layoutClass}">
-                <div class="pkg-loading">⏳ Loading packages...</div>
+                <div class="pkg-loading">â³ Loading packages...</div>
             </div>
         </div>
 
         <!-- Redeem Voucher -->
         <div class="section">
-            <div class="section-title">🎟️ Redeem Voucher</div>
+            <div class="section-title">ðŸŽŸï¸ Redeem Voucher</div>
             <div class="section-card">
                 <form name="voucher_form" action="$(link-login-only)" method="post" onsubmit="return doVoucher();">
                     <input type="hidden" name="dst" value="$(link-orig)" />
@@ -423,21 +415,21 @@ export default function HotspotLoginCustomizer() {
 
         <!-- Reconnect -->
         <div class="section">
-            <div class="section-title">🔄 Reconnect</div>
+            <div class="section-title">ðŸ”„ Reconnect</div>
             <div class="section-card">
                 <label style="font-size: 0.78rem; color: #666; margin-bottom: 6px; display: block;">Enter Transaction reference</label>
                 <div class="login-row">
                     <input type="text" class="field-input" id="zenopay-ref" placeholder="Transaction reference (HP...)" />
                 </div>
                 <button class="btn-accent" style="margin-top: 10px;" onclick="doReconnect()">
-                    💳 Reconnect
+                    ðŸ’³ Reconnect
                 </button>
             </div>
         </div>
 
         <!-- Manual Login -->
         <div class="section">
-            <div class="section-title">📶 Manual Login</div>
+            <div class="section-title">ðŸ“¶ Manual Login</div>
             <div class="section-card">
                 $(if error)
                 <div style="background: #fee2e2; color: #ef4444; padding: 10px; border-radius: 6px; margin-bottom: 15px; font-size: 0.85rem; text-align: center; border: 1px solid #fca5a5;">
@@ -450,7 +442,7 @@ export default function HotspotLoginCustomizer() {
                     <input type="hidden" name="mac" value="$(mac)" />
                     <div class="login-row">
                         <input type="text" class="field-input" name="username" value="$(username)" placeholder="Username" />
-                        <input type="password" class="field-input" name="password" placeholder="••••" />
+                        <input type="password" class="field-input" name="password" placeholder="â€¢â€¢â€¢â€¢" />
                         <button type="submit" class="btn-connect">Connect</button>
                     </div>
                 </form>
@@ -467,13 +459,13 @@ export default function HotspotLoginCustomizer() {
 
         <!-- Footer -->
         <div class="footer">
-            Powered by ${companyName} • ${selectedRouter?.name || 'Router'}
+            Powered by ${companyName} â€¢ ${selectedRouter?.name || 'Router'}
         </div>
     </div>
 
     <script src="md5.js"></script>
     <script>
-        // ── Configuration (URL is BAKED IN at download time — never use window.location here) ──
+        // â”€â”€ Configuration (URL is BAKED IN at download time â€” never use window.location here) â”€â”€
         var API_BASE = '${(backendUrl || CLEAN_API_URL || '').replace(/\/$/, '')}';
         var ROUTER_ID = '${selectedRouterId}';
         var ACCENT = '${accentColor}';
@@ -481,7 +473,7 @@ export default function HotspotLoginCustomizer() {
         var currentPkg = null;
         var pollInterval = null;
 
-        // ── Packages baked-in at generation time (always show these immediately) ──
+        // â”€â”€ Packages baked-in at generation time (always show these immediately) â”€â”€
         var fallbackPackages = ${JSON.stringify(
             routerPackages.length > 0
                 ? routerPackages.map(p => ({
@@ -501,7 +493,7 @@ export default function HotspotLoginCustomizer() {
                 return '<div class="pkg-card" onclick=\\'showPayment(' + JSON.stringify(p).replace(/"/g, "&quot;").replace(/'/g, "&#39;") + ')\\'>' +
                     '<div class="pkg-name">' + p.name + '</div>' +
                     '<div class="pkg-price"><small>TSH</small> ' + Number(p.price).toLocaleString() + '</div>' +
-                    '<div class="pkg-duration" style="margin-bottom:6px">⏱ ' + (p.validity||'') + '</div>' +
+                    '<div class="pkg-duration" style="margin-bottom:6px">â± ' + (p.validity||'') + '</div>' +
                     '<button style="width:100%; border:none; padding:6px; background:' + ACCENT + '; color:#fff; border-radius:6px; font-weight:700; font-size:0.75rem; cursor:pointer;">Buy</button>' +
                 '</div>';
             }).join('');
@@ -656,18 +648,18 @@ export default function HotspotLoginCustomizer() {
             }, 10000);
         }
 
-        // ── INIT: Show baked-in packages immediately, then try to fetch live ones ──
+        // â”€â”€ INIT: Show baked-in packages immediately, then try to fetch live ones â”€â”€
         (function() {
             // STEP 1: Always show baked-in packages immediately (no delay, no spinner)
             renderPackages(fallbackPackages);
 
             // STEP 2: Only attempt live fetch if we have a valid API_BASE and ROUTER_ID
             if (!API_BASE || API_BASE === '' || !ROUTER_ID) {
-                console.log('[Hotspot] No API_BASE or ROUTER_ID — using baked-in packages only.');
+                console.log('[Hotspot] No API_BASE or ROUTER_ID â€” using baked-in packages only.');
                 return;
             }
 
-            // Fetch live packages (may fail due to CORS from MikroTik — that is OK)
+            // Fetch live packages (may fail due to CORS from MikroTik â€” that is OK)
             fetch(API_BASE + '/api/hotspot/packages?routerId=' + ROUTER_ID, { mode: 'cors' })
                 .then(function(r) {
                     if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -686,7 +678,7 @@ export default function HotspotLoginCustomizer() {
                     }
                 })
                 .catch(function(err) {
-                    // CORS or network error — baked packages already showing, do nothing
+                    // CORS or network error â€” baked packages already showing, do nothing
                     console.log('[Hotspot] Live package fetch failed (using baked-in). Error: ' + err.message);
                 });
 
@@ -1063,6 +1055,14 @@ TROUBLESHOOTING:
         }
     };
 
+    // â”€â”€ Preview packages for the live panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    const previewPackages = routerPackages.map((p: any) => ({
+        id: p.id,
+        name: p.name,
+        price: p.price || 0,
+        validity: p.validity || (p.duration ? `${p.duration} ${p.durationUnit || ''}` : 'N/A'),
+    }));
+
     return (
         <div>
             {/* Header */}
@@ -1080,7 +1080,7 @@ TROUBLESHOOTING:
                 </div>
             </div>
 
-            {/* Router Selector */}
+            {/* â”€â”€ Router Selector â”€â”€ */}
             <div className="card" style={{ padding: 16, marginBottom: 20 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                     <RouterIcon style={{ color: '#d97706', fontSize: 22 }} />
@@ -1090,16 +1090,13 @@ TROUBLESHOOTING:
                     ) : routers.length === 0 ? (
                         <span style={{ fontSize: '0.85rem', color: '#dc2626' }}>No routers found. Add a router first in the Mikrotiks page.</span>
                     ) : (
-                        <select
-                            className="select-field"
+                        <select className="select-field"
                             style={{ width: '100%', maxWidth: 400, minWidth: 0, fontWeight: 500 }}
                             value={selectedRouterId}
                             onChange={e => setSelectedRouterId(e.target.value)}
                         >
                             {routers.map(r => (
-                                <option key={r.id} value={r.id}>
-                                    {r.name} — {r.host} ({r.status})
-                                </option>
+                                <option key={r.id} value={r.id}>{r.name} â€” {r.host} ({r.status})</option>
                             ))}
                         </select>
                     )}
@@ -1107,9 +1104,9 @@ TROUBLESHOOTING:
                         <span style={{
                             padding: '4px 12px', borderRadius: 20, fontSize: '0.75rem', fontWeight: 600,
                             background: selectedRouter.status === 'Online' ? '#d1fae5' : '#fee2e2',
-                            color: selectedRouter.status === 'Online' ? '#065f46' : '#dc2626',
+                            color:      selectedRouter.status === 'Online' ? '#065f46' : '#dc2626',
                         }}>
-                            {selectedRouter.status === 'Online' ? '● Online' : '○ Offline'}
+                            {selectedRouter.status === 'Online' ? 'â— Online' : 'â—‹ Offline'}
                         </span>
                     )}
                     <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
@@ -1119,473 +1116,61 @@ TROUBLESHOOTING:
                 </div>
                 {routerPackages.length > 0 && (
                     <div style={{ marginTop: 10, fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
-                        📦 <strong>{routerPackages.length}</strong> packages found for this router — they will appear on the login page
+                        ðŸ“¦ <strong>{routerPackages.length}</strong> packages found for this router â€” they will appear on the login page
                     </div>
                 )}
             </div>
 
+            {/* â”€â”€ Two-column: Controls | Preview â”€â”€ */}
             <div style={{ display: 'grid', gridTemplateColumns: showPreview ? 'repeat(auto-fit, minmax(320px, 1fr))' : '1fr', gap: 24 }}>
-                {/* Left: Customization Options */}
+                {/* Left â€” CustomizerPanel */}
                 <div>
-                    <div className="card" style={{ padding: 24 }}>
-                        <h3 style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20, fontSize: '1rem' }}>
-                            <PaletteIcon style={{ color: 'var(--info)' }} /> Customization Options
-                        </h3>
-
-                        {/* Colors */}
-                        <div style={{ marginBottom: 24 }}>
-                            <h4 style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12, color: 'var(--info)' }}>
-                                <PaletteIcon style={{ fontSize: 16 }} /> Colors
-                            </h4>
-                            <div className="grid-2 gap-16">
-                                <div>
-                                    <label style={{ fontSize: '0.82rem', fontWeight: 500, marginBottom: 6, display: 'block' }}>Primary Color</label>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                        <input type="color" value={primaryColor} onChange={e => setPrimaryColor(e.target.value)}
-                                            style={{ width: 36, height: 36, border: 'none', cursor: 'pointer', borderRadius: 4 }} />
-                                        <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Text & Borders<br />Used for headings and borders</span>
-                                    </div>
-                                </div>
-                                <div>
-                                    <label style={{ fontSize: '0.82rem', fontWeight: 500, marginBottom: 6, display: 'block' }}>Accent Color</label>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                        <input type="color" value={accentColor} onChange={e => setAccentColor(e.target.value)}
-                                            style={{ width: 36, height: 36, border: 'none', cursor: 'pointer', borderRadius: 4 }} />
-                                        <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Buttons & Highlights<br />Used for buttons and icons</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Typography */}
-                        <div style={{ marginBottom: 24 }}>
-                            <h4 style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12, color: 'var(--info)' }}>
-                                <TextFieldsIcon style={{ fontSize: 16 }} /> Typography
-                            </h4>
-                            <label style={{ fontSize: '0.82rem', fontWeight: 500, marginBottom: 8, display: 'block' }}>Font Family</label>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                {fonts.map(font => (
-                                    <label key={font.name} onClick={() => setSelectedFont(font.name)} style={{
-                                        display: 'flex', alignItems: 'center', gap: 10,
-                                        padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)',
-                                        cursor: 'pointer', background: selectedFont === font.name ? '#eff6ff' : '#fff',
-                                        borderColor: selectedFont === font.name ? 'var(--info)' : 'var(--border)',
-                                    }}>
-                                        <div style={{
-                                            width: 14, height: 14, borderRadius: '50%',
-                                            border: selectedFont === font.name ? '4px solid var(--info)' : '2px solid var(--border)',
-                                        }} />
-                                        <div>
-                                            <div style={{ fontWeight: 600, fontSize: '0.85rem', fontFamily: font.name }}>{font.name}</div>
-                                            <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>{font.description}</div>
-                                        </div>
-                                    </label>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Package Display Layout */}
-                        <div style={{ marginBottom: 24 }}>
-                            <h4 style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12, color: 'var(--info)' }}>
-                                <ViewModuleIcon style={{ fontSize: 16 }} /> Package Display Layout
-                            </h4>
-                            <div className="grid-3 gap-10">
-                                {[
-                                    { key: 'grid' as const, icon: <GridViewIcon />, label: 'Grid Layout', desc: 'Packages displayed in a clean vertical list format' },
-                                    { key: 'horizontal' as const, icon: <ViewColumnIcon />, label: 'Horizontal', desc: 'Compact horizontal scrollable bar with buy buttons' },
-                                    { key: 'vertical' as const, icon: <ViewListIcon />, label: 'Vertical Bar', desc: 'Long thin packages arranged vertically in a scrollable container' },
-                                ].map(l => (
-                                    <div key={l.key} onClick={() => setLayout(l.key)}
-                                        style={{
-                                            border: layout === l.key ? '2px solid var(--info)' : '1px solid var(--border)',
-                                            borderRadius: 'var(--radius-sm)', padding: 12, cursor: 'pointer',
-                                            background: layout === l.key ? '#eff6ff' : '#fff', textAlign: 'center',
-                                        }}>
-                                        <div style={{ color: layout === l.key ? 'var(--info)' : 'var(--text-secondary)', marginBottom: 4 }}>{l.icon}</div>
-                                        <div style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: 4 }}>{l.label}</div>
-                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, marginBottom: 4 }}>
-                                            <div style={{ width: 12, height: 12, borderRadius: '50%', border: layout === l.key ? '4px solid var(--info)' : '2px solid var(--border)' }} />
-                                        </div>
-                                        <div style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>{l.desc}</div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Advertisement Settings */}
-                        <div style={{ marginBottom: 20 }}>
-                            <h4 style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, color: 'var(--info)' }}>
-                                <CampaignIcon style={{ fontSize: 16 }} /> Advertisement Settings
-                            </h4>
-                            <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer', marginBottom: enableAds ? 12 : 0 }}>
-                                <input type="checkbox" checked={enableAds} onChange={e => setEnableAds(e.target.checked)} style={{ width: 16, height: 16, marginTop: 2 }} />
-                                <div>
-                                    <div style={{ fontWeight: 500, fontSize: '0.85rem' }}>Enable Advertisement Banner</div>
-                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Display an advertisement banner at the top of the login page.</div>
-                                </div>
-                            </label>
-                            {enableAds && (
-                                <div style={{ marginLeft: 24, padding: '10px 14px', background: '#f8fafc', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
-                                    <label style={{ display: 'block', fontSize: '0.78rem', color: '#475569', marginBottom: 6, fontWeight: 600 }}>Advertisement Text</label>
-                                    <input
-                                        type="text"
-                                        value={adMessage}
-                                        onChange={e => setAdMessage(e.target.value)}
-                                        placeholder="Type your advertisement completely..."
-                                        style={{ width: '100%', padding: '8px 12px', border: '1px solid #cbd5e1', borderRadius: 4, fontSize: '0.85rem' }}
-                                    />
-                                    <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: 6 }}>You can use emojis like 🎉, ⚡ locally!</div>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* User Experience Features */}
-                        <div style={{ marginBottom: 20 }}>
-                            <h4 style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, color: '#d97706' }}>
-                                <PersonIcon style={{ fontSize: 16 }} /> User Experience Features
-                            </h4>
-                            <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer', border: '1px solid #fef3c7', borderRadius: 'var(--radius-sm)', padding: 10 }}>
-                                <input type="checkbox" checked={enableRememberMe} onChange={e => setEnableRememberMe(e.target.checked)} style={{ width: 16, height: 16, marginTop: 2 }} />
-                                <div>
-                                    <div style={{ fontWeight: 500, fontSize: '0.85rem' }}>Remember Me Feature</div>
-                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>When enabled, users will be automatically reconnected as long as their subscription is active. Works even if username changes – remembers by account ID, MAC address, and device fingerprint.</div>
-                                </div>
-                            </label>
-                        </div>
-
-                        {/* Company Information */}
-                        <div style={{ marginBottom: 20 }}>
-                            <h4 style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12, color: 'var(--primary)' }}>
-                                <BusinessIcon style={{ fontSize: 16 }} /> Company & System Information
-                            </h4>
-                            <div className="grid-2 gap-12" style={{ marginBottom: 12 }}>
-                                <div className="form-group">
-                                    <label className="form-label" style={{ fontSize: '0.82rem' }}>Company Name</label>
-                                    <input type="text" className="form-input" value={companyName} onChange={e => setCompanyName(e.target.value)} />
-                                </div>
-                                <div className="form-group">
-                                    <label className="form-label" style={{ fontSize: '0.82rem' }}>Customer Care Number</label>
-                                    <input type="text" className="form-input" value={customerCareNumber} onChange={e => setCustomerCareNumber(e.target.value)} />
-                                </div>
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label" style={{ fontSize: '0.82rem' }}>Backend API URL Override</label>
-                                <input
-                                    type="text"
-                                    className="form-input"
-                                    value={backendUrl}
-                                    onChange={e => setBackendUrl(e.target.value)}
-                                    placeholder="https://api.yourdomain.com"
-                                />
-                                <div className="form-hint" style={{ fontSize: '0.72rem', marginTop: 4 }}>
-                                    The public URL of this billing system backend. Used for payments and voucher redemption.
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Action buttons */}
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10, marginTop: 24 }}>
-                            <button className="btn" onClick={handleSaveSettings} disabled={saving} style={{ background: saving ? '#818cf8' : '#4f46e5', color: '#fff', fontWeight: 600, padding: '10px 20px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                                {saving ? '⏳ Saving...' : '💾 Save Customization'}
-                            </button>
-                            <button className="btn" onClick={handlePreview} style={{ background: '#2563eb', color: '#fff', fontWeight: 600, padding: '10px 20px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                                <PreviewIcon fontSize="small" /> Preview Changes
-                            </button>
-                            <button className="btn" onClick={handleDownloadZip} style={{ background: '#16a34a', color: '#fff', fontWeight: 600, padding: '10px 20px', gridColumn: 'span 2', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                                <DownloadIcon fontSize="small" /> Download ZIP File
-                            </button>
-                        </div>
-                        {/* Save feedback */}
-                        {saveSuccess && (
-                            <div style={{ marginTop: 10, padding: '10px 14px', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 8, color: '#15803d', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: 6 }}>
-                                ✅ Settings saved successfully!
-                            </div>
-                        )}
-                        {saveError && (
-                            <div style={{ marginTop: 10, padding: '10px 14px', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, color: '#dc2626', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: 6 }}>
-                                ❌ {saveError}
-                            </div>
-                        )}
-                        {syncStatus && (
-                            <div style={{ 
-                                marginTop: 10, 
-                                padding: '10px 14px', 
-                                background: syncStatus.status === 'success' ? '#f0fdf4' : '#fffbeb', 
-                                border: `1px solid ${syncStatus.status === 'success' ? '#86efac' : '#fde68a'}`, 
-                                borderRadius: 8, 
-                                color: syncStatus.status === 'success' ? '#15803d' : '#b45309', 
-                                fontSize: '0.85rem', 
-                                display: 'flex', 
-                                alignItems: 'center', 
-                                justifyContent: 'space-between',
-                                gap: 6 
-                            }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                    {syncStatus.status === 'success' ? '✅' : '⚠️'} {syncStatus.message}
-                                </div>
-                                {syncStatus.status === 'error' && (
-                                    <button 
-                                        onClick={handleSaveSettings}
-                                        style={{ background: 'transparent', border: '1px solid #fcd34d', borderRadius: 4, padding: '4px 8px', fontSize: '0.75rem', cursor: 'pointer', color: '#92400e', fontWeight: 600 }}
-                                    >
-                                        Retry Sync
-                                    </button>
-                                )}
-                            </div>
-                        )}
-
-                    </div>
+                    <CustomizerPanel
+                        primaryColor={primaryColor}           setPrimaryColor={setPrimaryColor}
+                        accentColor={accentColor}             setAccentColor={setAccentColor}
+                        selectedFont={selectedFont}           setSelectedFont={setSelectedFont}
+                        layout={layout}                       setLayout={setLayout}
+                        enableAds={enableAds}                 setEnableAds={setEnableAds}
+                        adMessage={adMessage}                 setAdMessage={setAdMessage}
+                        enableRememberMe={enableRememberMe}   setEnableRememberMe={setEnableRememberMe}
+                        companyName={companyName}             setCompanyName={setCompanyName}
+                        customerCareNumber={customerCareNumber} setCustomerCareNumber={setCustomerCareNumber}
+                        backendUrl={backendUrl}               setBackendUrl={setBackendUrl}
+                        saving={saving}
+                        saveSuccess={saveSuccess}
+                        saveError={saveError}
+                        syncStatus={syncStatus}
+                        onSave={handleSaveSettings}
+                        onPreview={handlePreview}
+                        onDownloadZip={handleDownloadZip}
+                    />
                 </div>
 
-                {/* Right: Live Preview */}
+                {/* Right â€” HotspotLivePreview */}
                 {showPreview && (
                     <div>
-                        <div className="card" style={{ position: 'sticky', top: 20 }}>
-                            <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <h3 style={{ fontSize: '0.9rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
-                                    <PreviewIcon style={{ fontSize: 16, color: 'var(--info)' }} /> Live Preview
-                                </h3>
-                                <button
-                                    className="btn btn-secondary"
-                                    style={{ fontSize: '0.72rem', padding: '4px 10px' }}
-                                    onClick={() => setShowPreview(false)}
-                                >
-                                    Hide
-                                </button>
-                            </div>
-                            {/* MikroTik-style Preview */}
-                            <div style={{ background: '#f0f4f8', borderRadius: '0 0 12px 12px', overflow: 'hidden' }}>
-                                {/* Header */}
-                                <div style={{
-                                    background: `linear-gradient(135deg, ${primaryColor}, ${accentColor})`,
-                                    padding: '14px 12px 12px', textAlign: 'center', color: '#fff',
-                                    borderRadius: '0 0 14px 14px',
-                                }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 8 }}>
-                                        <span style={{ fontSize: '0.9rem' }}>📶</span>
-                                        <span style={{ fontWeight: 700, fontSize: '0.82rem', letterSpacing: 0.3, fontFamily: selectedFont }}>{companyName}</span>
-                                    </div>
-                                    <div style={{ fontSize: '0.6rem', fontWeight: 600, opacity: 0.9, marginBottom: 6 }}>Supported Mobile Networks</div>
-                                    <div style={{ display: 'flex', justifyContent: 'center', gap: 4, flexWrap: 'wrap', marginBottom: 8 }}>
-                                        {['M-Pesa', 'Airtel', 'T-Pesa', 'HaloPesa'].map(n => (
-                                            <span key={n} style={{
-                                                background: 'rgba(255,255,255,0.2)', borderRadius: 5, padding: '2px 6px',
-                                                fontSize: '0.52rem', fontWeight: 600,
-                                            }}>{n}</span>
-                                        ))}
-                                    </div>
-                                    <div style={{ fontSize: '0.58rem', opacity: 0.85, marginBottom: 6 }}>
-                                        📦 Select · 💳 Pay · 🌐 Connect
-                                    </div>
-                                    <div style={{
-                                        background: `${accentColor}40`, borderRadius: 12, padding: '4px 10px',
-                                        fontSize: '0.6rem', display: 'inline-flex', alignItems: 'center', gap: 4,
-                                    }}>
-                                        📞 Support: {customerCareNumber || '0621085215'}
-                                    </div>
-                                </div>
-
-                                {enableAds && (
-                                    <div style={{
-                                        background: `linear-gradient(90deg, ${accentColor}10, ${primaryColor}10)`,
-                                        padding: '6px 10px', textAlign: 'center', fontSize: '0.55rem',
-                                        color: primaryColor, fontWeight: 600
-                                    }}>
-                                        {adMessage || '🎉 Special offer! Get extra data on all packages today!'}
-                                    </div>
-                                )}
-
-                                <div style={{ padding: '10px 12px', fontFamily: selectedFont }}>
-                                    {/* Packages */}
-                                    <div style={{ fontWeight: 700, color: primaryColor, fontSize: '0.68rem', marginBottom: 6 }}>📦 Packages</div>
-                                    <div style={{
-                                        display: 'grid',
-                                        gridTemplateColumns: layout === 'horizontal' ? 'repeat(4, 1fr)' : layout === 'vertical' ? '1fr' : 'repeat(3, 1fr)',
-                                        gap: 5, marginBottom: 10,
-                                    }}>
-                                        {(routerPackages.length > 0 ? routerPackages.slice(0, 4) : [
-
-                                        ]).map((pkg: any, i: number) => (
-                                            <div key={i}
-                                                onClick={() => {
-                                                    setPreviewPaymentPkg(pkg);
-                                                    setPreviewPaymentStep('initial');
-                                                    setPreviewPhone('');
-                                                }}
-                                                style={{
-                                                    background: `linear-gradient(135deg, ${accentColor}08, ${accentColor}15)`,
-                                                    border: `1.5px solid ${accentColor}30`, borderRadius: 8,
-                                                    padding: '6px 4px', textAlign: 'center', cursor: 'pointer',
-                                                    transition: 'all 0.2s',
-                                                }}>
-                                                <div style={{ fontSize: '0.52rem', fontWeight: 700, color: accentColor, textTransform: 'uppercase' }}>{pkg.name}</div>
-                                                <div style={{ fontSize: '0.82rem', fontWeight: 700, color: primaryColor, lineHeight: 1 }}>
-                                                    <span style={{ fontSize: '0.48rem', color: '#888' }}>TSH </span>{(pkg.price || 0).toLocaleString()}
-                                                </div>
-                                                <div style={{ fontSize: '0.48rem', color: '#e74c3c', marginTop: 2, marginBottom: 5 }}>⏱ {pkg.validity}</div>
-                                                <button style={{
-                                                    background: accentColor, color: '#fff', border: 'none', padding: '3px 0',
-                                                    width: '100%', borderRadius: 4, fontSize: '0.48rem', fontWeight: 700,
-                                                    cursor: 'pointer'
-                                                }}>Buy</button>
-                                            </div>
-                                        ))}
-                                    </div>
-
-                                    {/* Voucher */}
-                                    <div style={{ fontWeight: 700, color: primaryColor, fontSize: '0.62rem', marginBottom: 4 }}>🎟️ Redeem Voucher</div>
-                                    <div style={{ background: '#f8fafb', border: '1px solid #e8ecf0', borderRadius: 8, padding: 8, marginBottom: 8 }}>
-                                        <div style={{ display: 'flex', gap: 4 }}>
-                                            <input placeholder="Voucher code" readOnly style={{
-                                                flex: 1, padding: '4px 6px', border: '1px solid #d1d5db', borderRadius: 5, fontSize: '0.56rem',
-                                            }} />
-                                            <button style={{
-                                                background: '#e53935', color: '#fff', border: 'none', padding: '4px 8px',
-                                                borderRadius: 5, fontSize: '0.52rem', fontWeight: 700,
-                                            }}>Redeem</button>
-                                        </div>
-                                    </div>
-
-                                    {/* Reconnect */}
-                                    <div style={{ fontWeight: 700, color: primaryColor, fontSize: '0.62rem', marginBottom: 4 }}>🔄 Reconnect</div>
-                                    <div style={{ background: '#f8fafb', border: '1px solid #e8ecf0', borderRadius: 8, padding: 8, marginBottom: 8 }}>
-                                        <input placeholder="Transaction reference (HP...)" readOnly style={{
-                                            width: '100%', padding: '4px 6px', border: '1px solid #d1d5db', borderRadius: 5,
-                                            fontSize: '0.56rem', marginBottom: 4,
-                                        }} />
-                                        <button style={{
-                                            width: '100%', background: 'linear-gradient(135deg, #e53935, #c62828)', color: '#fff',
-                                            border: 'none', padding: '5px', borderRadius: 5, fontSize: '0.56rem', fontWeight: 700,
-                                        }}>💳 Reconnect</button>
-                                    </div>
-
-                                    {/* Manual Login */}
-                                    <div style={{ fontWeight: 700, color: primaryColor, fontSize: '0.62rem', marginBottom: 4 }}>📶 Manual Login</div>
-                                    <div style={{ background: '#f8fafb', border: '1px solid #e8ecf0', borderRadius: 8, padding: 8, marginBottom: 6 }}>
-                                        <div style={{ display: 'flex', gap: 4 }}>
-                                            <input placeholder="HS-TI07956" readOnly style={{
-                                                flex: 1, padding: '4px 6px', border: '1px solid #d1d5db', borderRadius: 5, fontSize: '0.56rem',
-                                            }} />
-                                            <input placeholder="••••" type="password" readOnly style={{
-                                                flex: 1, padding: '4px 6px', border: '1px solid #d1d5db', borderRadius: 5, fontSize: '0.56rem',
-                                            }} />
-                                            <button style={{
-                                                background: accentColor, color: '#fff', border: 'none', padding: '4px 10px',
-                                                borderRadius: 5, fontSize: '0.52rem', fontWeight: 700, whiteSpace: 'nowrap',
-                                            }}>Connect</button>
-                                        </div>
-                                        {enableRememberMe && (
-                                            <div style={{ marginTop: 4, fontSize: '0.48rem', color: '#888', display: 'flex', alignItems: 'center', gap: 3 }}>
-                                                <input type="checkbox" readOnly style={{ width: 8, height: 8 }} />
-                                                Remember me (Auto-reconnect while subscribed)
-                                            </div>
-                                        )}
-                                        <div style={{
-                                            background: `${accentColor}10`, border: `1px solid ${accentColor}25`,
-                                            borderRadius: 5, padding: '4px 8px', marginTop: 6,
-                                            fontSize: '0.52rem', color: primaryColor, display: 'flex', alignItems: 'center', gap: 4,
-                                        }}>
-                                            🖥️ MAC: <strong>62:C4:BB:A5:6B:DA</strong>
-                                        </div>
-                                    </div>
-
-                                    <div style={{ textAlign: 'center', fontSize: '0.48rem', color: '#bbb', marginTop: 6 }}>
-                                        Powered by {companyName} • {selectedRouter?.name || 'Router'}
-                                    </div>
-                                </div>
-
-                                {/* Preview Payment Simulation Overlay */}
-                                {previewPaymentPkg && (
-                                    <div style={{
-                                        position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)',
-                                        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 15,
-                                        zIndex: 10, borderRadius: '0 0 12px 12px',
-                                        fontFamily: selectedFont
-                                    }}>
-                                        <div style={{ background: '#fff', borderRadius: 12, width: '100%', overflow: 'hidden', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}>
-                                            <div style={{ background: `linear-gradient(135deg, ${primaryColor}, ${accentColor})`, padding: 12, color: '#fff', textAlign: 'center' }}>
-                                                <div style={{ fontSize: '0.55rem', opacity: 0.9 }}>Confirm Purchase</div>
-                                                <div style={{ fontSize: '0.75rem', fontWeight: 700 }}>{previewPaymentPkg.name}</div>
-                                                <div style={{ fontSize: '0.85rem', fontWeight: 700 }}>TSH {previewPaymentPkg.price.toLocaleString()}</div>
-                                            </div>
-
-                                            {previewPaymentStep === 'initial' && (
-                                                <div style={{ padding: 15 }}>
-                                                    <div style={{ marginBottom: 10 }}>
-                                                        <label style={{ display: 'block', fontSize: '0.6rem', color: '#666', marginBottom: 4 }}>Enter Mobile Number</label>
-                                                        <input
-                                                            type="tel"
-                                                            placeholder="0XXXXXXXXX"
-                                                            value={previewPhone}
-                                                            onChange={e => setPreviewPhone(e.target.value)}
-                                                            style={{ width: '100%', padding: '6px 8px', border: '1px solid #ddd', borderRadius: 6, fontSize: '0.7rem' }}
-                                                        />
-                                                    </div>
-                                                    <div style={{ display: 'flex', gap: 6 }}>
-                                                        <button
-                                                            onClick={() => setPreviewPaymentStep('waiting')}
-                                                            style={{ flex: 2, background: accentColor, color: '#fff', border: 'none', padding: '6px', borderRadius: 6, fontSize: '0.65rem', fontWeight: 700, cursor: 'pointer' }}
-                                                        >Pay Now</button>
-                                                        <button
-                                                            onClick={() => setPreviewPaymentPkg(null)}
-                                                            style={{ flex: 1, background: '#94a3b8', color: '#fff', border: 'none', padding: '6px', borderRadius: 6, fontSize: '0.65rem', fontWeight: 700, cursor: 'pointer' }}
-                                                        >Cancel</button>
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            {previewPaymentStep === 'waiting' && (
-                                                <div style={{ padding: '25px 15px', textAlign: 'center' }}>
-                                                    <div style={{ display: 'inline-block', padding: '3px 10px', borderRadius: 15, fontSize: '0.55rem', fontWeight: 700, background: `${accentColor}15`, color: accentColor, marginBottom: 8 }}>
-                                                        Waiting for payment...
-                                                    </div>
-                                                    <div style={{ fontSize: '0.65rem', color: '#475569', marginBottom: 12 }}>Please enter your PIN on your phone.</div>
-                                                    <div className="preview-spinner" style={{ width: 20, height: 20, border: `2px solid ${accentColor}20`, borderTopColor: accentColor, borderRadius: '50%', margin: '0 auto' }}></div>
-                                                    <button
-                                                        onClick={() => {
-                                                            setPreviewPaymentStep('success');
-                                                            setTimeout(() => setPreviewPaymentPkg(null), 2500);
-                                                        }}
-                                                        style={{ marginTop: 15, background: 'none', border: 'none', color: accentColor, fontSize: '0.5rem', fontWeight: 600, cursor: 'pointer' }}
-                                                    >(Simulate Success)</button>
-                                                </div>
-                                            )}
-
-                                            {previewPaymentStep === 'success' && (
-                                                <div style={{ padding: '25px 15px', textAlign: 'center' }}>
-                                                    <div style={{ display: 'inline-block', padding: '3px 10px', borderRadius: 15, fontSize: '0.55rem', fontWeight: 700, background: '#22c55e', color: '#fff', marginBottom: 8 }}>
-                                                        PAID!
-                                                    </div>
-                                                    <div style={{ fontSize: '0.65rem', color: '#065f46', fontWeight: 600 }}>Connecting you online now...</div>
-                                                    <div style={{ fontSize: '0.8rem', marginTop: 8 }}>✅</div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                            <style>{`
-                                @keyframes previewSpin { to { transform: rotate(360deg); } }
-                                .preview-spinner { animation: previewSpin 0.8s linear infinite; }
-                            `}</style>
-                            <div style={{ padding: '8px 12px', fontSize: '0.72rem', color: '#dc2626' }}>
-                                <strong>Preview Note:</strong> This is a simplified preview. Click "Preview Changes" for the full page, or "Download ZIP" to get the complete template.
-                            </div>
-                        </div>
+                        <HotspotLivePreview
+                            primaryColor={primaryColor}
+                            accentColor={accentColor}
+                            selectedFont={selectedFont}
+                            layout={layout}
+                            enableAds={enableAds}
+                            adMessage={adMessage}
+                            enableRememberMe={enableRememberMe}
+                            companyName={companyName}
+                            customerCareNumber={customerCareNumber}
+                            routerName={selectedRouter?.name || 'Router'}
+                            packages={previewPackages}
+                            onHide={() => setShowPreview(false)}
+                        />
                     </div>
                 )}
             </div>
 
-            {/* Show Preview Toggle (when hidden) */}
+            {/* Show Preview FAB when panel is hidden */}
             {!showPreview && (
-                <button
-                    className="btn"
-                    style={{
-                        position: 'fixed', bottom: 20, right: 20,
-                        background: '#2563eb', color: '#fff', fontWeight: 600,
-                        padding: '10px 20px', borderRadius: 20, boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
-                        display: 'flex', alignItems: 'center', gap: 6, zIndex: 100,
-                    }}
+                <button className="btn"
+                    style={{ position: 'fixed', bottom: 20, right: 20, background: '#2563eb', color: '#fff', fontWeight: 600, padding: '10px 20px', borderRadius: 20, boxShadow: '0 4px 12px rgba(0,0,0,0.2)', display: 'flex', alignItems: 'center', gap: 6, zIndex: 100 }}
                     onClick={() => setShowPreview(true)}
                 >
                     <PreviewIcon fontSize="small" /> Show Preview

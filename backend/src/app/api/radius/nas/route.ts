@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { getTenantFilter, getAssignTenantId } from "@/lib/tenant";
@@ -8,10 +9,11 @@ export async function GET(req: NextRequest) {
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
 
         const { filter } = getTenantFilter(userPayload);
 
-        const nasList = await prisma.radiusNas.findMany({
+        const nasList = await db.radiusNas.findMany({
             where: { ...filter },
             orderBy: { createdAt: "desc" },
         });
@@ -40,6 +42,7 @@ export async function POST(req: NextRequest) {
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
 
         const body = await req.json();
         const { nasName, shortName, type, ports, secret, server, description } = body;
@@ -50,7 +53,7 @@ export async function POST(req: NextRequest) {
 
         const tenantId = getAssignTenantId(userPayload, body.tenantId);
 
-        const nas = await prisma.radiusNas.create({
+        const nas = await db.radiusNas.create({
             data: {
                 nasName,
                 shortName: shortName || null,

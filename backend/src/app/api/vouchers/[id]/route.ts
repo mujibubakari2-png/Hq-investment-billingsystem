@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 
@@ -6,19 +7,20 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
 
         const resolvedParams = await params;
         const body = await req.json();
         const { status, usedBy, customer, code } = body;
 
-        const existingVoucher = await prisma.voucher.findUnique({ where: { id: resolvedParams.id } });
+        const existingVoucher = await db.voucher.findUnique({ where: { id: resolvedParams.id } });
         if (!existingVoucher) return errorResponse("Voucher not found", 404);
 
         if (userPayload.role !== "SUPER_ADMIN" && existingVoucher.tenantId !== userPayload.tenantId) {
             return errorResponse("Forbidden", 403);
         }
 
-        const updated = await prisma.voucher.update({
+        const updated = await db.voucher.update({
             where: { id: resolvedParams.id },
             data: {
                 code,
@@ -39,17 +41,18 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
 
         const resolvedParams = await params;
         
-        const existingVoucher = await prisma.voucher.findUnique({ where: { id: resolvedParams.id } });
+        const existingVoucher = await db.voucher.findUnique({ where: { id: resolvedParams.id } });
         if (!existingVoucher) return errorResponse("Voucher not found", 404);
 
         if (userPayload.role !== "SUPER_ADMIN" && existingVoucher.tenantId !== userPayload.tenantId) {
             return errorResponse("Forbidden", 403);
         }
 
-        await prisma.voucher.delete({
+        await db.voucher.delete({
             where: { id: resolvedParams.id }
         });
         return jsonResponse({ message: "Voucher deleted successfully" });

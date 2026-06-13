@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { errorResponse, jsonResponse, getUserFromRequest } from "@/lib/auth";
 import { sendAccountApprovedNotifications } from "@/lib/accountNotifications";

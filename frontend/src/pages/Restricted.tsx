@@ -88,7 +88,7 @@ export default function Restricted() {
             </div>
 
             <div style={{ marginTop: '2rem', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-                <p>Need help? Email us at <a href="mailto:support@hqinvestment.co.tz" style={{ color: 'var(--primary)', textDecoration: 'none', fontWeight: 500 }}>support@hqinvestment.co.tz</a> or call +255 621 085 215 — we're here to help.</p>
+                <p>Need help? Email us at <a href="mailto:support@yourdomain.com" style={{ color: 'var(--primary)', textDecoration: 'none', fontWeight: 500 }}>support@yourdomain.com</a> or call +255 621 085 215 — we're here to help.</p>
                 <button onClick={() => { logout(); navigate('/login'); }} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', textDecoration: 'underline', cursor: 'pointer', marginTop: '1rem' }}>
                     Sign out and switch accounts
                 </button>

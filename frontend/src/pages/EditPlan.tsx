@@ -100,9 +100,9 @@ export default function EditPlan() {
             // Also fetch the specific subscription detail
             fetch(`${(import.meta.env.VITE_API_URL as string) ?? ''}/api/subscriptions/${id}`, {
                 headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                    'Content-Type': 'application/json'
                 },
+                credentials: 'include',
             }).then(r => r.json()),
         ])
             .then(([, pkgs, rtrs, subData]) => {

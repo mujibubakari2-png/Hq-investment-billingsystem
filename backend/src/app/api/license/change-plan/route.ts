@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { getJwtTenantId, isPlatformSuperAdmin } from "@/lib/tenant";
@@ -8,6 +9,7 @@ export async function POST(req: NextRequest) {
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
         if (userPayload.role !== "SUPER_ADMIN" || isPlatformSuperAdmin(userPayload)) {
             return errorResponse("Forbidden: Only the tenant Super Admin can change plans", 403);
         }
@@ -20,11 +22,11 @@ export async function POST(req: NextRequest) {
         if (!planId) return errorResponse("planId is required", 400);
 
         // Verify the plan exists
-        const newPlan = await prisma.saasPlan.findUnique({ where: { id: planId } });
+        const newPlan = await db.saasPlan.findUnique({ where: { id: planId } });
         if (!newPlan) return errorResponse("Plan not found", 404);
 
         // Update tenant's plan
-        const updated = await prisma.tenant.update({
+        const updated = await db.tenant.update({
             where: { id: tenantId },
             data: { planId: newPlan.id },
             include: { plan: true },
@@ -36,7 +38,9 @@ export async function POST(req: NextRequest) {
                 id: updated.plan.id,
                 name: updated.plan.name,
                 price: updated.plan.price,
-                clientLimit: updated.plan.clientLimit,
+                pppoeLimit: updated.plan.pppoeLimit,
+                hotspotLimit: updated.plan.hotspotLimit,
+                maxRouters: updated.plan.maxRouters,
             },
         });
     } catch (error) {

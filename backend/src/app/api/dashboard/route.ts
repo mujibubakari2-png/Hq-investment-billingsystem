@@ -1,11 +1,15 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
+import { withCache, invalidateNamespace, buildKey, TTL } from "@/lib/cache";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
+import { isPlatformSuperAdmin } from "@/lib/tenant";
 import { toISOSafe, toTimestampSafe, getStartOfTodayTZ, getStartOfMonthTZ } from "@/lib/dateUtils";
+import { Redis } from 'ioredis';
 
-// Bug #5 FIX: Throttle RADIUS sync to at most once per 60 seconds
+const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+
+// Bug #5 FIX: Throttle RADIUS sync to at most once per 60 seconds across all PM2 instances
 const RADIUS_SYNC_INTERVAL_MS = 60_000;
-let lastRadiusSyncTs = 0;
 
 // GET /api/dashboard - aggregate stats
 export async function GET(req: NextRequest) {
@@ -14,7 +18,7 @@ export async function GET(req: NextRequest) {
         if (!userPayload) return errorResponse("Unauthorized", 401);
 
         const isAdmin = userPayload.role === "SUPER_ADMIN" || userPayload.role === "ADMIN";
-        const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
+        const isPlatformAdmin = isPlatformSuperAdmin(userPayload);
 
         // Base filter for tenant isolation
         const tenantFilter = { tenantId: userPayload.tenantId };
@@ -24,7 +28,7 @@ export async function GET(req: NextRequest) {
         const targetTenantId = queryParams.get("tenantId");
         const routerId = queryParams.get("routerId");
         
-        if (isSuperAdmin && targetTenantId) {
+        if (isPlatformAdmin && targetTenantId) {
             tenantFilter.tenantId = targetTenantId;
         }
 
@@ -36,12 +40,12 @@ export async function GET(req: NextRequest) {
 
         // ── RADIUS Accounting Cleanup (Multi-tenancy fix) ──
         // Bug #5 FIX: Throttle sync operations to run at most once per 60 seconds
-        // instead of on every dashboard load (which fires every 30s auto-refresh).
-        const now_ts = Date.now();
-        const shouldSync = now_ts - lastRadiusSyncTs > RADIUS_SYNC_INTERVAL_MS;
+        // using a Redis mutex to prevent simultaneous syncs across PM2 processes.
+        const syncLockKey = `dashboard:radius:sync_lock:${userPayload.tenantId || 'global'}`;
+        const lockAcquired = await redis.set(syncLockKey, "1", "PX", RADIUS_SYNC_INTERVAL_MS, "NX");
+        const shouldSync = lockAcquired === "OK";
 
         if (shouldSync) {
-            lastRadiusSyncTs = now_ts;
 
             // Ensure all radacct records have a tenantId by mapping nasipaddress to Router table.
             try {
@@ -248,7 +252,7 @@ export async function GET(req: NextRequest) {
         if (isAdmin) {
             try {
                 // By day (last 30 days)
-                const rawDaily = isSuperAdmin && !targetTenantId
+                const rawDaily = isPlatformAdmin && !targetTenantId
                     ? await prisma.$queryRaw<any[]>`
                         SELECT TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY-MM-DD') as name, SUM(amount) as value
                         FROM transactions
@@ -264,7 +268,7 @@ export async function GET(req: NextRequest) {
                         ORDER BY name ASC`;
 
                 // By week (last 12 weeks)
-                const rawWeekly = isSuperAdmin && !targetTenantId
+                const rawWeekly = isPlatformAdmin && !targetTenantId
                     ? await prisma.$queryRaw<any[]>`
                         SELECT TO_CHAR(DATE_TRUNC('week', timezone('Africa/Dar_es_Salaam', "createdAt")), 'YYYY-MM-DD') as name, SUM(amount) as value
                         FROM transactions
@@ -280,7 +284,7 @@ export async function GET(req: NextRequest) {
                         ORDER BY DATE_TRUNC('week', timezone('Africa/Dar_es_Salaam', "createdAt")) ASC`;
 
                 // By month (last 12 months)
-                const rawMonthly = isSuperAdmin && !targetTenantId
+                const rawMonthly = isPlatformAdmin && !targetTenantId
                     ? await prisma.$queryRaw<any[]>`
                         SELECT TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY-MM') as name, SUM(amount) as value
                         FROM transactions
@@ -296,7 +300,7 @@ export async function GET(req: NextRequest) {
                         ORDER BY name ASC`;
 
                 // By year
-                const rawYearly = isSuperAdmin && !targetTenantId
+                const rawYearly = isPlatformAdmin && !targetTenantId
                     ? await prisma.$queryRaw<any[]>`
                         SELECT TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY') as name, SUM(amount) as value
                         FROM transactions
@@ -326,7 +330,7 @@ export async function GET(req: NextRequest) {
         // Subscriber growth (last 6 months)
         let subscriberGrowthData: any[] = [];
         try {
-            const rawGrowth = isSuperAdmin && !targetTenantId
+            const rawGrowth = isPlatformAdmin && !targetTenantId
                 ? await prisma.$queryRaw<any[]>`
                     SELECT TO_CHAR("createdAt", 'Mon') as month, COUNT(*) as clients
                     FROM clients

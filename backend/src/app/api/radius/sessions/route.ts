@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { getTenantFilter } from "@/lib/tenant";
@@ -8,6 +9,7 @@ export async function GET(req: NextRequest) {
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
 
         const { filter } = getTenantFilter(userPayload);
 
@@ -36,10 +38,10 @@ export async function GET(req: NextRequest) {
         }
 
         // Get total count for pagination
-        const total = await prisma.radAcct.count({ where });
+        const total = await db.radAcct.count({ where });
 
         // Get sessions with pagination
-        const sessions = await prisma.radAcct.findMany({
+        const sessions = await db.radAcct.findMany({
             where,
             orderBy: { acctstarttime: "desc" },
             skip: (page - 1) * limit,
@@ -99,7 +101,7 @@ export async function GET(req: NextRequest) {
         });
 
         // Compute summary stats (from ALL matching records, not just current page)
-        const allActiveSessions = await prisma.radAcct.findMany({
+        const allActiveSessions = await db.radAcct.findMany({
             where: { acctstoptime: null, ...filter },
             select: {
                 framedprotocol: true,

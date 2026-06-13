@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 
@@ -7,9 +8,10 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
 
         const { id } = await params;
-        await prisma.radiusNas.delete({ where: { id } });
+        await db.radiusNas.delete({ where: { id } });
         return jsonResponse({ message: "NAS client deleted" });
     } catch (e) {
         console.error("NAS delete error:", e);

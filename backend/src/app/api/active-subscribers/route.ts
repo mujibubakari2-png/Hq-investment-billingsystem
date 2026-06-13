@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { toISOSafe } from "@/lib/dateUtils";
@@ -8,6 +9,7 @@ export async function GET(req: NextRequest) {
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
 
         const tenantFilter = { tenantId: userPayload.tenantId };
 
@@ -26,7 +28,7 @@ export async function GET(req: NextRequest) {
         // in radacct (acctstoptime IS NULL). Otherwise it's OFFLINE.
         try {
             // Get all usernames that currently have an active RADIUS session
-            const activeRadiusSessions = await prisma.radAcct.findMany({
+            const activeRadiusSessions = await db.radAcct.findMany({
                 where: { acctstoptime: null, ...tenantFilter },
                 select: { username: true },
                 distinct: ["username"],
@@ -35,7 +37,7 @@ export async function GET(req: NextRequest) {
             const onlineUsernames = new Set(activeRadiusSessions.map((s) => s.username));
 
             // Fetch all active subscriptions with client info
-            const allActiveSubs = await prisma.subscription.findMany({
+            const allActiveSubs = await db.subscription.findMany({
                 where: { status: "ACTIVE", ...tenantFilter },
                 select: {
                     id: true,
@@ -59,13 +61,13 @@ export async function GET(req: NextRequest) {
 
             // Batch update to avoid N+1 queries
             if (toSetOnline.length > 0) {
-                await prisma.subscription.updateMany({
+                await db.subscription.updateMany({
                     where: { id: { in: toSetOnline } },
                     data: { onlineStatus: "ONLINE" },
                 });
             }
             if (toSetOffline.length > 0) {
-                await prisma.subscription.updateMany({
+                await db.subscription.updateMany({
                     where: { id: { in: toSetOffline } },
                     data: { onlineStatus: "OFFLINE" },
                 });
@@ -83,7 +85,7 @@ export async function GET(req: NextRequest) {
         }
 
         // Fetch all active subscriptions after online status sync
-        const allActive = await prisma.subscription.findMany({
+        const allActive = await db.subscription.findMany({
             where: whereCondition,
             include: { client: true, package: true, router: true },
             orderBy: { createdAt: "desc" }

@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { toISOSafe, toTimestampSafe } from "@/lib/dateUtils";
@@ -7,6 +8,7 @@ export async function GET(req: NextRequest) {
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
 
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
         const tenantFilter = { tenantId: userPayload.tenantId };
@@ -26,14 +28,14 @@ export async function GET(req: NextRequest) {
         }
 
         // Fetch all subscriptions with EXPIRED status for stats computation
-        const allExpired = await prisma.subscription.findMany({
+        const allExpired = await db.subscription.findMany({
             where: whereCondition,
             include: { client: true, package: true, router: true },
             orderBy: { expiresAt: "desc" }
         });
 
         // Compute active subscriptions strictly for the active stat tally
-        const activeCount = await prisma.subscription.count({ where: { status: "ACTIVE", ...tenantFilter }});
+        const activeCount = await db.subscription.count({ where: { status: "ACTIVE", ...tenantFilter }});
 
         const now = new Date();
         const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();

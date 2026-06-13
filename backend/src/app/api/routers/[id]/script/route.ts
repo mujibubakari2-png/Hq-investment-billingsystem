@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { getUserFromRequest, errorResponse } from "@/lib/auth";
 
@@ -12,9 +13,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
 
         const { id } = await params;
-        const router = await prisma.router.findUnique({ where: { id } });
+        const router = await db.router.findUnique({ where: { id } });
 
         if (!router) return errorResponse("Router not found", 404);
         if (userPayload.role !== "SUPER_ADMIN" && router.tenantId !== userPayload.tenantId) {
@@ -29,6 +31,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         let script = `# HQInvestment ISP Billing System - Router Setup Script
 # Generated for: ${cleanName}
 # Date: ${new Date().toISOString()}
+#
+# ==============================================================================
+# ⚠️ SECURITY WARNING: This script contains plaintext passwords and VPN keys!
+# After pasting this script into your router, please DELETE this file from your 
+# computer immediately to prevent credential theft.
+# ==============================================================================
 
 /log info "Starting HQInvestment Auto-Configuration..."
 

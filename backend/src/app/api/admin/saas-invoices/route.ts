@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { toISOSafe } from "@/lib/dateUtils";
@@ -7,12 +8,13 @@ import { toISOSafe } from "@/lib/dateUtils";
 // GET /api/admin/saas-invoices - list all SaaS (Tenant) invoices (Super Admin only)
 export async function GET(req: NextRequest) {
     try {
+        const db = getTenantClient(null);
         const user = getUserFromRequest(req);
-        if (!user || user.role !== "SUPER_ADMIN") {
+        if (!user || user.role !== "SUPER_ADMIN" || user.tenantId) {
             return errorResponse("Forbidden: Super Admin access required", 403);
         }
 
-        const invoices = await prisma.tenantInvoice.findMany({
+        const invoices = await db.tenantInvoice.findMany({
             include: {
                 tenant: { select: { name: true, email: true } },
                 plan: { select: { name: true, price: true } },
@@ -44,8 +46,9 @@ export async function GET(req: NextRequest) {
 // POST /api/admin/saas-invoices - manage SaaS invoices (confirm payment, generate new)
 export async function POST(req: NextRequest) {
     try {
+        const db = getTenantClient(null);
         const user = getUserFromRequest(req);
-        if (!user || user.role !== "SUPER_ADMIN") {
+        if (!user || user.role !== "SUPER_ADMIN" || user.tenantId) {
             return errorResponse("Forbidden: Super Admin access required", 403);
         }
 
@@ -53,7 +56,7 @@ export async function POST(req: NextRequest) {
         const { action, invoiceId, ...data } = body;
 
         if (action === "confirm_payment") {
-            const invoice = await prisma.tenantInvoice.findUnique({
+            const invoice = await db.tenantInvoice.findUnique({
                 where: { id: invoiceId },
                 include: { tenant: true }
             });
@@ -105,7 +108,7 @@ export async function POST(req: NextRequest) {
             autoDate.setDate(autoDate.getDate() + 30);
             const resolvedDueDate = dueDate ? new Date(dueDate) : autoDate;
 
-            const newInvoice = await prisma.tenantInvoice.create({
+            const newInvoice = await db.tenantInvoice.create({
                 data: {
                     tenantId,
                     planId,
@@ -124,7 +127,7 @@ export async function POST(req: NextRequest) {
             const { tenantId, months } = body;
             if (!tenantId) return errorResponse("tenantId is required", 400);
 
-            const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
+            const tenant = await db.tenant.findUnique({ where: { id: tenantId } });
             if (!tenant) return errorResponse("Tenant not found", 404);
 
             const now = new Date();
@@ -137,7 +140,7 @@ export async function POST(req: NextRequest) {
             const newExpiry = new Date(baseDate);
             newExpiry.setMonth(newExpiry.getMonth() + monthsToAdd);
 
-            await prisma.tenant.update({
+            await db.tenant.update({
                 where: { id: tenantId },
                 data: {
                     status: "ACTIVE",

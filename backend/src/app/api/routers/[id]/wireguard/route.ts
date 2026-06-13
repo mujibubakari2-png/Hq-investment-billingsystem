@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { getMikroTikService, sanitizeMikroTikName } from "@/lib/mikrotik";
@@ -44,6 +45,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
 
         const { id } = await params;
         const router = await getRouterWgFields(id);
@@ -66,7 +68,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
         // Logic to assign a unique Tunnel IP based on server's subnet
         if (!tunnelIp || !tunnelIp.startsWith(`${subnetPrefix}.`)) {
-            const allWgRouters = await prisma.router.findMany({
+            const allWgRouters = await db.router.findMany({
                 where: { id: { not: id }, wgTunnelIp: { not: null } },
                 select: { wgTunnelIp: true }
             });
@@ -179,6 +181,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
 
         const { id } = await params;
         const body = await req.json();
@@ -202,7 +205,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
             await updateRouterWgFields(id, { wgEnabled: false });
 
-            await prisma.routerLog.create({
+            await db.routerLog.create({
                 data: {
                     routerId: id,
                     action: "wireguard_deactivated",
@@ -221,9 +224,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
             await updateRouterWgFields(id, { host: newHost });
             // Also update via Prisma so it's reflected everywhere
-            await prisma.router.update({ where: { id }, data: { host: newHost, status: "OFFLINE" } });
+            await db.router.update({ where: { id }, data: { host: newHost, status: "OFFLINE" } });
 
-            await prisma.routerLog.create({
+            await db.routerLog.create({
                 data: {
                     routerId: id,
                     action: "wireguard_host_reset",
@@ -828,7 +831,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 }
                 await updateRouterWgFields(id, updateData);
 
-                await prisma.routerLog.create({
+                await db.routerLog.create({
                     data: {
                         routerId: id,
                         action: "wireguard_pushed",
@@ -846,7 +849,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 });
 
             } catch (err: any) {
-                await prisma.routerLog.create({
+                await db.routerLog.create({
                     data: {
                         routerId: id,
                         action: "wireguard_push_failed",
@@ -864,7 +867,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         // Default: manual activate (user pasted the script on MikroTik)
         try {
             // Aggressive Cleanup: Remove any peer that is not actively registered in the DB
-            const allValidRouters = await prisma.router.findMany({
+            const allValidRouters = await db.router.findMany({
                 where: { wgPublicKey: { not: null } },
                 select: { wgPublicKey: true }
             });
@@ -918,7 +921,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
         await updateRouterWgFields(id, activateData);
 
-        await prisma.routerLog.create({
+        await db.routerLog.create({
             data: {
                 routerId: id,
                 action: "wireguard_activated",

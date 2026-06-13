@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { hashPassword, jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { canAccessTenant } from "@/lib/tenant";
@@ -7,12 +8,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
         if (userPayload.role !== "SUPER_ADMIN") {
             return errorResponse("Forbidden", 403);
         }
 
         const { id } = await params;
-        const user = await prisma.user.findUnique({
+        const user = await db.user.findUnique({
             where: { id },
             select: {
                 id: true,
@@ -40,13 +42,14 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
         if (userPayload.role !== "SUPER_ADMIN") {
             return errorResponse("Forbidden", 403);
         }
 
         const { id } = await params;
         const body = await req.json();
-        const existing = await prisma.user.findUnique({
+        const existing = await db.user.findUnique({
             where: { id },
             select: { id: true, role: true, tenantId: true },
         });
@@ -88,7 +91,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
             data.password = await hashPassword(body.password);
         }
 
-        const user = await prisma.user.update({
+        const user = await db.user.update({
             where: { id },
             data,
             select: { id: true, username: true, fullName: true, email: true, role: true, status: true, phone: true, tenantId: true },
@@ -104,6 +107,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
         if (userPayload.role !== "SUPER_ADMIN") {
             return errorResponse("Forbidden", 403);
         }
@@ -115,7 +119,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
             return errorResponse("Cannot delete your own account", 400);
         }
 
-        const existing = await prisma.user.findUnique({
+        const existing = await db.user.findUnique({
             where: { id },
             select: { id: true, role: true, tenantId: true },
         });
@@ -125,7 +129,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
             return errorResponse("Cannot delete the tenant owner", 403);
         }
 
-        await prisma.user.delete({ where: { id } });
+        await db.user.delete({ where: { id } });
         return jsonResponse({ message: "User deleted" });
     } catch {
         return errorResponse("Internal server error", 500);

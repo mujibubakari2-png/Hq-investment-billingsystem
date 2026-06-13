@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 
@@ -7,6 +8,7 @@ export async function GET(req: NextRequest) {
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
 
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
         const tenantFilter = isSuperAdmin ? {} : { tenantId: userPayload.tenantId };
@@ -24,14 +26,14 @@ export async function GET(req: NextRequest) {
         if (status) where.status = status;
 
         const [logs, total] = await Promise.all([
-            prisma.routerLog.findMany({
+            db.routerLog.findMany({
                 where,
                 include: { router: { select: { name: true, host: true } } },
                 orderBy: { createdAt: "desc" },
                 take: limit,
                 skip: (page - 1) * limit,
             }),
-            prisma.routerLog.count({ where }),
+            db.routerLog.count({ where }),
         ]);
 
         return jsonResponse({

@@ -123,6 +123,16 @@ export async function POST(req: NextRequest) {
             return errorResponse(`Router with name "${name}" already exists in your tenant`);
         }
 
+        if (!existing) {
+            const tenant = await prisma.tenant.findUnique({
+                where: { id: tenantIdValue },
+                include: { plan: true, routers: { select: { id: true } } }
+            });
+            if (tenant && tenant.routers.length >= tenant.plan.maxRouters) {
+                return errorResponse(`Router limit reached. Your plan allows up to ${tenant.plan.maxRouters} routers.`, 403);
+            }
+        }
+
         const routerData: any = {
             name,
             host,

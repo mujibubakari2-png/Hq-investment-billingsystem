@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 
@@ -6,12 +7,13 @@ import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 // GET /api/admin/tenants - list all tenants (Super Admin only)
 export async function GET(req: NextRequest) {
     try {
+        const db = getTenantClient(null);
         const user = getUserFromRequest(req);
-        if (!user || user.role !== "SUPER_ADMIN") {
+        if (!user || user.role !== "SUPER_ADMIN" || user.tenantId) {
             return errorResponse("Forbidden: Super Admin access required", 403);
         }
 
-        const tenants = await prisma.tenant.findMany({
+        const tenants = await db.tenant.findMany({
             include: {
                 plan: true,
                 _count: {
@@ -49,8 +51,9 @@ export async function GET(req: NextRequest) {
 // POST /api/admin/tenants - create/confirm/update tenant (Super Admin only)
 export async function POST(req: NextRequest) {
     try {
+        const db = getTenantClient(null);
         const user = getUserFromRequest(req);
-        if (!user || user.role !== "SUPER_ADMIN") {
+        if (!user || user.role !== "SUPER_ADMIN" || user.tenantId) {
             return errorResponse("Forbidden: Super Admin access required", 403);
         }
 
@@ -58,7 +61,7 @@ export async function POST(req: NextRequest) {
         const { action, tenantId, ...data } = body;
 
         if (action === "confirm") {
-            const updated = await prisma.tenant.update({
+            const updated = await db.tenant.update({
                 where: { id: tenantId },
                 data: { status: "ACTIVE" }
             });
@@ -66,7 +69,7 @@ export async function POST(req: NextRequest) {
         }
 
         if (action === "suspend") {
-            const updated = await prisma.tenant.update({
+            const updated = await db.tenant.update({
                 where: { id: tenantId },
                 data: { status: "SUSPENDED" }
             });

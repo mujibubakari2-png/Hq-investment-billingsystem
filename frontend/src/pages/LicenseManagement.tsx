@@ -107,7 +107,8 @@ export default function LicenseManagement() {
         daysRemaining,
         expiresAt,
         customersCount,
-        clientLimit,
+        pppoeLimit,
+        hotspotLimit,
         paidThisMonth,
         hasOutstanding,
         plan,
@@ -149,7 +150,7 @@ export default function LicenseManagement() {
                                         {plan?.id === p.id && <span style={{ fontSize: '0.7rem', background: '#16a34a', color: '#fff', padding: '1px 8px', borderRadius: 10 }}>CURRENT</span>}
                                     </div>
                                     <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: 2 }}>
-                                        Up to {p.clientLimit.toLocaleString()} customers
+                                        {p.pppoeLimit.toLocaleString()} PPPoE, {p.hotspotLimit ? p.hotspotLimit.toLocaleString() : '∞'} Hotspot, {p.maxRouters} {p.maxRouters === 1 ? 'Router' : 'Routers'}
                                     </div>
                                 </div>
                                 <div style={{ fontWeight: 700, textAlign: 'right' }}>
@@ -263,8 +264,8 @@ export default function LicenseManagement() {
                     padding: '20px 30px', borderLeft: '1px solid var(--border-light)',
                     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                 }}>
-                    <PeopleIcon style={{ fontSize: 24, color: customersCount! >= clientLimit! ? '#ef4444' : '#3b82f6', marginBottom: 4 }} />
-                    <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>{customersCount} <span style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>/ {clientLimit}</span></div>
+                    <PeopleIcon style={{ fontSize: 24, color: customersCount! >= (pppoeLimit! + (hotspotLimit || 0)) ? '#ef4444' : '#3b82f6', marginBottom: 4 }} />
+                    <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>{customersCount} <span style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>/ {pppoeLimit! + (hotspotLimit ? hotspotLimit : 0)}{hotspotLimit === null ? '+' : ''}</span></div>
                     <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Customers Bound</div>
                 </div>
 

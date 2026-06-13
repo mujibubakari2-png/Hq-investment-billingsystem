@@ -1,0 +1,40 @@
+# Backend .dockerignore — DO-004
+# Exclude files that should never be in the Docker build context
+
+# Dependencies — reinstalled inside the image
+node_modules/
+.pnp
+.pnp.js
+
+# Next.js build output (built fresh inside the image)
+.next/
+out/
+
+# Test files
+src/__tests__/
+jest.config.ts
+coverage/
+*.test.ts
+
+# Local env files — secrets are injected at runtime via docker-compose env
+.env
+.env.*
+!.env.example
+
+# Dev / editor artifacts
+.git/
+.gitignore
+.gitattributes
+.vscode/
+.cursor/
+*.log
+*.local
+
+# Debug scripts and temp files
+fix_*.ps1
+fix_*.sh
+diff.txt
+
+# Documentation (not needed in image)
+*.md
+!README.md

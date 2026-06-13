@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 
@@ -6,12 +7,13 @@ import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 // GET /api/admin/sms - list all SMS messages across all tenants (Super Admin only)
 export async function GET(req: NextRequest) {
     try {
+        const db = getTenantClient(null);
         const user = getUserFromRequest(req);
-        if (!user || user.role !== "SUPER_ADMIN") {
+        if (!user || user.role !== "SUPER_ADMIN" || user.tenantId) {
             return errorResponse("Forbidden: Super Admin access required", 403);
         }
 
-        const messages = await prisma.smsMessage.findMany({
+        const messages = await db.smsMessage.findMany({
             include: {
                 tenant: { select: { name: true } },
                 client: { select: { fullName: true, username: true } }
@@ -41,8 +43,9 @@ export async function GET(req: NextRequest) {
 // POST /api/admin/sms - send global SMS (Super Admin only)
 export async function POST(req: NextRequest) {
     try {
+        const db = getTenantClient(null);
         const user = getUserFromRequest(req);
-        if (!user || user.role !== "SUPER_ADMIN") {
+        if (!user || user.role !== "SUPER_ADMIN" || user.tenantId) {
             return errorResponse("Forbidden: Super Admin access required", 403);
         }
 
@@ -54,7 +57,7 @@ export async function POST(req: NextRequest) {
         }
 
         // Create the message in DB
-        const sms = await prisma.smsMessage.create({
+        const sms = await db.smsMessage.create({
             data: {
                 recipient,
                 message,

@@ -1,0 +1,24 @@
+# Frontend .dockerignore — DO-004
+node_modules/
+dist/
+
+# Test
+coverage/
+*.test.ts
+*.test.tsx
+
+# Env
+.env
+.env.*
+!.env.example
+
+# Editor / git
+.git/
+.gitignore
+.vscode/
+.cursor/
+*.log
+*.local
+
+# Docs
+*.md

@@ -89,6 +89,32 @@ export class PaymentService {
     // provided; otherwise fall back to the global buildCallbackUrl() which uses APP_URL.
     const callbackUrl = opts.callbackUrl ?? buildCallbackUrl(providerName);
 
+    // PAY-001 FIX: Idempotency check — if a transaction with this reference already
+    // exists and is PENDING or COMPLETED, return the existing state without hitting the
+    // payment gateway again. Prevents double charges on client retries or network errors.
+    const existingTx = await prisma.transaction.findFirst({
+      where: { reference, tenantId: tenantId ?? null },
+    });
+    if (existingTx) {
+      if (existingTx.status === "COMPLETED") {
+        return {
+          success: true,
+          message: "Payment already completed",
+          reference,
+          idempotent: true,
+        } as any;
+      }
+      if (existingTx.status === "PENDING") {
+        return {
+          success: true,
+          message: "Payment already initiated and is pending",
+          reference,
+          idempotent: true,
+        } as any;
+      }
+      // FAILED transactions: allow re-initiation with same reference
+    }
+
     // Load provider (DB channel config first, env fallback)
     const channel = await this.getChannel(tenantId, providerName);
     const provider = getPaymentProvider(providerName, channel);
@@ -189,7 +215,10 @@ export class PaymentService {
     // 4. Idempotency — find existing transaction
     // NOTE: include { client, invoice } — `invoice` is a new relation pending prisma generate
     const transaction = await (prisma.transaction.findFirst as any)({
-      where: { reference: parsed.transactionRef },
+      where: { 
+        reference: parsed.transactionRef,
+        ...(tenantId ? { tenantId } : {})
+      },
       include: { client: true, invoice: true },
     }) as any;
 
@@ -244,6 +273,32 @@ export class PaymentService {
       };
     }
 
+    // 5.5. Verify Amount (Prevent Partial Payment Attack)
+    if (parsed.amount !== undefined && parsed.amount < transaction.amount) {
+      await prisma.$transaction(async (tx) => {
+        await tx.transaction.update({
+          where: { id: transaction.id },
+          data: { status: "FAILED" },
+        });
+      });
+
+      await prisma.webhookLog.update({
+        where: { id: webhookLog.id },
+        data: {
+          status: "FAILED",
+          errorMessage: `Underpaid: Paid ${parsed.amount}, Expected ${transaction.amount}`,
+          processedAt: new Date(),
+        },
+      });
+
+      return {
+        processed: true,
+        transactionRef: parsed.transactionRef,
+        status: "FAILED",
+        message: "Payment amount does not match transaction amount",
+      };
+    }
+
     // 6. Handle SUCCESSFUL payment
     // E10 FIX: Look up package by packageId stored on Transaction first,
     // fall back to planName (string) only if packageId is absent.
@@ -259,14 +314,6 @@ export class PaymentService {
     // DB transaction: mark paid, create/extend subscription, activate client
     let duplicateDetected = false;
     const result = await prisma.$transaction(async (tx) => {
-      // Idempotency Lock: Re-fetch transaction to guarantee it hasn't been processed by a concurrent webhook
-      const currentTx = await tx.transaction.findUnique({
-        where: { id: transaction.id }
-      });
-      if (currentTx?.status === "COMPLETED") {
-        duplicateDetected = true;
-        return { updatedTx: null, sub: null };
-      }
       const now = new Date();
       let baseDate = now;
 
@@ -297,9 +344,22 @@ export class PaymentService {
         }
       }
 
-      const updatedTx = await tx.transaction.update({
-        where: { id: transaction.id },
+      // Idempotency Lock: Use atomic updateMany to ensure we only update if it's not already COMPLETED
+      const updateResult = await tx.transaction.updateMany({
+        where: { 
+          id: transaction.id,
+          status: { not: "COMPLETED" } 
+        },
         data: { status: "COMPLETED", expiryDate: expiresAt },
+      });
+
+      if (updateResult.count === 0) {
+        duplicateDetected = true;
+        return { updatedTx: null, sub: null };
+      }
+
+      const updatedTx = await tx.transaction.findUnique({
+        where: { id: transaction.id }
       });
 
       // PAY-002 FIX: If this transaction was initiated from an invoice payment,

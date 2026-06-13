@@ -141,6 +141,29 @@ export async function POST(req: NextRequest) {
             return errorResponse("Username already exists", 409);
         }
 
+        if (!tenantIdValue) {
+            return errorResponse("Tenant ID is required", 400);
+        }
+
+        const tenant = await prisma.tenant.findUnique({
+            where: { id: tenantIdValue },
+            include: { plan: true, clients: { select: { id: true, serviceType: true } } }
+        });
+
+        if (tenant) {
+            const pppoeClientsCount = tenant.clients.filter(c => c.serviceType === "PPPOE").length;
+            const hotspotClientsCount = tenant.clients.filter(c => c.serviceType === "HOTSPOT").length;
+            const requestedServiceType = body.serviceType || body.service_type || "HOTSPOT";
+
+            if (requestedServiceType === "PPPOE" && pppoeClientsCount >= tenant.plan.pppoeLimit) {
+                return errorResponse(`PPPoE client limit reached. Your plan allows up to ${tenant.plan.pppoeLimit} PPPoE clients.`, 403);
+            }
+
+            if (requestedServiceType === "HOTSPOT" && tenant.plan.hotspotLimit !== null && hotspotClientsCount >= tenant.plan.hotspotLimit) {
+                return errorResponse(`Hotspot client limit reached. Your plan allows up to ${tenant.plan.hotspotLimit} Hotspot clients.`, 403);
+            }
+        }
+
         const clientData = {
             username,
             fullName,

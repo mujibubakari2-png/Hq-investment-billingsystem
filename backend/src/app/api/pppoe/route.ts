@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 
@@ -8,6 +9,7 @@ export async function GET(req: NextRequest) {
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
 
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
         const tenantFilter = { tenantId: userPayload.tenantId };
@@ -30,7 +32,7 @@ export async function GET(req: NextRequest) {
             whereCondition.routerId = routerId;
         }
 
-        const subscriptions = await prisma.subscription.findMany({
+        const subscriptions = await db.subscription.findMany({
             where: whereCondition,
             include: { client: true, package: true, router: true },
             orderBy: { createdAt: "desc" },
@@ -38,7 +40,7 @@ export async function GET(req: NextRequest) {
             take: limit
         });
 
-        const total = await prisma.subscription.count({ where: whereCondition });
+        const total = await db.subscription.count({ where: whereCondition });
 
         // Date helper
         const isValidDate = (d: any) => d instanceof Date && !isNaN(d.getTime());

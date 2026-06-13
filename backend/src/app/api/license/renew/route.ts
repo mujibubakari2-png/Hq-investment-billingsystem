@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { randomUUID } from "node:crypto";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { getPaymentProvider } from "@/lib/payments/registry";
@@ -10,6 +11,7 @@ export async function POST(req: NextRequest) {
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
         if (userPayload.role !== "SUPER_ADMIN" || isPlatformSuperAdmin(userPayload)) {
             return errorResponse("Forbidden: Only the tenant Super Admin can renew licenses", 403);
         }
@@ -24,7 +26,7 @@ export async function POST(req: NextRequest) {
             return errorResponse("Missing package details", 400);
         }
 
-        const tenant = await prisma.tenant.findUnique({
+        const tenant = await db.tenant.findUnique({
             where: { id: tenantId },
             include: { plan: true }
         });
@@ -34,14 +36,14 @@ export async function POST(req: NextRequest) {
         let invoice;
         
         if (invoiceId) {
-            invoice = await prisma.tenantInvoice.findUnique({
+            invoice = await db.tenantInvoice.findUnique({
                 where: { id: invoiceId }
             });
             if (!invoice) return errorResponse("Invoice not found", 404);
             if (invoice.tenantId !== tenant.id) return errorResponse("Forbidden", 403);
         } else {
             // FIX: Avoid duplicating PENDING invoices. Delete any existing PENDING invoice before creating a new one.
-            await prisma.tenantInvoice.deleteMany({
+            await db.tenantInvoice.deleteMany({
                 where: { 
                     tenantId: tenant.id,
                     status: "PENDING",
@@ -51,7 +53,7 @@ export async function POST(req: NextRequest) {
 
             // CREATE NEW PENDING INVOICE
             const invoiceNumber = `INV-${new Date().getFullYear()}-${randomUUID().replace(/-/g, "").slice(0, 8).toUpperCase()}`;
-            invoice = await prisma.tenantInvoice.create({
+            invoice = await db.tenantInvoice.create({
                 data: {
                     invoiceNumber,
                     tenantId: tenant.id,
@@ -73,7 +75,7 @@ export async function POST(req: NextRequest) {
         let providerName = "PALMPESA"; // default
         
         // Prefer the configured global PaymentChannel for the platform
-        const systemChannel = await prisma.paymentChannel.findFirst({
+        const systemChannel = await db.paymentChannel.findFirst({
             where: { status: "ACTIVE", tenantId: null }
         });
         

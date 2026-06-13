@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 
@@ -9,6 +10,7 @@ export async function GET(req: NextRequest) {
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
 
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
         const tenantFilter = isSuperAdmin ? {} : { tenantId: userPayload.tenantId };
@@ -31,7 +33,7 @@ export async function GET(req: NextRequest) {
         }
 
         const [vouchers, total] = await Promise.all([
-            prisma.voucher.findMany({
+            db.voucher.findMany({
                 where,
                 include: {
                     package: { select: { name: true, type: true } },
@@ -42,7 +44,7 @@ export async function GET(req: NextRequest) {
                 skip,
                 take: limit,
             }),
-            prisma.voucher.count({ where }),
+            db.voucher.count({ where }),
         ]);
 
         const mapped = vouchers.map((v: any) => ({
@@ -70,13 +72,14 @@ export async function GET(req: NextRequest) {
 // POST /api/vouchers - single voucher creation
 export async function POST(req: NextRequest) {
     try {
+        const db = getTenantClient(null);
         const body = await req.json();
         const { code, packageId, routerId, createdById } = body;
 
         if (!packageId) return errorResponse("packageId is required");
 
-        let pkg = await prisma.package.findUnique({ where: { id: packageId } });
-        if (!pkg) pkg = await prisma.package.findFirst({ where: { name: packageId } });
+        let pkg = await db.package.findUnique({ where: { id: packageId } });
+        if (!pkg) pkg = await db.package.findFirst({ where: { name: packageId } });
         if (!pkg) return errorResponse("Package not found", 404);
 
         // Prefer logged-in user from JWT token, then body, then admin fallback
@@ -93,7 +96,7 @@ export async function POST(req: NextRequest) {
         const routerIdValue = normalizedRouterId ? normalizedRouterId : null;
 
         if (routerIdValue) {
-            const router = await prisma.router.findUnique({ where: { id: routerIdValue } });
+            const router = await db.router.findUnique({ where: { id: routerIdValue } });
             if (!router) return errorResponse("Router not found", 404);
             if (!isSuperAdmin && router.tenantId !== currentUser.tenantId) {
                 return errorResponse("Forbidden: Router belongs to another tenant", 403);
@@ -103,7 +106,7 @@ export async function POST(req: NextRequest) {
         const tenantFilter = { tenantId: isSuperAdmin ? undefined : currentUser.tenantId };
         let finalCreatedById = currentUser?.userId || createdById;
         if (!finalCreatedById) {
-            const admin = await prisma.user.findFirst({ where: { role: { in: ["ADMIN", "SUPER_ADMIN"] } } });
+            const admin = await db.user.findFirst({ where: { role: { in: ["ADMIN", "SUPER_ADMIN"] } } });
             finalCreatedById = admin?.id;
         }
 
@@ -113,10 +116,10 @@ export async function POST(req: NextRequest) {
         const tenantIdValue = isSuperAdmin ? pkg.tenantId : currentUser.tenantId;
 
         // Ensure code is unique for friendly error message
-        const exists = await prisma.voucher.findUnique({ where: { code: finalCode } });
+        const exists = await db.voucher.findUnique({ where: { code: finalCode } });
         if (exists) return errorResponse("Voucher code already exists", 409);
 
-        const voucher = await prisma.voucher.create({
+        const voucher = await db.voucher.create({
             data: {
                 code: finalCode,
                 packageId: pkg.id,

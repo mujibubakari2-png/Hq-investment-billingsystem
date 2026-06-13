@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { encrypt, decrypt } from "@/lib/encryption";
@@ -8,11 +9,12 @@ export async function GET(req: NextRequest) {
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
 
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
         const tenantFilter = isSuperAdmin ? {} : { tenantId: userPayload.tenantId };
 
-        const vpnUsers = await prisma.vpnUser.findMany({
+        const vpnUsers = await db.vpnUser.findMany({
             where: { ...tenantFilter },
             include: { router: { select: { id: true, name: true, host: true } } },
             orderBy: { createdAt: "desc" },
@@ -50,6 +52,7 @@ export async function POST(req: NextRequest) {
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
 
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
 
@@ -61,7 +64,7 @@ export async function POST(req: NextRequest) {
         }
 
         // Verify router belongs to user's tenant
-        const router = await prisma.router.findUnique({ where: { id: routerId } });
+        const router = await db.router.findUnique({ where: { id: routerId } });
         if (!router) return errorResponse("Router not found", 404);
         if (!isSuperAdmin && router.tenantId !== userPayload.tenantId) {
             return errorResponse("Forbidden", 403);
@@ -70,12 +73,12 @@ export async function POST(req: NextRequest) {
         const tenantIdValue = isSuperAdmin ? router.tenantId : userPayload.tenantId;
 
         // Check for duplicate username within the same tenant
-        const existing = await prisma.vpnUser.findFirst({ 
+        const existing = await db.vpnUser.findFirst({ 
             where: { username, tenantId: tenantIdValue } 
         });
         if (existing) return errorResponse("VPN username already exists for this tenant", 409);
 
-        const vpnUser = await prisma.vpnUser.create({
+        const vpnUser = await db.vpnUser.create({
             data: {
                 username,
                 // VPN-001 FIX: Encrypt password at rest. For WireGuard, 'password' holds

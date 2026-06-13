@@ -11,16 +11,51 @@ function isNextBuild(): boolean {
     );
 }
 
-function getJwtSecret(): string {
-    // SEC-008 FIX: Do NOT cache the secret at module level.
-    // Module-level caching in Next.js serverless can return a stale secret after
-    // env rotation or in edge environments where modules are reloaded between requests.
-    const secret = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET;
+// ── CRIT-006 FIX: Separate secrets for access and refresh tokens ──────────────
+//
+// Previously both signToken() and signRefreshToken() used the same JWT_SECRET.
+// This meant a stolen 7-day refresh token could be submitted as a 2h access
+// token (since the signature was valid for both). An attacker only needed to
+// change the `expiresIn` claim or strip it entirely to bypass the short window.
+//
+// Fix: Two distinct env vars — one per token type. Each secret is validated
+// independently. Both must be set and must be different from each other.
+// Adding `aud` (audience) + `iss` (issuer) claims ensures tokens can't be
+// reused across endpoints even if one secret is leaked.
+
+function getAccessSecret(): string {
+    if (isNextBuild()) return "build-placeholder";
+    const secret = process.env.JWT_ACCESS_SECRET;
     if (!secret) {
-        throw new Error("FATAL: JWT_SECRET or NEXTAUTH_SECRET environment variable is required. Add it to your .env file.");
+        throw new Error(
+            "FATAL: JWT_ACCESS_SECRET environment variable is required. " +
+            "Generate with: node -e \"console.log(require('crypto').randomBytes(48).toString('hex'))\""
+        );
     }
     if (secret.length < 32) {
-        throw new Error("FATAL: JWT_SECRET or NEXTAUTH_SECRET must be at least 32 characters long for security.");
+        throw new Error("FATAL: JWT_ACCESS_SECRET must be at least 32 characters long.");
+    }
+    return secret;
+}
+
+function getRefreshSecret(): string {
+    if (isNextBuild()) return "build-placeholder-refresh";
+    const secret = process.env.JWT_REFRESH_SECRET;
+    if (!secret) {
+        throw new Error(
+            "FATAL: JWT_REFRESH_SECRET environment variable is required. " +
+            "Generate with: node -e \"console.log(require('crypto').randomBytes(48).toString('hex'))\""
+        );
+    }
+    if (secret.length < 32) {
+        throw new Error("FATAL: JWT_REFRESH_SECRET must be at least 32 characters long.");
+    }
+    // Prevent accidental reuse of the same secret for both token types
+    if (secret === process.env.JWT_ACCESS_SECRET) {
+        throw new Error(
+            "FATAL: JWT_REFRESH_SECRET must be different from JWT_ACCESS_SECRET. " +
+            "Using the same secret defeats the purpose of having separate token types."
+        );
     }
     return secret;
 }
@@ -31,6 +66,8 @@ export interface JwtPayload {
     role: string;
     tenantId?: string | null;
     tenant_id?: string | null; // Alias for tests
+    // CRIT-006: Token type discriminator — prevents access tokens being used as refresh tokens
+    tokenType?: "access" | "refresh";
 }
 
 export class UnauthorizedError extends Error {
@@ -48,17 +85,74 @@ export function comparePassword(password: string, hash: string): Promise<boolean
     return bcrypt.compare(password, hash);
 }
 
+/**
+ * Sign a short-lived access token (2h).
+ * Uses JWT_ACCESS_SECRET. Embeds tokenType: "access" claim.
+ */
 export function signToken(payload: JwtPayload): string {
-    return jwt.sign(payload, getJwtSecret(), { expiresIn: "2h" }); // Extended from 30m for long ISP agent sessions
+    return jwt.sign(
+        { ...payload, tokenType: "access" },
+        getAccessSecret(),
+        {
+            expiresIn: "2h",
+            issuer: "hq-investment-isp",
+            audience: "hq-investment-app",
+        }
+    );
 }
 
+/**
+ * Sign a long-lived refresh token (7d).
+ * Uses JWT_REFRESH_SECRET. Embeds tokenType: "refresh" claim.
+ */
 export function signRefreshToken(payload: JwtPayload): string {
-    return jwt.sign(payload, getJwtSecret(), { expiresIn: "7d" });
+    return jwt.sign(
+        { ...payload, tokenType: "refresh" },
+        getRefreshSecret(),
+        {
+            expiresIn: "7d",
+            issuer: "hq-investment-isp",
+            audience: "hq-investment-refresh",
+        }
+    );
 }
 
+/**
+ * Verify an access token.
+ * CRIT-006 FIX: Uses JWT_ACCESS_SECRET; rejects refresh tokens submitted here.
+ */
 export function verifyToken(token: string): JwtPayload | null {
     try {
-        return jwt.verify(token, getJwtSecret()) as JwtPayload;
+        const payload = jwt.verify(token, getAccessSecret(), {
+            issuer: "hq-investment-isp",
+            audience: "hq-investment-app",
+        }) as JwtPayload;
+
+        // Reject if someone submits a refresh token to an access-token endpoint
+        if (payload.tokenType && payload.tokenType !== "access") {
+            return null;
+        }
+        return payload;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Verify a refresh token.
+ * Uses JWT_REFRESH_SECRET; rejects access tokens submitted here.
+ */
+export function verifyRefreshToken(token: string): JwtPayload | null {
+    try {
+        const payload = jwt.verify(token, getRefreshSecret(), {
+            issuer: "hq-investment-isp",
+            audience: "hq-investment-refresh",
+        }) as JwtPayload;
+
+        if (payload.tokenType && payload.tokenType !== "refresh") {
+            return null;
+        }
+        return payload;
     } catch {
         return null;
     }
@@ -89,7 +183,7 @@ export function getUserFromRequest(req: NextRequest): JwtPayload | null {
 /**
  * Enforce authentication for API routes.
  *
- * Throws an Error when the request does not contain a valid JWT.
+ * Throws an UnauthorizedError when the request does not contain a valid JWT.
  * Routes should wrap calls in a try/catch and return `errorResponse`
  * with status 401 on failure.
  */

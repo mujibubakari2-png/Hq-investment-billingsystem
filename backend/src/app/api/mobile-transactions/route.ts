@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { toISOSafe, toTimestampSafe, getStartOfTodayTZ, getStartOfMonthTZ, getEndOfMonthTZ } from "@/lib/dateUtils";
@@ -7,6 +8,7 @@ export async function GET(req: NextRequest) {
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
 
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
         const tenantFilter: { tenantId?: string | null } = isSuperAdmin ? {} : { tenantId: userPayload.tenantId };
@@ -20,11 +22,11 @@ export async function GET(req: NextRequest) {
         }
         
         // Fetch settings to determine active gateways scoped by tenantId
-        let gwSetting = await prisma.systemSetting.findFirst({ where: { key: 'paymentGateways', ...tenantFilter } });
+        let gwSetting = await db.systemSetting.findFirst({ where: { key: 'paymentGateways', ...tenantFilter } });
         
         // Fallback to global setting if no tenant-specific override exists
         if (!gwSetting && !isSuperAdmin) {
-            gwSetting = await prisma.systemSetting.findFirst({ where: { key: 'paymentGateways', tenantId: null } });
+            gwSetting = await db.systemSetting.findFirst({ where: { key: 'paymentGateways', tenantId: null } });
         }
         
         let activeGws: string[] = [];
@@ -47,7 +49,7 @@ export async function GET(req: NextRequest) {
         const limit = limitParam === "All" ? 999999 : parseInt(limitParam);
 
         // Fetch all transactions scoped by tenantId
-        const transactions = await prisma.transaction.findMany({
+        const transactions = await db.transaction.findMany({
             where: { ...tenantFilter },
             include: { client: { select: { username: true, fullName: true } } },
             orderBy: { createdAt: "desc" },

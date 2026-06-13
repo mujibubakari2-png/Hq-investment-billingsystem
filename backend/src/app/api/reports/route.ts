@@ -1,3 +1,4 @@
+import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { NextRequest } from "next/server";
@@ -7,6 +8,7 @@ export async function GET(req: NextRequest) {
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
 
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
         const tenantFilter = { tenantId: userPayload.tenantId };
@@ -37,7 +39,7 @@ export async function GET(req: NextRequest) {
 
         switch (type) {
             case "revenue": {
-                const transactions = await prisma.transaction.findMany({
+                const transactions = await db.transaction.findMany({
                     where: {
                         status: "COMPLETED",
                         createdAt: { gte: startDate },
@@ -65,10 +67,10 @@ export async function GET(req: NextRequest) {
 
             case "clients": {
                 const [total, active, inactive, newClients] = await Promise.all([
-                    prisma.client.count({ where: { ...tenantFilter } }),
-                    prisma.client.count({ where: { status: "ACTIVE", ...tenantFilter } }),
-                    prisma.client.count({ where: { status: { in: ["INACTIVE", "EXPIRED", "SUSPENDED"] }, ...tenantFilter } }),
-                    prisma.client.count({ where: { createdAt: { gte: startDate }, ...tenantFilter } }),
+                    db.client.count({ where: { ...tenantFilter } }),
+                    db.client.count({ where: { status: "ACTIVE", ...tenantFilter } }),
+                    db.client.count({ where: { status: { in: ["INACTIVE", "EXPIRED", "SUSPENDED"] }, ...tenantFilter } }),
+                    db.client.count({ where: { createdAt: { gte: startDate }, ...tenantFilter } }),
                 ]);
 
                 data = { 
@@ -82,9 +84,9 @@ export async function GET(req: NextRequest) {
 
             case "subscriptions": {
                 const [active, expired, total] = await Promise.all([
-                    prisma.subscription.count({ where: { status: "ACTIVE", ...tenantFilter } }),
-                    prisma.subscription.count({ where: { status: "EXPIRED", ...tenantFilter } }),
-                    prisma.subscription.count({ where: { ...tenantFilter } }),
+                    db.subscription.count({ where: { status: "ACTIVE", ...tenantFilter } }),
+                    db.subscription.count({ where: { status: "EXPIRED", ...tenantFilter } }),
+                    db.subscription.count({ where: { ...tenantFilter } }),
                 ]);
 
                 data = { 

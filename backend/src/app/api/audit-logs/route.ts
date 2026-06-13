@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { requirePermission } from "@/lib/rbac";
@@ -30,6 +31,7 @@ export async function GET(req: NextRequest) {
     const to     = searchParams.get("to")     || undefined;
 
     try {
+        const db = getTenantClient(null);
         const where: Record<string, unknown> = { tenantId };
 
         if (userId) where.userId = userId;
@@ -42,8 +44,8 @@ export async function GET(req: NextRequest) {
         }
 
         const [total, logs] = await Promise.all([
-            prisma.auditLog.count({ where }),
-            prisma.auditLog.findMany({
+            db.auditLog.count({ where }),
+            db.auditLog.findMany({
                 where,
                 orderBy: { createdAt: "desc" },
                 skip: (page - 1) * limit,

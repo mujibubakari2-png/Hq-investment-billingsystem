@@ -25,9 +25,9 @@ export default function EditVoucherModal({ voucher, onClose, onSave }: EditVouch
             await fetch(`${(import.meta.env.VITE_API_URL as string) ?? ''}/api/vouchers/${voucher.id}`, {
                 method: 'PUT',
                 headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${localStorage.getItem('token')}`
+                    'Content-Type': 'application/json'
                 },
+                credentials: 'include',
                 body: JSON.stringify({ code, status: status.toUpperCase(), customer, usedBy })
             });
 

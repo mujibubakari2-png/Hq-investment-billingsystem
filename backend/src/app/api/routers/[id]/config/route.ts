@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { getUserFromRequest, errorResponse, jsonResponse } from "@/lib/auth";
 
@@ -11,9 +12,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
 
         const { id } = await params;
-        const router = await prisma.router.findUnique({
+        const router = await db.router.findUnique({
             where: { id },
             include: {
                 tenant: { select: { name: true } }

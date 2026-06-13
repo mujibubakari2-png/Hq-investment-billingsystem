@@ -17,7 +17,7 @@ async function main() {
                 id: p.id,
                 name: p.name,
                 price: `${p.price.toLocaleString()} TSH`,
-                pppoeLimit: p.clientLimit,
+                pppoeLimit: p.pppoeLimit,
             })));
             return;
         }
@@ -25,10 +25,10 @@ async function main() {
         console.log("Creating SaaS Plans...");
         await prisma.saasPlan.createMany({
             data: [
-                { id: "free_trial",      name: "10-Day Free Trial", price: 0,     clientLimit: 10   },
-                { id: "plan_starter",    name: "Starter",           price: 15000, clientLimit: 150  },
-                { id: "plan_business",   name: "Business",          price: 30000, clientLimit: 300  },
-                { id: "plan_enterprise", name: "Enterprise",        price: 50000, clientLimit: 5000 },
+                { id: "free_trial",      name: "10-Day Free Trial", price: 0,     pppoeLimit: 10, hotspotLimit: null, maxRouters: 1 },
+                { id: "plan_starter",    name: "Starter",           price: 15000, pppoeLimit: 150, hotspotLimit: null, maxRouters: 3 },
+                { id: "plan_business",   name: "Business",          price: 30000, pppoeLimit: 300, hotspotLimit: null, maxRouters: 5 },
+                { id: "plan_enterprise", name: "Enterprise",        price: 50000, pppoeLimit: 5000, hotspotLimit: null, maxRouters: 10 },
             ],
             skipDuplicates: true,
         });

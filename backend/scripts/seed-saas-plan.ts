@@ -17,7 +17,9 @@ async function main() {
             data: {
                 name: "Basic Plan",
                 price: 100000,
-                clientLimit: 500
+                pppoeLimit: 500,
+                hotspotLimit: null,
+                maxRouters: 5
             }
         });
         console.log("  ✓ Created basic SaaS plan:", plan.id);

@@ -1,0 +1,101 @@
+# Default values for HQ INVESTMENT ISP Platform
+# This is a YAML-formatted file.
+
+global:
+  domain: hqinvestment.local
+  tls:
+    enabled: false
+    secretName: hq-tls-secret
+
+backend:
+  replicaCount: 1
+  image:
+    repository: hqinvestment/backend
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 3001
+  env:
+    NODE_ENV: "production"
+    APP_NAME: "HQ INVESTMENT"
+    LOG_LEVEL: "info"
+    PAYMENT_ENVIRONMENT: "sandbox"
+  resources:
+    limits:
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+frontend:
+  replicaCount: 1
+  image:
+    repository: hqinvestment/frontend
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 80
+  resources:
+    limits:
+      memory: 128Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+
+postgres:
+  enabled: true
+  image:
+    repository: postgres
+    tag: "16-alpine"
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 5432
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClass: ""
+  resources:
+    limits:
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+redis:
+  enabled: true
+  image:
+    repository: redis
+    tag: "7-alpine"
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 6379
+  persistence:
+    enabled: true
+    size: 2Gi
+    storageClass: ""
+  resources:
+    limits:
+      memory: 128Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+
+# Secrets MUST be overridden in production via --set or a secure values file
+secrets:
+  databasePassword: "hq-super-secure-db-password"
+  jwtAccessSecret: "generate-a-random-96-char-hex-string-for-access-token"
+  jwtRefreshSecret: "generate-a-random-96-char-hex-string-for-refresh-token"
+  fieldEncryptionKey: "generate-a-random-64-char-hex-string-for-db-encryption"
+  cronSecret: "generate-a-random-16-char-string-for-cron"
+
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"

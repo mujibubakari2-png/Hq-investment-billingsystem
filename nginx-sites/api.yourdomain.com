@@ -33,18 +33,25 @@ server {
     include             /etc/letsencrypt/options-ssl-nginx.conf;
     ssl_dhparam         /etc/letsencrypt/ssl-dhparams.pem;
 
-    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
+    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
     add_header X-Frame-Options            "DENY" always;
     add_header X-Content-Type-Options     "nosniff" always;
     add_header Referrer-Policy            "strict-origin-when-cross-origin" always;
+    # SEC-004 FIX: Content-Security-Policy — API only serves JSON; block all framing/scripts
+    add_header Content-Security-Policy    "default-src 'none'; frame-ancestors 'none'" always;
+    # SEC-004 FIX: Disable browser features not needed by API
+    add_header Permissions-Policy         "geolocation=(), microphone=(), camera=(), payment=()" always;
+    # Tracing: unique request ID propagated to backend logs
+    add_header X-Request-ID               $request_id always;
 
     add_header Access-Control-Allow-Origin      "https://app.yourdomain.com" always;
     add_header Access-Control-Allow-Methods     "GET, POST, PUT, DELETE, PATCH, OPTIONS" always;
-    add_header Access-Control-Allow-Headers     "Authorization, Content-Type, X-Requested-With" always;
+    add_header Access-Control-Allow-Headers     "Authorization, Content-Type, X-Requested-With, X-Request-ID" always;
     add_header Access-Control-Allow-Credentials "true" always;
     add_header Access-Control-Max-Age           "86400" always;
 
-    client_max_body_size    50M;
+    # SEC-004 FIX: Reduced from 50M — only the /api/upload route needs large bodies
+    client_max_body_size    10M;
     client_body_buffer_size 128k;
 
     if ($http_next_action) {

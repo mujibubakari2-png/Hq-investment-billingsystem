@@ -43,7 +43,7 @@ export default function Contact() {
                 <div className="p-3 bg-blue-100 text-primary rounded-full">
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
                 </div>
-                <span className="text-lg text-gray-700">support@hqinvestment.co.tz</span>
+                <span className="text-lg text-gray-700">support@yourdomain.com</span>
               </div>
               <div className="flex items-center space-x-4">
                 <div className="p-3 bg-blue-100 text-primary rounded-full">
@@ -69,7 +69,7 @@ export default function Contact() {
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-secondary transition-all"
-                  placeholder="John Mwangi"
+                  placeholder="mujibu bakari"
                 />
               </div>
               <div>
@@ -97,14 +97,13 @@ export default function Contact() {
               <button
                 type="submit"
                 disabled={status === "loading"}
-                className={`w-full py-4 rounded-xl text-lg font-bold text-white transition-all ${
-                  status === "loading" ? "bg-gray-400" : "bg-primary hover:bg-accent"
-                }`}
+                className={`w-full py-4 rounded-xl text-lg font-bold text-white transition-all ${status === "loading" ? "bg-gray-400" : "bg-primary hover:bg-accent"
+                  }`}
               >
                 {status === "loading" ? "Sending..." : "Send Message →"}
               </button>
               {status === "success" && <p className="text-green-600 font-medium text-center">Message received! We'll get back to you within a few hours.</p>}
-              {status === "error" && <p className="text-red-600 font-medium text-center">Something went wrong. Please try again or email us directly at support@hqinvestment.co.tz</p>}
+              {status === "error" && <p className="text-red-600 font-medium text-center">Something went wrong. Please try again or email us directly at support@yourdomain.com</p>}
             </form>
           </motion.div>
         </div>

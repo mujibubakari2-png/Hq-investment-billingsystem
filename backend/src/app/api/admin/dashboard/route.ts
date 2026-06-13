@@ -1,13 +1,14 @@
 import { NextRequest } from "next/server";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { errorResponse, jsonResponse, getUserFromRequest } from "@/lib/auth";
 
-
 export async function GET(req: NextRequest) {
     try {
+        const db = getTenantClient(null);
         const user = getUserFromRequest(req);
-        if (!user || user.role !== "SUPER_ADMIN") {
-            return errorResponse("Forbidden: Super Admin access required", 403);
+        if (!user || user.role !== "SUPER_ADMIN" || user.tenantId) {
+            return errorResponse("Forbidden: Platform Admin access required", 403);
         }
 
         const [
@@ -17,14 +18,14 @@ export async function GET(req: NextRequest) {
             revenueResult,
             unpaidInvoices
         ] = await Promise.all([
-            prisma.tenant.count(),
-            prisma.tenant.count({ where: { status: "ACTIVE" } }),
-            prisma.tenant.count({ where: { status: "TRIALLING" } }),
-            prisma.tenantPayment.aggregate({
+            db.tenant.count(),
+            db.tenant.count({ where: { status: "ACTIVE" } }),
+            db.tenant.count({ where: { status: "TRIALLING" } }),
+            db.tenantPayment.aggregate({
                 _sum: { amount: true },
                 where: { status: "COMPLETED" }
             }),
-            prisma.tenantInvoice.count({ where: { status: "PENDING" } })
+            db.tenantInvoice.count({ where: { status: "PENDING" } })
         ]);
 
         return jsonResponse({

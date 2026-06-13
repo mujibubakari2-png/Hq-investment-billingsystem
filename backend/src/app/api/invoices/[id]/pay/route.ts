@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { paymentService } from "@/lib/payments/service";
@@ -21,6 +22,7 @@ export async function POST(
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
         if (!["SUPER_ADMIN", "ADMIN"].includes(userPayload.role)) {
             return errorResponse("Forbidden", 403);
         }
@@ -28,7 +30,7 @@ export async function POST(
         const { id } = await params;
 
         // Load invoice with client
-        const invoice = await prisma.invoice.findUnique({
+        const invoice = await db.invoice.findUnique({
             where: { id },
             include: { client: true, items: true },
         });
@@ -51,7 +53,7 @@ export async function POST(
         }
 
         // Auto-resolve provider: find first active mobile PaymentChannel for this tenant
-        const channel = await prisma.paymentChannel.findFirst({
+        const channel = await db.paymentChannel.findFirst({
             where: {
                 status: "ACTIVE",
                 tenantId: invoice.tenantId ?? null,
@@ -71,7 +73,7 @@ export async function POST(
 
         // Create PENDING transaction linked to the invoice
         // NOTE: invoiceId is a new schema field — uses `as any` until prisma generate runs
-        const transaction = await (prisma.transaction.create as any)({
+        const transaction = await (db.transaction.create as any)({
             data: {
                 clientId: client.id,
                 planName: `Invoice ${invoice.invoiceNumber}`,
@@ -97,7 +99,7 @@ export async function POST(
         });
 
         if (!result.success) {
-            await prisma.transaction.update({
+            await db.transaction.update({
                 where: { id: transaction.id },
                 data: { status: "FAILED" },
             });

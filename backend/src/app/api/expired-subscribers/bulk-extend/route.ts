@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { getMikroTikService } from "@/lib/mikrotik";
@@ -8,6 +9,7 @@ export async function POST(req: NextRequest) {
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
 
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
         const tenantFilter = { tenantId: userPayload.tenantId };
@@ -19,7 +21,7 @@ export async function POST(req: NextRequest) {
             return errorResponse("Please select at least one expired subscriber to bulk extend.");
         }
 
-        const subs = await prisma.subscription.findMany({
+        const subs = await db.subscription.findMany({
             where: { id: { in: subscriptionIds }, status: "EXPIRED", ...tenantFilter },
             include: { client: true, package: true, router: true },
         });
@@ -47,7 +49,7 @@ export async function POST(req: NextRequest) {
                 await mikrotik.activateService(sub.client.username, pwd, sub.package.name, type);
 
                 // Update database
-                await prisma.subscription.update({
+                await db.subscription.update({
                     where: { id: sub.id },
                     data: {
                         status: "ACTIVE",
@@ -57,7 +59,7 @@ export async function POST(req: NextRequest) {
                 });
 
                 // Record log
-                await prisma.routerLog.create({
+                await db.routerLog.create({
                     data: {
                         routerId: sub.routerId,
                         action: "BULK_EXTEND_SUCCESS",
@@ -93,7 +95,7 @@ export async function POST(req: NextRequest) {
             } catch (err: any) {
                 console.error(`Bulk extend specific error on ${sub.id}:`, err);
                 // Mark DB
-                await prisma.subscription.update({
+                await db.subscription.update({
                     where: { id: sub.id },
                     data: {
                         syncStatus: "FAILED_SYNC"
@@ -101,7 +103,7 @@ export async function POST(req: NextRequest) {
                 });
                 
                 if (sub.routerId && sub.client) {
-                    await prisma.routerLog.create({
+                    await db.routerLog.create({
                         data: {
                             routerId: sub.routerId,
                             action: "BULK_EXTEND_FAILED",

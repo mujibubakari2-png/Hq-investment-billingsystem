@@ -44,7 +44,7 @@ export const paymentChannelsApi = {
 export interface LicenseResponse {
     isSuperAdmin: boolean; companyName?: string; licenseKey?: string;
     status?: string; daysRemaining?: number; expiresAt?: string;
-    customersCount?: number; clientLimit?: number; paidThisMonth?: number;
+    customersCount?: number; pppoeLimit?: number; hotspotLimit?: number | null; maxRouters?: number; paidThisMonth?: number;
     hasOutstanding?: boolean; message?: string;
     plan?: { id: string; name: string; price: number };
     outstandingInvoices?: { id: string; invoiceNumber: string; amount: number; dueDate: string; status: string }[];
@@ -55,10 +55,10 @@ export const licenseApi = {
     renewLicense:(data: { packageMonths: number; phoneNumber: string; amount: number; invoiceId?: string }) =>
         post<{ success: boolean; message: string; expiresAt: string }>('/license/renew', data),
     changePlan:  (planId: string) =>
-        post<{ message: string; plan: { id: string; name: string; price: number; clientLimit: number } }>('/license/change-plan', { planId }),
+        post<{ message: string; plan: { id: string; name: string; price: number; pppoeLimit: number; hotspotLimit: number | null; maxRouters: number } }>('/license/change-plan', { planId }),
 };
 
-export interface SaasPlan { id: string; name: string; price: number; clientLimit: number; }
+export interface SaasPlan { id: string; name: string; price: number; pppoeLimit: number; hotspotLimit: number | null; maxRouters: number; }
 export const saasPlansApi = { list: () => get<SaasPlan[]>('/saas-plans') };
 
 export const reportsApi = {

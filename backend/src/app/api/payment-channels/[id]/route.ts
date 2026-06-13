@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { encryptPaymentChannelFields } from "@/lib/encryption";
@@ -8,13 +9,14 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
         if (userPayload.role !== "SUPER_ADMIN") {
             return errorResponse("Forbidden: Only the tenant Super Admin can manage payment channels", 403);
         }
 
         const { id } = await params;
         const body = await req.json();
-        const existing = await prisma.paymentChannel.findUnique({ where: { id } });
+        const existing = await db.paymentChannel.findUnique({ where: { id } });
         if (!existing) return errorResponse("Payment channel not found", 404);
         if (!canAccessTenant(userPayload, existing.tenantId)) {
             return errorResponse("Forbidden", 403);
@@ -26,7 +28,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
             webhookSecret: body.webhookSecret,
         });
 
-        const channel = await prisma.paymentChannel.update({
+        const channel = await db.paymentChannel.update({
             where: { id },
             data: {
                 name: body.name,
@@ -39,7 +41,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         });
 
         if (channel.tenantId) {
-            await prisma.tenantPaymentGateway.upsert({
+            await db.tenantPaymentGateway.upsert({
                 where: {
                     tenantId_provider: {
                         tenantId: channel.tenantId,
@@ -73,20 +75,21 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
         if (userPayload.role !== "SUPER_ADMIN") {
             return errorResponse("Forbidden: Only the tenant Super Admin can manage payment channels", 403);
         }
 
         const { id } = await params;
-        const existing = await prisma.paymentChannel.findUnique({ where: { id } });
+        const existing = await db.paymentChannel.findUnique({ where: { id } });
         if (!existing) return errorResponse("Payment channel not found", 404);
         if (!canAccessTenant(userPayload, existing.tenantId)) {
             return errorResponse("Forbidden", 403);
         }
 
-        await prisma.paymentChannel.delete({ where: { id } });
+        await db.paymentChannel.delete({ where: { id } });
         if (existing.tenantId) {
-            await prisma.tenantPaymentGateway.updateMany({
+            await db.tenantPaymentGateway.updateMany({
                 where: { tenantId: existing.tenantId, provider: existing.provider },
                 data: { enabled: false, status: "INACTIVE" },
             });

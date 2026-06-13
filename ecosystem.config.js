@@ -83,23 +83,5 @@ module.exports = {
 
     // The Vite frontend is served by Nginx from frontend/dist.
     // It does not need a PM2 process.
-  ],
-
-  deploy: {
-    production: {
-      user: 'ubuntu',
-      host: ['YOUR_VPS_IP'],
-      ref: 'origin/main',
-      repo: 'git@github.com:YOUR_ORG/Hq-investment-billingsystem.git',
-      path: PROJECT_DIR,
-      'pre-deploy-local': '',
-      'post-deploy':
-        'pnpm install --frozen-lockfile && ' +
-        'pnpm --filter backend build && ' +
-        'pnpm --filter landing-page build && ' +
-        'pnpm --filter frontend build && ' +
-        'pm2 reload ecosystem.config.js --env production --update-env',
-      'pre-setup': ''
-    }
-  }
+  ]
 };

@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { getTenantFilter, getAssignTenantId } from "@/lib/tenant";
@@ -8,6 +9,7 @@ export async function POST(req: NextRequest) {
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
 
         const { filter } = getTenantFilter(userPayload);
         const tenantId = getAssignTenantId(userPayload);
@@ -21,14 +23,14 @@ export async function POST(req: NextRequest) {
 
         if (clientIds && clientIds.length > 0) {
             // Send to specific clients — scoped to tenant
-            const clients = await prisma.client.findMany({
+            const clients = await db.client.findMany({
                 where: { id: { in: clientIds }, ...filter },
                 select: { id: true, phone: true },
             });
 
             for (const client of clients) {
                 if (client.phone) {
-                    const sms = await prisma.smsMessage.create({
+                    const sms = await db.smsMessage.create({
                         data: {
                             clientId: client.id,
                             recipient: client.phone,
@@ -44,7 +46,7 @@ export async function POST(req: NextRequest) {
         } else if (recipients && recipients.length > 0) {
             // Send to phone numbers directly
             for (const recipient of recipients) {
-                const sms = await prisma.smsMessage.create({
+                const sms = await db.smsMessage.create({
                     data: {
                         recipient,
                         message,

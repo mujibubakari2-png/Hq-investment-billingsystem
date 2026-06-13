@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { getTenantFilter, getAssignTenantId } from "@/lib/tenant";
@@ -8,10 +9,11 @@ export async function GET(req: NextRequest) {
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
 
         const { filter } = getTenantFilter(userPayload);
 
-        const templates = await prisma.messageTemplate.findMany({
+        const templates = await db.messageTemplate.findMany({
             where: filter,
             orderBy: { createdAt: "desc" },
         });
@@ -36,6 +38,7 @@ export async function POST(req: NextRequest) {
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
 
         const tenantId = getAssignTenantId(userPayload);
         const body = await req.json();
@@ -44,7 +47,7 @@ export async function POST(req: NextRequest) {
             return errorResponse("Name and content are required");
         }
 
-        const template = await prisma.messageTemplate.create({
+        const template = await db.messageTemplate.create({
             data: {
                 name: body.name,
                 content: body.content,

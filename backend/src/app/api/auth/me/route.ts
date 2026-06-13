@@ -1,15 +1,17 @@
 import { NextRequest } from "next/server";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { getUserFromRequest, jsonResponse, errorResponse } from "@/lib/auth";
 
 export async function GET(req: NextRequest) {
     try {
+        const db = getTenantClient(null);
         const payload = getUserFromRequest(req);
         if (!payload) {
             return errorResponse("Unauthorized", 401);
         }
 
-        const user = await prisma.user.findUnique({
+        const user = await db.user.findUnique({
             where: { id: payload.userId },
             select: {
                 id: true,

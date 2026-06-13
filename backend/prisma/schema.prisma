@@ -24,6 +24,12 @@ model User {
   // isPlatformAdmin: true for HQ INVESTMENT platform operators (no tenantId).
   // false (default) for all tenant owners and sub-users.
   isPlatformAdmin Boolean @default(false)
+  // CRIT-005 FIX: Soft delete — prevents permanent data loss on user deletion
+  deletedAt DateTime?
+  // CRIT-002 FIX: TOTP-based MFA fields
+  mfaEnabled      Boolean  @default(false)
+  mfaSecret       String?  // AES-256-GCM encrypted TOTP secret
+  mfaBackupCodes  String[] // bcrypt-hashed one-time backup codes
   auditLogs    AuditLog[]
   createdUsers User[]  @relation("UserCreatedBy")
   ownedTenants Tenant[] @relation("TenantOwner")
@@ -36,6 +42,7 @@ model User {
   @@index([createdById])
   @@index([role])
   @@index([status])
+  @@index([deletedAt])
   @@map("users")
 }
 
@@ -54,7 +61,7 @@ model UserOtp {
 
 model Client {
   id            String         @id @default(cuid())
-  username      String         @unique
+  username      String
   fullName      String
   phone         String?
   email         String?
@@ -76,6 +83,7 @@ model Client {
   @@index([status])
   @@index([serviceType])
   @@index([createdAt])
+  @@unique([username, tenantId])
   @@map("clients")
 }
 
@@ -279,7 +287,7 @@ model Equipment {
 
 model Voucher {
   id          String        @id @default(cuid())
-  code        String        @unique
+  code        String
   packageId   String
   routerId    String?
   status      VoucherStatus @default(UNUSED)
@@ -295,6 +303,7 @@ model Voucher {
   router      Router?       @relation(fields: [routerId], references: [id])
   tenant      Tenant?       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
+  @@unique([code, tenantId])
   @@map("vouchers")
 }
 
@@ -580,7 +589,9 @@ model SaasPlan {
   id          String          @id @default(cuid())
   name        String
   price       Float
-  clientLimit Int
+  pppoeLimit  Int             @default(100)
+  hotspotLimit Int?
+  maxRouters  Int             @default(1)
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
   invoices    TenantInvoice[]

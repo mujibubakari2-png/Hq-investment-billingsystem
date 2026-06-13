@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 
@@ -17,11 +18,12 @@ export async function POST(req: NextRequest) {
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
 
         const tenantFilter = { tenantId: userPayload.tenantId };
 
         // 1. Get all unique usernames currently online in RADIUS
-        const activeRadiusSessions = await prisma.radAcct.findMany({
+        const activeRadiusSessions = await db.radAcct.findMany({
             where: { acctstoptime: null, ...tenantFilter },
             select: { username: true },
             distinct: ["username"],
@@ -30,7 +32,7 @@ export async function POST(req: NextRequest) {
         const onlineUsernames = new Set(activeRadiusSessions.map((s) => s.username));
 
         // 2. Fetch all active subscriptions with their client's username
-        const activeSubscriptions = await prisma.subscription.findMany({
+        const activeSubscriptions = await db.subscription.findMany({
             where: { status: "ACTIVE", ...tenantFilter },
             select: { id: true, onlineStatus: true, client: { select: { username: true } } },
         });
@@ -52,13 +54,13 @@ export async function POST(req: NextRequest) {
         // 3. Batch update subscriptions
         const [onlineResult, offlineResult] = await Promise.all([
             toSetOnline.length > 0
-                ? prisma.subscription.updateMany({
+                ? db.subscription.updateMany({
                     where: { id: { in: toSetOnline } },
                     data: { onlineStatus: "ONLINE" },
                 })
                 : Promise.resolve({ count: 0 }),
             toSetOffline.length > 0
-                ? prisma.subscription.updateMany({
+                ? db.subscription.updateMany({
                     where: { id: { in: toSetOffline } },
                     data: { onlineStatus: "OFFLINE" },
                 })
@@ -92,11 +94,12 @@ export async function GET(req: NextRequest) {
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
 
         const tenantFilter = { tenantId: userPayload.tenantId };
 
         const [activeSessions, totalActive] = await Promise.all([
-            prisma.radAcct.findMany({
+            db.radAcct.findMany({
                 where: { acctstoptime: null, ...tenantFilter },
                 select: {
                     username: true,
@@ -107,7 +110,7 @@ export async function GET(req: NextRequest) {
                     callingstationid: true,
                 },
             }),
-            prisma.subscription.count({ where: { status: "ACTIVE", ...tenantFilter } }),
+            db.subscription.count({ where: { status: "ACTIVE", ...tenantFilter } }),
         ]);
 
         const hotspotOnline = activeSessions.filter(s => s.framedprotocol !== "PPP").length;

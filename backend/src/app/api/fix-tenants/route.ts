@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { getUserFromRequest } from "@/lib/auth";
 
@@ -6,6 +7,7 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
     try {
+        const db = getTenantClient(null);
         // ── Security: SUPER_ADMIN only ────────────────────────────────────────
         const user = getUserFromRequest(req);
         if (!user || user.role !== "SUPER_ADMIN") {
@@ -14,7 +16,7 @@ export async function GET(req: NextRequest) {
 
         console.log("Checking for stuck tenants with PAID invoices...");
 
-        const tenants = await prisma.tenant.findMany({
+        const tenants = await db.tenant.findMany({
             include: {
                 tenantInvoices: true
             }
@@ -43,7 +45,7 @@ export async function GET(req: NextRequest) {
                     }
                     newExpiry.setMonth(newExpiry.getMonth() + totalPaidMonths);
 
-                    await prisma.tenant.update({
+                    await db.tenant.update({
                         where: { id: tenant.id },
                         data: {
                             status: 'ACTIVE',
@@ -67,7 +69,7 @@ export async function GET(req: NextRequest) {
                         let updatedExpiry = new Date(now);
                         updatedExpiry.setMonth(updatedExpiry.getMonth() + sumMonths);
 
-                        await prisma.tenant.update({
+                        await db.tenant.update({
                             where: { id: tenant.id },
                             data: { licenseExpiresAt: updatedExpiry }
                         });

@@ -9,13 +9,13 @@
     "start": "next start --hostname 127.0.0.1 --port ${PORT:-3000}",
     "start:droplet": "bash scripts/droplet-start.sh",
     "next:start": "next start --hostname 127.0.0.1 --port ${PORT:-3000}",
-
     "db:seed": "tsx scripts/seed.ts",
     "db:migrate": "prisma migrate deploy",
-
     "db:check-migrations": "tsx scripts/check-migrations.js",
     "db:fix-migrations": "tsx scripts/fix-migrations.js",
-    "db:generate": "prisma generate"
+    "db:generate": "prisma generate",
+    "test": "node scripts/setup-test-db.js && jest --config jest.config.ts",
+    "test:coverage": "node scripts/setup-test-db.js && jest --config jest.config.ts --coverage"
   },
   "prisma": {
     "seed": "tsx scripts/seed.ts"
@@ -35,27 +35,36 @@
     "@prisma/client-runtime-utils": "7.7.0",
     "@types/nodemailer": "^7.0.11",
     "bcryptjs": "^3.0.3",
+    "bullmq": "^5.78.0",
     "dotenv": "^17.3.1",
     "google-auth-library": "^10.6.2",
+    "ioredis": "^5.11.1",
     "jsonwebtoken": "^9.0.3",
-    "next": "15.1.11",
+    "next": "^15.1.11",
     "nodemailer": "^8.0.4",
+    "otplib": "^13.4.1",
     "pg": "^8.20.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
+    "qrcode": "^1.5.4",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
     "tsx": "^4.21.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
+    "@types/jest": "^30.0.0",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^20",
     "@types/pg": "^8.20.0",
-    "@types/react": "^18.3.28",
-    "@types/react-dom": "^18.3.1",
+    "@types/qrcode": "^1.5.6",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
     "husky": "^9.1.7",
+    "jest": "^30.4.2",
+    "jest-environment-node": "^30.4.1",
     "lint-staged": "^16.4.0",
     "prisma": "7.7.0",
+    "ts-jest": "^29.4.11",
     "typescript": "^5"
   }
 }

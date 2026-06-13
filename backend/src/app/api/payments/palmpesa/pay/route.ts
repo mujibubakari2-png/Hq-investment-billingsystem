@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { errorResponse, jsonResponse, getUserFromRequest } from "@/lib/auth";
 
@@ -15,6 +16,7 @@ export async function POST(req: NextRequest) {
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
         if (userPayload.role !== "SUPER_ADMIN" && userPayload.role !== "ADMIN") {
             return errorResponse("Forbidden: Admin access required", 403);
         }
@@ -26,7 +28,7 @@ export async function POST(req: NextRequest) {
             return errorResponse("Missing tenantInvoiceId or phone", 400);
         }
 
-        const invoice = await prisma.tenantInvoice.findUnique({
+        const invoice = await db.tenantInvoice.findUnique({
             where: { id: tenantInvoiceId },
             include: { tenant: true }
         });

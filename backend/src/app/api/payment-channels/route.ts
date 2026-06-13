@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { encryptPaymentChannelFields, decryptPaymentChannelFields } from "@/lib/encryption";
@@ -35,11 +36,12 @@ export async function GET(req: NextRequest) {
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
 
         const platformAdmin = isPlatformSuperAdmin(userPayload);
         const { filter: tenantFilter } = getTenantFilter(userPayload);
 
-        const channels = await prisma.paymentChannel.findMany({
+        const channels = await db.paymentChannel.findMany({
             where: { ...tenantFilter },
             orderBy: { createdAt: "desc" },
             include: platformAdmin ? { tenant: { select: { id: true, name: true } } } : undefined,
@@ -81,6 +83,7 @@ export async function POST(req: NextRequest) {
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
 
         if (userPayload.role !== "SUPER_ADMIN") {
             return errorResponse("Forbidden: Only the tenant Super Admin can manage payment channels", 403);
@@ -107,7 +110,7 @@ export async function POST(req: NextRequest) {
 
         // MT-002: Validate tenantId exists before creating
         if (tenantIdValue) {
-            const tenantExists = await prisma.tenant.findUnique({ where: { id: tenantIdValue }, select: { id: true } });
+            const tenantExists = await db.tenant.findUnique({ where: { id: tenantIdValue }, select: { id: true } });
             if (!tenantExists) {
                 return errorResponse(`Tenant not found: ${tenantIdValue}`, 404);
             }
@@ -120,7 +123,7 @@ export async function POST(req: NextRequest) {
             webhookSecret: data.webhookSecret,
         });
 
-        const channel = await prisma.paymentChannel.create({
+        const channel = await db.paymentChannel.create({
             data: {
                 name: data.name,
                 provider: data.provider,
@@ -135,7 +138,7 @@ export async function POST(req: NextRequest) {
         });
 
         if (tenantIdValue) {
-            await prisma.tenantPaymentGateway.upsert({
+            await db.tenantPaymentGateway.upsert({
                 where: {
                     tenantId_provider: {
                         tenantId: tenantIdValue,

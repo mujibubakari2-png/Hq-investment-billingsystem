@@ -7,6 +7,12 @@ export async function GET(
 ) {
     const { routerId } = await context.params;
 
+    const authHeader = request.headers.get("Authorization");
+    const expectedKey = process.env.ROUTER_SYNC_API_KEY;
+    if (expectedKey && authHeader !== `Bearer ${expectedKey}`) {
+        return NextResponse.json({ status: "error", message: "Unauthorized router sync" }, { status: 401 });
+    }
+
     console.log(`[SYNC] Sync request received for router: ${routerId}`);
 
     try {

@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 
@@ -6,9 +7,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
 
         const { id } = await params;
-        const router = await prisma.router.findUnique({
+        const router = await db.router.findUnique({
             where: { id },
             include: {
                 packages: true,
@@ -33,10 +35,11 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
 
         const { id } = await params;
 
-        const existingRouter = await prisma.router.findUnique({ where: { id } });
+        const existingRouter = await db.router.findUnique({ where: { id } });
         if (!existingRouter) return errorResponse("Router not found", 404);
         
         if (userPayload.role !== "SUPER_ADMIN" && existingRouter.tenantId !== userPayload.tenantId) {
@@ -71,27 +74,27 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         if (body.status) data.status = body.status.toUpperCase();
         if (body.accountingEnabled !== undefined) data.accountingEnabled = !!body.accountingEnabled;
 
-        const router = await prisma.router.update({ where: { id }, data });
+        const router = await db.router.update({ where: { id }, data });
 
         // Synchronize with RADIUS NAS table to manage RADIUS via VPN
         const nasIp = router.wgTunnelIp || router.host;
-        const existingNas = await prisma.radiusNas.findFirst({
+        const existingNas = await db.radiusNas.findFirst({
             where: { tenantId: existingRouter.tenantId, nasName: nasIp }
         });
 
         if (existingNas) {
-            await prisma.radiusNas.update({
+            await db.radiusNas.update({
                 where: { id: existingNas.id },
                 data: { secret: router.password || process.env.RADIUS_NAS_SECRET || 'hqinvestment_radius_secret', shortName: router.name }
             });
         } else {
             // Clean up old NAS entry if the IP changed
             if (existingRouter.wgTunnelIp !== router.wgTunnelIp || existingRouter.host !== router.host) {
-                await prisma.radiusNas.deleteMany({
+                await db.radiusNas.deleteMany({
                     where: { tenantId: existingRouter.tenantId, nasName: existingRouter.wgTunnelIp || existingRouter.host }
                 });
             }
-            await prisma.radiusNas.create({
+            await db.radiusNas.create({
                 data: {
                     nasName: nasIp,
                     shortName: router.name,
@@ -104,7 +107,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         }
 
         // Log the update
-        await prisma.routerLog.create({
+        await db.routerLog.create({
             data: {
                 routerId: id,
                 tenantId: existingRouter.tenantId,
@@ -129,20 +132,21 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
 
         const { id } = await params;
         
-        const existingRouter = await prisma.router.findUnique({ where: { id } });
+        const existingRouter = await db.router.findUnique({ where: { id } });
         if (!existingRouter) return errorResponse("Router not found", 404);
         
         if (userPayload.role !== "SUPER_ADMIN" && existingRouter.tenantId !== userPayload.tenantId) {
             return errorResponse("Unauthorized to delete this router", 403);
         }
 
-        await prisma.radiusNas.deleteMany({
+        await db.radiusNas.deleteMany({
             where: { tenantId: existingRouter.tenantId, nasName: existingRouter.wgTunnelIp || existingRouter.host }
         });
-        await prisma.router.delete({ where: { id } });
+        await db.router.delete({ where: { id } });
         return jsonResponse({ message: "Router deleted" });
     } catch {
         return errorResponse("Internal server error", 500);

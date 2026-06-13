@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { toISOSafe } from "@/lib/dateUtils";
@@ -9,6 +10,7 @@ export async function GET(req: NextRequest) {
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
 
         if (isPlatformSuperAdmin(userPayload)) {
             return jsonResponse({
@@ -20,7 +22,7 @@ export async function GET(req: NextRequest) {
         const tenantId = getJwtTenantId(userPayload);
         if (!tenantId) return errorResponse("Tenant ID missing", 400);
 
-        const tenant = await prisma.tenant.findUnique({
+        const tenant = await db.tenant.findUnique({
             where: { id: tenantId },
             include: {
                 plan: true,
@@ -65,7 +67,7 @@ export async function GET(req: NextRequest) {
         // Covers both ACTIVE and TRIALLING tenants (trial ended = suspended).
         const canAutoSuspend = currentStatus === "ACTIVE" || currentStatus === "TRIALLING";
         if (hasAnyExpiry && daysRemaining <= 0 && canAutoSuspend) {
-            await prisma.tenant.update({ where: { id: tenant.id }, data: { status: "SUSPENDED" } });
+            await db.tenant.update({ where: { id: tenant.id }, data: { status: "SUSPENDED" } });
             currentStatus = "SUSPENDED";
         }
 
@@ -89,7 +91,9 @@ export async function GET(req: NextRequest) {
             daysRemaining,
             expiresAt: toISOSafe(expiresAt),
             customersCount: tenant.clients.length,
-            clientLimit: tenant.plan.clientLimit,
+            pppoeLimit: tenant.plan.pppoeLimit,
+            hotspotLimit: tenant.plan.hotspotLimit,
+            maxRouters: tenant.plan.maxRouters,
             subUsersCount: tenant.users.length,
             subUsersLimit: getSubUserLimitForPlan(tenant.plan.name),
             paidThisMonth,

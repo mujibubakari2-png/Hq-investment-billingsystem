@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { getTenantFilter } from "@/lib/tenant";
@@ -12,15 +13,16 @@ export async function GET(req: NextRequest) {
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
 
         const { filter } = getTenantFilter(userPayload);
 
         // ── 1. Database checks ────────────────────────────────────────────────
         const [radcheckCount, nasCount, activeSessionCount, radreplyCount] = await Promise.all([
-            prisma.radCheck.count({ where: { ...filter } }),
-            prisma.radiusNas.count({ where: { ...filter } }),
-            prisma.radAcct.count({ where: { acctstoptime: null, ...filter } }),
-            prisma.radReply.count({ where: { ...filter } }),
+            db.radCheck.count({ where: { ...filter } }),
+            db.radiusNas.count({ where: { ...filter } }),
+            db.radAcct.count({ where: { acctstoptime: null, ...filter } }),
+            db.radReply.count({ where: { ...filter } }),
         ]);
 
         // ── 2. FreeRADIUS process check (server-side) ─────────────────────────

@@ -1,10 +1,12 @@
 import { NextRequest } from "next/server";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 
 // POST /api/vouchers/generate - Bulk generate vouchers
 export async function POST(req: NextRequest) {
     try {
+        const db = getTenantClient(null);
         const body = await req.json();
         const {
             packageId,
@@ -28,7 +30,7 @@ export async function POST(req: NextRequest) {
 
         let finalCreatedById = currentUser.userId || createdById;
         if (!finalCreatedById) {
-            const admin = await prisma.user.findFirst({ where: { role: { in: ["ADMIN", "SUPER_ADMIN"] } } });
+            const admin = await db.user.findFirst({ where: { role: { in: ["ADMIN", "SUPER_ADMIN"] } } });
             finalCreatedById = admin?.id;
         }
 
@@ -41,9 +43,9 @@ export async function POST(req: NextRequest) {
             return errorResponse("packageId is required");
         }
 
-        let pkg = await prisma.package.findUnique({ where: { id: packageId } });
+        let pkg = await db.package.findUnique({ where: { id: packageId } });
         if (!pkg) {
-            pkg = await prisma.package.findFirst({ where: { name: packageId } });
+            pkg = await db.package.findFirst({ where: { name: packageId } });
         }
 
         if (!pkg) {
@@ -59,7 +61,7 @@ export async function POST(req: NextRequest) {
         }
 
         if (routerIdValue) {
-            const router = await prisma.router.findUnique({ where: { id: routerIdValue } });
+            const router = await db.router.findUnique({ where: { id: routerIdValue } });
             if (!router) return errorResponse("Router not found", 404);
             if (tenantIdValue && router.tenantId && router.tenantId !== tenantIdValue) {
                 return errorResponse("Forbidden: Router belongs to another tenant", 403);
@@ -97,7 +99,7 @@ export async function POST(req: NextRequest) {
 
         const codeList = Array.from(codes);
 
-        await prisma.voucher.createMany({
+        await db.voucher.createMany({
             data: codeList.map((code) => ({
                 code,
                 packageId: actualPackageId,
@@ -108,7 +110,7 @@ export async function POST(req: NextRequest) {
             skipDuplicates: true
         });
 
-        const vouchers = await prisma.voucher.findMany({
+        const vouchers = await db.voucher.findMany({
             where: { code: { in: codeList } },
             orderBy: { createdAt: "desc" },
         });

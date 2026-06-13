@@ -294,7 +294,9 @@ export default function RenewLicense() {
                                     style={{ border: `2px solid ${license?.plan?.id === p.id ? '#1a1a2e' : 'var(--border-light)'}`, borderRadius: '8px', padding: '0.75rem 1rem', marginBottom: '0.75rem', cursor: changingPlan ? 'wait' : 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: license?.plan?.id === p.id ? '#f8f9fa' : '#fff' }}>
                                     <div>
                                         <div style={{ fontWeight: 600 }}>{p.name}</div>
-                                        <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Up to {p.clientLimit.toLocaleString()} customers</div>
+                                        <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                                            {p.pppoeLimit.toLocaleString()} PPPoE, {p.hotspotLimit ? p.hotspotLimit.toLocaleString() : '∞'} Hotspot, {p.maxRouters} {p.maxRouters === 1 ? 'Router' : 'Routers'}
+                                        </div>
                                     </div>
                                     <div style={{ fontWeight: 700 }}>TSH {p.price.toLocaleString()}/mo</div>
                                 </div>
@@ -324,7 +326,7 @@ export default function RenewLicense() {
                             >
                                 {allPlans.map(p => (
                                     <option key={p.id} value={p.id}>
-                                        {p.name} — TSH {p.price.toLocaleString()}/mo ({p.clientLimit} clients limit)
+                                        {p.name} — TSH {p.price.toLocaleString()}/mo ({p.pppoeLimit} PPPoE limit)
                                     </option>
                                 ))}
                             </select>

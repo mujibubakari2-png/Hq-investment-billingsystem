@@ -1,14 +1,17 @@
 import { NextRequest } from "next/server";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
-
 import { toISOSafe, toTimestampSafe, parseSafeDate } from "@/lib/dateUtils";
+import { invalidateNamespace } from "@/lib/cache";
+
 
 // GET /api/transactions
 export async function GET(req: NextRequest) {
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
 
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
         const tenantFilter = { tenantId: userPayload.tenantId };
@@ -33,14 +36,14 @@ export async function GET(req: NextRequest) {
         }
 
         const [transactions, total] = await Promise.all([
-            prisma.transaction.findMany({
+            db.transaction.findMany({
                 where,
                 include: { client: { select: { username: true, fullName: true } } },
                 orderBy: { createdAt: "desc" },
                 skip,
                 take: limit,
             }),
-            prisma.transaction.count({ where }),
+            db.transaction.count({ where }),
         ]);
 
         const mapped = transactions.map((t: any) => ({
@@ -60,7 +63,7 @@ export async function GET(req: NextRequest) {
 
         let mobileStats = null;
         if (type.toUpperCase() === "MOBILE") {
-            const stats = (await prisma.transaction.groupBy({
+            const stats = (await db.transaction.groupBy({
                 by: ['status'],
                 where: { type: 'MOBILE', ...tenantFilter },
                 _count: { _all: true },
@@ -89,6 +92,7 @@ export async function POST(req: NextRequest) {
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
 
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
         const tenantFilter = { tenantId: userPayload.tenantId };
@@ -98,7 +102,7 @@ export async function POST(req: NextRequest) {
         // Resolve client ID natively if a username was provided instead
         let clientId = body.clientId;
         if (!clientId && body.username) {
-            const client = await prisma.client.findFirst({
+            const client = await db.client.findFirst({
                 where: {
                     OR: [
                         { username: body.username },
@@ -117,7 +121,7 @@ export async function POST(req: NextRequest) {
         // Resolve plan name natively if a planId was provided instead
         let planName = body.planName;
         if (!planName && body.planId) {
-            const plan = await prisma.package.findUnique({ where: { id: body.planId } });
+            const plan = await db.package.findUnique({ where: { id: body.planId } });
             if (plan && (isSuperAdmin || plan.tenantId === userPayload.tenantId)) {
                 planName = plan.name;
             }
@@ -127,7 +131,7 @@ export async function POST(req: NextRequest) {
 
         const tenantIdValue = userPayload.tenantId;
 
-        const transaction = await prisma.transaction.create({
+        const transaction = await db.transaction.create({
             data: {
                 clientId: clientId,
                 planName: planName || "Manual Transaction",
@@ -141,7 +145,13 @@ export async function POST(req: NextRequest) {
             },
         });
 
+        // Invalidate dashboard cache so revenue totals update on next load
+        if (tenantIdValue) {
+            invalidateNamespace(tenantIdValue, 'dashboard').catch(() => {});
+        }
+
         return jsonResponse(transaction, 201);
+
     } catch (e) {
         console.error(e);
         return errorResponse("Internal server error", 500);

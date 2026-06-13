@@ -1,13 +1,18 @@
 import { NextRequest } from "next/server";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
-import { jsonResponse, errorResponse } from "@/lib/auth";
+import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 
 // GET /api/clients/[id]
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
+        const userPayload = getUserFromRequest(req);
+        if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
+
         const { id } = await params;
-        const client = await prisma.client.findUnique({
-            where: { id },
+        const client = await db.client.findFirst({
+            where: { id, tenantId: userPayload.tenantId },
             include: {
                 subscriptions: {
                     include: { package: true, router: true },
@@ -28,10 +33,20 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 // PUT /api/clients/[id]
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
+        const userPayload = getUserFromRequest(req);
+        if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
+
         const { id } = await params;
         const body = await req.json();
 
-        const client = await prisma.client.update({
+        const clientExists = await db.client.findFirst({
+            where: { id, tenantId: userPayload.tenantId }
+        });
+
+        if (!clientExists) return errorResponse("Client not found", 404);
+
+        const client = await db.client.update({
             where: { id },
             data: {
                 username: body.username, // Allow updating username
@@ -53,10 +68,21 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 }
 
 // DELETE /api/clients/[id]
-export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
+        const userPayload = getUserFromRequest(req);
+        if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
+
         const { id } = await params;
-        await prisma.client.delete({ where: { id } });
+        
+        const clientExists = await db.client.findFirst({
+            where: { id, tenantId: userPayload.tenantId }
+        });
+
+        if (!clientExists) return errorResponse("Client not found", 404);
+
+        await db.client.delete({ where: { id } });
         return jsonResponse({ message: "Client deleted" });
     } catch {
         return errorResponse("Internal server error", 500);

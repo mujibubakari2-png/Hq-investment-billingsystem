@@ -4,13 +4,15 @@ import prisma from "@/lib/prisma";
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { providerName: string } }
+  { params }: { params: Promise<{ providerName: string }> }
 ) {
+  let resolvedParams: any = {};
   try {
+    resolvedParams = await params;
     const rateLimitRes = await checkRateLimit(req);
     if (rateLimitRes) return rateLimitRes;
 
-    const { providerName } = params;
+    const { providerName } = resolvedParams;
     
     // Platform-level webhook uses global ENV secret, not tenant-specific config
     const webhookSecret = process.env[`${providerName.toUpperCase()}_WEBHOOK_SECRET`] || process.env.WEBHOOK_SECRET;
@@ -50,7 +52,7 @@ export async function POST(
     return NextResponse.json({ message: "Platform webhook processed" }, { status: 200 });
 
   } catch (error: any) {
-    console.error(`[PLATFORM WEBHOOK ERROR] provider: ${params.providerName}`, error);
+    console.error(`[PLATFORM WEBHOOK ERROR] provider: ${resolvedParams?.providerName}`, error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }

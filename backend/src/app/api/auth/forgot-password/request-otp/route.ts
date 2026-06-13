@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server";
-import { randomInt } from "node:crypto";
 import prisma from "@/lib/prisma";
 import { errorResponse, jsonResponse } from "@/lib/auth";
 import { sendOtpEmail } from "@/lib/email";
+import { generateAndStoreOtp } from "@/lib/otp";
 
 export async function POST(req: NextRequest) {
     try {
@@ -13,45 +13,37 @@ export async function POST(req: NextRequest) {
             return errorResponse("Email or phone is required");
         }
 
-        const user = await prisma.user.findFirst({ 
-            where: { 
+        const user = await prisma.user.findFirst({
+            where: {
                 OR: [
                     { email: identifier },
                     { username: identifier }
                 ]
-            } 
-        });
-        
-        if (!user) {
-            return errorResponse("User not found");
-        }
-
-        // Generate a 6-digit OTP
-        const otp = randomInt(100000, 1000000).toString();
-        const email = user.email || identifier;
-
-        await prisma.userOtp.create({
-            data: {
-                email,
-                otp,
-                expiresAt: new Date(Date.now() + 30 * 60 * 1000), // 30 mins
             }
         });
 
-        // Send the email
-        const emailResult = await sendOtpEmail(email, otp, 'password-reset');
+        if (!user) {
+            // SEC-003: Return same message whether user exists or not (prevents enumeration)
+            return jsonResponse({ message: "If an account exists, a password reset OTP has been sent." });
+        }
+
+        const email = user.email || identifier;
+
+        // SEC-003 FIX: generateAndStoreOtp() hashes before DB write — code is only in email
+        const { code } = await generateAndStoreOtp(email, user.tenantId);
+
+        const emailResult = await sendOtpEmail(email, code, 'password-reset');
 
         if (!emailResult.success) {
             console.error(`[AUTH] Failed to send password reset OTP to ${email}:`, emailResult.error);
-            
             return errorResponse(
-                `Email error: ${emailResult.error}. Please check your SMTP settings in your .env file.`, 
+                `Email error: ${emailResult.error}. Please check your SMTP settings.`,
                 500
             );
         }
 
-        return jsonResponse({ 
-            message: "Password reset OTP sent to your email.",
+        return jsonResponse({
+            message: "If an account exists, a password reset OTP has been sent.",
         });
     } catch (e) {
         console.error("FORGOT PASSWORD OTP ERROR:", e);

@@ -24,7 +24,7 @@ export default function TechnicalSupport() {
                         <EmailIcon style={{ fontSize: 48, color: 'var(--info)', marginBottom: 12 }} />
                         <h3 style={{ marginBottom: 8 }}>Email Support</h3>
                         <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: 16 }}>Drop us an email and our team will get back to you within a few hours — even on weekends.</p>
-                        <button className="btn btn-primary" onClick={() => window.location.href = 'mailto:support@hqinvestment.co.tz'}>support@hqinvestment.co.tz</button>
+                        <button className="btn btn-primary" onClick={() => window.location.href = 'mailto:support@yourdomain.com'}>support@yourdomain.com</button>
                     </div>
                 </div>
                 <div className="card">

@@ -57,14 +57,14 @@ export default function PaymentStatus({
   // ── Poll for status ───────────────────────────────────────────────────────
   const poll = useCallback(async () => {
     try {
-      const token = localStorage.getItem("token") ?? "";
+
       const params = new URLSearchParams();
       if (provider) params.set("provider", provider);
       if (providerRef) params.set("providerRef", providerRef);
 
       const res = await fetch(
         `${API_BASE}/api/payments/status/${reference}?${params}`,
-        { headers: { Authorization: `Bearer ${token}` } }
+        { credentials: "include" }
       );
 
       if (!res.ok) return;

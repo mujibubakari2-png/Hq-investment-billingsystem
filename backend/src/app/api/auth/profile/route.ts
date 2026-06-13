@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { hashPassword, comparePassword, jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 
@@ -7,8 +8,9 @@ export async function GET(req: NextRequest) {
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
 
-        const user = await prisma.user.findUnique({
+        const user = await db.user.findUnique({
             where: { id: userPayload.userId },
             select: { id: true, username: true, email: true, role: true, phone: true, fullName: true },
         });
@@ -26,6 +28,7 @@ export async function PUT(req: NextRequest) {
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
 
         const body = await req.json();
 
@@ -38,7 +41,7 @@ export async function PUT(req: NextRequest) {
 
         // Handle password change
         if (body.currentPassword && body.newPassword) {
-            const user = await prisma.user.findUnique({ where: { id: userPayload.userId } });
+            const user = await db.user.findUnique({ where: { id: userPayload.userId } });
             if (!user) return errorResponse("User not found", 404);
 
             const isValid = await comparePassword(body.currentPassword, user.password);
@@ -47,7 +50,7 @@ export async function PUT(req: NextRequest) {
             data.password = await hashPassword(body.newPassword);
         }
 
-        const updated = await prisma.user.update({
+        const updated = await db.user.update({
             where: { id: userPayload.userId },
             data,
             select: { id: true, username: true, email: true, role: true, phone: true, fullName: true },

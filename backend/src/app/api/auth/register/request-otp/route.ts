@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server";
-import { randomInt } from "node:crypto";
 import prisma from "@/lib/prisma";
 import { errorResponse, jsonResponse } from "@/lib/auth";
 import { sendOtpEmail } from "@/lib/email";
+import { generateAndStoreOtp } from "@/lib/otp";
 
 export async function POST(req: NextRequest) {
     try {
@@ -17,27 +17,15 @@ export async function POST(req: NextRequest) {
             return errorResponse("Email is already registered");
         }
 
-        // Generate a 6-digit OTP
-        const otp = randomInt(100000, 1000000).toString();
+        // SEC-003 FIX: generateAndStoreOtp() bcrypt-hashes before DB write
+        const { code } = await generateAndStoreOtp(email, null);
 
-        await prisma.userOtp.create({
-            data: {
-                email,
-                otp,
-                expiresAt: new Date(Date.now() + 30 * 60 * 1000), // 30 minutes
-            }
-        });
-
-        // Send the email
-        const emailResult = await sendOtpEmail(email, otp, 'registration');
+        const emailResult = await sendOtpEmail(email, code, 'registration');
 
         if (!emailResult.success) {
-            // Log full error internally
             console.error(`[AUTH] Failed to send registration OTP to ${email}:`, emailResult.error);
-            
-            // Return the specific SMTP error to help the user fix their config
             return errorResponse(
-                `Email error: ${emailResult.error}. Please check your SMTP settings in your .env file.`, 
+                `Email error: ${emailResult.error}. Please check your SMTP settings in your .env file.`,
                 500
             );
         }

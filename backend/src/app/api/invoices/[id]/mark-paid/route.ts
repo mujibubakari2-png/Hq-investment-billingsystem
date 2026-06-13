@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { syncRadiusUser } from "@/lib/radius";
@@ -20,6 +21,7 @@ export async function POST(
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
         if (!["SUPER_ADMIN", "ADMIN"].includes(userPayload.role)) {
             return errorResponse("Forbidden", 403);
         }
@@ -28,7 +30,7 @@ export async function POST(
         const body = await req.json().catch(() => ({}));
         const note = body.note as string | undefined;
 
-        const invoice = await prisma.invoice.findUnique({
+        const invoice = await db.invoice.findUnique({
             where: { id },
             include: { client: true, items: true },
         });
@@ -49,7 +51,7 @@ export async function POST(
 
         // Create a MANUAL transaction record for audit trail
         // NOTE: invoiceId is a new schema field — uses `as any` until prisma generate runs
-        const transaction = await (prisma.transaction.create as any)({
+        const transaction = await (db.transaction.create as any)({
             data: {
                 clientId: client.id,
                 planName: `Invoice ${invoice.invoiceNumber}`,
@@ -64,7 +66,7 @@ export async function POST(
         });
 
         // Mark invoice PAID — paidAt and transactionId are new fields, use `as any` until regenerated
-        await (prisma.invoice.update as any)({
+        await (db.invoice.update as any)({
             where: { id: invoice.id },
             data: {
                 status: "PAID",
@@ -77,7 +79,7 @@ export async function POST(
         const firstItem = invoice.items[0];
         let pkg = null;
         if (firstItem?.description) {
-            pkg = await prisma.package.findFirst({
+            pkg = await db.package.findFirst({
                 where: {
                     OR: [
                         { name: firstItem.description },
@@ -98,17 +100,17 @@ export async function POST(
                 case "MONTHS":  expiresAt.setMonth(expiresAt.getMonth() + pkg.duration); break;
             }
 
-            const existingSub = await prisma.subscription.findFirst({
+            const existingSub = await db.subscription.findFirst({
                 where: { clientId: client.id, packageId: pkg.id, status: "ACTIVE" },
             });
 
             if (existingSub) {
-                newSub = await prisma.subscription.update({
+                newSub = await db.subscription.update({
                     where: { id: existingSub.id },
                     data: { expiresAt, syncStatus: "PENDING", onlineStatus: "ONLINE" },
                 });
             } else {
-                newSub = await prisma.subscription.create({
+                newSub = await db.subscription.create({
                     data: {
                         clientId: client.id,
                         packageId: pkg.id,
@@ -124,7 +126,7 @@ export async function POST(
                 });
             }
 
-            await prisma.client.update({
+            await db.client.update({
                 where: { id: client.id },
                 data: { status: "ACTIVE" },
             });
@@ -150,7 +152,7 @@ export async function POST(
             } catch (radErr) {
                 console.error("[Mark-Paid] RADIUS sync failed:", radErr);
                 if (newSub?.id) {
-                    await prisma.subscription.update({
+                    await db.subscription.update({
                         where: { id: newSub.id },
                         data: { syncStatus: "PENDING_RADIUS_SYNC" },
                     }).catch(() => {});
@@ -165,7 +167,7 @@ export async function POST(
                     const type = client.serviceType === "HOTSPOT" ? "hotspot" : "pppoe";
                     await mt.activateService(client.username, pwd, pkg.name, type, new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000));
                     if (newSub?.id) {
-                        await prisma.subscription.update({
+                        await db.subscription.update({
                             where: { id: newSub.id },
                             data: { syncStatus: "SYNCED" },
                         });

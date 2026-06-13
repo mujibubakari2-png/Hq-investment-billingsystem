@@ -23,9 +23,36 @@ export interface AuthLoginResponse {
     user: AuthUser;
 }
 
+// CRIT-002: MFA challenge — returned instead of token when user has MFA enabled
+export interface AuthMfaChallenge {
+    mfaRequired: true;
+    tempToken: string;
+    message: string;
+}
+
+export type LoginResult = AuthLoginResponse | AuthMfaChallenge;
+
+export function isMfaChallenge(r: LoginResult): r is AuthMfaChallenge {
+    return (r as AuthMfaChallenge).mfaRequired === true;
+}
+
 export const authApi = {
     login: (username: string, password: string) =>
-        post<AuthLoginResponse>('/auth/login', { username, password }),
+        post<LoginResult>('/auth/login', { username, password }),
+
+    // CRIT-002: Complete MFA challenge with a 6-digit TOTP code or backup code
+    mfaVerify: (tempToken: string, code: string) =>
+        post<AuthLoginResponse>('/auth/mfa/verify', { tempToken, code }),
+
+    // MFA management (Profile page)
+    mfaSetup: () =>
+        post<{ secret: string; qrDataUrl: string; backupCodes: string[] }>('/auth/mfa/setup', {}),
+
+    mfaEnable: (data: { secret: string; code: string; backupCodes: string[] }) =>
+        post<{ success: boolean; message: string }>('/auth/mfa/enable', data),
+
+    mfaDisable: (password: string) =>
+        post<{ success: boolean; message: string }>('/auth/mfa/disable', { password }),
 
     me: () => get<AuthUser & { status: string }>('/auth/me'),
 

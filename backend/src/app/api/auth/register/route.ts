@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
-import { errorResponse, jsonResponse, hashPassword, signToken } from "@/lib/auth";
+import { errorResponse, jsonResponse, hashPassword, signToken, signRefreshToken } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/rateLimiter";
 import logger from "@/lib/logger";
 import { sendAccountCreatedNotifications } from "@/lib/accountNotifications";
@@ -50,7 +50,8 @@ export async function POST(req: NextRequest) {
                     id: "free_trial",
                     name: "10-Day Free Trial",
                     price: 0,
-                    clientLimit: 10
+                    pppoeLimit: 10,
+                    hotspotLimit: null
                 }
             });
         }
@@ -174,12 +175,14 @@ export async function POST(req: NextRequest) {
             return { user: newUser, tenant: ownedTenant };
         });
 
-        const token = signToken({
+        const payload = {
             userId: result.user.id,
             username: result.user.username,
             role: result.user.role,
             tenantId: result.tenant.id,
-        });
+        };
+        const token = signToken(payload);
+        const refreshToken = signRefreshToken(payload);
 
         await sendAccountCreatedNotifications({
             tenantId: result.tenant.id,
@@ -188,7 +191,7 @@ export async function POST(req: NextRequest) {
             phone: result.tenant.phone,
         });
 
-        
+
         const response = jsonResponse({
             message: "Registration successful. Your tenant workspace is ready.",
             token,
@@ -210,12 +213,12 @@ export async function POST(req: NextRequest) {
             },
             tenant: result.tenant
         }, 201);
-        
+
         const isSecure = req.headers.get("x-forwarded-proto") === "https" || (req as any).nextUrl?.protocol === "https:";
         const sameSiteStr = isSecure ? 'None; Secure' : 'Lax';
         response.headers.append('Set-Cookie', `accessToken=${token}; Path=/; HttpOnly; SameSite=${sameSiteStr}; Max-Age=1800`);
-        response.headers.append('Set-Cookie', `refreshToken=${token}; Path=/; HttpOnly; SameSite=${sameSiteStr}; Max-Age=604800`);
-        
+        response.headers.append('Set-Cookie', `refreshToken=${refreshToken}; Path=/; HttpOnly; SameSite=${sameSiteStr}; Max-Age=604800`);
+
         return response;
     } catch (e) {
         logger.error('Register error', { error: (e as Error)?.message || String(e) });

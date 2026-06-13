@@ -4,13 +4,15 @@ import { checkRateLimit } from "@/lib/rateLimiter";
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { tenantId: string; providerName: string } }
+  { params }: { params: Promise<{ tenantId: string; providerName: string }> }
 ) {
+  let p: any = {};
   try {
+    p = await params;
     const rateLimitRes = await checkRateLimit(req);
     if (rateLimitRes) return rateLimitRes;
 
-    const { tenantId, providerName } = params;
+    const { tenantId, providerName } = p;
     
     const rawBody = await req.text();
     let body;
@@ -36,7 +38,7 @@ export async function POST(
       return NextResponse.json({ error: result.message }, { status: 400 });
     }
   } catch (error: any) {
-    console.error(`[TENANT WEBHOOK ERROR] tenant: ${params.tenantId}, provider: ${params.providerName}`, error);
+    console.error(`[TENANT WEBHOOK ERROR] tenant: ${p.tenantId}, provider: ${p.providerName}`, error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }

@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { hashPassword, jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { toISOSafe } from "@/lib/dateUtils";
@@ -63,6 +64,7 @@ export async function GET(req: NextRequest) {
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
 
         if (userPayload.role !== "SUPER_ADMIN") {
             return errorResponse("Forbidden: Super Admin access required", 403);
@@ -77,7 +79,7 @@ export async function GET(req: NextRequest) {
 
         // Show all users in the tenant — including SUPER_ADMIN so they can see themselves
         // but sub-users (ADMIN/AGENT/VIEWER) are the primary focus
-        const users = await prisma.user.findMany({
+        const users = await db.user.findMany({
             where: { ...tenantFilter },
             select: {
                 id: true,
@@ -98,7 +100,7 @@ export async function GET(req: NextRequest) {
         let planName: string | null = null;
         let subUserLimit = 3;
         if (tenantId) {
-            const tenant = await prisma.tenant.findUnique({
+            const tenant = await db.tenant.findUnique({
                 where: { id: tenantId },
                 select: { plan: { select: { name: true } } },
             });
@@ -142,6 +144,7 @@ export async function POST(req: NextRequest) {
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
 
         if (userPayload.role !== "SUPER_ADMIN") {
             return errorResponse("Forbidden: Super Admin access required", 403);
@@ -154,7 +157,7 @@ export async function POST(req: NextRequest) {
             return errorResponse("Username and email are required");
         }
 
-        const existing = await prisma.user.findFirst({
+        const existing = await db.user.findFirst({
             where: { OR: [{ username: body.username }, { email: body.email }] },
         });
         if (existing) return errorResponse("Username or email already exists", 409);
@@ -188,13 +191,13 @@ export async function POST(req: NextRequest) {
         const tempPassword = generateTempPassword(12);
 
         // Fetch tenant name for the welcome email
-        const tenant = await prisma.tenant.findUnique({
+        const tenant = await db.tenant.findUnique({
             where: { id: tenantId },
             select: { name: true },
         });
         const companyName = tenant?.name || "Your Organisation";
 
-        const user = await prisma.user.create({
+        const user = await db.user.create({
             data: {
                 username:   body.username,
                 fullName:   body.fullName || null,

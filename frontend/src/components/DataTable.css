@@ -1,0 +1,294 @@
+/* ============================================================================
+   DataTable.css — RD-001 Responsive Data Table Styles
+   ============================================================================ */
+
+/* ── Wrapper ── */
+.dt-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    width: 100%;
+}
+
+/* ── Toolbar ── */
+.dt-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    padding: 0.875rem 1.25rem;
+    border-bottom: 1px solid var(--border-color, rgba(255,255,255,0.07));
+}
+
+.dt-toolbar-left,
+.dt-toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    flex-wrap: wrap;
+}
+
+.dt-label {
+    font-size: 0.8rem;
+    color: var(--text-muted, #94a3b8);
+    white-space: nowrap;
+}
+
+.dt-select {
+    background: var(--input-bg, rgba(255,255,255,0.05));
+    border: 1px solid var(--border-color, rgba(255,255,255,0.1));
+    border-radius: 6px;
+    color: var(--text-primary, #f1f5f9);
+    font-size: 0.82rem;
+    padding: 0.3rem 0.55rem;
+    cursor: pointer;
+    outline: none;
+    transition: border-color 0.2s;
+}
+.dt-select:focus { border-color: var(--accent, #3b82f6); }
+
+/* Search */
+.dt-search {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+.dt-search-icon {
+    position: absolute;
+    left: 0.6rem;
+    font-size: 0.95rem !important;
+    color: var(--text-muted, #94a3b8);
+    pointer-events: none;
+}
+.dt-search-input {
+    background: var(--input-bg, rgba(255,255,255,0.05));
+    border: 1px solid var(--border-color, rgba(255,255,255,0.1));
+    border-radius: 8px;
+    color: var(--text-primary, #f1f5f9);
+    font-size: 0.85rem;
+    padding: 0.4rem 0.75rem 0.4rem 2rem;
+    width: 200px;
+    outline: none;
+    transition: border-color 0.2s, width 0.3s;
+}
+.dt-search-input:focus {
+    border-color: var(--accent, #3b82f6);
+    width: 260px;
+}
+.dt-search-input::placeholder { color: var(--text-muted, #64748b); }
+
+/* ── Scroll wrapper — allows horizontal scroll on small screens ── */
+.dt-scroll-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    width: 100%;
+}
+
+/* ── Table ── */
+.dt-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+    table-layout: auto;
+}
+
+.dt-table thead tr {
+    background: var(--table-header-bg, rgba(255,255,255,0.03));
+    border-bottom: 1px solid var(--border-color, rgba(255,255,255,0.08));
+}
+
+.dt-table th {
+    padding: 0.75rem 1rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-muted, #94a3b8);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    user-select: none;
+}
+.dt-table th:hover .dt-sort-neutral { opacity: 1; }
+
+.dt-th-inner {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* Sort icons */
+.dt-sort-icon {
+    font-size: 0.9rem !important;
+    opacity: 0.4;
+    transition: opacity 0.2s, color 0.2s;
+    vertical-align: middle;
+}
+.dt-sort-icon.dt-sort-active {
+    opacity: 1;
+    color: var(--accent, #3b82f6);
+}
+.dt-sort-icon.dt-sort-neutral { opacity: 0.25; }
+
+/* Rows */
+.dt-table tbody tr {
+    border-bottom: 1px solid var(--border-color, rgba(255,255,255,0.05));
+    transition: background 0.15s;
+}
+.dt-table tbody tr:hover {
+    background: var(--row-hover-bg, rgba(255,255,255,0.03));
+}
+.dt-table tbody tr.dt-row-clickable {
+    cursor: pointer;
+}
+.dt-table tbody tr.dt-row-clickable:hover {
+    background: var(--row-hover-bg, rgba(59,130,246,0.06));
+}
+
+.dt-table td {
+    padding: 0.75rem 1rem;
+    color: var(--text-primary, #f1f5f9);
+    vertical-align: middle;
+}
+
+/* ── Skeleton loading ── */
+.dt-skeleton-row td { padding: 0.9rem 1rem; }
+.dt-skeleton-cell {
+    height: 14px;
+    border-radius: 6px;
+    background: linear-gradient(
+        90deg,
+        var(--skeleton-base, rgba(255,255,255,0.06)) 25%,
+        var(--skeleton-shine, rgba(255,255,255,0.12)) 50%,
+        var(--skeleton-base, rgba(255,255,255,0.06)) 75%
+    );
+    background-size: 200% 100%;
+    animation: dt-shimmer 1.4s infinite;
+    min-width: 60px;
+}
+@keyframes dt-shimmer {
+    0%   { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* ── Empty state ── */
+.dt-empty {
+    text-align: center;
+    padding: 3.5rem 1rem !important;
+}
+.dt-empty-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    color: var(--text-muted, #64748b);
+}
+.dt-empty-icon { font-size: 2.5rem; }
+.dt-empty-inner p { font-size: 0.9rem; }
+
+/* ── Pagination ── */
+.dt-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    padding: 0.875rem 1.25rem;
+    border-top: 1px solid var(--border-color, rgba(255,255,255,0.07));
+}
+
+.dt-pagination-info {
+    font-size: 0.82rem;
+    color: var(--text-muted, #94a3b8);
+}
+
+.dt-pagination-btns {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.dt-page-btn {
+    background: transparent;
+    border: 1px solid var(--border-color, rgba(255,255,255,0.1));
+    border-radius: 6px;
+    color: var(--text-muted, #94a3b8);
+    font-size: 0.8rem;
+    padding: 0.3rem 0.65rem;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+    min-width: 36px;
+    text-align: center;
+}
+.dt-page-btn:hover:not(:disabled) {
+    background: var(--accent-subtle, rgba(59,130,246,0.12));
+    border-color: var(--accent, #3b82f6);
+    color: var(--text-primary, #f1f5f9);
+}
+.dt-page-btn.active {
+    background: var(--accent, #3b82f6);
+    border-color: var(--accent, #3b82f6);
+    color: #fff;
+    font-weight: 600;
+}
+.dt-page-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.dt-page-ellipsis { color: var(--text-muted, #64748b); font-size: 0.85rem; padding: 0 0.25rem; }
+
+/* ── Column visibility breakpoints ── */
+/* data-hide="sm" → hidden below 640px */
+@media (max-width: 640px) {
+    [data-hide="sm"] { display: none !important; }
+}
+/* data-hide="md" → hidden below 768px */
+@media (max-width: 768px) {
+    [data-hide="md"] { display: none !important; }
+}
+/* data-hide="lg" → hidden below 1024px */
+@media (max-width: 1024px) {
+    [data-hide="lg"] { display: none !important; }
+}
+
+/* ── Mobile card mode: rows as stacked cards below 600px ── */
+@media (max-width: 600px) {
+    .dt-toolbar { flex-direction: column; align-items: stretch; }
+    .dt-toolbar-left, .dt-toolbar-right { justify-content: space-between; }
+    .dt-search-input { width: 100%; }
+    .dt-search { flex: 1; }
+
+    .dt-table thead { display: none; } /* Hide column headers — labels shown inline */
+
+    .dt-table tbody tr {
+        display: block;
+        border: 1px solid var(--border-color, rgba(255,255,255,0.08));
+        border-radius: 10px;
+        margin: 0.5rem 0.75rem;
+        padding: 0.75rem;
+        background: var(--card-bg, rgba(255,255,255,0.02));
+    }
+    .dt-table tbody tr:hover { background: var(--row-hover-bg, rgba(255,255,255,0.04)); }
+
+    .dt-table td {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.4rem 0.25rem;
+        font-size: 0.82rem;
+        border: none;
+    }
+    /* Inject the column label as a left-side label in card mode */
+    .dt-table td::before {
+        content: attr(data-label);
+        font-size: 0.72rem;
+        font-weight: 600;
+        color: var(--text-muted, #64748b);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        flex-shrink: 0;
+        margin-right: 0.75rem;
+        min-width: 90px;
+    }
+    /* Hide the last column (Actions) label prefix */
+    .dt-table td:last-child::before { content: ''; min-width: 0; }
+
+    .dt-pagination { flex-direction: column; align-items: center; }
+    .dt-pagination-btns { flex-wrap: wrap; justify-content: center; }
+}

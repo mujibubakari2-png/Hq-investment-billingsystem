@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { parseSafeDate, toISOSafe } from "@/lib/dateUtils";
@@ -8,6 +9,7 @@ export async function GET(req: NextRequest) {
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
 
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
         const tenantFilter = { tenantId: userPayload.tenantId };
@@ -26,7 +28,7 @@ export async function GET(req: NextRequest) {
             ];
         }
 
-        const expenses = await prisma.expense.findMany({
+        const expenses = await db.expense.findMany({
             where,
             include: { createdBy: { select: { username: true } }, tenant: { select: { name: true } } },
             orderBy: { date: "desc" },
@@ -62,13 +64,14 @@ export async function POST(req: NextRequest) {
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
 
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
         const body = await req.json();
 
         let createdById = body.createdById || body.created_by || userPayload.userId;
         if (!createdById) {
-            const admin = await prisma.user.findFirst({ 
+            const admin = await db.user.findFirst({ 
                 where: { 
                     role: { in: ["ADMIN", "SUPER_ADMIN"] },
                     ...({ tenantId: userPayload.tenantId })
@@ -84,7 +87,7 @@ export async function POST(req: NextRequest) {
         const amount = parseFloat(body.amount) || parseFloat(body.amount_value) || 0;
         const tenantIdValue = userPayload.tenantId;
 
-        const expense = await prisma.expense.create({
+        const expense = await db.expense.create({
             data: {
                 category: body.category || "OTHER",
                 description: body.description || "N/A",

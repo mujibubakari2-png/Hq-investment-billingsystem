@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 
@@ -14,21 +15,22 @@ export async function GET(req: NextRequest) {
 
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
 
-        const router = await prisma.router.findUnique({ where: { id: routerId } });
+        const router = await db.router.findUnique({ where: { id: routerId } });
         if (!router) return errorResponse("Router not found", 404);
         
         if (userPayload.role !== "SUPER_ADMIN" && router.tenantId !== userPayload.tenantId) {
             return errorResponse("Unauthorized to access this router's settings", 403);
         }
 
-        let settings = await prisma.hotspotSettings.findUnique({
+        let settings = await db.hotspotSettings.findUnique({
             where: { routerId },
         });
 
         // If no settings exist yet, create defaults
         if (!settings) {
-            settings = await prisma.hotspotSettings.create({
+            settings = await db.hotspotSettings.create({
                 data: {
                     routerId,
                     tenantId: router.tenantId
@@ -55,13 +57,14 @@ export async function POST(req: NextRequest) {
 
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
 
         // Only SUPER_ADMIN can update hotspot settings
         if (userPayload.role !== "SUPER_ADMIN") {
             return errorResponse("Forbidden: Super Admin access required", 403);
         }
 
-        const router = await prisma.router.findUnique({ where: { id: routerId } });
+        const router = await db.router.findUnique({ where: { id: routerId } });
         if (!router) return errorResponse("Router not found", 404);
         
         if (router.tenantId && router.tenantId !== userPayload.tenantId) {
@@ -70,7 +73,7 @@ export async function POST(req: NextRequest) {
 
         const tenantId = router.tenantId;
 
-        const settings = await prisma.hotspotSettings.upsert({
+        const settings = await db.hotspotSettings.upsert({
             where: { routerId },
             update: { ...data },
             create: {
@@ -87,7 +90,7 @@ export async function POST(req: NextRequest) {
         try {
             // Check if tenant has hotspot auto-sync enabled
             const tenantSettings = tenantId
-                ? await prisma.tenantSettings.findUnique({ where: { tenantId } })
+                ? await db.tenantSettings.findUnique({ where: { tenantId } })
                 : null;
 
             const autoSyncEnabled = tenantSettings?.hotspotAutoSync !== false; // default true

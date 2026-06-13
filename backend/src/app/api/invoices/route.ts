@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { toISOSafe, parseSafeDate } from "@/lib/dateUtils";
@@ -8,6 +9,7 @@ export async function GET(req: NextRequest) {
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
         if (userPayload.role !== "SUPER_ADMIN" && userPayload.role !== "ADMIN") {
             return errorResponse("Forbidden", 403);
         }
@@ -33,7 +35,7 @@ export async function GET(req: NextRequest) {
             ];
         }
 
-        const invoices = await prisma.invoice.findMany({
+        const invoices = await db.invoice.findMany({
             where,
             include: {
                 client: { select: { username: true, fullName: true } },
@@ -80,6 +82,7 @@ export async function POST(req: NextRequest) {
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
         if (userPayload.role !== "SUPER_ADMIN" && userPayload.role !== "ADMIN") {
             return errorResponse("Forbidden", 403);
         }
@@ -92,14 +95,14 @@ export async function POST(req: NextRequest) {
         // Without this check, a tenant ADMIN can create invoices against any client UUID
         // from any other tenant, leaking cross-tenant billing data.
         if (body.clientId) {
-            const client = await prisma.client.findUnique({ where: { id: body.clientId } });
+            const client = await db.client.findUnique({ where: { id: body.clientId } });
             if (!client) return errorResponse("Client not found", 404);
             if (!isSuperAdmin && client.tenantId !== userPayload.tenantId) {
                 return errorResponse("Forbidden: client does not belong to your tenant", 403);
             }
         }
 
-        const invoice = await prisma.invoice.create({
+        const invoice = await db.invoice.create({
             data: {
                 invoiceNumber: body.invoiceNumber || `INV-${Date.now()}`,
                 clientId: body.clientId,

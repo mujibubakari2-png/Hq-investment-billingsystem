@@ -1,34 +1,31 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { errorResponse, jsonResponse, hashPassword } from "@/lib/auth";
+import { verifyAndConsumeOtp } from "@/lib/otp";
+import { checkRateLimit } from "@/lib/rateLimiter";
 
 export async function POST(req: NextRequest) {
     try {
+        const rateLimitResponse = await checkRateLimit(req);
+        if (rateLimitResponse) return rateLimitResponse;
+
         const { email, password, otp } = await req.json();
 
         if (!email || !password || !otp) {
             return errorResponse("Missing required fields");
         }
 
-        // Verify OTP
-        const validOtp = await prisma.userOtp.findFirst({
-            where: {
-                email,
-                otp,
-                used: false,
-                expiresAt: { gt: new Date() }
-            }
-        });
-
-        if (!validOtp) {
-            return errorResponse("Invalid or expired OTP", 400);
+        if (password.length < 8) {
+            return errorResponse("Password must be at least 8 characters", 400);
         }
 
-        // Mark OTP as used
-        await prisma.userOtp.update({
-            where: { id: validOtp.id },
-            data: { used: true }
-        });
+        // SEC-003 FIX: verifyAndConsumeOtp() uses bcrypt.compare against stored hash
+        // and atomically marks OTP as used on success
+        const valid = await verifyAndConsumeOtp(email, otp);
+
+        if (!valid) {
+            return errorResponse("Invalid or expired OTP", 400);
+        }
 
         // Hash new password
         const hashedPassword = await hashPassword(password);

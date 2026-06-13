@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { decrypt } from "@/lib/encryption";
@@ -8,11 +9,14 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
 
         const { id } = await params;
         
         // ── 1. Fetch user to get routerId and username ──
-        const vpnUser = await prisma.vpnUser.findUnique({ where: { id } });
+        const vpnUser = await db.vpnUser.findFirst({ 
+            where: { id, tenantId: userPayload.tenantId } 
+        });
         if (!vpnUser) return errorResponse("VPN user not found", 404);
 
         // ── 2. Delete from MikroTik ──
@@ -33,7 +37,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
         }
 
         // ── 3. Delete from DB ──
-        await prisma.vpnUser.delete({ where: { id } });
+        await db.vpnUser.delete({ where: { id } });
         return jsonResponse({ message: "VPN user deleted" });
     } catch (e) {
         console.error("VPN delete error:", e);

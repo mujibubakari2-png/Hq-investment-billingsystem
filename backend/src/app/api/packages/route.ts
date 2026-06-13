@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { createPackageSchema, validateData } from "@/lib/validation";
@@ -9,6 +10,7 @@ export async function GET(req: NextRequest) {
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
 
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
         const tenantFilter = isSuperAdmin ? {} : { tenantId: userPayload.tenantId };
@@ -30,7 +32,7 @@ export async function GET(req: NextRequest) {
         }
         if (routerId) where.routerId = routerId;
 
-        const packages = await prisma.package.findMany({
+        const packages = await db.package.findMany({
             where,
             include: { router: { select: { name: true } } },
             orderBy: { createdAt: "desc" },
@@ -88,6 +90,7 @@ export async function POST(req: NextRequest) {
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
 
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
         const tenantFilter = isSuperAdmin ? {} : { tenantId: userPayload.tenantId };
@@ -122,7 +125,7 @@ export async function POST(req: NextRequest) {
         let routerTenantId: string | null | undefined = userPayload.tenantId;
 
         if (routerId) {
-            const router = await prisma.router.findFirst({
+            const router = await db.router.findFirst({
                 where: {
                     OR: [
                         { id: routerId },
@@ -136,7 +139,7 @@ export async function POST(req: NextRequest) {
             routerTenantId = router.tenantId;
         }
 
-        const pkg = await prisma.package.create({
+        const pkg = await db.package.create({
             data: {
                 ...validatedData,
                 routerId: routerId || null,
@@ -158,7 +161,7 @@ export async function POST(req: NextRequest) {
                     pkg.type === "PPPOE" ? "pppoe" : "hotspot",
                     pkg.devices || 1,
                 );
-                await prisma.routerLog.create({
+                await db.routerLog.create({
                     data: {
                         routerId: pkg.routerId,
                         tenantId: pkg.tenantId,
@@ -169,7 +172,7 @@ export async function POST(req: NextRequest) {
                 });
             } catch (err: any) {
                 console.error("MikroTik Sync Error:", err);
-                await prisma.routerLog.create({
+                await db.routerLog.create({
                     data: {
                         routerId: pkg.routerId,
                         tenantId: pkg.tenantId,

@@ -50,10 +50,10 @@ async function main() {
         if (existingPlans === 0) {
             await prisma.saasPlan.createMany({
                 data: [
-                    { id: "free_trial",      name: "10-Day Free Trial", price: 0,     clientLimit: 10   },
-                    { id: "plan_starter",    name: "Starter",           price: 15000, clientLimit: 150  },
-                    { id: "plan_business",   name: "Business",          price: 30000, clientLimit: 300  },
-                    { id: "plan_enterprise", name: "Enterprise",        price: 50000, clientLimit: 5000 },
+                    { id: "free_trial",      name: "10-Day Free Trial", price: 0,     pppoeLimit: 10, hotspotLimit: null, maxRouters: 1 },
+                    { id: "plan_starter",    name: "Starter",           price: 15000, pppoeLimit: 150, hotspotLimit: null, maxRouters: 3 },
+                    { id: "plan_business",   name: "Business",          price: 30000, pppoeLimit: 300, hotspotLimit: null, maxRouters: 5 },
+                    { id: "plan_enterprise", name: "Enterprise",        price: 50000, pppoeLimit: 5000, hotspotLimit: null, maxRouters: 10 },
                 ],
                 skipDuplicates: true
             });
@@ -62,74 +62,7 @@ async function main() {
             console.log(`⏭️  ${existingPlans} SaaS Plans already exist. Skipping.\n`);
         }
 
-        // 2. Create Super Admin User
-        console.log("👤 Creating Super Admin user...");
-        const superAdminEmail = "superadmin@hqinvestment.co.tz";
-        const superAdminPassword = "hq-admin-2026";
-        const hashedPassword = await bcrypt.hash(superAdminPassword, 12);
-
-        let existing = null;
-        try {
-            existing = await prisma.user.findFirst({
-                where: {
-                    OR: [
-                        { email: superAdminEmail },
-                        { username: "superadmin" }
-                    ]
-                }
-            });
-        } catch (err) {
-            console.error(`❌ Error querying users table: ${(err as Error).message}`);
-            console.log("🔍 This usually means the table 'users' does not exist yet.");
-            throw err; // Re-throw to be caught by the main catch block
-        }
-
-        if (existing) {
-            await prisma.user.update({
-                where: { id: existing.id },
-                data: {
-                    email: superAdminEmail,
-                    username: "superadmin",
-                    role: "SUPER_ADMIN",
-                    password: hashedPassword,
-                    tenantId: null
-                }
-            });
-            console.log(`✅ Updated existing Super Admin: ${superAdminEmail}\n`);
-        } else {
-            await prisma.user.create({
-                data: {
-                    username: "superadmin",
-                    email: superAdminEmail,
-                    password: hashedPassword,
-                    fullName: "Platform Super Admin",
-                    role: "SUPER_ADMIN",
-                    status: "ACTIVE",
-                    tenantId: null
-                }
-            });
-            console.log(`✅ Created new Super Admin: ${superAdminEmail}\n`);
-        }
-
-        // 3. Demote other Super Admins
-        const others = await prisma.user.updateMany({
-            where: {
-                email: { not: superAdminEmail },
-                role: "SUPER_ADMIN"
-            },
-            data: {
-                role: "ADMIN"
-            }
-        }).catch(() => ({ count: 0 }));
-
-        if (others.count > 0) {
-            console.log(`✅ Demoted ${others.count} other users from SUPER_ADMIN to ADMIN.\n`);
-        }
-
-        console.log("🎉 Database seed completed successfully!");
-        console.log(`\n📧 Super Admin Credentials:`);
-        console.log(`   Email: ${superAdminEmail}`);
-        console.log(`   Password: ${superAdminPassword}\n`);
+        console.log("🎉 Database seed completed successfully!\n");
 
     } catch (error) {
         console.error("\n❌ Seed failed:", error);

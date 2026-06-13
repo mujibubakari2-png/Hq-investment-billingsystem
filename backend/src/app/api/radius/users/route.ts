@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { getTenantFilter, getAssignTenantId } from "@/lib/tenant";
@@ -8,10 +9,11 @@ export async function GET(req: NextRequest) {
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
 
         const { filter } = getTenantFilter(userPayload);
 
-        const users = await prisma.radiusUser.findMany({
+        const users = await db.radiusUser.findMany({
             where: { ...filter },
             orderBy: { createdAt: "desc" },
         });
@@ -45,6 +47,7 @@ export async function POST(req: NextRequest) {
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
 
         const body = await req.json();
         const { username, password, fullName, authType, groupName, speed, dataLimit, sessionTimeout, simultaneousUse, framedIpAddress } = body;
@@ -56,12 +59,12 @@ export async function POST(req: NextRequest) {
         const tenantId = getAssignTenantId(userPayload, body.tenantId);
 
         // Check for duplicate username within the same tenant
-        const existing = await prisma.radiusUser.findFirst({ 
+        const existing = await db.radiusUser.findFirst({ 
             where: { username, tenantId } 
         });
         if (existing) return errorResponse("RADIUS username already exists for this tenant", 409);
 
-        const user = await prisma.radiusUser.create({
+        const user = await db.radiusUser.create({
             data: {
                 username,
                 password,

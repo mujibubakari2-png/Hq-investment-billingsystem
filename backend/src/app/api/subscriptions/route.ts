@@ -1,15 +1,19 @@
 import { NextRequest } from "next/server";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { getMikroTikService } from "@/lib/mikrotik";
 import { syncRadiusUser } from "@/lib/radius";
 import { parseSafeDate, toISOSafe, toTimestampSafe, isValidDate } from "@/lib/dateUtils";
+import { invalidateNamespace } from "@/lib/cache";
+
 
 // GET /api/subscriptions
 export async function GET(req: NextRequest) {
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
 
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
         const tenantFilter = isSuperAdmin ? {} : { tenantId: userPayload.tenantId };
@@ -35,7 +39,7 @@ export async function GET(req: NextRequest) {
         }
 
         const [subs, total] = await Promise.all([
-            prisma.subscription.findMany({
+            db.subscription.findMany({
                 where,
                 include: {
                     client: true,
@@ -48,7 +52,7 @@ export async function GET(req: NextRequest) {
                 skip,
                 take: limit,
             }),
-            prisma.subscription.count({ where }),
+            db.subscription.count({ where }),
         ]);
 
         const mapped = subs.map((s) => {
@@ -94,6 +98,7 @@ export async function POST(req: NextRequest) {
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
 
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
 
@@ -108,7 +113,7 @@ export async function POST(req: NextRequest) {
         }
 
         // Verify client belongs to tenant
-        const client = await prisma.client.findUnique({ where: { id: clientId } });
+        const client = await db.client.findUnique({ where: { id: clientId } });
         if (!client) return errorResponse("Client not found", 404);
         if (!isSuperAdmin && client.tenantId !== userPayload.tenantId) {
             return errorResponse("Forbidden", 403);
@@ -116,7 +121,7 @@ export async function POST(req: NextRequest) {
 
         const tenantIdValue = isSuperAdmin ? client.tenantId : userPayload.tenantId;
 
-        const sub = await prisma.subscription.create({
+        const sub = await db.subscription.create({
             data: {
                 clientId,
                 packageId,
@@ -165,8 +170,8 @@ export async function POST(req: NextRequest) {
                 const type = sub.client.serviceType === "HOTSPOT" ? "hotspot" : "pppoe";
                 await mikrotik.activateService(sub.client.username, pwd, sub.package.name, type);
                 
-                await prisma.subscription.update({ where: { id: sub.id }, data: { syncStatus: "SYNCED" } });
-                await prisma.routerLog.create({
+                await db.subscription.update({ where: { id: sub.id }, data: { syncStatus: "SYNCED" } });
+                await db.routerLog.create({
                     data: {
                         routerId: sub.routerId,
                         action: "MANUAL_SUB_ACTIVATED",
@@ -177,8 +182,8 @@ export async function POST(req: NextRequest) {
                 });
             } catch (err: any) {
                 console.error("Manual sub mikrotik sync error:", err);
-                await prisma.subscription.update({ where: { id: sub.id }, data: { syncStatus: "FAILED_SYNC" } });
-                await prisma.routerLog.create({
+                await db.subscription.update({ where: { id: sub.id }, data: { syncStatus: "FAILED_SYNC" } });
+                await db.routerLog.create({
                     data: {
                         routerId: sub.routerId,
                         action: "MANUAL_SUB_ACTIVATED_FAILED",
@@ -188,6 +193,11 @@ export async function POST(req: NextRequest) {
                     }
                 });
             }
+        }
+
+        // Invalidate dashboard cache so next load reflects new subscription
+        if (sub.tenantId) {
+            invalidateNamespace(sub.tenantId, 'dashboard').catch(() => {});
         }
 
         // DB-006 FIX: Return a safe mapped response — never expose router credentials or

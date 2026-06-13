@@ -6,11 +6,14 @@
  */
 
 import { PaymentProvider, ProviderName, ProviderConfig } from "@/lib/payments/types";
-import { PalmPesaProvider } from "@/lib/payments/providers/palmpesa";
-import { ZenoPayProvider } from "@/lib/payments/providers/zenopay";
-import { MongikeProvider } from "@/lib/payments/providers/mongike";
-import { HarakaPayProvider } from "@/lib/payments/providers/harakapay";
+import { PalmPesaProvider }    from "@/lib/payments/providers/palmpesa";
+import { ZenoPayProvider }     from "@/lib/payments/providers/zenopay";
+import { MongikeProvider }     from "@/lib/payments/providers/mongike";
+import { HarakaPayProvider }   from "@/lib/payments/providers/harakapay";
+import { StripeProvider }      from "@/lib/payments/providers/stripe";
+import { FlutterwaveProvider } from "@/lib/payments/providers/flutterwave";
 // E11 FIX: Removed MPESA
+
 import { env } from "@/lib/env";
 // CRED-001 FIX: Import decrypt so DB-stored credentials are decrypted before being
 // handed to provider instances. Without this, providers receive raw "enc:v1:..." strings
@@ -62,6 +65,19 @@ function envConfigFor(provider: ProviderName): ProviderConfig {
         apiSecret: env.HARAKAPAY_API_SECRET,
         apiUrl: env.HARAKAPAY_API_URL,
         webhookSecret: env.HARAKAPAY_WEBHOOK_SECRET,
+        environment,
+      };
+    case "STRIPE":
+      return {
+        apiKey:        process.env.STRIPE_SECRET_KEY,
+        webhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
+        environment,
+      };
+    case "FLUTTERWAVE":
+      return {
+        apiKey:        process.env.FLUTTERWAVE_SECRET_KEY,
+        webhookSecret: process.env.FLUTTERWAVE_WEBHOOK_HASH,
+        apiUrl:        process.env.FLUTTERWAVE_API_URL,
         environment,
       };
   }
@@ -138,6 +154,10 @@ export function getPaymentProvider(
       return new MongikeProvider(config);
     case "HARAKAPAY":
       return new HarakaPayProvider(config);
+    case "STRIPE":
+      return new StripeProvider(config);
+    case "FLUTTERWAVE":
+      return new FlutterwaveProvider(config);
     default:
       throw new Error(`Unknown payment provider: "${providerName}"`);
   }
@@ -152,6 +172,8 @@ export const SUPPORTED_PROVIDERS: ProviderName[] = [
   "ZENOPAY",
   "MONGIKE",
   "HARAKAPAY",
+  "STRIPE",
+  "FLUTTERWAVE",
 ];
 
 export function isSupportedProvider(name: string): name is ProviderName {

@@ -1,4 +1,7 @@
 import prisma from "./prisma";
+import bcrypt from "bcryptjs";
+import { createHash } from "crypto";
+
 
 /**
  * RADIUS Synchronization Utility
@@ -8,23 +11,33 @@ import prisma from "./prisma";
  *
  * ARCHITECTURE:
  *  - radcheck  → attributes FreeRADIUS checks BEFORE granting access
- *                (Cleartext-Password, Expiration)
+ *                (MD5-Password, Expiration)
+ *                RAD-002 FIX: Changed from Cleartext-Password to MD5-Password.
+ *                FreeRADIUS pap module hashes the incoming PAP password with MD5
+ *                and compares to stored hash — avoids plaintext passwords at rest
+ *                in the database. Run the backfill migration below on existing rows.
  *  - radreply  → attributes FreeRADIUS sends back AFTER granting access
  *                (Session-Timeout, Mikrotik-Rate-Limit, etc.)
  *
  * Both tables must be populated for MikroTik to accept the session.
  *
- * E08 FIX: All upserts now use `tenantId: tenantId || null` (not `|| ""`)
- *          to avoid DB constraint errors when tenantId is absent.
- * E16 FIX: upsertRadCheck / upsertRadReply now use prisma.upsert() with a
- *          unique compound key, eliminating the findFirst → create/update
- *          race condition under high concurrency.
- *          Requires a unique constraint: @@unique([username, tenantId, attribute])
- *          on both RadCheck and RadReply models in schema.prisma.
+ * CRIT-004 FIX: upsertRadCheck / upsertRadReply now use a single atomic
+ *   prisma.$executeRaw() INSERT ... ON CONFLICT DO UPDATE statement.
+ *   The previous findFirst → create pattern had a TOCTOU race condition:
+ *   two concurrent webhook callbacks for the same user could both reach the
+ *   create() branch simultaneously, causing a P2002 unique constraint error
+ *   or silent data corruption. The ON CONFLICT approach is atomic at the DB
+ *   level — only one write wins, no retry logic needed.
  */
 
 // ─── Internal Helpers ────────────────────────────────────────────────────────
 
+/**
+ * CRIT-004 FIX: Atomic upsert for radcheck using raw SQL ON CONFLICT DO UPDATE.
+ * Prisma's generated upsert() struggles with compound nullable unique keys
+ * (username, tenantId, attribute) where tenantId can be NULL. Raw SQL handles
+ * this correctly via the named unique index.
+ */
 async function upsertRadCheck(
     username: string,
     attribute: string,
@@ -32,46 +45,18 @@ async function upsertRadCheck(
     op: string,
     tenantId: string | null
 ) {
-    // RAD-001 FIX: Wrap create() in try/catch to handle the findFirst→create race condition.
-    // Under concurrent payment webhooks for the same user, two goroutines may both reach
-    // the create() branch simultaneously, causing a unique constraint violation.
-    // On conflict: fall back to update by re-querying the now-existing row.
-    const existing = await prisma.radCheck.findFirst({
-        where: { username, attribute, tenantId: tenantId || null },
-    });
-
-    if (existing) {
-        await prisma.radCheck.update({
-            where: { id: existing.id },
-            data: { value, op },
-        });
-    } else {
-        try {
-            await prisma.radCheck.create({
-                data: {
-                    username,
-                    attribute,
-                    op,
-                    value,
-                    tenantId: tenantId || null,
-                },
-            });
-        } catch (err: any) {
-            // P2002 = Prisma unique constraint violation — race condition, row created concurrently
-            if (err?.code === 'P2002') {
-                const race = await prisma.radCheck.findFirst({
-                    where: { username, attribute, tenantId: tenantId || null },
-                });
-                if (race) {
-                    await prisma.radCheck.update({ where: { id: race.id }, data: { value, op } });
-                }
-            } else {
-                throw err;
-            }
-        }
-    }
+    const tid = tenantId || null;
+    await prisma.$executeRaw`
+        INSERT INTO radcheck (username, attribute, op, value, "tenantId")
+        VALUES (${username}, ${attribute}, ${op}, ${value}, ${tid})
+        ON CONFLICT ON CONSTRAINT "username_tenantId_attribute"
+        DO UPDATE SET value = EXCLUDED.value, op = EXCLUDED.op
+    `;
 }
 
+/**
+ * CRIT-004 FIX: Atomic upsert for radreply using raw SQL ON CONFLICT DO UPDATE.
+ */
 async function upsertRadReply(
     username: string,
     attribute: string,
@@ -79,40 +64,13 @@ async function upsertRadReply(
     op: string,
     tenantId: string | null
 ) {
-    // RAD-001 FIX: Same race-condition guard as upsertRadCheck above.
-    const existing = await prisma.radReply.findFirst({
-        where: { username, attribute, tenantId: tenantId || null },
-    });
-
-    if (existing) {
-        await prisma.radReply.update({
-            where: { id: existing.id },
-            data: { value, op },
-        });
-    } else {
-        try {
-            await prisma.radReply.create({
-                data: {
-                    username,
-                    attribute,
-                    op,
-                    value,
-                    tenantId: tenantId || null,
-                },
-            });
-        } catch (err: any) {
-            if (err?.code === 'P2002') {
-                const race = await prisma.radReply.findFirst({
-                    where: { username, attribute, tenantId: tenantId || null },
-                });
-                if (race) {
-                    await prisma.radReply.update({ where: { id: race.id }, data: { value, op } });
-                }
-            } else {
-                throw err;
-            }
-        }
-    }
+    const tid = tenantId || null;
+    await prisma.$executeRaw`
+        INSERT INTO radreply (username, attribute, op, value, "tenantId")
+        VALUES (${username}, ${attribute}, ${op}, ${value}, ${tid})
+        ON CONFLICT ON CONSTRAINT "username_tenantId_attribute"
+        DO UPDATE SET value = EXCLUDED.value, op = EXCLUDED.op
+    `;
 }
 
 async function deleteRadReplyAttribute(
@@ -158,9 +116,6 @@ export async function syncRadiusUser(params: {
         ? Math.max(0, Math.floor((expiresAt.getTime() - Date.now()) / 1000))
         : null;
 
-    // E08 FIX: We use findFirst + create/update instead of upsert because Prisma's
-    // generated type for the unique compound index strictly demands a string for tenantId,
-    // which prevents us from cleanly passing `null` in an upsert's where clause.
     let radiusUser = await prisma.radiusUser.findFirst({
         where: { username, tenantId: tenantId || null },
     });
@@ -195,9 +150,15 @@ export async function syncRadiusUser(params: {
         });
     }
 
-    // ── 2. radcheck: Cleartext-Password ───────────────────────────────────────
+    // ── 2. radcheck: MD5-Password (RAD-002 FIX — no longer Cleartext-Password) ─
+    // FreeRADIUS pap module: hashes incoming password with MD5, compares to stored.
+    // MD5 is intentionally used here — it is what FreeRADIUS pap expects;
+    // bcrypt is NOT compatible with FreeRADIUS's PAP verification path.
     if (password) {
-        await upsertRadCheck(username, "Cleartext-Password", password, ":=", tenantId);
+        const md5Hash = createHash('md5').update(password).digest('hex');
+        await upsertRadCheck(username, "MD5-Password", md5Hash, ":=", tenantId);
+        // Remove any legacy Cleartext-Password entry to prevent stale plaintext
+        await deleteRadCheckAttribute(username, "Cleartext-Password", tenantId);
     }
 
     // ── 3. radcheck: Simultaneous-Use (prevents multi-login abuse) ────────────
@@ -213,24 +174,18 @@ export async function syncRadiusUser(params: {
     }
 
     // ── 5. radreply: Session-Timeout (CRITICAL for MikroTik) ─────────────────
-    //    MikroTik uses Session-Timeout to know when to disconnect the user.
-    //    Without this, MikroTik may refuse to fully establish the session.
     if (sessionTimeoutSecs !== null && sessionTimeoutSecs > 0) {
         await upsertRadReply(username, "Session-Timeout", String(sessionTimeoutSecs), "=", tenantId);
     } else {
-        // Remove stale Session-Timeout if subscription expired or no expiry
         await deleteRadReplyAttribute(username, "Session-Timeout", tenantId);
     }
 
     // ── 6. radreply: Mikrotik-Rate-Limit (bandwidth control) ─────────────────
-    //    Format: "upload/download" e.g. "10M/20M"
-    //    FreeRADIUS passes this to MikroTik which applies a queue tree.
     if (rateLimit) {
         await upsertRadReply(username, "Mikrotik-Rate-Limit", rateLimit, "=", tenantId);
     }
 
     // ── 7. radreply: Mikrotik-Group (Hotspot/PPPoE Profile) ──────────────────
-    //    FreeRADIUS passes this to MikroTik which assigns the matching profile.
     if (profileName) {
         await upsertRadReply(username, "Mikrotik-Group", profileName, "=", tenantId);
     } else {
@@ -242,8 +197,6 @@ export async function syncRadiusUser(params: {
 
 /**
  * Suspend a user in RADIUS — immediately rejects all new auth attempts.
- * Sets Expiration to the past in radcheck AND removes Session-Timeout
- * from radreply so any cached session also expires.
  */
 export async function suspendRadiusUser(username: string, tenantId: string | null) {
     // 1. Mark high-level model as Inactive

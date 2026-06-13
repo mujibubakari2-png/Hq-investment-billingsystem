@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { suspendRadiusUser } from "@/lib/radius";
@@ -21,13 +22,14 @@ export async function POST(req: NextRequest) {
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
 
         const tenantFilter = { tenantId: userPayload.tenantId };
         const now = new Date();
 
         // 1. Find all ACTIVE voucher subscriptions that have expired
         //    Use select-only (no include) to avoid the Prisma include+select conflict
-        const expiredVoucherSubs = await prisma.subscription.findMany({
+        const expiredVoucherSubs = await db.subscription.findMany({
             where: {
                 ...tenantFilter,
                 status: "ACTIVE",
@@ -59,7 +61,7 @@ export async function POST(req: NextRequest) {
 
             try {
                 // 2. Mark subscription as EXPIRED in the database
-                await prisma.subscription.update({
+                await db.subscription.update({
                     where: { id: sub.id },
                     data: { status: "EXPIRED", onlineStatus: "OFFLINE" },
                 });
@@ -103,12 +105,13 @@ export async function GET(req: NextRequest) {
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
 
         const tenantFilter = { tenantId: userPayload.tenantId };
         const now = new Date();
 
         // Use select-only (never mix include + select — Prisma disallows it)
-        const expiredVoucherSubs = await prisma.subscription.findMany({
+        const expiredVoucherSubs = await db.subscription.findMany({
             where: {
                 ...tenantFilter,
                 status: "ACTIVE",

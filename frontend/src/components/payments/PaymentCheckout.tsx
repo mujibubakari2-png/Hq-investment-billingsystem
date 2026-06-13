@@ -79,13 +79,12 @@ export default function PaymentCheckout({
     setApiError("");
 
     try {
-      const token = localStorage.getItem("token") ?? "";
       const res = await fetch(`${API_BASE}/api/payments/initiate`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
         },
+        credentials: "include",
         body: JSON.stringify({
           provider,
           phone,

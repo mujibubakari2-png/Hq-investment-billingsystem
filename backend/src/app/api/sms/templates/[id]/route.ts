@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 
@@ -6,19 +7,20 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
 
         const { id } = await params;
         const body = await req.json();
 
         // Verify template exists
-        const existing = await prisma.messageTemplate.findUnique({ where: { id } });
+        const existing = await db.messageTemplate.findUnique({ where: { id } });
         if (!existing) return errorResponse("Template not found", 404);
 
         if (userPayload.role !== "SUPER_ADMIN" && existing.tenantId !== userPayload.tenantId) {
             return errorResponse("Template not found", 404);
         }
 
-        const template = await prisma.messageTemplate.update({
+        const template = await db.messageTemplate.update({
             where: { id },
             data: {
                 name: body.name,
@@ -39,18 +41,19 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
 
         const { id } = await params;
 
         // Verify template exists
-        const existing = await prisma.messageTemplate.findUnique({ where: { id } });
+        const existing = await db.messageTemplate.findUnique({ where: { id } });
         if (!existing) return errorResponse("Template not found", 404);
 
         if (userPayload.role !== "SUPER_ADMIN" && existing.tenantId !== userPayload.tenantId) {
             return errorResponse("Template not found", 404);
         }
 
-        await prisma.messageTemplate.delete({ where: { id } });
+        await db.messageTemplate.delete({ where: { id } });
         return jsonResponse({ message: "Template deleted" });
     } catch (e) {
         console.error("TEMPLATE DELETE ERROR:", e);
