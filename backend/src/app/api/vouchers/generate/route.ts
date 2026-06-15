@@ -6,7 +6,6 @@ import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 // POST /api/vouchers/generate - Bulk generate vouchers
 export async function POST(req: NextRequest) {
     try {
-        const db = getTenantClient(null);
         const body = await req.json();
         const {
             packageId,
@@ -21,6 +20,13 @@ export async function POST(req: NextRequest) {
         // Prefer logged-in user from JWT token, then body, then admin fallback
         const currentUser = getUserFromRequest(req);
         if (!currentUser) return errorResponse("Unauthorized", 401);
+
+        // Only ADMIN or SUPER_ADMIN can bulk-generate vouchers
+        if (!["ADMIN", "SUPER_ADMIN"].includes(currentUser.role)) {
+            return errorResponse("Forbidden: ADMIN or SUPER_ADMIN required", 403);
+        }
+
+        const db = getTenantClient(currentUser);
 
         const normalizedCount = Math.max(1, Math.min(500, Number(count) || 10));
         const normalizedCodeLength = Math.max(4, Math.min(32, Number(codeLength) || 8));

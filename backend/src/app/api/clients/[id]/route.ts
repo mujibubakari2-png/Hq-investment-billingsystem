@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
+import { ClientUpdateSchema } from "@/lib/validators";
 
 // GET /api/clients/[id]
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -39,6 +40,12 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
         const { id } = await params;
         const body = await req.json();
+        const parsed = ClientUpdateSchema.safeParse(body);
+        if (!parsed.success) {
+            const msg = parsed.error.issues.map((e: any) => `${e.path.join('.')}: ${e.message}`).join('; ');
+            return errorResponse(`Invalid request body: ${msg}`, 400);
+        }
+        const update = parsed.data;
 
         const clientExists = await db.client.findFirst({
             where: { id, tenantId: userPayload.tenantId }
@@ -46,20 +53,18 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
         if (!clientExists) return errorResponse("Client not found", 404);
 
-        const client = await db.client.update({
-            where: { id },
-            data: {
-                username: body.username, // Allow updating username
-                fullName: body.fullName,
-                phone: body.phone,
-                email: body.email,
-                serviceType: body.serviceType === "PPPoE" ? "PPPOE" : "HOTSPOT",
-                accountType: body.accountType === "Business" ? "BUSINESS" : "PERSONAL",
-                status: body.status?.toUpperCase(),
-                macAddress: body.macAddress,
-                device: body.device,
-            },
-        });
+        const dataToUpdate: any = {};
+        if (update.username) dataToUpdate.username = update.username;
+        if (update.fullName) dataToUpdate.fullName = update.fullName;
+        if (update.phone) dataToUpdate.phone = update.phone;
+        if (update.email) dataToUpdate.email = update.email;
+        if (update.serviceType) dataToUpdate.serviceType = update.serviceType;
+        if (update.accountType) dataToUpdate.accountType = update.accountType;
+        if (update.status) dataToUpdate.status = update.status?.toUpperCase();
+        if (update.macAddress) dataToUpdate.macAddress = update.macAddress;
+        if (update.device) dataToUpdate.device = update.device;
+
+        const client = await db.client.update({ where: { id }, data: dataToUpdate });
 
         return jsonResponse(client);
     } catch {
@@ -75,12 +80,12 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
         const db = getTenantClient(userPayload);
 
         const { id } = await params;
-        
-        const clientExists = await db.client.findFirst({
-            where: { id, tenantId: userPayload.tenantId }
-        });
 
+        const clientExists = await db.client.findFirst({ where: { id, tenantId: userPayload.tenantId } });
         if (!clientExists) return errorResponse("Client not found", 404);
+
+        // RBAC: Prevent VIEWER role from deleting clients
+        if (userPayload.role === "VIEWER") return errorResponse("Forbidden", 403);
 
         await db.client.delete({ where: { id } });
         return jsonResponse({ message: "Client deleted" });

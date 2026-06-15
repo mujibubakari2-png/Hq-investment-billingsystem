@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 
 /**
@@ -16,24 +17,28 @@ export async function GET(req: NextRequest) {
         const { searchParams } = new URL(req.url);
         const routerId = searchParams.get("routerId") || searchParams.get("router_id") || "";
 
-        if (routerId) {
-            const router = await prisma.router.findUnique({
-                where: { id: routerId },
-                select: { id: true }
-            });
-            if (!router) return errorResponse("Router not found", 404);
+        if (!routerId) {
+            return errorResponse("routerId is required", 400);
         }
 
-        const packages = await prisma.package.findMany({
+        const router = await prisma.router.findUnique({
+            where: { id: routerId },
+            select: { id: true, tenantId: true },
+        });
+        if (!router) return errorResponse("Router not found", 404);
+        const db = getTenantClient(router.tenantId);
+
+        const packages = await db.package.findMany({
             where: {
                 type: "HOTSPOT",
                 status: "ACTIVE",
-                ...(routerId ? { routerId } : {})
+                routerId,
+                tenantId: router.tenantId,
             },
             orderBy: { createdAt: "desc" }
         });
 
-        return jsonResponse(packages.map(p => ({
+        return jsonResponse(packages.map((p: any) => ({
             id: p.id,
             name: p.name,
             type: p.type,

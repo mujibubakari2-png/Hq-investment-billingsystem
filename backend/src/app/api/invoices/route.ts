@@ -3,6 +3,7 @@ import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { toISOSafe, parseSafeDate } from "@/lib/dateUtils";
+import { InvoiceCreateSchema } from "@/lib/validators";
 
 // GET /api/invoices
 export async function GET(req: NextRequest) {
@@ -89,13 +90,17 @@ export async function POST(req: NextRequest) {
 
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
         const body = await req.json();
+        const parsed = InvoiceCreateSchema.safeParse(body);
+        if (!parsed.success) {
+            const msg = parsed.error.issues.map((e: any) => `${e.path.join('.')}: ${e.message}`).join('; ');
+            return errorResponse(`Invalid request body: ${msg}`, 400);
+        }
+        const data = parsed.data;
         const tenantIdValue = userPayload.tenantId;
 
         // API-002 FIX: Validate that clientId belongs to the requesting tenant.
-        // Without this check, a tenant ADMIN can create invoices against any client UUID
-        // from any other tenant, leaking cross-tenant billing data.
-        if (body.clientId) {
-            const client = await db.client.findUnique({ where: { id: body.clientId } });
+        if (data.clientId) {
+            const client = await db.client.findUnique({ where: { id: data.clientId } });
             if (!client) return errorResponse("Client not found", 404);
             if (!isSuperAdmin && client.tenantId !== userPayload.tenantId) {
                 return errorResponse("Forbidden: client does not belong to your tenant", 403);
@@ -104,15 +109,15 @@ export async function POST(req: NextRequest) {
 
         const invoice = await db.invoice.create({
             data: {
-                invoiceNumber: body.invoiceNumber || `INV-${Date.now()}`,
-                clientId: body.clientId,
-                amount: parseFloat(body.amount),
-                status: (body.status || "DRAFT").toUpperCase(),
-                dueDate: parseSafeDate(body.dueDate) || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // Default 7 days from now
-                issuedDate: parseSafeDate(body.issuedDate) || new Date(),
+                invoiceNumber: data.invoiceNumber || `INV-${Date.now()}`,
+                clientId: data.clientId,
+                amount: data.amount,
+                status: data.status || "DRAFT",
+                dueDate: parseSafeDate(data.dueDate) || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+                issuedDate: parseSafeDate(data.issuedDate) || new Date(),
                 tenantId: tenantIdValue,
                 items: {
-                    create: (body.items || []).map((item: { description: string; quantity: number; unitPrice: number; total: number }) => ({
+                    create: (data.items || []).map((item: { description: string; quantity: number; unitPrice: number; total: number }) => ({
                         description: item.description,
                         quantity: parseInt(String(item.quantity)),
                         unitPrice: parseFloat(String(item.unitPrice)),

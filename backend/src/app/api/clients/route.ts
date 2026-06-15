@@ -1,7 +1,8 @@
 import { NextRequest } from "next/server";
-import prisma from "@/lib/prisma";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { toISOSafe } from "@/lib/dateUtils";
+import { ClientCreateSchema } from "@/lib/validators";
 
 // GET /api/clients - List all clients
 export async function GET(req: NextRequest) {
@@ -9,6 +10,7 @@ export async function GET(req: NextRequest) {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
 
+        const db = getTenantClient(userPayload);
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
         const tenantFilter = { tenantId: userPayload.tenantId };
 
@@ -34,7 +36,7 @@ export async function GET(req: NextRequest) {
         if (serviceType) where.serviceType = serviceType;
 
         const [clients, total] = await Promise.all([
-            prisma.client.findMany({
+            db.client.findMany({
                 where,
                 include: {
                     subscriptions: {
@@ -48,7 +50,7 @@ export async function GET(req: NextRequest) {
                 skip,
                 take: limit,
             }),
-            prisma.client.count({ where }),
+            db.client.count({ where }),
         ]);
 
         const mapped = clients.map((c: {
@@ -103,9 +105,12 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
-        const fullName = body.fullName || body.full_name || body.name;
-        const phone = body.phone || body.phoneNumber || body.phone_number;
-        const email = body.email || body.emailAddress;
+        const parsed = ClientCreateSchema.safeParse(body);
+        if (!parsed.success) {
+            const msg = parsed.error.issues.map((e: any) => `${e.path.join('.')}: ${e.message}`).join('; ');
+            return errorResponse(`Invalid request body: ${msg}`, 400);
+        }
+        const { username: bodyUsername, fullName, phone, email, serviceType } = parsed.data;
         const planId = body.planId || body.plan_id || body.plan;
 
         if (!fullName) return errorResponse("Full name is required");
@@ -131,6 +136,8 @@ export async function POST(req: NextRequest) {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
 
+        const db = getTenantClient(userPayload);
+
         //  Always use token's tenantId — SUPER_ADMIN should use /api/admin/clients for cross-tenant ops
         const tenantIdValue = userPayload.tenantId;
 
@@ -138,14 +145,13 @@ export async function POST(req: NextRequest) {
             return errorResponse("Tenant ID is required", 400);
         }
 
-        const existing = await prisma.client.findFirst({ where: { username, tenantId: tenantIdValue } });
+        const existing = await db.client.findFirst({ where: { username, tenantId: tenantIdValue } });
 
-        // Always reject duplicate usernames — removed unsafe dev-mode bypass
         if (existing) {
             return errorResponse("Username already exists", 409);
         }
 
-        const tenant = await prisma.tenant.findUnique({
+        const tenant = await db.tenant.findUnique({
             where: { id: tenantIdValue },
             include: { plan: true, clients: { select: { id: true, serviceType: true } } }
         });
@@ -177,7 +183,7 @@ export async function POST(req: NextRequest) {
             tenantId: tenantIdValue
         };
 
-        const client = await prisma.client.create({ data: clientData });
+        const client = await db.client.create({ data: clientData });
 
         return jsonResponse({
             id: client.id,

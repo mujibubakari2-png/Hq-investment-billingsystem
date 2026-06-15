@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { requireAuth, hashPassword, comparePassword, jsonResponse, errorResponse } from "@/lib/auth";
 import logger from "@/lib/logger";
@@ -14,6 +15,7 @@ export async function POST(req: NextRequest) {
     }
 
     try {
+        const db = getTenantClient(payload);
         const body = await req.json();
         const { currentPassword, newPassword } = body;
 
@@ -21,7 +23,7 @@ export async function POST(req: NextRequest) {
             return errorResponse("Both current password and new password are required");
         }
 
-        const user = await prisma.user.findUnique({ where: { id: payload.userId } });
+        const user = await db.user.findUnique({ where: { id: payload.userId } });
         if (!user) {
             return errorResponse("User not found", 404);
         }
@@ -33,7 +35,7 @@ export async function POST(req: NextRequest) {
 
         const hashedNewPassword = await hashPassword(newPassword);
 
-        await prisma.user.update({
+        await db.user.update({
             where: { id: payload.userId },
             data: { password: hashedNewPassword }
         });

@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { getMikroTikService } from "@/lib/mikrotik";
 import { getTenantClient } from "@/lib/tenantPrisma";
+import { PackageUpdateSchema } from "@/lib/validators";
 
 // GET /api/packages/[id]
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -33,32 +34,37 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         const { id } = await params;
         const body = await req.json();
 
-        const routerId = body.routerId || body.router;
+        const parsed = PackageUpdateSchema.safeParse(body);
+        if (!parsed.success) {
+            const msg = parsed.error.issues.map((e: any) => `${e.path.join('.')}: ${e.message}`).join('; ');
+            return errorResponse(`Invalid request body: ${msg}`, 400);
+        }
+        const update = parsed.data;
+
+        const routerId = update.routerId || update.router || body.routerId || body.router;
         const router = routerId
-            ? await db.router.findFirst({ where: { OR: [{ id: routerId }, { name: routerId }] } })
+            ? await db.router.findFirst({ where: { OR: [{ id: routerId }, { name: routerId }], tenantId: userPayload.tenantId } })
             : null;
 
-        const pkg = await db.package.update({
-            where: { id },
-            data: {
-                name: body.name,
-                type: body.type === "PPPoE" ? "PPPOE" : "HOTSPOT",
-                category: body.category === "Business" ? "BUSINESS" : "PERSONAL",
-                uploadSpeed: body.uploadSpeed ? parseFloat(body.uploadSpeed) : undefined,
-                uploadUnit: body.uploadUnit,
-                downloadSpeed: body.downloadSpeed ? parseFloat(body.downloadSpeed) : undefined,
-                downloadUnit: body.downloadUnit,
-                price: body.price ? parseFloat(body.price) : undefined,
-                duration: body.duration ? parseInt(body.duration) : undefined,
-                durationUnit: body.durationUnit?.toUpperCase(),
-                burstEnabled: body.burstEnabled,
-                hotspotType: body.hotspotType === "Data-capped" ? "DATA_CAPPED" : body.hotspotType === "Unlimited" ? "UNLIMITED" : undefined,
-                devices: body.devices ? parseInt(body.devices) : undefined,
-                paymentType: body.paymentType === "Postpaid" ? "POSTPAID" : body.paymentType === "Prepaid" ? "PREPAID" : undefined,
-                status: body.status === "Inactive" ? "INACTIVE" : body.status === "Active" ? "ACTIVE" : undefined,
-                routerId: router?.id,
-            },
-        });
+        const dataToUpdate: any = {};
+        if (update.name) dataToUpdate.name = update.name;
+        if (update.type) dataToUpdate.type = update.type;
+        if (update.category) dataToUpdate.category = update.category;
+        if (update.uploadSpeed) dataToUpdate.uploadSpeed = update.uploadSpeed;
+        if (update.uploadUnit) dataToUpdate.uploadUnit = update.uploadUnit;
+        if (update.downloadSpeed) dataToUpdate.downloadSpeed = update.downloadSpeed;
+        if (update.downloadUnit) dataToUpdate.downloadUnit = update.downloadUnit;
+        if (update.price) dataToUpdate.price = update.price;
+        if (update.duration) dataToUpdate.duration = update.duration;
+        if (update.durationUnit) dataToUpdate.durationUnit = update.durationUnit?.toUpperCase();
+        if (typeof update.burstEnabled !== 'undefined') dataToUpdate.burstEnabled = update.burstEnabled;
+        if (update.hotspotType) dataToUpdate.hotspotType = update.hotspotType === "Data-capped" ? "DATA_CAPPED" : update.hotspotType === "Unlimited" ? "UNLIMITED" : update.hotspotType;
+        if (typeof update.devices !== 'undefined') dataToUpdate.devices = update.devices;
+        if (update.paymentType) dataToUpdate.paymentType = update.paymentType;
+        if (update.status) dataToUpdate.status = update.status;
+        if (router) dataToUpdate.routerId = router.id;
+
+        const pkg = await db.package.update({ where: { id }, data: dataToUpdate });
 
         // Best-effort: sync MikroTik bandwidth profile when package changes
         if (pkg.routerId) {
@@ -109,7 +115,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
         const db = getTenantClient(userPayload);
 
         const { id } = await params;
-        
+
         // Manual cascade delete to handle foreign key constraints
         await db.$transaction([
             db.subscription.deleteMany({ where: { packageId: id } }),

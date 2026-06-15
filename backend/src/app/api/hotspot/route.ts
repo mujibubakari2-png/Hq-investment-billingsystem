@@ -1,6 +1,5 @@
 import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
-import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 
 
@@ -22,10 +21,10 @@ export async function GET(req: NextRequest) {
         const limit = limitParam === "All" ? 999999 : parseInt(limitParam);
 
         // Filter for ACTIVE subscriptions with client type HOTSPOT
-        const whereCondition: any = { 
-            status: "ACTIVE", 
+        const whereCondition: any = {
+            status: "ACTIVE",
             client: { serviceType: "HOTSPOT" },
-            ...tenantFilter 
+            ...tenantFilter
         };
 
         if (routerId !== "All") {
@@ -61,8 +60,8 @@ export async function GET(req: NextRequest) {
         }));
 
         if (search) {
-            const filtered = mapped.filter(s => 
-                s.username.toLowerCase().includes(search) || 
+            const filtered = mapped.filter(s =>
+                s.username.toLowerCase().includes(search) ||
                 s.fullName.toLowerCase().includes(search) ||
                 s.macAddress.toLowerCase().includes(search)
             );

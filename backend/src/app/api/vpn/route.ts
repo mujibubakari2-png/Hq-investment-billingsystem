@@ -3,6 +3,7 @@ import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { encrypt, decrypt } from "@/lib/encryption";
+import { VpnUserCreateSchema } from "@/lib/validators";
 
 // GET /api/vpn – list VPN users (from ppp secrets stored in a table)
 export async function GET(req: NextRequest) {
@@ -57,11 +58,12 @@ export async function POST(req: NextRequest) {
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
 
         const body = await req.json();
-        const { username, password, fullName, protocol, profile, localAddress, remoteAddress, routerId, service } = body;
-
-        if (!username || !password || !routerId) {
-            return errorResponse("Username, password, and routerId are required", 400);
+        const parsed = VpnUserCreateSchema.safeParse(body);
+        if (!parsed.success) {
+            const msg = parsed.error.issues.map((e: any) => `${e.path.join('.')}: ${e.message}`).join('; ');
+            return errorResponse(`Invalid request body: ${msg}`, 400);
         }
+        const { username, password, fullName, protocol, profile, localAddress, remoteAddress, routerId, service } = parsed.data;
 
         // Verify router belongs to user's tenant
         const router = await db.router.findUnique({ where: { id: routerId } });
@@ -73,8 +75,8 @@ export async function POST(req: NextRequest) {
         const tenantIdValue = isSuperAdmin ? router.tenantId : userPayload.tenantId;
 
         // Check for duplicate username within the same tenant
-        const existing = await db.vpnUser.findFirst({ 
-            where: { username, tenantId: tenantIdValue } 
+        const existing = await db.vpnUser.findFirst({
+            where: { username, tenantId: tenantIdValue }
         });
         if (existing) return errorResponse("VPN username already exists for this tenant", 409);
 

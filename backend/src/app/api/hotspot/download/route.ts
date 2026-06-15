@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { readFileSync, readdirSync, statSync, existsSync } from "fs";
 import { join } from "path";
 import prisma from "@/lib/prisma";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import { sanitizeMikroTikName } from "@/lib/mikrotik";
 
 /**
@@ -58,27 +59,33 @@ export async function GET(req: NextRequest) {
             const router = await prisma.router.findUnique({
                 where: { id: routerId },
                 select: {
-                    password: true,
                     name: true,
+                    tenantId: true,
                     hotspotSettings: true,
-                    tenant: {
-                        select: {
-                            name: true,
-                            phone: true
-                        }
-                    }
                 }
             });
             if (router) {
-                routerSecret = router.password || process.env.RADIUS_NAS_SECRET || "hqinvestment_radius_secret";
+                const db = getTenantClient(router.tenantId);
+                // Re-fetch via tenant-scoped client to ensure the settings belong to the same tenant.
+                const tenantRouter = await db.router.findUnique({
+                    where: { id: routerId },
+                    select: { name: true, hotspotSettings: true }
+                });
+                if (tenantRouter) {
+                    routerName = sanitizeMikroTikName(tenantRouter.name);
+                    hotspotSettings = tenantRouter.hotspotSettings;
+                }
+            }
+            if (router) {
+                routerSecret = process.env.RADIUS_NAS_SECRET || "hqinvestment_radius_secret";
                 routerName = sanitizeMikroTikName(router.name);
                 hotspotSettings = router.hotspotSettings;
 
                 // Fallbacks if no specific hotspot settings
                 if (!hotspotSettings) {
                     hotspotSettings = {
-                        companyName: router.tenant?.name || "HQINVESTMENT",
-                        customerCareNumber: router.tenant?.phone || "+255 000 000 000",
+                        companyName: "HQINVESTMENT",
+                        customerCareNumber: "+255 000 000 000",
                         primaryColor: "#1a1a2e",
                         accentColor: "#6366f1"
                     };
@@ -136,7 +143,7 @@ export async function GET(req: NextRequest) {
 
         // Generate a clean DNS name
         const domain = new URL(apiUrl).hostname;
-        const dnsName = hotspotSettings?.companyName 
+        const dnsName = hotspotSettings?.companyName
             ? sanitizeMikroTikName(hotspotSettings.companyName) + ".net"
             : "hotspot.net";
 

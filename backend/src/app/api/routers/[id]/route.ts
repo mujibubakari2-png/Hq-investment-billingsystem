@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
+import { RouterUpdateSchema } from "@/lib/validators";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
@@ -41,38 +42,44 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
         const existingRouter = await db.router.findUnique({ where: { id } });
         if (!existingRouter) return errorResponse("Router not found", 404);
-        
+
         if (userPayload.role !== "SUPER_ADMIN" && existingRouter.tenantId !== userPayload.tenantId) {
             return errorResponse("Unauthorized to modify this router", 403);
         }
 
         const body = await req.json();
+        const parsed = RouterUpdateSchema.safeParse(body);
+        if (!parsed.success) {
+            const msg = parsed.error.issues.map((e: any) => `${e.path.join('.')}: ${e.message}`).join('; ');
+            return errorResponse(`Invalid request body: ${msg}`, 400);
+        }
+        const update = parsed.data;
 
         const data: any = {};
         // Handle aliases
-        const name = body.name || body.routerName || body.hostname || body.router_name;
-        const host = body.host || body.hostIP || body.ipAddress || body.address || body.ip;
-        const password = body.password || body.accessCode || body.secret || body.sharedSecret;
-        const username = body.username || body.user;
+        const name = update.name || body.routerName || body.hostname || body.router_name;
+        const host = update.host || body.host || body.hostIP || body.ipAddress || body.address || body.ip;
+        const password = update.password || body.password || body.accessCode || body.secret || body.sharedSecret;
+        const username = update.username || body.username || body.user;
 
         if (name) data.name = name;
         if (host) data.host = host;
         if (username !== undefined && username !== "") data.username = username;
         if (password !== undefined && password !== "") data.password = password;
-        
+
         // Port handling - allow null to override defaults
-        if (body.port !== undefined || body.apiPort !== undefined) {
-            const portVal = body.port !== undefined ? body.port : body.apiPort;
-            data.port = portVal === null ? null : parseInt(portVal.toString());
-            
-            const apiPortVal = body.apiPort !== undefined ? body.apiPort : portVal;
-            data.apiPort = apiPortVal === null ? null : parseInt(apiPortVal.toString());
+        if (typeof update.port !== 'undefined' || typeof update.apiPort !== 'undefined' || body.port !== undefined || body.apiPort !== undefined) {
+            const portVal = typeof update.port !== 'undefined' ? update.port : (body.port !== undefined ? body.port : update.apiPort !== undefined ? update.apiPort : body.apiPort);
+            data.port = portVal === null ? null : parseInt(String(portVal));
+
+            const apiPortVal = typeof update.apiPort !== 'undefined' ? update.apiPort : (body.apiPort !== undefined ? body.apiPort : portVal);
+            data.apiPort = apiPortVal === null ? null : parseInt(String(apiPortVal));
         }
 
-        if (body.vpnMode) data.vpnMode = body.vpnMode;
-        if (body.description !== undefined) data.description = body.description;
-        if (body.status) data.status = body.status.toUpperCase();
-        if (body.accountingEnabled !== undefined) data.accountingEnabled = !!body.accountingEnabled;
+        if (update.vpnMode) data.vpnMode = update.vpnMode;
+        if (typeof update.description !== 'undefined') data.description = update.description;
+        if (update.status) data.status = update.status.toUpperCase();
+        if (typeof update.accountingEnabled !== 'undefined') data.accountingEnabled = !!update.accountingEnabled;
 
         const router = await db.router.update({ where: { id }, data });
 
@@ -135,10 +142,10 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
         const db = getTenantClient(userPayload);
 
         const { id } = await params;
-        
+
         const existingRouter = await db.router.findUnique({ where: { id } });
         if (!existingRouter) return errorResponse("Router not found", 404);
-        
+
         if (userPayload.role !== "SUPER_ADMIN" && existingRouter.tenantId !== userPayload.tenantId) {
             return errorResponse("Unauthorized to delete this router", 403);
         }

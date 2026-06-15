@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
+import { SubscriptionCreateSchema, SubscriptionUpdateSchema } from "@/lib/validators";
 import { getMikroTikService } from "@/lib/mikrotik";
 import { syncRadiusUser } from "@/lib/radius";
 import { parseSafeDate, toISOSafe, toTimestampSafe, isValidDate } from "@/lib/dateUtils";
@@ -60,7 +61,7 @@ export async function GET(req: NextRequest) {
             const nowTs = Date.now();
             // E07 FIX: was (nowTs - expiresTs) which computed ELAPSED days; now correctly computes REMAINING days
             const days = expiresTs > 0 ? Math.max(0, Math.floor((expiresTs - nowTs) / (1000 * 3600 * 24))) : 0;
-            
+
             return {
                 id: s.id,
                 user: s.client?.username || "Unknown",
@@ -103,10 +104,12 @@ export async function POST(req: NextRequest) {
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
 
         const body = await req.json();
-        
-        const clientId = body.clientId || body.client;
-        const packageId = body.packageId || body.package;
-        const routerId = body.routerId || body.router;
+        const parsed = SubscriptionCreateSchema.safeParse(body);
+        if (!parsed.success) {
+            const msg = parsed.error.issues.map((e: any) => `${e.path.join('.')}: ${e.message}`).join('; ');
+            return errorResponse(`Invalid request body: ${msg}`, 400);
+        }
+        const { clientId, packageId, routerId, expiresAt, method } = parsed.data;
 
         if (!clientId || !packageId) {
             return errorResponse(`clientId and packageId are required. Got clientId: ${clientId}, packageId: ${packageId}`);
@@ -169,7 +172,7 @@ export async function POST(req: NextRequest) {
                 const pwd = sub.client.phone || "123456";
                 const type = sub.client.serviceType === "HOTSPOT" ? "hotspot" : "pppoe";
                 await mikrotik.activateService(sub.client.username, pwd, sub.package.name, type);
-                
+
                 await db.subscription.update({ where: { id: sub.id }, data: { syncStatus: "SYNCED" } });
                 await db.routerLog.create({
                     data: {
@@ -197,7 +200,7 @@ export async function POST(req: NextRequest) {
 
         // Invalidate dashboard cache so next load reflects new subscription
         if (sub.tenantId) {
-            invalidateNamespace(sub.tenantId, 'dashboard').catch(() => {});
+            invalidateNamespace(sub.tenantId, 'dashboard').catch(() => { });
         }
 
         // DB-006 FIX: Return a safe mapped response — never expose router credentials or

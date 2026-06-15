@@ -1,19 +1,21 @@
 import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
-import { errorResponse, jsonResponse, getUserFromRequest } from "@/lib/auth";
+import { errorResponse, jsonResponse } from "@/lib/auth";
+import { requireRole } from "@/lib/rbac";
 import { sendAccountApprovedNotifications } from "@/lib/accountNotifications";
 
 
 // GET /api/super-admin/tenants — list all tenants
 export async function GET(req: NextRequest) {
     try {
-        const userPayload = getUserFromRequest(req);
-        if (!userPayload || userPayload.role !== "SUPER_ADMIN" || userPayload.tenantId) {
-            return errorResponse("Unauthorized", 403);
-        }
+        const guard = requireRole(req, "SUPER_ADMIN");
+        if (guard.error) return guard.error;
+        const userPayload = guard.user;
+        if (userPayload.tenantId) return errorResponse("Unauthorized", 403);
+        const db = getTenantClient(null);
 
-        const tenants = await prisma.tenant.findMany({
+        const tenants = await db.tenant.findMany({
             orderBy: { createdAt: "desc" },
             include: {
                 users: {
@@ -48,10 +50,11 @@ export async function GET(req: NextRequest) {
 // Body: { tenantId, action?: "approve" | "suspend" | "reactivate" }
 export async function POST(req: NextRequest) {
     try {
-        const userPayload = getUserFromRequest(req);
-        if (!userPayload || userPayload.role !== "SUPER_ADMIN" || userPayload.tenantId) {
-            return errorResponse("Unauthorized", 403);
-        }
+        const guard = requireRole(req, "SUPER_ADMIN");
+        if (guard.error) return guard.error;
+        const userPayload = guard.user;
+        if (userPayload.tenantId) return errorResponse("Unauthorized", 403);
+        const db = getTenantClient(null);
 
         const body = await req.json();
         const { tenantId, action } = body;
@@ -60,7 +63,7 @@ export async function POST(req: NextRequest) {
             return errorResponse("tenantId is required", 400);
         }
 
-        const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
+        const tenant = await db.tenant.findUnique({ where: { id: tenantId } });
         if (!tenant) {
             return errorResponse("Tenant not found", 404);
         }
@@ -75,7 +78,7 @@ export async function POST(req: NextRequest) {
             const trialEnd = new Date();
             trialEnd.setDate(trialEnd.getDate() + 10);
 
-            await prisma.tenant.update({
+            await db.tenant.update({
                 where: { id: tenantId },
                 data: { status: "TRIALLING", trialStart, trialEnd }
             });
@@ -94,7 +97,7 @@ export async function POST(req: NextRequest) {
 
         // ── Suspend ───────────────────────────────────────────────────────────
         if (action === "suspend") {
-            await prisma.tenant.update({
+            await db.tenant.update({
                 where: { id: tenantId },
                 data: { status: "SUSPENDED" }
             });
@@ -103,7 +106,7 @@ export async function POST(req: NextRequest) {
 
         // ── Reactivate ────────────────────────────────────────────────────────
         if (action === "reactivate") {
-            await prisma.tenant.update({
+            await db.tenant.update({
                 where: { id: tenantId },
                 data: { status: "ACTIVE" }
             });

@@ -3,6 +3,7 @@ import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { parseSafeDate, toISOSafe } from "@/lib/dateUtils";
+import { ExpenseCreateSchema } from "@/lib/validators";
 
 // GET /api/expenses
 export async function GET(req: NextRequest) {
@@ -68,14 +69,20 @@ export async function POST(req: NextRequest) {
 
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
         const body = await req.json();
+        const parsed = ExpenseCreateSchema.safeParse(body);
+        if (!parsed.success) {
+            const msg = parsed.error.issues.map((e: any) => `${e.path.join('.')}: ${e.message}`).join('; ');
+            return errorResponse(`Invalid request body: ${msg}`, 400);
+        }
+        const { category, description, amount, date, reference, receipt } = parsed.data;
 
         let createdById = body.createdById || body.created_by || userPayload.userId;
         if (!createdById) {
-            const admin = await db.user.findFirst({ 
-                where: { 
+            const admin = await db.user.findFirst({
+                where: {
                     role: { in: ["ADMIN", "SUPER_ADMIN"] },
                     ...({ tenantId: userPayload.tenantId })
-                } 
+                }
             });
             createdById = admin?.id;
         }
@@ -84,17 +91,16 @@ export async function POST(req: NextRequest) {
             return errorResponse("Creator user ID is required");
         }
 
-        const amount = parseFloat(body.amount) || parseFloat(body.amount_value) || 0;
         const tenantIdValue = userPayload.tenantId;
 
         const expense = await db.expense.create({
             data: {
-                category: body.category || "OTHER",
-                description: body.description || "N/A",
+                category,
+                description,
                 amount,
-                date: parseSafeDate(body.date) || new Date(),
-                reference: body.reference || `EXP-${Date.now()}`,
-                receipt: body.receipt,
+                date: parseSafeDate(date as any) || new Date(),
+                reference,
+                receipt,
                 createdById,
                 tenantId: tenantIdValue
             },

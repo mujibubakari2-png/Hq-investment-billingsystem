@@ -1,15 +1,15 @@
 import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
-import { errorResponse, jsonResponse, getUserFromRequest } from "@/lib/auth";
+import { errorResponse, jsonResponse } from "@/lib/auth";
+import { requireRole } from "@/lib/rbac";
 import { sendAccountApprovedNotifications } from "@/lib/accountNotifications";
 
 export async function POST(req: NextRequest) {
     try {
-        const userPayload = getUserFromRequest(req);
-        if (!userPayload || userPayload.role !== "SUPER_ADMIN") {
-            return errorResponse("Unauthorized. Only Super Admin can approve accounts.", 403);
-        }
+        const guard = requireRole(req, "SUPER_ADMIN");
+        if (guard.error) return guard.error;
+        const db = getTenantClient(null);
 
         const body = await req.json();
         const tenantId = body.tenantId;
@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
             return errorResponse("Missing tenantId in request body.", 400);
         }
 
-        const targetTenant = await prisma.tenant.findUnique({
+        const targetTenant = await db.tenant.findUnique({
             where: { id: tenantId }
         });
 
@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
         const trialEnd = new Date();
         trialEnd.setDate(trialEnd.getDate() + 10);
 
-        const updatedTenant = await prisma.tenant.update({
+        const updatedTenant = await db.tenant.update({
             where: { id: tenantId },
             data: {
                 status: "TRIALLING",   // trial tracking — auto-suspends when trialEnd passes

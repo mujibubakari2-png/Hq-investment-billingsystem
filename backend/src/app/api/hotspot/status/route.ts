@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 
 /**
@@ -15,13 +16,29 @@ export async function GET(req: NextRequest) {
     try {
         const { searchParams } = new URL(req.url);
         const reference = searchParams.get("reference");
+        const routerId = searchParams.get("routerId") || searchParams.get("router_id");
 
         if (!reference) {
             return errorResponse("Reference is required", 400);
         }
+        if (!routerId) {
+            return errorResponse("routerId is required", 400);
+        }
 
-        const transaction = await prisma.transaction.findFirst({
-            where: { reference },
+        const router = await prisma.router.findUnique({
+            where: { id: routerId },
+            select: { id: true, tenantId: true },
+        });
+        if (!router) {
+            return errorResponse("Router not found", 404);
+        }
+        const db = getTenantClient(router.tenantId);
+
+        const transaction = await db.transaction.findFirst({
+            where: {
+                reference,
+                tenantId: router.tenantId,
+            },
             include: {
                 client: {
                     select: {
@@ -48,7 +65,7 @@ export async function GET(req: NextRequest) {
 
         if (transaction.status === "COMPLETED") {
             // Find the active subscription
-            const subscription = await prisma.subscription.findFirst({
+            const subscription = await db.subscription.findFirst({
                 where: {
                     clientId: transaction.clientId,
                     status: "ACTIVE",

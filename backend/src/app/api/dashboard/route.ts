@@ -1,16 +1,18 @@
 import { NextRequest } from "next/server";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { withCache, invalidateNamespace, buildKey, TTL } from "@/lib/cache";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
+import { requirePermission } from "@/lib/rbac";
 import { isPlatformSuperAdmin } from "@/lib/tenant";
 import { toISOSafe, toTimestampSafe, getStartOfTodayTZ, getStartOfMonthTZ } from "@/lib/dateUtils";
 import { Redis } from 'ioredis';
 
 const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
-  lazyConnect: true,
+    lazyConnect: true,
 });
 redis.on('error', (err) => {
-  console.error('[Redis Error in dashboard route]:', err.message);
+    console.error('[Redis Error in dashboard route]:', err.message);
 });
 
 // Bug #5 FIX: Throttle RADIUS sync to at most once per 60 seconds across all PM2 instances
@@ -19,20 +21,22 @@ const RADIUS_SYNC_INTERVAL_MS = 60_000;
 // GET /api/dashboard - aggregate stats
 export async function GET(req: NextRequest) {
     try {
-        const userPayload = getUserFromRequest(req);
-        if (!userPayload) return errorResponse("Unauthorized", 401);
+        const guard = requirePermission(req, "dashboard:read");
+        if (guard.error) return guard.error;
+        const userPayload = guard.user;
+        const db = getTenantClient(userPayload);
 
         const isAdmin = userPayload.role === "SUPER_ADMIN" || userPayload.role === "ADMIN";
         const isPlatformAdmin = isPlatformSuperAdmin(userPayload);
 
         // Base filter for tenant isolation
         const tenantFilter = { tenantId: userPayload.tenantId };
-        
+
         // Super Admin can override tenant filter to see specific tenant dashboard via query param
         const { searchParams: queryParams } = new URL(req.url);
         const targetTenantId = queryParams.get("tenantId");
         const routerId = queryParams.get("routerId");
-        
+
         if (isPlatformAdmin && targetTenantId) {
             tenantFilter.tenantId = targetTenantId;
         }
@@ -58,7 +62,7 @@ export async function GET(req: NextRequest) {
                     where: { tenantId: { not: null } },
                     select: { host: true, tenantId: true, wgTunnelIp: true }
                 });
-                
+
                 for (const router of routers) {
                     const possibleIps = [router.host, router.wgTunnelIp].filter(Boolean) as string[];
                     if (possibleIps.length > 0) {

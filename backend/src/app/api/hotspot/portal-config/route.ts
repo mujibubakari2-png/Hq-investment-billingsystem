@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 import { env } from "@/lib/env";
 
@@ -30,14 +31,15 @@ export async function GET(req: NextRequest) {
     // Verify the router exists (no tenantId leak — only expose safe fields)
     const router = await prisma.router.findUnique({
       where: { id: routerId },
-      select: { id: true, name: true, status: true },
+      select: { id: true, name: true, status: true, tenantId: true },
     });
 
     if (!router) {
       return errorResponse("Router not found", 404);
     }
 
-    const settings = await prisma.hotspotSettings.findUnique({
+    const db = getTenantClient(router.tenantId);
+    const settings = await db.hotspotSettings.findUnique({
       where: { routerId },
       select: {
         primaryColor: true,

@@ -45,6 +45,9 @@ const TENANT_MODELS = new Set([
     'radAcct',
     'radCheck',
     'radReply',
+    'radGroupCheck',
+    'radGroupReply',
+    'radUserGroup',
     'radiusUser',
     'smsMessage',
     'userOtp',
@@ -175,16 +178,16 @@ function injectFilters(
     args: any,
     tenantId: string | null,
 ): any {
-    const isTenantModel    = TENANT_MODELS.has(model as any);
-    const isSoftDeleted    = SOFT_DELETE_MODELS.has(model as any);
+    const isTenantModel = TENANT_MODELS.has(model as any);
+    const isSoftDeleted = SOFT_DELETE_MODELS.has(model as any);
     const shouldScopeTenant = tenantId !== null && isTenantModel;
     const shouldFilterDeleted = isSoftDeleted;
 
     if (!shouldScopeTenant && !shouldFilterDeleted) return args;
 
     const additions: Record<string, any> = {};
-    if (shouldScopeTenant)    additions.tenantId  = tenantId;
-    if (shouldFilterDeleted)  additions.deletedAt = null;
+    if (shouldScopeTenant) additions.tenantId = tenantId;
+    if (shouldFilterDeleted) additions.deletedAt = null;
 
     return {
         ...args,

@@ -5,11 +5,9 @@ import { getUserFromRequest, jsonResponse, errorResponse } from "@/lib/auth";
 
 export async function GET(req: NextRequest) {
     try {
-        const db = getTenantClient(null);
         const payload = getUserFromRequest(req);
-        if (!payload) {
-            return errorResponse("Unauthorized", 401);
-        }
+        if (!payload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(payload);
 
         const user = await db.user.findUnique({
             where: { id: payload.userId },

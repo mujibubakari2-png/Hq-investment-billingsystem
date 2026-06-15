@@ -3,6 +3,7 @@ import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { getTenantFilter, getAssignTenantId } from "@/lib/tenant";
+import { RadiusUserCreateSchema } from '@/lib/validators';
 
 // GET /api/radius/users – list RADIUS users (tenant-isolated)
 export async function GET(req: NextRequest) {
@@ -50,17 +51,22 @@ export async function POST(req: NextRequest) {
         const db = getTenantClient(userPayload);
 
         const body = await req.json();
-        const { username, password, fullName, authType, groupName, speed, dataLimit, sessionTimeout, simultaneousUse, framedIpAddress } = body;
+        const parsed = RadiusUserCreateSchema.safeParse(body);
+        if (!parsed.success) {
+            const msg = parsed.error.issues.map((e: any) => `${e.path.join('.')}: ${e.message}`).join('; ');
+            return errorResponse(`Invalid request body: ${msg}`, 400);
+        }
+        const { username, password, fullName, authType, groupName, speed, dataLimit, sessionTimeout, simultaneousUse, framedIpAddress, tenantId: bodyTenantId } = parsed.data;
 
         if (!username || !password) {
             return errorResponse("Username and password are required", 400);
         }
 
-        const tenantId = getAssignTenantId(userPayload, body.tenantId);
+        const tenantId = getAssignTenantId(userPayload, bodyTenantId);
 
         // Check for duplicate username within the same tenant
-        const existing = await db.radiusUser.findFirst({ 
-            where: { username, tenantId } 
+        const existing = await db.radiusUser.findFirst({
+            where: { username, tenantId }
         });
         if (existing) return errorResponse("RADIUS username already exists for this tenant", 409);
 

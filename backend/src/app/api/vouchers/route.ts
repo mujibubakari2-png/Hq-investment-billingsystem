@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
+import { VoucherCreateSchema } from '@/lib/validators';
 
 import { toISOSafe, toTimestampSafe } from "@/lib/dateUtils";
 
@@ -14,7 +15,7 @@ export async function GET(req: NextRequest) {
 
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
         const tenantFilter = isSuperAdmin ? {} : { tenantId: userPayload.tenantId };
-        
+
         const { searchParams } = new URL(req.url);
         const status = searchParams.get("status") || "";
         const search = searchParams.get("search") || "";
@@ -72,22 +73,28 @@ export async function GET(req: NextRequest) {
 // POST /api/vouchers - single voucher creation
 export async function POST(req: NextRequest) {
     try {
-        const db = getTenantClient(null);
         const body = await req.json();
-        const { code, packageId, routerId, createdById } = body;
+        const parsed = VoucherCreateSchema.safeParse(body);
+        if (!parsed.success) {
+            const msg = parsed.error.issues.map((e: any) => `${e.path.join('.')}: ${e.message}`).join('; ');
+            return errorResponse(`Invalid request body: ${msg}`, 400);
+        }
+        const { code, packageId, routerId, createdById } = parsed.data;
 
         if (!packageId) return errorResponse("packageId is required");
-
-        let pkg = await db.package.findUnique({ where: { id: packageId } });
-        if (!pkg) pkg = await db.package.findFirst({ where: { name: packageId } });
-        if (!pkg) return errorResponse("Package not found", 404);
 
         // Prefer logged-in user from JWT token, then body, then admin fallback
         const currentUser = getUserFromRequest(req);
         if (!currentUser) return errorResponse("Unauthorized", 401);
 
+        const db = getTenantClient(currentUser);
+
+        let pkg = await db.package.findUnique({ where: { id: packageId } });
+        if (!pkg) pkg = await db.package.findFirst({ where: { name: packageId } });
+        if (!pkg) return errorResponse("Package not found", 404);
+
         const isSuperAdmin = currentUser.role === "SUPER_ADMIN";
-        
+
         if (!isSuperAdmin && pkg.tenantId !== currentUser.tenantId) {
             return errorResponse("Forbidden: Package belongs to another tenant", 403);
         }

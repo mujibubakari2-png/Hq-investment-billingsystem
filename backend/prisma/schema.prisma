@@ -482,6 +482,9 @@ model Tenant {
   radaccts         RadAcct[]
   radchecks        RadCheck[]
   radReplies       RadReply[]
+  radGroupChecks   RadGroupCheck[]
+  radGroupReplies  RadGroupReply[]
+  radUserGroups    RadUserGroup[]
   radPostAuths     RadPostAuth[]
   radiusNas        RadiusNas[]
   radiusUsers      RadiusUser[]
@@ -752,8 +755,13 @@ model RadGroupCheck {
   attribute String @db.VarChar(64)
   op        String @default(":=") @db.VarChar(2)
   value     String @db.VarChar(253)
+  tenantId  String?
+  tenant    Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([groupname])
+  @@index([tenantId])
+  @@index([tenantId, groupname])
+  @@unique([groupname, tenantId, attribute], name: "groupname_tenant_attribute")
   @@map("radgroupcheck")
 }
 
@@ -764,8 +772,13 @@ model RadGroupReply {
   attribute String @db.VarChar(64)
   op        String @default("=") @db.VarChar(2)
   value     String @db.VarChar(253)
+  tenantId  String?
+  tenant    Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([groupname])
+  @@index([tenantId])
+  @@index([tenantId, groupname])
+  @@unique([groupname, tenantId, attribute], name: "groupname_tenant_attribute_reply")
   @@map("radgroupreply")
 }
 
@@ -775,8 +788,13 @@ model RadUserGroup {
   username  String @db.VarChar(64)
   groupname String @db.VarChar(64)
   priority  Int    @default(1)
+  tenantId  String?
+  tenant    Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([username])
+  @@index([tenantId])
+  @@index([tenantId, username])
+  @@unique([username, tenantId, groupname], name: "username_tenant_group")
   @@map("radusergroup")
 }
 

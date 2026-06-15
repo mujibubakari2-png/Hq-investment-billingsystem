@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 import { getMikroTikService, sanitizeMikroTikName } from "@/lib/mikrotik";
@@ -17,10 +18,30 @@ export async function POST(req: NextRequest) {
         if (!code) {
             return errorResponse("Voucher code is required", 400);
         }
+        if (!routerId) {
+            return errorResponse("routerId is required", 400);
+        }
 
-        // Find the voucher
+        const router = await prisma.router.findUnique({
+            where: { id: routerId },
+            select: { id: true, tenantId: true },
+        });
+        if (!router) {
+            return errorResponse("Router not found", 404);
+        }
+
+        const db = getTenantClient(router.tenantId);
+
         const voucher = await prisma.voucher.findFirst({
-            where: { code, status: "UNUSED" },
+            where: {
+                code,
+                status: "UNUSED",
+                OR: [
+                    { routerId: null },
+                    { routerId },
+                ],
+                tenantId: router.tenantId,
+            },
             include: { package: true },
         });
 
@@ -34,7 +55,7 @@ export async function POST(req: NextRequest) {
 
         // Validate router if voucher is locked to a router
         if (voucher.routerId && routerId && voucher.routerId !== routerId) {
-             return errorResponse("This voucher is not valid for this router", 400);
+            return errorResponse("This voucher is not valid for this router", 400);
         }
 
         const pkg = voucher.package;
@@ -60,8 +81,9 @@ export async function POST(req: NextRequest) {
         // Find or create client by MAC address
         let client = null;
         if (macAddress) {
-            client = await prisma.client.findFirst({
-                where: { 
+            client = await db.client.findFirst({
+                where: {
+                    tenantId: pkg.tenantId,
                     macAddress,
                     subscriptions: {
                         some: {
@@ -76,7 +98,7 @@ export async function POST(req: NextRequest) {
         if (!client) {
             // Create a temporary client for the voucher
             const username = sanitizeMikroTikName(`V-${code}`);
-            client = await prisma.client.create({
+            client = await db.client.create({
                 data: {
                     username,
                     fullName: `Voucher User (${code})`,

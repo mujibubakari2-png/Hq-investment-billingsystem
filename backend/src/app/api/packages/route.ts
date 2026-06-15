@@ -3,6 +3,7 @@ import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { createPackageSchema, validateData } from "@/lib/validation";
+import { PackageCreateSchema } from "@/lib/validators";
 import { getMikroTikService } from "@/lib/mikrotik";
 
 // GET /api/packages
@@ -113,13 +114,14 @@ export async function POST(req: NextRequest) {
             devices: body.devices !== undefined ? parseInt(String(body.devices)) : undefined,
         };
 
-        // Validate input
-        const validation = validateData(createPackageSchema, normalized);
-        if (!validation.success) {
-            console.error("[PACKAGE VALIDATION FAILED]:", validation.errors, "| Input:", JSON.stringify(normalized));
-            return errorResponse(`Validation failed: ${validation.errors.join(', ')}`, 400);
+        // Validate input using Zod schema
+        const parsed = PackageCreateSchema.safeParse(normalized);
+        if (!parsed.success) {
+            const msg = parsed.error.issues.map((e: any) => `${e.path.join('.')}: ${e.message}`).join('; ');
+            console.error("[PACKAGE VALIDATION FAILED]:", parsed.error.issues, "| Input:", JSON.stringify(normalized));
+            return errorResponse(`Validation failed: ${msg}`, 400);
         }
-        const validatedData = validation.data;
+        const validatedData = parsed.data;
 
         let routerId = validatedData.routerId;
         let routerTenantId: string | null | undefined = userPayload.tenantId;

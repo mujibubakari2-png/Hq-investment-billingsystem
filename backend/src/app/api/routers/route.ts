@@ -1,13 +1,17 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
+import { requirePermission } from "@/lib/rbac";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import { toISOSafe } from "@/lib/dateUtils";
 
 // GET /api/routers
 export async function GET(req: NextRequest) {
     try {
-        const userPayload = getUserFromRequest(req);
-        if (!userPayload) return errorResponse("Unauthorized", 401);
+        const guard = requirePermission(req, "routers:read");
+        if (guard.error) return guard.error;
+        const userPayload = guard.user;
+        const db = getTenantClient(userPayload);
 
         const isPlatformAdmin = userPayload.role === "SUPER_ADMIN" && !userPayload.tenantId;
         const tenantFilter = isPlatformAdmin ? {} : { tenantId: userPayload.tenantId };
@@ -16,7 +20,7 @@ export async function GET(req: NextRequest) {
         const search = searchParams.get("search")?.toLowerCase() || "";
         const isPaginated = searchParams.has("page");
 
-        const routers = await prisma.router.findMany({
+        const routers = await db.router.findMany({
             where: { ...tenantFilter },
             include: {
                 _count: { select: { packages: true, subscriptions: true, logs: true } },
@@ -24,7 +28,7 @@ export async function GET(req: NextRequest) {
             orderBy: { createdAt: "desc" },
         });
 
-        let mapped = routers.map((r) => ({
+        let mapped = routers.map((r: any) => ({
             id: r.id,
             router_id: r.id, // Alias
             name: r.name,
@@ -53,7 +57,7 @@ export async function GET(req: NextRequest) {
 
         if (isPaginated) {
             if (search) {
-                mapped = mapped.filter(r =>
+                mapped = mapped.filter((r: any) =>
                     r.name.toLowerCase().includes(search) ||
                     r.host.toLowerCase().includes(search)
                 );
@@ -76,8 +80,10 @@ export async function GET(req: NextRequest) {
 // POST /api/routers
 export async function POST(req: NextRequest) {
     try {
-        const userPayload = getUserFromRequest(req);
-        if (!userPayload) return errorResponse("Unauthorized", 401);
+        const guard = requirePermission(req, "routers:write");
+        if (guard.error) return guard.error;
+        const userPayload = guard.user;
+        const db = getTenantClient(userPayload);
 
         const isPlatformAdmin = userPayload.role === "SUPER_ADMIN" && !userPayload.tenantId;
         const body = await req.json();
@@ -116,7 +122,7 @@ export async function POST(req: NextRequest) {
             return errorResponse("Invalid API port number (must be 1-65535)");
         }
 
-        const existing = await prisma.router.findFirst({ where: { name, ...tenantFilter } });
+        const existing = await db.router.findFirst({ where: { name, ...tenantFilter } });
         const isDev = process.env.NODE_ENV !== "production";
 
         if (existing && !isDev) {
@@ -124,7 +130,7 @@ export async function POST(req: NextRequest) {
         }
 
         if (!existing) {
-            const tenant = await prisma.tenant.findUnique({
+            const tenant = await db.tenant.findUnique({
                 where: { id: tenantIdValue },
                 include: { plan: true, routers: { select: { id: true } } }
             });
@@ -154,12 +160,12 @@ export async function POST(req: NextRequest) {
         if (body.wgListenPort) routerData.wgListenPort = parseInt(body.wgListenPort.toString());
 
         const router = existing
-            ? await prisma.router.update({ where: { id: existing.id }, data: routerData })
-            : await prisma.router.create({ data: routerData });
+            ? await db.router.update({ where: { id: existing.id }, data: routerData })
+            : await db.router.create({ data: routerData });
 
         // Synchronize with RADIUS NAS table to manage RADIUS via VPN
         const nasIp = router.wgTunnelIp || router.host;
-        const existingNas = await prisma.radiusNas.findFirst({
+        const existingNas = await db.radiusNas.findFirst({
             where: { tenantId: tenantIdValue, nasName: nasIp }
         });
 
@@ -169,18 +175,18 @@ export async function POST(req: NextRequest) {
         }
 
         if (existingNas) {
-            await prisma.radiusNas.update({
+            await db.radiusNas.update({
                 where: { id: existingNas.id },
                 data: { secret: nasSecret, shortName: router.name }
             });
         } else {
             // Also clean up old NAS entry if the IP changed
             if (existing && existing.wgTunnelIp !== router.wgTunnelIp) {
-                await prisma.radiusNas.deleteMany({
+                await db.radiusNas.deleteMany({
                     where: { tenantId: tenantIdValue, nasName: existing.wgTunnelIp || existing.host }
                 });
             }
-            await prisma.radiusNas.create({
+            await db.radiusNas.create({
                 data: {
                     nasName: nasIp,
                     shortName: router.name,
@@ -193,7 +199,7 @@ export async function POST(req: NextRequest) {
         }
 
         // Log the creation
-        await prisma.routerLog.create({
+        await db.routerLog.create({
             data: {
                 routerId: router.id,
                 tenantId: tenantIdValue,

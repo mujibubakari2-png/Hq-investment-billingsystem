@@ -23,15 +23,15 @@ export async function GET(req: NextRequest) {
     if (!tenantId) return errorResponse("Tenant ID missing", 400);
 
     const { searchParams } = new URL(req.url);
-    const page   = Math.max(1, parseInt(searchParams.get("page")  || "1", 10));
-    const limit  = Math.min(100, parseInt(searchParams.get("limit") || "50", 10));
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
+    const limit = Math.min(100, parseInt(searchParams.get("limit") || "50", 10));
     const userId = searchParams.get("userId") || undefined;
     const action = searchParams.get("action") || undefined;
-    const from   = searchParams.get("from")   || undefined;
-    const to     = searchParams.get("to")     || undefined;
+    const from = searchParams.get("from") || undefined;
+    const to = searchParams.get("to") || undefined;
 
     try {
-        const db = getTenantClient(null);
+        const db = getTenantClient(guard.user);
         const where: Record<string, unknown> = { tenantId };
 
         if (userId) where.userId = userId;
@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
         if (from || to) {
             where.createdAt = {
                 ...(from ? { gte: new Date(from) } : {}),
-                ...(to   ? { lte: new Date(to)   } : {}),
+                ...(to ? { lte: new Date(to) } : {}),
             };
         }
 
@@ -59,19 +59,19 @@ export async function GET(req: NextRequest) {
         ]);
 
         const data = logs.map(log => ({
-            id:         log.id,
-            action:     log.action,
-            resource:   log.resource,
+            id: log.id,
+            action: log.action,
+            resource: log.resource,
             resourceId: log.resourceId,
-            details:    log.details,
-            ipAddress:  log.ipAddress,
-            createdAt:  toISOSafe(log.createdAt),
+            details: log.details,
+            ipAddress: log.ipAddress,
+            createdAt: toISOSafe(log.createdAt),
             user: {
-                id:       log.user.id,
+                id: log.user.id,
                 fullName: log.user.fullName,
                 username: log.user.username,
-                email:    log.user.email,
-                role:     log.user.role,
+                email: log.user.email,
+                role: log.user.role,
             },
         }));
 

@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
+import { VoucherCreateSchema } from "@/lib/validators";
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
@@ -11,7 +12,13 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
         const resolvedParams = await params;
         const body = await req.json();
-        const { status, usedBy, customer, code } = body;
+
+        const parsed = VoucherCreateSchema.partial().safeParse(body);
+        if (!parsed.success) {
+            const msg = parsed.error.issues.map((e: any) => `${e.path.join('.')}: ${e.message}`).join('; ');
+            return errorResponse(`Invalid request body: ${msg}`, 400);
+        }
+        const { status, usedBy, customer, code } = parsed.data;
 
         const existingVoucher = await db.voucher.findUnique({ where: { id: resolvedParams.id } });
         if (!existingVoucher) return errorResponse("Voucher not found", 404);
@@ -44,7 +51,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
         const db = getTenantClient(userPayload);
 
         const resolvedParams = await params;
-        
+
         const existingVoucher = await db.voucher.findUnique({ where: { id: resolvedParams.id } });
         if (!existingVoucher) return errorResponse("Voucher not found", 404);
 

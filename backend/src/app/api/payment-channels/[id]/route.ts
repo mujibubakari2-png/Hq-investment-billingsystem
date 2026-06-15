@@ -3,6 +3,7 @@ import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { encryptPaymentChannelFields } from "@/lib/encryption";
+import { PaymentChannelUpdateSchema } from "@/lib/validators";
 import { canAccessTenant } from "@/lib/tenant";
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -16,6 +17,13 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
         const { id } = await params;
         const body = await req.json();
+
+        const parsed = PaymentChannelUpdateSchema.safeParse(body);
+        if (!parsed.success) {
+            const msg = parsed.error.issues.map((e: any) => `${e.path.join('.')}: ${e.message}`).join('; ');
+            return errorResponse(`Invalid request body: ${msg}`, 400);
+        }
+        const data = parsed.data;
         const existing = await db.paymentChannel.findUnique({ where: { id } });
         if (!existing) return errorResponse("Payment channel not found", 404);
         if (!canAccessTenant(userPayload, existing.tenantId)) {
@@ -23,20 +31,20 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         }
 
         const encryptedFields = encryptPaymentChannelFields({
-            apiKey: body.apiKey,
-            apiSecret: body.apiSecret,
-            webhookSecret: body.webhookSecret,
+            apiKey: data.apiKey ?? body.apiKey,
+            apiSecret: data.apiSecret ?? body.apiSecret,
+            webhookSecret: data.webhookSecret ?? body.webhookSecret,
         });
 
         const channel = await db.paymentChannel.update({
             where: { id },
             data: {
-                name: body.name,
-                provider: body.provider,
-                accountNumber: body.accountNumber,
+                name: data.name ?? body.name,
+                provider: data.provider ?? body.provider,
+                accountNumber: data.accountNumber ?? body.accountNumber,
                 ...encryptedFields,
-                status: body.status === "Inactive" ? "INACTIVE" : body.status === "Active" ? "ACTIVE" : undefined,
-                config: body.config,
+                status: data.status ?? body.status,
+                config: data.config ?? body.config,
             },
         });
 

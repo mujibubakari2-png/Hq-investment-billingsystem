@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { randomUUID } from "node:crypto";
 import prisma from "@/lib/prisma";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 import { getMikroTikService, sanitizeMikroTikName } from "@/lib/mikrotik";
 import { syncRadiusUser } from "@/lib/radius";
@@ -25,14 +26,15 @@ import { formatPhoneTZ } from "@/lib/payments/utils";
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const packageId  = String(body.packageId  || body.package_id  || body.package || "");
-    const phone      = body.phone || body.phoneNumber || body.phone_number || body.username || body.user;
+    const packageId = String(body.packageId || body.package_id || body.package || "");
+    const phone = body.phone || body.phoneNumber || body.phone_number || body.username || body.user;
     const macAddress = body.macAddress || body.mac_address || body.mac;
-    const routerId   = String(body.routerId || body.router_id || body.router || "");
+    const routerId = String(body.routerId || body.router_id || body.router || "");
 
     // ── Validation ───────────────────────────────────────────────────────────
+    if (!routerId) return errorResponse("routerId is required", 400);
     if (!packageId) return errorResponse("Package ID is required", 400);
-    if (!phone)     return errorResponse("Phone number is required", 400);
+    if (!phone) return errorResponse("Phone number is required", 400);
 
     const phoneDigits = phone.replace(/\D/g, "");
     if (/^\d+$/.test(phone) && phoneDigits.length < 9) {
@@ -41,19 +43,37 @@ export async function POST(req: NextRequest) {
 
     const cleanPhone = formatPhoneTZ(phone);
 
+    const router = await prisma.router.findUnique({
+      where: { id: routerId },
+      select: { id: true, tenantId: true },
+    });
+    if (!router) {
+      return errorResponse("Router not found", 404);
+    }
+
+    const db = getTenantClient(router.tenantId);
+
     // ── Find Package ─────────────────────────────────────────────────────────
     let pkg = await prisma.package.findUnique({
       where: { id: packageId },
       include: { router: true },
     });
 
+    if (pkg) {
+      if (pkg.tenantId !== router.tenantId) {
+        pkg = null;
+      } else if (pkg.routerId && pkg.routerId !== routerId) {
+        pkg = null;
+      }
+    }
+
     if (!pkg) {
-      // API-006 FIX: Only allow fallback by exact package NAME match.
-      // The previous fallback included `status: "ACTIVE"` as a standalone OR condition,
-      // meaning any invalid/non-UUID packageId could match the FIRST active package in the
-      // system — assigning the completely wrong plan to the customer.
-      pkg = await prisma.package.findFirst({
-        where: { name: packageId },
+      pkg = await db.package.findFirst({
+        where: {
+          name: packageId,
+          routerId: routerId,
+          tenantId: router.tenantId,
+        },
         include: { router: true },
       });
     }
@@ -72,7 +92,7 @@ export async function POST(req: NextRequest) {
     // which is essential in multi-region or multi-instance deployments.
     let hotspotBackendUrl: string | null = null;
     if (pkg.routerId) {
-      const hs = await prisma.hotspotSettings.findUnique({
+      const hs = await db.hotspotSettings.findUnique({
         where: { routerId: pkg.routerId },
         select: { backendUrl: true },
       });
@@ -84,8 +104,9 @@ export async function POST(req: NextRequest) {
     // A single OR can merge two completely different clients who happen to share a MAC
     // address (e.g. a device was resold). Phone is the primary identifier; MAC is only
     // used as a fallback when no phone match is found.
-    let existingClient = await prisma.client.findFirst({
+    let existingClient = await db.client.findFirst({
       where: {
+        tenantId: pkg.tenantId,
         phone: cleanPhone,
         subscriptions: {
           some: { status: "ACTIVE", expiresAt: { gt: new Date() } },
@@ -94,8 +115,9 @@ export async function POST(req: NextRequest) {
     });
 
     if (!existingClient && macAddress) {
-      existingClient = await prisma.client.findFirst({
+      existingClient = await db.client.findFirst({
         where: {
+          tenantId: pkg.tenantId,
           macAddress,
           subscriptions: {
             some: { status: "ACTIVE", expiresAt: { gt: new Date() } },
@@ -118,12 +140,12 @@ export async function POST(req: NextRequest) {
       const username = sanitizeMikroTikName(`HS-${cleanPhone.slice(-10)}`);
       let finalUsername = username;
       let suffix = 1;
-      while (await prisma.client.findFirst({ where: { username: finalUsername, tenantId: pkg.tenantId } })) {
+      while (await db.client.findFirst({ where: { username: finalUsername, tenantId: pkg.tenantId } })) {
         finalUsername = `${username}-${suffix}`;
         suffix++;
       }
 
-      const newClient = await prisma.client.create({
+      const newClient = await db.client.create({
         data: {
           username: finalUsername,
           fullName: `Hotspot ${cleanPhone}`,
@@ -140,7 +162,7 @@ export async function POST(req: NextRequest) {
     // ── Create PENDING Transaction ────────────────────────────────────────────
     const reference = `HP-${randomUUID().replace(/-/g, "").slice(0, 16).toUpperCase()}`;
 
-    const transaction = await prisma.transaction.create({
+    const transaction = await db.transaction.create({
       data: {
         clientId,
         planName: pkg.name,
@@ -165,7 +187,7 @@ export async function POST(req: NextRequest) {
 
     if (!provider || provider === "MOBILE_MONEY" || provider === "M-PESA") {
       // Load tenant gateway settings
-      const tenantSettings = await prisma.systemSetting.findMany({
+      const tenantSettings = await db.systemSetting.findMany({
         where: { tenantId: pkg.tenantId ?? null },
       });
 
@@ -183,7 +205,7 @@ export async function POST(req: NextRequest) {
         provider = defaultGw.name.toUpperCase();
       } else {
         // Try first active PaymentChannel for this tenant
-        const channel = await prisma.paymentChannel.findFirst({
+        const channel = await db.paymentChannel.findFirst({
           where: {
             status: "ACTIVE",
             ...(pkg.tenantId ? { tenantId: pkg.tenantId } : {}),
@@ -195,7 +217,7 @@ export async function POST(req: NextRequest) {
           // PAY-001 FIX: No provider configured — return error instead of defaulting to ZENOPAY.
           // Silently defaulting causes payment initiation to fail for tenants using other providers,
           // and would mark the transaction as PENDING with no way to recover.
-          await prisma.transaction.update({
+          await db.transaction.update({
             where: { id: transaction.id },
             data: { status: "FAILED" },
           });
@@ -293,9 +315,9 @@ async function completeHotspotPurchase(
 
   switch (pkg.durationUnit) {
     case "MINUTES": expiresAt.setMinutes(expiresAt.getMinutes() + pkg.duration); break;
-    case "HOURS":   expiresAt.setHours(expiresAt.getHours()     + pkg.duration); break;
-    case "DAYS":    expiresAt.setDate(expiresAt.getDate()        + pkg.duration); break;
-    case "MONTHS":  expiresAt.setMonth(expiresAt.getMonth()      + pkg.duration); break;
+    case "HOURS": expiresAt.setHours(expiresAt.getHours() + pkg.duration); break;
+    case "DAYS": expiresAt.setDate(expiresAt.getDate() + pkg.duration); break;
+    case "MONTHS": expiresAt.setMonth(expiresAt.getMonth() + pkg.duration); break;
   }
 
   await prisma.$transaction(async (tx) => {

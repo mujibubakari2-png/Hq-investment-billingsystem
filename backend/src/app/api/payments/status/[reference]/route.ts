@@ -11,6 +11,7 @@
 
 import { NextRequest } from "next/server";
 import { jsonResponse, errorResponse } from "@/lib/auth";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { paymentService } from "@/lib/payments/service";
 import { isSupportedProvider } from "@/lib/payments/registry";
@@ -25,7 +26,7 @@ export async function GET(
 
     const { searchParams } = new URL(req.url);
     const providerParam = searchParams.get("provider");
-    const providerRef   = searchParams.get("providerRef");
+    const providerRef = searchParams.get("providerRef");
 
     // ── DB Lookup ────────────────────────────────────────────────────────────
     const transaction = await prisma.transaction.findFirst({
@@ -53,16 +54,17 @@ export async function GET(
 
     // ── If COMPLETED, add connection credentials ─────────────────────────────
     if (transaction.status === "COMPLETED") {
-      const subscription = await prisma.subscription.findFirst({
+      const db = getTenantClient(transaction.tenantId ?? null);
+      const subscription = await db.subscription.findFirst({
         where: { clientId: transaction.clientId, status: "ACTIVE" },
         orderBy: { createdAt: "desc" },
       });
 
-      baseResponse.username   = transaction.client.username;
-      baseResponse.password   = transaction.client.phone;
-      baseResponse.expiresAt  = subscription?.expiresAt?.toISOString() ?? transaction.expiryDate?.toISOString();
+      baseResponse.username = transaction.client.username;
+      baseResponse.password = transaction.client.phone;
+      baseResponse.expiresAt = subscription?.expiresAt?.toISOString() ?? transaction.expiryDate?.toISOString();
       baseResponse.autoConnect = true;
-      baseResponse.message    = "Payment confirmed! You can now connect.";
+      baseResponse.message = "Payment confirmed! You can now connect.";
     } else if (transaction.status === "FAILED") {
       baseResponse.message = "Payment failed. Please try again.";
     } else {

@@ -3,6 +3,7 @@ import { getTenantClient } from "@/lib/tenantPrisma";
 import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { parseOptionalDate } from "@/lib/dateUtils";
+import { EquipmentCreateSchema } from "@/lib/validators";
 
 // GET /api/equipment
 export async function GET(req: NextRequest) {
@@ -51,19 +52,25 @@ export async function POST(req: NextRequest) {
 
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
         const body = await req.json();
+        const parsed = EquipmentCreateSchema.safeParse(body);
+        if (!parsed.success) {
+            const msg = parsed.error.issues.map((e: any) => `${e.path.join('.')}: ${e.message}`).join('; ');
+            return errorResponse(`Invalid request body: ${msg}`, 400);
+        }
+        const { name, type, serialNumber, location, assignedTo, purchaseDate, notes, routerId } = parsed.data;
         const tenantIdValue = userPayload.tenantId;
 
         const equipment = await db.equipment.create({
             data: {
-                name: body.name || body.model || "Unknown Equipment",
-                type: body.type || "OTHER",
-                serialNumber: body.serialNumber || body.serial_number || `SN-${Date.now()}`,
-                status: (body.status || "ACTIVE").toUpperCase() as any,
-                location: body.location,
-                assignedTo: body.assignedTo,
-                purchaseDate: parseOptionalDate(body.purchaseDate),
-                notes: body.notes,
-                routerId: body.routerId,
+                name: name || "Unknown Equipment",
+                type: type || "OTHER",
+                serialNumber: serialNumber || `SN-${Date.now()}`,
+                status: "ACTIVE",
+                location,
+                assignedTo,
+                purchaseDate: parseOptionalDate(purchaseDate as any),
+                notes,
+                routerId,
                 tenantId: tenantIdValue
             },
         });

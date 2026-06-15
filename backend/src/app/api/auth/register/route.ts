@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { errorResponse, jsonResponse, hashPassword, signToken, signRefreshToken } from "@/lib/auth";
+import { AuthRegisterSchema } from "@/lib/validators";
 import { checkRateLimit } from "@/lib/rateLimiter";
 import logger from "@/lib/logger";
 import { sendAccountCreatedNotifications } from "@/lib/accountNotifications";
@@ -19,15 +20,18 @@ export async function POST(req: NextRequest) {
             return errorResponse("Invalid JSON in request body", 400);
         }
 
-        const email = body.email;
-        const password = body.password;
-        const fullName = body.fullName || body.name || email?.split('@')[0] || "New User";
+        const parsed = AuthRegisterSchema.safeParse(body);
+        if (!parsed.success) {
+            const msg = parsed.error.issues.map((e: any) => `${e.path.join('.')}: ${e.message}`).join('; ');
+            return errorResponse(`Invalid request body: ${msg}`, 400);
+        }
+
+        const email = parsed.data.email;
+        const password = parsed.data.password;
+        const fullName = parsed.data.fullName || body.name || email?.split('@')[0] || "New User";
         const companyName = body.tenantName || body.companyName || body.organization || `${fullName}'s Organization`;
         const planId = body.planId || body.plan || "free_trial";
         const phone = body.phone || "";
-
-        if (!email) return errorResponse("Email is required");
-        if (!password) return errorResponse("Password is required");
 
         // Verify if plan exists, or use default if it's a test string
         let plan = await prisma.saasPlan.findUnique({ where: { id: planId } });

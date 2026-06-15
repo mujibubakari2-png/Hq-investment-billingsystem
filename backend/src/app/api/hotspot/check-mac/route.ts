@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 
 /**
@@ -12,32 +13,56 @@ export async function GET(req: NextRequest) {
     try {
         const { searchParams } = new URL(req.url);
         const mac = searchParams.get("mac");
+        const routerId = searchParams.get("routerId") || searchParams.get("router_id");
 
         if (!mac) {
             return errorResponse("MAC address is required", 400);
         }
+        if (!routerId) {
+            return errorResponse("routerId is required", 400);
+        }
+
         const normalizedMac = mac.trim().toLowerCase();
         const isValidMac = /^([0-9a-f]{2}[:\-]){5}[0-9a-f]{2}$/.test(normalizedMac);
         if (!isValidMac) {
             return errorResponse("Invalid MAC address format", 400);
         }
 
-        // Find an active subscription for this MAC address
-        const subscription = await prisma.subscription.findFirst({
+        const router = await prisma.router.findUnique({
+            where: { id: routerId },
+            select: { id: true, tenantId: true },
+        });
+        if (!router) {
+            return errorResponse("Router not found", 404);
+        }
+        const db = getTenantClient(router.tenantId);
+
+        // Find an active subscription for this MAC address on the expected router.
+        const subscription = await db.subscription.findFirst({
             where: {
-                client: {
-                    macAddress: normalizedMac,
-                },
                 status: "ACTIVE",
                 expiresAt: {
                     gt: new Date(),
                 },
+                tenantId: router.tenantId,
+                client: {
+                    macAddress: normalizedMac,
+                },
+                OR: [
+                    { routerId },
+                    { package: { routerId } },
+                ],
             },
             include: {
                 client: {
                     select: {
                         username: true,
                         phone: true,
+                    },
+                },
+                package: {
+                    select: {
+                        name: true,
                     },
                 },
             },
@@ -50,29 +75,26 @@ export async function GET(req: NextRequest) {
             return jsonResponse({ active: false, message: "No active subscription found" });
         }
 
-        // Determine correct password
-        let password = subscription.client.phone; // default for Mobile purchases
-        
+        let password = subscription.client.phone;
         if (subscription.method === "VOUCHER") {
-            // Find the most recently used voucher by this client
             const lastVoucher = await prisma.voucher.findFirst({
-                where: { usedBy: subscription.client.username, status: "USED" },
-                orderBy: { usedAt: "desc" }
+                where: { usedBy: subscription.client.username, status: "USED", tenantId: router.tenantId },
+                orderBy: { usedAt: "desc" },
             });
-            
+
             if (lastVoucher) {
                 password = lastVoucher.code;
             } else if (subscription.client.username.startsWith("V-")) {
-                password = subscription.client.username.substring(2); // Fallback to extraction
+                password = subscription.client.username.substring(2);
             }
         }
 
         return jsonResponse({
             active: true,
             username: subscription.client.username,
-            password: password,
+            password,
             expiresAt: subscription.expiresAt.toISOString(),
-            packageName: subscription.packageId,
+            packageName: subscription.package?.name || null,
         });
 
     } catch (e) {

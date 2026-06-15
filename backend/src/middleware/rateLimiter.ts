@@ -4,6 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { getUserFromRequest } from '@/lib/auth';
 
 interface RateLimitConfig {
     windowMs: number; // Time window in milliseconds
@@ -80,13 +81,17 @@ function getRateLimitKey(request: NextRequest, userId?: string): string {
 }
 
 /**
- * Get user role from request context
+ * Derive role from verified JWT to prevent header spoofing.
  */
 function getUserRole(request: NextRequest): 'admin' | 'user' | 'anonymous' {
-    const userRole = request.headers.get('x-user-role');
-    if (userRole === 'admin') return 'admin';
-    if (userRole === 'user') return 'user';
-    return 'anonymous';
+    try {
+        const payload = getUserFromRequest(request);
+        if (!payload) return 'anonymous';
+        if (payload.role === 'ADMIN' || payload.role === 'SUPER_ADMIN') return 'admin';
+        return 'user';
+    } catch {
+        return 'anonymous';
+    }
 }
 
 /**
@@ -116,7 +121,7 @@ function getRateLimitConfig(path: string, role: 'admin' | 'user' | 'anonymous'):
  * Check if request should be rate limited
  */
 export function isRateLimited(request: NextRequest, userId?: string): { limited: boolean; message: string; retryAfter?: number } {
-    const key = getRateLimitKey(request, userId);
+    const key = getRateLimitKey(request, userId || getUserFromRequest(request)?.userId);
     const role = getUserRole(request);
     const path = new URL(request.url).pathname;
     const config = getRateLimitConfig(path, role);
