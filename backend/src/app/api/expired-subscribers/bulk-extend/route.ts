@@ -1,6 +1,5 @@
 import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
-import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { getMikroTikService } from "@/lib/mikrotik";
 import { syncRadiusUser } from "@/lib/radius";
@@ -101,7 +100,7 @@ export async function POST(req: NextRequest) {
                         syncStatus: "FAILED_SYNC"
                     }
                 });
-                
+
                 if (sub.routerId && sub.client) {
                     await db.routerLog.create({
                         data: {
