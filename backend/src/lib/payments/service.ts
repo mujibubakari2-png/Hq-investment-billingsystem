@@ -5,7 +5,7 @@
  * Handles: initiation, status checks, webhook processing, logging, idempotency.
  */
 
-import prisma from "@/lib/prisma";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import { getPaymentProvider, isSupportedProvider } from "@/lib/payments/registry";
 import {
   PaymentRequest,
@@ -53,7 +53,8 @@ export class PaymentService {
     // MT-003 FIX: Explicitly match tenantId=null for global channels when tenantId is null.
     // The previous `...(tenantId ? { tenantId } : {})` pattern omitted the tenantId filter
     // entirely when tenantId was null/falsy, allowing any tenant's channel to be returned.
-    return prisma.paymentChannel.findFirst({
+    const db = getTenantClient(tenantId);
+    return db.paymentChannel.findFirst({
       where: {
         provider: providerName.toUpperCase(),
         status: "ACTIVE",
@@ -92,7 +93,9 @@ export class PaymentService {
     // PAY-001 FIX: Idempotency check — if a transaction with this reference already
     // exists and is PENDING or COMPLETED, return the existing state without hitting the
     // payment gateway again. Prevents double charges on client retries or network errors.
-    const existingTx = await prisma.transaction.findFirst({
+    const globalDb = getTenantClient(null);
+    let db = getTenantClient(tenantId);
+    const existingTx = await db.transaction.findFirst({
       where: { reference, tenantId: tenantId ?? null },
     });
     if (existingTx) {
@@ -173,8 +176,11 @@ export class PaymentService {
     // 1. Verify webhook authenticity
     const verification = await provider.verifyWebhook(headers, rawBody);
 
+    const globalDb = getTenantClient(null);
+    let db = getTenantClient(tenantId);
+
     // 2. Log to webhook_logs regardless of verification result
-    const webhookLog = await prisma.webhookLog.create({
+    const webhookLog = await globalDb.webhookLog.create({
       data: {
         provider: providerName.toUpperCase(),
         payload: body as object,
@@ -186,7 +192,7 @@ export class PaymentService {
     });
 
     if (!verification.verified) {
-      await prisma.webhookLog.update({
+      await db.webhookLog.update({
         where: { id: webhookLog.id },
         data: { status: "FAILED", errorMessage: verification.reason },
       });
@@ -196,7 +202,7 @@ export class PaymentService {
     // 3. Parse payload
     const parsed = provider.parseWebhookPayload(body);
 
-    await prisma.webhookLog.update({
+    await db.webhookLog.update({
       where: { id: webhookLog.id },
       data: {
         transactionRef: parsed.transactionRef || null,
@@ -205,7 +211,7 @@ export class PaymentService {
     });
 
     if (!parsed.transactionRef) {
-      await prisma.webhookLog.update({
+      await db.webhookLog.update({
         where: { id: webhookLog.id },
         data: { status: "FAILED", errorMessage: "Missing transactionRef in payload" },
       });
@@ -214,16 +220,24 @@ export class PaymentService {
 
     // 4. Idempotency — find existing transaction
     // NOTE: include { client, invoice } — `invoice` is a new relation pending prisma generate
-    const transaction = await (prisma.transaction.findFirst as any)({
-      where: { 
+    const transaction = await (db.transaction.findFirst as any)({
+      where: {
         reference: parsed.transactionRef,
         ...(tenantId ? { tenantId } : {})
       },
       include: { client: true, invoice: true },
     }) as any;
 
+    if (!tenantId && transaction?.tenantId) {
+      db = getTenantClient(transaction.tenantId);
+      await globalDb.webhookLog.update({
+        where: { id: webhookLog.id },
+        data: { tenantId: transaction.tenantId },
+      });
+    }
+
     if (!transaction) {
-      await prisma.webhookLog.update({
+      await db.webhookLog.update({
         where: { id: webhookLog.id },
         data: { status: "FAILED", errorMessage: "Transaction not found" },
       });
@@ -236,7 +250,7 @@ export class PaymentService {
 
     // Already processed — return early
     if (transaction.status === "COMPLETED") {
-      await prisma.webhookLog.update({
+      await db.webhookLog.update({
         where: { id: webhookLog.id },
         data: { status: "DUPLICATE", processedAt: new Date() },
       });
@@ -250,14 +264,14 @@ export class PaymentService {
 
     // 5. Handle FAILED payment
     if (parsed.resultCode !== "0") {
-      await prisma.$transaction(async (tx) => {
+      await db.$transaction(async (tx) => {
         await tx.transaction.update({
           where: { id: transaction.id },
           data: { status: "FAILED" },
         });
       });
 
-      await prisma.webhookLog.update({
+      await db.webhookLog.update({
         where: { id: webhookLog.id },
         data: {
           status: "PROCESSED",
@@ -275,14 +289,14 @@ export class PaymentService {
 
     // 5.5. Verify Amount (Prevent Partial Payment Attack)
     if (parsed.amount !== undefined && parsed.amount < transaction.amount) {
-      await prisma.$transaction(async (tx) => {
+      await db.$transaction(async (tx) => {
         await tx.transaction.update({
           where: { id: transaction.id },
           data: { status: "FAILED" },
         });
       });
 
-      await prisma.webhookLog.update({
+      await db.webhookLog.update({
         where: { id: webhookLog.id },
         data: {
           status: "FAILED",
@@ -303,17 +317,20 @@ export class PaymentService {
     // E10 FIX: Look up package by packageId stored on Transaction first,
     // fall back to planName (string) only if packageId is absent.
     // This prevents subscription creation failure when a package is renamed.
-    const pkg = await prisma.package.findFirst({
+    const pkg = await db.package.findFirst({
       where: transaction.packageId
-        ? { id: transaction.packageId }
-        : { name: transaction.planName ?? "" },
+        ? { id: transaction.packageId, tenantId: transaction.tenantId }
+        : {
+          name: transaction.planName ?? "",
+          tenantId: transaction.tenantId,
+        },
     });
 
 
 
     // DB transaction: mark paid, create/extend subscription, activate client
     let duplicateDetected = false;
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await db.$transaction(async (tx) => {
       const now = new Date();
       let baseDate = now;
 
@@ -338,17 +355,17 @@ export class PaymentService {
       if (pkg) {
         switch (pkg.durationUnit) {
           case "MINUTES": expiresAt.setMinutes(expiresAt.getMinutes() + pkg.duration); break;
-          case "HOURS":   expiresAt.setHours(expiresAt.getHours() + pkg.duration); break;
-          case "DAYS":    expiresAt.setDate(expiresAt.getDate() + pkg.duration); break;
-          case "MONTHS":  expiresAt.setMonth(expiresAt.getMonth() + pkg.duration); break;
+          case "HOURS": expiresAt.setHours(expiresAt.getHours() + pkg.duration); break;
+          case "DAYS": expiresAt.setDate(expiresAt.getDate() + pkg.duration); break;
+          case "MONTHS": expiresAt.setMonth(expiresAt.getMonth() + pkg.duration); break;
         }
       }
 
       // Idempotency Lock: Use atomic updateMany to ensure we only update if it's not already COMPLETED
       const updateResult = await tx.transaction.updateMany({
-        where: { 
+        where: {
           id: transaction.id,
-          status: { not: "COMPLETED" } 
+          status: { not: "COMPLETED" }
         },
         data: { status: "COMPLETED", expiryDate: expiresAt },
       });
@@ -427,7 +444,7 @@ export class PaymentService {
     });
 
     if (duplicateDetected) {
-      await prisma.webhookLog.update({
+      await db.webhookLog.update({
         where: { id: webhookLog.id },
         data: { status: "DUPLICATE", processedAt: new Date() },
       });
@@ -469,7 +486,7 @@ export class PaymentService {
         // silently swallowing the error. A background job can retry PENDING_RADIUS_SYNC.
         console.error(`[PAYMENT SERVICE] RADIUS sync failed — scheduling retry:`, radErr);
         if (newSub?.id) {
-          await prisma.subscription.update({
+          await db.subscription.update({
             where: { id: newSub.id },
             data: { syncStatus: "PENDING_RADIUS_SYNC" },
           }).catch((e) => console.error("[PAYMENT SERVICE] Failed to mark PENDING_RADIUS_SYNC:", e));
@@ -487,13 +504,13 @@ export class PaymentService {
         await mikrotik.activateService(client.username, pwd, pkg.name, type, (newSub as any).expiresAt);
 
         if (newSub?.id) {
-          await prisma.subscription.update({
+          await db.subscription.update({
             where: { id: newSub.id },
             data: { syncStatus: "SYNCED" },
           });
         }
 
-        await prisma.routerLog.create({
+        await db.routerLog.create({
           data: {
             routerId: pkg.routerId,
             action: "PAYMENT_WEBHOOK_ACTIVATED",
@@ -506,7 +523,7 @@ export class PaymentService {
       } catch (mkErr: unknown) {
         const msg = mkErr instanceof Error ? mkErr.message : "Unknown";
         console.error(`[PAYMENT SERVICE] MikroTik activation failed:`, msg);
-        await prisma.routerLog.create({
+        await db.routerLog.create({
           data: {
             routerId: pkg.routerId,
             action: "PAYMENT_WEBHOOK_ACTIVATION_FAILED",
@@ -519,21 +536,5 @@ export class PaymentService {
     }
 
     // 9. Mark webhook as processed
-    await prisma.webhookLog.update({
-      where: { id: webhookLog.id },
-      data: { status: "PROCESSED", processedAt: new Date() },
-    });
-
-    console.log(`✅ [PAYMENT SERVICE] ${providerName} webhook processed: ${parsed.transactionRef}`);
-
-    return {
-      processed: true,
-      transactionRef: parsed.transactionRef,
-      status: "COMPLETED",
-      message: "Payment confirmed and service activated",
-    };
-  }
-}
-
-// Export singleton
-export const paymentService = new PaymentService();
+    await db.webhookLog.update({
+      ate({

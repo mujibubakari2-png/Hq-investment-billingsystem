@@ -8,6 +8,8 @@ import SaveIcon from '@mui/icons-material/Save';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SyncIcon from '@mui/icons-material/Sync';
 import { useNavigate, useParams, Link } from 'react-router-dom';
+import type { ApiResponse } from '../api/httpClient';
+import { get, isApiErrorResponse } from '../api/httpClient';
 import { subscriptionsApi, packagesApi, routersApi } from '../api';
 
 interface SubscriptionDetail {
@@ -98,23 +100,18 @@ export default function EditPlan() {
             packagesApi.list(),
             routersApi.list(),
             // Also fetch the specific subscription detail
-            fetch(`${(import.meta.env.VITE_API_URL as string) ?? ''}/api/subscriptions/${id}`, {
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                credentials: 'include',
-            }).then(r => r.json()),
+            get<ApiResponse<SubscriptionDetail>>(`/subscriptions/${id}`),
         ])
             .then(([, pkgs, rtrs, subData]) => {
                 setPackages(pkgs as unknown as PkgOption[]);
                 setRouters(rtrs as unknown as RouterOption[]);
 
-                if (subData?.error) {
+                if (isApiErrorResponse(subData)) {
                     setError(subData.error);
                     return;
                 }
 
-                setSub(subData as SubscriptionDetail);
+                setSub(subData);
 
                 // Populate form fields
                 setPackageId(subData.packageId || '');

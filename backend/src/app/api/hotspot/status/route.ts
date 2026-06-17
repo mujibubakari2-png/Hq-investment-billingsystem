@@ -1,5 +1,4 @@
 import { NextRequest } from "next/server";
-import prisma from "@/lib/prisma";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 
@@ -25,12 +24,16 @@ export async function GET(req: NextRequest) {
             return errorResponse("routerId is required", 400);
         }
 
-        const router = await prisma.router.findUnique({
+        const lookupDb = getTenantClient(null);
+        const router = await lookupDb.router.findUnique({
             where: { id: routerId },
             select: { id: true, tenantId: true },
         });
         if (!router) {
             return errorResponse("Router not found", 404);
+        }
+        if (!router.tenantId) {
+            return errorResponse("Invalid router configuration", 400);
         }
         const db = getTenantClient(router.tenantId);
 

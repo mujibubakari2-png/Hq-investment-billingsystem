@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
-import prisma from "@/lib/prisma";
-import { hashPassword, jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
+import { hashPassword, jsonResponse, errorResponse } from "@/lib/auth";
+import { requireRole } from "@/lib/rbac";
 import { toISOSafe } from "@/lib/dateUtils";
 import { getJwtTenantId, getTenantFilter, isPlatformSuperAdmin } from "@/lib/tenant";
 import { assertTenantCanAddSubUser } from "@/lib/userLimits";
@@ -27,9 +27,9 @@ async function sendWelcomeEmail(
     companyName: string
 ) {
     const roleLabel =
-        role === "ADMIN"  ? "Admin"  :
-        role === "AGENT"  ? "Agent"  :
-        role === "VIEWER" ? "Viewer" : role;
+        role === "ADMIN" ? "Admin" :
+            role === "AGENT" ? "Agent" :
+                role === "VIEWER" ? "Viewer" : role;
 
     const html = `
     <div style="font-family: sans-serif; padding: 24px; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #eee; border-radius: 12px;">
@@ -61,14 +61,12 @@ async function sendWelcomeEmail(
 
 // GET /api/system-users — list sub-users under this tenant (SUPER_ADMIN only)
 export async function GET(req: NextRequest) {
-    try {
-        const userPayload = getUserFromRequest(req);
-        if (!userPayload) return errorResponse("Unauthorized", 401);
-        const db = getTenantClient(userPayload);
 
-        if (userPayload.role !== "SUPER_ADMIN") {
-            return errorResponse("Forbidden: Super Admin access required", 403);
-        }
+    try {
+        const guard = requireRole(req, "SUPER_ADMIN");
+        if (guard.error) return guard.error;
+        const userPayload = guard.user;
+        const db = getTenantClient(userPayload);
 
         const tenantId = getJwtTenantId(userPayload);
         if (!tenantId && !isPlatformSuperAdmin(userPayload)) {
@@ -141,14 +139,12 @@ export async function GET(req: NextRequest) {
 
 // POST /api/system-users — create a sub-user under this tenant (SUPER_ADMIN only)
 export async function POST(req: NextRequest) {
-    try {
-        const userPayload = getUserFromRequest(req);
-        if (!userPayload) return errorResponse("Unauthorized", 401);
-        const db = getTenantClient(userPayload);
 
-        if (userPayload.role !== "SUPER_ADMIN") {
-            return errorResponse("Forbidden: Super Admin access required", 403);
-        }
+    try {
+        const guard = requireRole(req, "SUPER_ADMIN");
+        if (guard.error) return guard.error;
+        const userPayload = guard.user;
+        const db = getTenantClient(userPayload);
 
         const platformAdmin = isPlatformSuperAdmin(userPayload);
         const body = await req.json();
@@ -199,13 +195,13 @@ export async function POST(req: NextRequest) {
 
         const user = await db.user.create({
             data: {
-                username:   body.username,
-                fullName:   body.fullName || null,
-                email:      body.email,
-                password:   await hashPassword(tempPassword),
-                phone:      body.phone || null,
-                role:       assignedRole,
-                tenantId:   tenantId,
+                username: body.username,
+                fullName: body.fullName || null,
+                email: body.email,
+                password: await hashPassword(tempPassword),
+                phone: body.phone || null,
+                role: assignedRole,
+                tenantId: tenantId,
                 createdById: userPayload.userId,
             },
             select: {

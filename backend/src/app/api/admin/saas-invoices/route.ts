@@ -1,18 +1,17 @@
 import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
-import prisma from "@/lib/prisma";
-import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
+import { jsonResponse, errorResponse } from "@/lib/auth";
+import { requireRole } from "@/lib/rbac";
 import { toISOSafe } from "@/lib/dateUtils";
 
 
 // GET /api/admin/saas-invoices - list all SaaS (Tenant) invoices (Super Admin only)
 export async function GET(req: NextRequest) {
     try {
+        const guard = requireRole(req, "SUPER_ADMIN");
+        if (guard.error) return guard.error;
+        const user = guard.user;
         const db = getTenantClient(null);
-        const user = getUserFromRequest(req);
-        if (!user || user.role !== "SUPER_ADMIN" || user.tenantId) {
-            return errorResponse("Forbidden: Super Admin access required", 403);
-        }
 
         const invoices = await db.tenantInvoice.findMany({
             include: {
@@ -46,11 +45,10 @@ export async function GET(req: NextRequest) {
 // POST /api/admin/saas-invoices - manage SaaS invoices (confirm payment, generate new)
 export async function POST(req: NextRequest) {
     try {
+        const guard = requireRole(req, "SUPER_ADMIN");
+        if (guard.error) return guard.error;
+        const user = guard.user;
         const db = getTenantClient(null);
-        const user = getUserFromRequest(req);
-        if (!user || user.role !== "SUPER_ADMIN" || user.tenantId) {
-            return errorResponse("Forbidden: Super Admin access required", 403);
-        }
 
         const body = await req.json();
         const { action, invoiceId, ...data } = body;
@@ -63,7 +61,7 @@ export async function POST(req: NextRequest) {
 
             if (!invoice) return errorResponse("Invoice not found", 404);
 
-            await prisma.$transaction(async (tx) => {
+            await db.$transaction(async (tx) => {
                 await tx.tenantInvoice.update({
                     where: { id: invoiceId },
                     data: { status: "PAID" }
@@ -90,7 +88,7 @@ export async function POST(req: NextRequest) {
 
                 await tx.tenant.update({
                     where: { id: invoice.tenantId },
-                    data: { 
+                    data: {
                         status: "ACTIVE",
                         licenseExpiresAt: newExpiry
                     }

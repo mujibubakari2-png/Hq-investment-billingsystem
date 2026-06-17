@@ -159,3 +159,30 @@ DO $$ BEGIN
         ON DELETE RESTRICT ON UPDATE CASCADE;
     END IF;
 END $$;
+
+-- Update Prisma _prisma_migrations table so Prisma tracks this as applied
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_class WHERE relname = '_prisma_migrations') THEN
+        RAISE NOTICE '_prisma_migrations table not found; skip insert';
+    ELSE
+        INSERT INTO _prisma_migrations (
+            id,
+            checksum,
+            finished_at,
+            migration_name,
+            logs,
+            rolled_back_at,
+            started_at,
+            applied_steps_count
+        ) VALUES (
+            gen_random_uuid()::text,
+            'manual_multi_tenant_owner_refactor',
+            NOW(),
+            '20260610_multi_tenant_owner_refactor',
+            NULL,
+            NULL,
+            NOW(),
+            1
+        ) ON CONFLICT DO NOTHING;
+    END IF;
+END $$;

@@ -1,4 +1,4 @@
-import prisma from "@/lib/prisma";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import { sendEmail } from "@/lib/email";
 
 type AccountNotificationInput = {
@@ -28,13 +28,13 @@ function getPortalUrl(): string {
 
 async function createSmsLog(recipient: string, message: string, tenantId?: string | null) {
     try {
-        await prisma.smsMessage.create({
+        const db = getTenantClient(tenantId ?? null);
+        await db.smsMessage.create({
             data: {
                 recipient,
                 message,
                 type: "INDIVIDUAL",
                 status: "SENT",
-                tenantId: tenantId || null,
             },
         });
     } catch (err) {

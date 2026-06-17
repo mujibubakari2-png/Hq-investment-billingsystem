@@ -5,7 +5,7 @@
  * Call `writeAuditLog()` from any API route after a successful mutating action.
  */
 
-import prisma from "@/lib/prisma";
+import { getTenantClient } from "@/lib/tenantPrisma";
 
 export interface AuditLogParams {
     tenantId: string;
@@ -24,35 +24,35 @@ export interface AuditLogParams {
  */
 export async function writeAuditLog(params: AuditLogParams): Promise<void> {
     try {
-        await prisma.auditLog.create({
+        const db = getTenantClient(params.tenantId);
+        await db.auditLog.create({
             data: {
-                tenantId:   params.tenantId,
-                userId:     params.userId,
-                action:     params.action,
-                resource:   params.resource,
+                tenantId: params.tenantId,
+                userId: params.userId,
+                action: params.action,
+                resource: params.resource,
                 resourceId: params.resourceId ?? null,
-                details:    params.details ? (params.details as any) : undefined,
-                ipAddress:  params.ipAddress ?? null,
-                userAgent:  params.userAgent ?? null,
-            },
-        });
-    } catch (err) {
-        // Audit log writes are best-effort — never throw
-        console.error("[AUDIT] Failed to write audit log:", err);
-    }
-}
+                details: params.details ? (params.details as any) : undefined,
+                ipAddress: params.ipAddress ?? null,
+                userAgent: params.userAgent ?? null,
+                null,
+                h(err) {
+                    // Audit log writes are best-effort — never throw
+                    console.error("[AUDIT] Failed to write audit log:", err);
+                }
+            }
 
 /**
  * Extract IP address from a Next.js request.
  */
 export function getIpFromRequest(req: Request): string | undefined {
-    const forwarded = (req.headers as any).get?.("x-forwarded-for")
-        || (req.headers as any)["x-forwarded-for"];
-    if (forwarded) return String(forwarded).split(",")[0].trim();
+            const forwarded = (req.headers as any).get?.("x-forwarded-for")
+                || (req.headers as any)["x-forwarded-for"];
+            if(forwarded) return String(forwarded).split(",")[0].trim();
 
-    const realIp = (req.headers as any).get?.("x-real-ip")
-        || (req.headers as any)["x-real-ip"];
-    if (realIp) return String(realIp).trim();
+            const realIp = (req.headers as any).get?.("x-real-ip")
+                || (req.headers as any)["x-real-ip"];
+            if(realIp) return String(realIp).trim();
 
-    return undefined;
-}
+            return undefined;
+        }

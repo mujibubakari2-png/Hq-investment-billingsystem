@@ -1,10 +1,11 @@
 import { NextRequest } from "next/server";
-import prisma from "@/lib/prisma";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 import { getMikroTikService } from "@/lib/mikrotik";
 import { syncRadiusUser } from "@/lib/radius";
 import { env } from "@/lib/env";
 import { rateLimitMiddleware } from "@/middleware/rateLimiter";
+import crypto from "crypto";
 
 /**
  * POST /api/hotspot/callback
@@ -28,8 +29,14 @@ export async function POST(req: NextRequest) {
         if (!webhookSecret) {
             return errorResponse("Webhook secret is not configured", 500);
         }
-        const providedSecret = req.headers.get("x-webhook-secret");
-        if (providedSecret !== webhookSecret) {
+        const providedSecret = (req.headers.get("x-webhook-secret") || req.headers.get("x-tpesa-signature") || "").toString();
+        const providedDigest = crypto.createHash("sha256").update(providedSecret).digest();
+        const secretDigest = crypto.createHash("sha256").update(webhookSecret).digest();
+        try {
+            if (!crypto.timingSafeEqual(providedDigest, secretDigest)) {
+                return errorResponse("Unauthorized webhook", 401);
+            }
+        } catch {
             return errorResponse("Unauthorized webhook", 401);
         }
 
@@ -50,15 +57,19 @@ export async function POST(req: NextRequest) {
 
         console.log("📥 Hotspot payment callback:", { AccountReference, TransactionId, ResultCode, ResultDesc });
 
+        const globalDb = getTenantClient(null);
+
         // Handle failed payments
         if (ResultCode !== "0" && ResultCode !== 0) {
             // Update transaction to FAILED
-            const failedTx = await prisma.transaction.findFirst({
+            const failedTx = await globalDb.transaction.findUnique({
                 where: { reference: AccountReference },
             });
             if (failedTx) {
-                await prisma.transaction.update({
-                    where: { id: failedTx.id },
+                // Ensure we include tenantId in the where clause to avoid accidental
+                // cross-tenant updates when using the global DB client.
+                await globalDb.transaction.update({
+                    where: { id: failedTx.id, tenantId: failedTx.tenantId },
                     data: { status: "FAILED" },
                 });
             }
@@ -66,7 +77,7 @@ export async function POST(req: NextRequest) {
         }
 
         // Find the transaction
-        const transaction = await prisma.transaction.findFirst({
+        const transaction = await globalDb.transaction.findUnique({
             where: { reference: AccountReference },
             include: { client: true },
         });
@@ -80,13 +91,34 @@ export async function POST(req: NextRequest) {
             return jsonResponse({ message: "Already processed" });
         }
 
-        // Find the package by planName
-        const pkg = await prisma.package.findFirst({
-            where: { name: transaction.planName || "" },
-        });
+        if (!transaction.tenantId) {
+            console.error("Transaction missing tenantId:", transaction.id);
+            return errorResponse("Invalid transaction tenant data", 500);
+        }
 
-        if (!pkg) {
-            console.error("Package not found:", transaction.planName);
+        const tenantDb = getTenantClient(transaction.tenantId);
+        const pkg = transaction.packageId
+            ? await tenantDb.package.findFirst({
+                where: {
+                    id: transaction.packageId,
+                    tenantId: transaction.tenantId,
+                },
+            })
+            : await tenantDb.package.findFirst({
+                where: {
+                    name: transaction.planName || "",
+                    tenantId: transaction.tenantId,
+                },
+            });
+
+        if (!pkg || pkg.tenantId !== transaction.tenantId) {
+            console.error("Package not found for transaction tenant", {
+                transactionId: transaction.id,
+                planName: transaction.planName,
+                packageId: transaction.packageId,
+                transactionTenantId: transaction.tenantId,
+                pkgTenantId: pkg?.tenantId,
+            });
             return errorResponse("Package not found", 404);
         }
 
@@ -109,8 +141,8 @@ export async function POST(req: NextRequest) {
                 break;
         }
 
-        // Complete the purchase in a transaction
-        const [updatedTx, newSub] = await prisma.$transaction(async (tx) => {
+        // Complete the purchase in a tenant-scoped transaction
+        const [updatedTx, newSub] = await tenantDb.$transaction(async (tx) => {
             // 1. Update transaction
             const utx = await tx.transaction.update({
                 where: { id: transaction.id },
@@ -176,7 +208,7 @@ export async function POST(req: NextRequest) {
                 await mikrotik.activateService(transaction.client.username, userPassword, pkg.name, "hotspot");
 
                 finalSyncStatus = "SYNCED";
-                await prisma.routerLog.create({
+                await tenantDb.routerLog.create({
                     data: {
                         routerId: pkg.routerId,
                         action: "HOTSPOT_USER_ACTIVATED",
@@ -188,7 +220,7 @@ export async function POST(req: NextRequest) {
             } catch (logErr: any) {
                 console.error("Router/MikroTik error:", logErr);
                 finalSyncStatus = "FAILED_SYNC";
-                await prisma.routerLog.create({
+                await tenantDb.routerLog.create({
                     data: {
                         routerId: pkg.routerId,
                         action: "HOTSPOT_USER_ACTIVATED_FAILED",
@@ -200,7 +232,7 @@ export async function POST(req: NextRequest) {
             }
 
             if (newSub?.id) {
-                await prisma.subscription.update({
+                await tenantDb.subscription.update({
                     where: { id: newSub.id },
                     data: { syncStatus: finalSyncStatus },
                 });

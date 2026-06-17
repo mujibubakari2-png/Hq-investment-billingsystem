@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import prisma from "../../../../lib/prisma";
+import { getTenantClient } from "@/lib/tenantPrisma";
 
 export async function GET(
     request: Request,
@@ -16,7 +16,8 @@ export async function GET(
     console.log(`[SYNC] Sync request received for router: ${routerId}`);
 
     try {
-        const router = await prisma.router.findFirst({
+        const db = getTenantClient(null);
+        const router = await db.router.findFirst({
             where: {
                 OR: [
                     { id: routerId },
@@ -28,15 +29,15 @@ export async function GET(
         if (!router) {
             console.warn(`[SYNC] Router not found: ${routerId}`);
             return NextResponse.json(
-                { 
-                    status: "error", 
-                    message: "Router not found" 
+                {
+                    status: "error",
+                    message: "Router not found"
                 },
                 { status: 404 }
             );
         }
 
-        await prisma.router.update({
+        await db.router.update({
             where: { id: router.id },
             data: {
                 lastSeen: new Date(),
@@ -59,9 +60,9 @@ export async function GET(
     } catch (error) {
         console.error(`[SYNC] Sync failed for router ${routerId}:`, error);
         return NextResponse.json(
-            { 
-                status: "error", 
-                message: "Sync failed" 
+            {
+                status: "error",
+                message: "Sync failed"
             },
             { status: 500 }
         );

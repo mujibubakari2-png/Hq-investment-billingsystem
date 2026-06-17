@@ -1,6 +1,5 @@
 import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
-import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { toISOSafe, toTimestampSafe, parseSafeDate } from "@/lib/dateUtils";
 import { invalidateNamespace } from "@/lib/cache";
@@ -147,7 +146,7 @@ export async function POST(req: NextRequest) {
 
         // Invalidate dashboard cache so revenue totals update on next load
         if (tenantIdValue) {
-            invalidateNamespace(tenantIdValue, 'dashboard').catch(() => {});
+            invalidateNamespace(tenantIdValue, 'dashboard').catch(() => { });
         }
 
         return jsonResponse(transaction, 201);

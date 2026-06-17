@@ -1,6 +1,5 @@
 import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
-import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { getTenantFilter } from "@/lib/tenant";
 import { exec } from "child_process";
@@ -98,8 +97,8 @@ export async function GET(req: NextRequest) {
             freeradiusRunning && nasCount > 0 && radcheckCount > 0
                 ? "healthy"
                 : warnings.length > 0
-                ? "warning"
-                : "unknown";
+                    ? "warning"
+                    : "unknown";
 
         return jsonResponse({
             status: overallStatus,

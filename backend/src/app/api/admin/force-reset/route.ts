@@ -1,10 +1,14 @@
 import { NextRequest } from "next/server";
-import prisma from "@/lib/prisma";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse, hashPassword } from "@/lib/auth";
+import { checkRateLimit } from "@/lib/rateLimiter";
 
 
 export async function GET(req: NextRequest) {
     try {
+        const rateLimitResponse = await checkRateLimit(req);
+        if (rateLimitResponse) return rateLimitResponse;
+
         if (process.env.NODE_ENV === "production") {
             return errorResponse("Not found", 404);
         }
@@ -21,11 +25,12 @@ export async function GET(req: NextRequest) {
             return errorResponse("Server setup is incomplete", 500);
         }
 
+        const db = getTenantClient(null);
         const hashedPassword = await hashPassword(password);
-        
-        await prisma.user.upsert({
+
+        const result = await db.user.upsert({
             where: { email },
-            update: { 
+            update: {
                 password: hashedPassword,
                 role: "SUPER_ADMIN",
                 status: "ACTIVE",
@@ -40,10 +45,8 @@ export async function GET(req: NextRequest) {
                 fullName: "Platform Super Admin"
             }
         });
-        
-        return jsonResponse({
-            message: `User ${email} is now SUPER_ADMIN`
-        });
+
+        return jsonResponse({ message: `User ${result.email} is now SUPER_ADMIN` });
     } catch (error: any) {
         console.error("[FORCE RESET ERROR]:", error);
         return errorResponse("Error resetting user", 500);

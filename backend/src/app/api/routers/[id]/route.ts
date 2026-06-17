@@ -1,13 +1,15 @@
 import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
-import prisma from "@/lib/prisma";
-import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
+import { jsonResponse, errorResponse } from "@/lib/auth";
+import { requirePermission } from "@/lib/rbac";
+import { canAccessTenant } from "@/lib/tenant";
 import { RouterUpdateSchema } from "@/lib/validators";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const userPayload = getUserFromRequest(req);
-        if (!userPayload) return errorResponse("Unauthorized", 401);
+        const guard = requirePermission(req, "routers:read");
+        if (guard.error) return guard.error;
+        const userPayload = guard.user;
         const db = getTenantClient(userPayload);
 
         const { id } = await params;
@@ -22,7 +24,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         });
         if (!router) return errorResponse("Router not found", 404);
 
-        if (userPayload.role !== "SUPER_ADMIN" && router.tenantId !== userPayload.tenantId) {
+        if (!canAccessTenant(userPayload, router.tenantId)) {
             return errorResponse("Unauthorized to access this router", 403);
         }
 
@@ -34,8 +36,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const userPayload = getUserFromRequest(req);
-        if (!userPayload) return errorResponse("Unauthorized", 401);
+        const guard = requirePermission(req, "routers:write");
+        if (guard.error) return guard.error;
+        const userPayload = guard.user;
         const db = getTenantClient(userPayload);
 
         const { id } = await params;
@@ -43,7 +46,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         const existingRouter = await db.router.findUnique({ where: { id } });
         if (!existingRouter) return errorResponse("Router not found", 404);
 
-        if (userPayload.role !== "SUPER_ADMIN" && existingRouter.tenantId !== userPayload.tenantId) {
+        if (!canAccessTenant(userPayload, existingRouter.tenantId)) {
             return errorResponse("Unauthorized to modify this router", 403);
         }
 
@@ -137,8 +140,9 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const userPayload = getUserFromRequest(req);
-        if (!userPayload) return errorResponse("Unauthorized", 401);
+        const guard = requirePermission(req, "routers:delete");
+        if (guard.error) return guard.error;
+        const userPayload = guard.user;
         const db = getTenantClient(userPayload);
 
         const { id } = await params;
@@ -146,7 +150,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
         const existingRouter = await db.router.findUnique({ where: { id } });
         if (!existingRouter) return errorResponse("Router not found", 404);
 
-        if (userPayload.role !== "SUPER_ADMIN" && existingRouter.tenantId !== userPayload.tenantId) {
+        if (!canAccessTenant(userPayload, existingRouter.tenantId)) {
             return errorResponse("Unauthorized to delete this router", 403);
         }
 

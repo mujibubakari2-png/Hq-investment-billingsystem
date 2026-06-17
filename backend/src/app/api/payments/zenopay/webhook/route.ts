@@ -1,9 +1,10 @@
 import { NextRequest } from "next/server";
-import prisma from "@/lib/prisma";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import { errorResponse, jsonResponse } from "@/lib/auth";
 import { sendEmail } from "@/lib/email";
 import { env } from "@/lib/env";
 import { rateLimitMiddleware } from "@/middleware/rateLimiter";
+import crypto from "crypto";
 
 export async function POST(req: NextRequest) {
     try {
@@ -15,14 +16,16 @@ export async function POST(req: NextRequest) {
 
         const webhookSecret = env.ZENOPAY_WEBHOOK_SECRET || env.PAYMENT_WEBHOOK_SECRET;
         if (webhookSecret) {
-            const providedSecret = req.headers.get("x-webhook-secret") || req.headers.get("x-zeno-signature");
-            if (providedSecret !== webhookSecret) {
+            const providedSecret = (req.headers.get("x-webhook-secret") || req.headers.get("x-zeno-signature") || "").toString();
+            const providedDigest = crypto.createHash("sha256").update(providedSecret).digest();
+            const secretDigest = crypto.createHash("sha256").update(webhookSecret).digest();
+            if (!crypto.timingSafeEqual(providedDigest, secretDigest)) {
                 return errorResponse("Unauthorized webhook signature", 401);
             }
         }
 
         const body = await req.json();
-        
+
         // ZenoPay payload extraction
         const orderId = (body?.order_id as string) || (body?.reference as string) || "";
         const transactionId = (body?.transaction_id as string) || (body?.provider_ref as string) || "";
@@ -39,8 +42,10 @@ export async function POST(req: NextRequest) {
             return jsonResponse({ message: "Acknowledged non-success status" });
         }
 
+        const globalDb = getTenantClient(null);
+
         // Find the invoice
-        const invoice = await prisma.tenantInvoice.findUnique({
+        const invoice = await globalDb.tenantInvoice.findUnique({
             where: { invoiceNumber: orderId },
             include: { tenant: true }
         });
@@ -54,7 +59,8 @@ export async function POST(req: NextRequest) {
         }
 
         // Run updates inside a transaction
-        await prisma.$transaction(async (tx) => {
+        const tenantDb = getTenantClient(invoice.tenantId);
+        await tenantDb.$transaction(async (tx: any) => {
             // 1. Update invoice status
             await tx.tenantInvoice.update({
                 where: { id: invoice.id },
@@ -69,7 +75,7 @@ export async function POST(req: NextRequest) {
                     amount: amount || invoice.amount,
                     transactionId: transactionId || null,
                     status: "COMPLETED",
-                    paymentMethod: "ZENOPAY" 
+                    paymentMethod: "ZENOPAY"
                 }
             });
 
@@ -84,7 +90,7 @@ export async function POST(req: NextRequest) {
 
             await tx.tenant.update({
                 where: { id: invoice.tenantId },
-                data: { 
+                data: {
                     status: "ACTIVE",
                     licenseExpiresAt: newExpiry
                 }

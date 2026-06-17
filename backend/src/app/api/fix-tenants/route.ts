@@ -1,18 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
-import prisma from "@/lib/prisma";
-import { getUserFromRequest } from "@/lib/auth";
+import { requireRole } from "@/lib/rbac";
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
     try {
+        const guard = requireRole(req, "SUPER_ADMIN");
+        if (guard.error) return guard.error;
+        const user = guard.user;
         const db = getTenantClient(null);
-        // ── Security: SUPER_ADMIN only ────────────────────────────────────────
-        const user = getUserFromRequest(req);
-        if (!user || user.role !== "SUPER_ADMIN") {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-        }
 
         console.log("Checking for stuck tenants with PAID invoices...");
 
@@ -28,10 +25,10 @@ export async function GET(req: NextRequest) {
             // If tenant is still SUSPENDED or PENDING_APPROVAL, but has an invoice marked PAID
             if (tenant.status !== 'ACTIVE') {
                 const hasPaid = tenant.tenantInvoices.some((inv: any) => inv.status === 'PAID');
-                
+
                 if (hasPaid) {
                     console.log(`Fixing tenant ${tenant.name} (${tenant.id})`);
-                    
+
                     const now = new Date();
 
                     let totalPaidMonths = 0;
@@ -52,7 +49,7 @@ export async function GET(req: NextRequest) {
                             licenseExpiresAt: newExpiry
                         }
                     });
-                    
+
                     fixedCount++;
                 }
             } else {
@@ -62,7 +59,7 @@ export async function GET(req: NextRequest) {
                     const now = new Date();
                     if (tenant.licenseExpiresAt < now) {
                         console.log(`Fixing active tenant with expired date but PAID invoices: ${tenant.name}`);
-                        
+
                         let sumMonths = 0;
                         for (const inv of paidInvoices) sumMonths += (inv.packageMonths || 1);
 

@@ -1,6 +1,5 @@
 import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
-import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { toISOSafe, toTimestampSafe, getStartOfTodayTZ, getStartOfMonthTZ, getEndOfMonthTZ } from "@/lib/dateUtils";
 
@@ -20,17 +19,17 @@ export async function GET(req: NextRequest) {
         if (isSuperAdmin && targetTenantId) {
             tenantFilter.tenantId = targetTenantId;
         }
-        
+
         // Fetch settings to determine active gateways scoped by tenantId
         let gwSetting = await db.systemSetting.findFirst({ where: { key: 'paymentGateways', ...tenantFilter } });
-        
+
         // Fallback to global setting if no tenant-specific override exists
         if (!gwSetting && !isSuperAdmin) {
             gwSetting = await db.systemSetting.findFirst({ where: { key: 'paymentGateways', tenantId: null } });
         }
-        
+
         let activeGws: string[] = [];
-        
+
         if (gwSetting?.value) {
             try {
                 const parsed = JSON.parse(gwSetting.value);

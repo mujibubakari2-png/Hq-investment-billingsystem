@@ -1,10 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
+import { get } from '../api/httpClient';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import SearchIcon from '@mui/icons-material/Search';
-
-const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 interface AuditLogEntry {
     id: string;
@@ -34,8 +33,8 @@ const ACTION_COLORS: Record<string, { bg: string; color: string }> = {
     CREATE: { bg: '#d1fae5', color: '#065f46' },
     UPDATE: { bg: '#dbeafe', color: '#1d4ed8' },
     DELETE: { bg: '#fee2e2', color: '#991b1b' },
-    LOGIN:  { bg: '#fef3c7', color: '#92400e' },
-    OTHER:  { bg: '#f3f4f6', color: '#374151' },
+    LOGIN: { bg: '#fef3c7', color: '#92400e' },
+    OTHER: { bg: '#f3f4f6', color: '#374151' },
 };
 
 function getActionColor(action: string) {
@@ -60,23 +59,21 @@ async function fetchAuditLogs(params: {
     sp.set('limit', String(params.limit));
     if (params.userId) sp.set('userId', params.userId);
     if (params.action) sp.set('action', params.action);
-    if (params.from)   sp.set('from', params.from);
-    if (params.to)     sp.set('to', params.to);
+    if (params.from) sp.set('from', params.from);
+    if (params.to) sp.set('to', params.to);
 
-    const res = await fetch(`${API_BASE}/audit-logs?${sp}`, { credentials: 'include' });
-    if (!res.ok) throw new Error(await res.text());
-    return res.json();
+    return get<{ data: AuditLogEntry[]; pagination: Pagination }>(`/audit-logs?${sp}`);
 }
 
 export default function AuditLogs() {
-    const [logs, setLogs]         = useState<AuditLogEntry[]>([]);
+    const [logs, setLogs] = useState<AuditLogEntry[]>([]);
     const [pagination, setPagination] = useState<Pagination | null>(null);
-    const [loading, setLoading]   = useState(false);
-    const [page, setPage]         = useState(1);
+    const [loading, setLoading] = useState(false);
+    const [page, setPage] = useState(1);
     const [actionFilter, setActionFilter] = useState('');
-    const [showFilters, setShowFilters]   = useState(false);
+    const [showFilters, setShowFilters] = useState(false);
     const [fromDate, setFromDate] = useState('');
-    const [toDate, setToDate]     = useState('');
+    const [toDate, setToDate] = useState('');
     const [expandedId, setExpandedId] = useState<string | null>(null);
 
     const load = useCallback(async () => {

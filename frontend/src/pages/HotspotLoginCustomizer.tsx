@@ -48,13 +48,10 @@ export default function HotspotLoginCustomizer() {
     const [saving, setSaving] = useState(false);
     const [saveSuccess, setSaveSuccess] = useState(false);
     const [saveError, setSaveError] = useState<string | null>(null);
-    const [syncStatus, setSyncStatus] = useState<{status: 'success' | 'error', message: string} | null>(null);
+    const [syncStatus, setSyncStatus] = useState<{ status: 'success' | 'error', message: string } | null>(null);
 
     // Live preview
     const [showPreview, setShowPreview] = useState(true);
-    const [previewPaymentPkg, setPreviewPaymentPkg] = useState<any | null>(null);
-    const [previewPaymentStep, setPreviewPaymentStep] = useState<'initial' | 'waiting' | 'success'>('initial');
-    const [previewPhone, setPreviewPhone] = useState('');
 
     // Load routers
     useEffect(() => {
@@ -532,8 +529,8 @@ export default function HotspotLoginCustomizer() {
                 })
             })
             .then(function(r) { return r.json(); })
-            .then(function(d) {
-                if (d.error) { throw new Error(d.error); }
+                .then(function(d) {
+                if (d && typeof d.error === 'string') { throw new Error(d.error); }
                 document.getElementById('paymentInitial').style.display = 'none';
                 document.getElementById('paymentWait').style.display = 'block';
                 startPolling(d.reference);
@@ -548,8 +545,11 @@ export default function HotspotLoginCustomizer() {
         function startPolling(ref) {
             if (pollInterval) clearInterval(pollInterval);
             pollInterval = setInterval(function() {
-                fetch(API_BASE + '/api/hotspot/status?reference=' + ref)
-                .then(function(r) { return r.json(); })
+                fetch(API_BASE + '/api/hotspot/status?reference=' + ref + '&routerId=' + ROUTER_ID)
+                .then(function(r) {
+                    if (!r.ok) throw new Error('HTTP ' + r.status);
+                    return r.json();
+                })
                 .then(function(d) {
                     if (d.status === 'COMPLETED') {
                         clearInterval(pollInterval);
@@ -567,6 +567,13 @@ export default function HotspotLoginCustomizer() {
                         alert('Payment failed or cancelled. Please try again.');
                         closePayment();
                     }
+                })
+                .catch(function(err) {
+                    // Network or parse error during polling — stop polling and surface message
+                    if (pollInterval) clearInterval(pollInterval);
+                    console.error('[Hotspot] status poll error:', err);
+                    alert(err.message || 'Failed to check payment status. Please try again later.');
+                    closePayment();
                 });
             }, 3000);
         }
@@ -617,8 +624,8 @@ export default function HotspotLoginCustomizer() {
                 })
             })
             .then(function(r) { return r.json(); })
-            .then(function(d) {
-                if (d.error) { throw new Error(d.error); }
+                .then(function(d) {
+                if (d && typeof d.error === 'string') { throw new Error(d.error); }
                 alert('Voucher valid! Connecting...');
                 connectUser(d.username, d.password || '');
             })
@@ -685,7 +692,7 @@ export default function HotspotLoginCustomizer() {
             // STEP 3: Check for active subscription (Auto-reconnect by MAC)
             var currentMac = '$(mac)';
             if (currentMac && currentMac !== '' && currentMac.indexOf('$') === -1) {
-                fetch(API_BASE + '/api/hotspot/check-mac?mac=' + encodeURIComponent(currentMac), { mode: 'cors' })
+                fetch(API_BASE + '/api/hotspot/check-mac?mac=' + encodeURIComponent(currentMac) + '&routerId=' + ROUTER_ID, { mode: 'cors' })
                     .then(function(r) { return r.json(); })
                     .then(function(d) {
                         if (d.active) {
@@ -724,14 +731,14 @@ export default function HotspotLoginCustomizer() {
                 customerCareNumber,
                 backendUrl
             });
-            
+
             setSaveSuccess(true);
-            
+
             if (res.synced !== undefined) {
                 setSyncStatus({
                     status: res.synced ? 'success' : 'error',
-                    message: res.synced 
-                        ? (res.syncMessage || 'Synced to MikroTik successfully.') 
+                    message: res.synced
+                        ? (res.syncMessage || 'Synced to MikroTik successfully.')
                         : (res.syncError ? `Sync failed: ${res.syncError}` : 'Failed to sync to MikroTik.')
                 });
             }
@@ -1104,7 +1111,7 @@ TROUBLESHOOTING:
                         <span style={{
                             padding: '4px 12px', borderRadius: 20, fontSize: '0.75rem', fontWeight: 600,
                             background: selectedRouter.status === 'Online' ? '#d1fae5' : '#fee2e2',
-                            color:      selectedRouter.status === 'Online' ? '#065f46' : '#dc2626',
+                            color: selectedRouter.status === 'Online' ? '#065f46' : '#dc2626',
                         }}>
                             {selectedRouter.status === 'Online' ? 'â— Online' : 'â—‹ Offline'}
                         </span>
@@ -1126,16 +1133,16 @@ TROUBLESHOOTING:
                 {/* Left â€” CustomizerPanel */}
                 <div>
                     <CustomizerPanel
-                        primaryColor={primaryColor}           setPrimaryColor={setPrimaryColor}
-                        accentColor={accentColor}             setAccentColor={setAccentColor}
-                        selectedFont={selectedFont}           setSelectedFont={setSelectedFont}
-                        layout={layout}                       setLayout={setLayout}
-                        enableAds={enableAds}                 setEnableAds={setEnableAds}
-                        adMessage={adMessage}                 setAdMessage={setAdMessage}
-                        enableRememberMe={enableRememberMe}   setEnableRememberMe={setEnableRememberMe}
-                        companyName={companyName}             setCompanyName={setCompanyName}
+                        primaryColor={primaryColor} setPrimaryColor={setPrimaryColor}
+                        accentColor={accentColor} setAccentColor={setAccentColor}
+                        selectedFont={selectedFont} setSelectedFont={setSelectedFont}
+                        layout={layout} setLayout={setLayout}
+                        enableAds={enableAds} setEnableAds={setEnableAds}
+                        adMessage={adMessage} setAdMessage={setAdMessage}
+                        enableRememberMe={enableRememberMe} setEnableRememberMe={setEnableRememberMe}
+                        companyName={companyName} setCompanyName={setCompanyName}
                         customerCareNumber={customerCareNumber} setCustomerCareNumber={setCustomerCareNumber}
-                        backendUrl={backendUrl}               setBackendUrl={setBackendUrl}
+                        backendUrl={backendUrl} setBackendUrl={setBackendUrl}
                         saving={saving}
                         saveSuccess={saveSuccess}
                         saveError={saveError}

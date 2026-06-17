@@ -1,6 +1,5 @@
 import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
-import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 import { getMikroTikService, sanitizeMikroTikName } from "@/lib/mikrotik";
 import { syncRadiusUser } from "@/lib/radius";
@@ -22,17 +21,21 @@ export async function POST(req: NextRequest) {
             return errorResponse("routerId is required", 400);
         }
 
-        const router = await prisma.router.findUnique({
+        const lookupDb = getTenantClient(null);
+        const router = await lookupDb.router.findUnique({
             where: { id: routerId },
             select: { id: true, tenantId: true },
         });
         if (!router) {
             return errorResponse("Router not found", 404);
         }
+        if (!router.tenantId) {
+            return errorResponse("Invalid router configuration", 400);
+        }
 
         const db = getTenantClient(router.tenantId);
 
-        const voucher = await prisma.voucher.findFirst({
+        const voucher = await db.voucher.findFirst({
             where: {
                 code,
                 status: "UNUSED",
@@ -40,7 +43,6 @@ export async function POST(req: NextRequest) {
                     { routerId: null },
                     { routerId },
                 ],
-                tenantId: router.tenantId,
             },
             include: { package: true },
         });
@@ -112,9 +114,9 @@ export async function POST(req: NextRequest) {
         }
 
         // Update voucher status and subscription in a transaction
-        const [updatedVoucher, newSub, updatedClient] = await prisma.$transaction([
+        const [updatedVoucher, newSub, updatedClient] = await db.$transaction([
             // 1. Mark voucher as USED
-            prisma.voucher.update({
+            db.voucher.update({
                 where: { id: voucher.id },
                 data: {
                     status: "USED",
@@ -123,7 +125,7 @@ export async function POST(req: NextRequest) {
                 },
             }),
             // 2. Create subscription
-            prisma.subscription.create({
+            db.subscription.create({
                 data: {
                     clientId: client.id,
                     packageId: pkg.id,
@@ -138,7 +140,7 @@ export async function POST(req: NextRequest) {
                 },
             }),
             // 3. Update client
-            prisma.client.update({
+            db.client.update({
                 where: { id: client.id },
                 data: { status: "ACTIVE" },
             }),
@@ -176,7 +178,7 @@ export async function POST(req: NextRequest) {
                 await mikrotik.activateService(client.username, code, pkg.name, "hotspot", expiresAt);
 
                 finalSyncStatus = "SYNCED";
-                await prisma.routerLog.create({
+                await db.routerLog.create({
                     data: {
                         routerId: rId,
                         action: "HOTSPOT_VOUCHER_REDEEMED",
@@ -193,7 +195,7 @@ export async function POST(req: NextRequest) {
             }
 
             if (newSub?.id) {
-                await prisma.subscription.update({
+                await db.subscription.update({
                     where: { id: newSub.id },
                     data: { syncStatus: finalSyncStatus }
                 });

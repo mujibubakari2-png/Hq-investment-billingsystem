@@ -1,5 +1,4 @@
 import { NextRequest } from "next/server";
-import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { requirePermission } from "@/lib/rbac";
 import { getTenantClient } from "@/lib/tenantPrisma";

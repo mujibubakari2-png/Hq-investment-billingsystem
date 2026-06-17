@@ -1,7 +1,8 @@
 import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
-import prisma from "@/lib/prisma";
-import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
+import { jsonResponse, errorResponse } from "@/lib/auth";
+import { requireRole } from "@/lib/rbac";
+import { canAccessTenant } from "@/lib/tenant";
 import { paymentService } from "@/lib/payments/service";
 import { generateReference } from "@/lib/payments/utils";
 
@@ -20,12 +21,10 @@ export async function POST(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const userPayload = getUserFromRequest(req);
-        if (!userPayload) return errorResponse("Unauthorized", 401);
+        const guard = requireRole(req, "SUPER_ADMIN", "ADMIN");
+        if (guard.error) return guard.error;
+        const userPayload = guard.user;
         const db = getTenantClient(userPayload);
-        if (!["SUPER_ADMIN", "ADMIN"].includes(userPayload.role)) {
-            return errorResponse("Forbidden", 403);
-        }
 
         const { id } = await params;
 
@@ -38,7 +37,7 @@ export async function POST(
         if (!invoice) return errorResponse("Invoice not found", 404);
 
         // Tenant isolation
-        if (userPayload.role !== "SUPER_ADMIN" && invoice.tenantId !== userPayload.tenantId) {
+        if (!canAccessTenant(userPayload, invoice.tenantId)) {
             return errorResponse("Forbidden", 403);
         }
 
@@ -71,23 +70,25 @@ export async function POST(
 
         const reference = generateReference("INV");
 
-        // Create PENDING transaction linked to the invoice
+        // Create PENDING transaction and mark invoice PENDING atomically to avoid races.
         // NOTE: invoiceId is a new schema field — uses `as any` until prisma generate runs
-        const transaction = await (db.transaction.create as any)({
-            data: {
-                clientId: client.id,
-                planName: `Invoice ${invoice.invoiceNumber}`,
-                amount: invoice.amount,
-                type: "MOBILE",
-                method: channel.provider,
-                status: "PENDING",
-                reference,
-                tenantId: invoice.tenantId,
-                invoiceId: invoice.id,
-            },
-        });
+        const [transaction] = await (db.$transaction as any)([
+            db.transaction.create({
+                data: {
+                    clientId: client.id,
+                    planName: `Invoice ${invoice.invoiceNumber}`,
+                    amount: invoice.amount,
+                    type: "MOBILE",
+                    method: channel.provider,
+                    status: "PENDING",
+                    reference,
+                    tenantId: invoice.tenantId,
+                    invoiceId: invoice.id,
+                },
+            }),
+        ]);
 
-        // Initiate payment
+        // Initiate payment (external) — not part of DB transaction
         const result = await paymentService.initiatePayment({
             tenantId: invoice.tenantId,
             amount: invoice.amount,
@@ -99,10 +100,11 @@ export async function POST(
         });
 
         if (!result.success) {
-            await db.transaction.update({
-                where: { id: transaction.id },
-                data: { status: "FAILED" },
-            });
+            // Mark transaction FAILED; invoice status was not modified because the payment initiation step failed.
+            await (db.$transaction as any)([
+                db.transaction.update({ where: { id: transaction.id }, data: { status: "FAILED" } }),
+            ]).catch((e: unknown) => console.error("Failed to rollback invoice status after payment initiation failure:", e));
+
             return errorResponse(result.message || "Payment initiation failed", 502);
         }
 

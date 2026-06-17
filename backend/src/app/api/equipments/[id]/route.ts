@@ -1,5 +1,4 @@
 import { NextRequest } from "next/server";
-import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import { parseOptionalDate } from "@/lib/dateUtils";
@@ -8,7 +7,8 @@ import { EquipmentUpdateSchema } from "@/lib/validators";
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
         const { id } = await params;
-        const eq = await prisma.equipment.findUnique({
+        const db = getTenantClient(null);
+        const eq = await db.equipment.findUnique({
             where: { id },
             include: { router: true },
         });
@@ -34,8 +34,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
             return errorResponse(`Invalid request body: ${msg}`, 400);
         }
 
-        const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
-        const existing = await prisma.equipment.findFirst({ where: isSuperAdmin ? { id } : { id, tenantId: userPayload.tenantId } });
+        const existing = await db.equipment.findFirst({ where: { id } });
         if (!existing) return errorResponse("Equipment not found", 404);
 
         const update = parsed.data;
@@ -50,7 +49,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         if (update.notes) dataToUpdate.notes = update.notes;
         if (update.routerId) dataToUpdate.routerId = update.routerId;
 
-        const eq = await prisma.equipment.update({ where: { id }, data: dataToUpdate });
+        const eq = await db.equipment.update({ where: { id }, data: dataToUpdate });
         return jsonResponse(eq);
     } catch (err) {
         console.error(err);
@@ -62,14 +61,15 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     try {
         const userPayload = getUserFromRequest(req);
         if (!userPayload) return errorResponse("Unauthorized", 401);
+        const db = getTenantClient(userPayload);
 
         const { id } = await params;
-        const existing = await prisma.equipment.findFirst({ where: userPayload.role === "SUPER_ADMIN" ? { id } : { id, tenantId: userPayload.tenantId } });
+        const existing = await db.equipment.findFirst({ where: { id } });
         if (!existing) return errorResponse("Equipment not found", 404);
 
         if (userPayload.role === "VIEWER") return errorResponse("Forbidden", 403);
 
-        await prisma.equipment.delete({ where: { id } });
+        await db.equipment.delete({ where: { id } });
         return jsonResponse({ message: "Equipment deleted" });
     } catch (err) {
         console.error(err);

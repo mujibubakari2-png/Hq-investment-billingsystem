@@ -1,6 +1,5 @@
 import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
-import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { toISOSafe, toTimestampSafe } from "@/lib/dateUtils";
 
@@ -35,7 +34,7 @@ export async function GET(req: NextRequest) {
         });
 
         // Compute active subscriptions strictly for the active stat tally
-        const activeCount = await db.subscription.count({ where: { status: "ACTIVE", ...tenantFilter }});
+        const activeCount = await db.subscription.count({ where: { status: "ACTIVE", ...tenantFilter } });
 
         const now = new Date();
         const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
@@ -45,7 +44,7 @@ export async function GET(req: NextRequest) {
         const allMapped = allExpired.map(s => {
             const expiresTs = toTimestampSafe(s.expiresAt);
             const expiredDays = expiresTs > 0 ? Math.max(0, Math.floor((now.getTime() - expiresTs) / (1000 * 3600 * 24))) : 0;
-            
+
             return {
                 id: s.id,
                 username: s.client?.username || "Unknown",

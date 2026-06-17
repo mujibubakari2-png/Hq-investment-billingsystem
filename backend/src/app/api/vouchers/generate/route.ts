@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
+import { jsonResponse, errorResponse } from "@/lib/auth";
+import { requireRole } from "@/lib/rbac";
 import { getTenantClient } from "@/lib/tenantPrisma";
-import prisma from "@/lib/prisma";
-import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 
 // POST /api/vouchers/generate - Bulk generate vouchers
 export async function POST(req: NextRequest) {
@@ -17,14 +17,11 @@ export async function POST(req: NextRequest) {
             codeFormat = "alphanumeric-upper"
         } = body;
 
-        // Prefer logged-in user from JWT token, then body, then admin fallback
-        const currentUser = getUserFromRequest(req);
-        if (!currentUser) return errorResponse("Unauthorized", 401);
 
         // Only ADMIN or SUPER_ADMIN can bulk-generate vouchers
-        if (!["ADMIN", "SUPER_ADMIN"].includes(currentUser.role)) {
-            return errorResponse("Forbidden: ADMIN or SUPER_ADMIN required", 403);
-        }
+        const guard = requireRole(req, "ADMIN", "SUPER_ADMIN");
+        if (guard.error) return guard.error;
+        const currentUser = guard.user;
 
         const db = getTenantClient(currentUser);
 

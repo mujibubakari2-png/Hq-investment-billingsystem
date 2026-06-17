@@ -1,7 +1,8 @@
 import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
-import prisma from "@/lib/prisma";
-import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
+import { jsonResponse, errorResponse } from "@/lib/auth";
+import { requirePermission } from "@/lib/rbac";
+import { canAccessTenant } from "@/lib/tenant";
 import { getMikroTikService, sanitizeMikroTikName } from "@/lib/mikrotik";
 import { wireguardManager } from "@/lib/wireguard";
 import { exec } from "child_process";
@@ -10,8 +11,8 @@ const execAsync = promisify(exec);
 
 // ── Raw SQL helpers (bypass Prisma client validation for new fields) ────────
 
-async function getRouterWgFields(routerId: string) {
-    const rows = await prisma.$queryRawUnsafe(
+async function getRouterWgFields(db: ReturnType<typeof getTenantClient>, routerId: string) {
+    const rows = await db.$queryRawUnsafe(
         `SELECT "wgPrivateKey", "wgPublicKey", "wgPeerPublicKey", "wgPresharedKey",
                 "wgTunnelIp", "wgServerEndpoint", "wgListenPort", "wgEnabled", "wgConfiguredAt",
                 "host", "name", "id", "tenantId", "port", "apiPort", "password", "username"
@@ -21,7 +22,7 @@ async function getRouterWgFields(routerId: string) {
     return rows[0] || null;
 }
 
-async function updateRouterWgFields(routerId: string, data: Record<string, any>) {
+async function updateRouterWgFields(db: ReturnType<typeof getTenantClient>, routerId: string, data: Record<string, any>) {
     const setClauses: string[] = [];
     const values: any[] = [];
     let idx = 1;
@@ -33,7 +34,7 @@ async function updateRouterWgFields(routerId: string, data: Record<string, any>)
     }
 
     values.push(routerId);
-    await prisma.$executeRawUnsafe(
+    await db.$executeRawUnsafe(
         `UPDATE "routers" SET ${setClauses.join(", ")} WHERE "id" = $${idx}`,
         ...values,
     );
@@ -43,15 +44,16 @@ async function updateRouterWgFields(routerId: string, data: Record<string, any>)
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const userPayload = getUserFromRequest(req);
-        if (!userPayload) return errorResponse("Unauthorized", 401);
+        const guard = requirePermission(req, "routers:read");
+        if (guard.error) return guard.error;
+        const userPayload = guard.user;
         const db = getTenantClient(userPayload);
 
         const { id } = await params;
-        const router = await getRouterWgFields(id);
+        const router = await getRouterWgFields(db, id);
         if (!router) return errorResponse("Router not found", 404);
 
-        if (userPayload.role !== "SUPER_ADMIN" && router.tenantId !== userPayload.tenantId) {
+        if (!canAccessTenant(userPayload, router.tenantId)) {
             return errorResponse("Unauthorized to access this router", 403);
         }
 
@@ -80,7 +82,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
                 nextIp++;
             }
             tunnelIp = `${subnetPrefix}.${nextIp}`;
-            await updateRouterWgFields(id, { wgTunnelIp: tunnelIp });
+            await updateRouterWgFields(db, id, { wgTunnelIp: tunnelIp });
         }
 
         if (!wgPrivateKey) {
@@ -98,7 +100,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
                 return errorResponse("WireGuard server public key is not configured", 500);
             }
 
-            await updateRouterWgFields(id, {
+            await updateRouterWgFields(db, id, {
                 wgPrivateKey,
                 wgPublicKey,
                 wgPeerPublicKey,
@@ -116,7 +118,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
         if (wgPeerPublicKey !== currentServerPublicKey) {
             wgPeerPublicKey = currentServerPublicKey;
-            await updateRouterWgFields(id, { wgPeerPublicKey });
+            await updateRouterWgFields(db, id, { wgPeerPublicKey });
         }
 
         const serverTunnelIp = wgServerIp; // Use actual interface IP
@@ -179,18 +181,19 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const userPayload = getUserFromRequest(req);
-        if (!userPayload) return errorResponse("Unauthorized", 401);
+        const guard = requirePermission(req, "routers:write");
+        if (guard.error) return guard.error;
+        const userPayload = guard.user;
         const db = getTenantClient(userPayload);
 
         const { id } = await params;
         const body = await req.json();
         const action = body.action || "activate";
 
-        const router = await getRouterWgFields(id);
+        const router = await getRouterWgFields(db, id);
         if (!router) return errorResponse("Router not found", 404);
 
-        if (userPayload.role !== "SUPER_ADMIN" && router.tenantId !== userPayload.tenantId) {
+        if (!canAccessTenant(userPayload, router.tenantId)) {
             return errorResponse("Unauthorized to modify this router", 403);
         }
 
@@ -203,7 +206,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 console.error("Failed to remove wireguard peer:", err);
             }
 
-            await updateRouterWgFields(id, { wgEnabled: false });
+            await updateRouterWgFields(db, id, { wgEnabled: false });
 
             await db.routerLog.create({
                 data: {
@@ -222,7 +225,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             const newHost = body.host;
             if (!newHost) return errorResponse("Provide the original public IP as 'host' in the request body", 400);
 
-            await updateRouterWgFields(id, { host: newHost });
+            await updateRouterWgFields(db, id, { host: newHost });
             // Also update via Prisma so it's reflected everywhere
             await db.router.update({ where: { id }, data: { host: newHost, status: "OFFLINE" } });
 
@@ -257,12 +260,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         // IMPORTANT: LAN gateway MUST NOT overlap with the WireGuard VPN subnet!
         // If VPN is 10.0.0.x, we must use a different subnet for LAN like 10.10.0.x
         const tunnelParts = tunnelIp.split('.');
-        const lanPrefix2   = `${tunnelParts[0]}.10.${tunnelParts[2] || '0'}`; // e.g. "10.10.0"
-        const lanGateway   = `${lanPrefix2}.1`;                                // e.g. "10.10.0.1"
-        const lanCidr      = `${lanGateway}/24`;                               // e.g. "10.10.0.1/24"
-        const lanNetwork   = `${lanPrefix2}.0/24`;                             // e.g. "10.10.0.0/24"
+        const lanPrefix2 = `${tunnelParts[0]}.10.${tunnelParts[2] || '0'}`; // e.g. "10.10.0"
+        const lanGateway = `${lanPrefix2}.1`;                                // e.g. "10.10.0.1"
+        const lanCidr = `${lanGateway}/24`;                               // e.g. "10.10.0.1/24"
+        const lanNetwork = `${lanPrefix2}.0/24`;                             // e.g. "10.10.0.0/24"
         const lanPoolStart = `${lanPrefix2}.10`;
-        const lanPoolEnd   = `${lanPrefix2}.254`;
+        const lanPoolEnd = `${lanPrefix2}.254`;
         const listenPort = router.wgListenPort || 51820;
 
         // Use request host as fallback if no endpoint is configured (match GET logic)
@@ -428,7 +431,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 }
 
                 // Sanitize name for RouterOS identifiers using shared lib function
-                const safeRouterName      = sanitizeMikroTikName(router.name);
+                const safeRouterName = sanitizeMikroTikName(router.name);
                 const safeRouterNameLower = sanitizeMikroTikName(router.name.toLowerCase());
 
                 const hotspotProfileName = `hsprof-${safeRouterNameLower}`;
@@ -479,10 +482,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
                 // Use separate pool ranges for Hotspot and PPPoE to prevent IP collisions
                 // Hotspot clients: .10 – .149  |  PPPoE clients: .150 – .250
-                const hsPoolStart  = `${lanPrefix2}.10`;
-                const hsPoolEnd    = `${lanPrefix2}.149`;
+                const hsPoolStart = `${lanPrefix2}.10`;
+                const hsPoolEnd = `${lanPrefix2}.149`;
                 const ppoePoolStart = `${lanPrefix2}.150`;
-                const ppoePoolEnd   = `${lanPrefix2}.250`;
+                const ppoePoolEnd = `${lanPrefix2}.250`;
 
                 try {
                     await service.apiRequestPublic("/ip/pool", "PUT", {
@@ -728,11 +731,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                     if (Array.isArray(oldRadius)) {
                         for (const r of oldRadius) {
                             if (r.comment?.includes("HQInvestment") || r.comment?.includes("HQInvestment RADIUS")) {
-                                try { await service.apiRequestPublic(`/radius/${r[".id"]}`, "DELETE"); } catch {}
+                                try { await service.apiRequestPublic(`/radius/${r[".id"]}`, "DELETE"); } catch { }
                             }
                         }
                     }
-                } catch {}
+                } catch { }
 
                 try {
                     await service.apiRequestPublic("/radius", "PUT", {
@@ -769,22 +772,22 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                     if (Array.isArray(oldWg)) {
                         for (const entry of oldWg) {
                             if (entry.comment?.includes("HQInvestment")) {
-                                try { await service.apiRequestPublic(`/ip/hotspot/walled-garden/${entry[".id"]}`, "DELETE"); } catch {}
+                                try { await service.apiRequestPublic(`/ip/hotspot/walled-garden/${entry[".id"]}`, "DELETE"); } catch { }
                             }
                         }
                     }
-                } catch {}
+                } catch { }
 
                 try {
                     const oldWgIp = await service.apiRequestPublic("/ip/hotspot/walled-garden/ip");
                     if (Array.isArray(oldWgIp)) {
                         for (const entry of oldWgIp) {
                             if (entry.comment?.includes("HQInvestment")) {
-                                try { await service.apiRequestPublic(`/ip/hotspot/walled-garden/ip/${entry[".id"]}`, "DELETE"); } catch {}
+                                try { await service.apiRequestPublic(`/ip/hotspot/walled-garden/ip/${entry[".id"]}`, "DELETE"); } catch { }
                             }
                         }
                     }
-                } catch {}
+                } catch { }
 
                 // Allow billing portal domain (DNS-based) - unauthenticated clients can reach it
                 try {
@@ -829,7 +832,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 } else {
                     console.warn(`[WireGuard] Peer ${tunnelIp} has not completed handshake yet. Keeping current host IP.`);
                 }
-                await updateRouterWgFields(id, updateData);
+                await updateRouterWgFields(db, id, updateData);
 
                 await db.routerLog.create({
                     data: {
@@ -919,7 +922,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             responseMessage = `WireGuard peer registered on server, but MikroTik has NOT connected yet (no handshake).\n\nTo fix:\n1. Verify the config was pasted correctly on MikroTik.\n2. Check UDP port ${listenPort} is open on MikroTik (firewall rule must be above any DROP rule).\n3. Run on Droplet: sudo wg show wg0\n4. Once the MikroTik peer appears with a handshake, click Activate again.`;
         }
 
-        await updateRouterWgFields(id, activateData);
+        await updateRouterWgFields(db, id, activateData);
 
         await db.routerLog.create({
             data: {

@@ -1,6 +1,5 @@
 import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
-import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { getTenantFilter, getAssignTenantId } from "@/lib/tenant";
 
@@ -59,10 +58,10 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        return jsonResponse({ 
+        return jsonResponse({
             success: true,
-            sent: messages.length, 
-            messages 
+            sent: messages.length,
+            messages
         }, 201);
     } catch (e) {
         console.error("SMS BULK ERROR:", e);

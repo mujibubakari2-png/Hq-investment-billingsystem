@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import prisma from "@/lib/prisma";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import { errorResponse, jsonResponse, hashPassword, signToken, signRefreshToken } from "@/lib/auth";
 import { AuthRegisterSchema } from "@/lib/validators";
 import { checkRateLimit } from "@/lib/rateLimiter";
@@ -11,6 +11,8 @@ import { createUniqueTenantSlug } from "@/lib/tenantSlug";
 export async function POST(req: NextRequest) {
     const rateLimitResponse = await checkRateLimit(req);
     if (rateLimitResponse) return rateLimitResponse;
+
+    const db = getTenantClient(null);
 
     try {
         let body;
@@ -34,22 +36,22 @@ export async function POST(req: NextRequest) {
         const phone = body.phone || "";
 
         // Verify if plan exists, or use default if it's a test string
-        let plan = await prisma.saasPlan.findUnique({ where: { id: planId } });
+        let plan = await db.saasPlan.findUnique({ where: { id: planId } });
 
         if (!plan && (planId === "basic" || planId === "standard" || planId === "premium")) {
             // Map simple strings to seeded IDs
             const mappedId = `plan_${planId}`;
-            plan = await prisma.saasPlan.findUnique({ where: { id: mappedId } });
+            plan = await db.saasPlan.findUnique({ where: { id: mappedId } });
         }
 
         // Default to standard if not found
         if (!plan) {
-            plan = await prisma.saasPlan.findFirst();
+            plan = await db.saasPlan.findFirst();
         }
 
         // If STILL no plan (empty DB), create a default one for the flow to continue
         if (!plan) {
-            plan = await prisma.saasPlan.create({
+            plan = await db.saasPlan.create({
                 data: {
                     id: "free_trial",
                     name: "10-Day Free Trial",
@@ -76,7 +78,7 @@ export async function POST(req: NextRequest) {
         }
 
         // Verify if email already exists
-        const existingUser = await prisma.user.findFirst({
+        const existingUser = await db.user.findFirst({
             where: {
                 OR: [
                     { email },
@@ -97,7 +99,7 @@ export async function POST(req: NextRequest) {
 
         // Strictly verify that the OTP was validated at Step 2
         if (inputOtp || isProd) {
-            const verifiedOtpMatch = await prisma.userOtp.findFirst({
+            const verifiedOtpMatch = await db.userOtp.findFirst({
                 where: {
                     email,
                     otp: inputOtp || "NOT_PROVIDED",
@@ -114,7 +116,7 @@ export async function POST(req: NextRequest) {
         const hashedPassword = await hashPassword(password);
 
         // Run user and tenant creation inside a transaction
-        const result = await prisma.$transaction(async (tx) => {
+        const result = await db.$transaction(async (tx) => {
             // 1. Calculate trial dates (10 days)
             const trialStart = new Date();
             const trialEnd = new Date();

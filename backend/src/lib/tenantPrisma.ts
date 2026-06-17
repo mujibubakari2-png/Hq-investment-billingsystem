@@ -56,6 +56,13 @@ const TENANT_MODELS = new Set([
     'invoice',
     'equipment',
     'paymentChannel',
+    'tenantBranding',
+    'tenantSettings',
+    'tenantInvoice',
+    'tenantPayment',
+    'tenantPaymentGateway',
+    'tenantLicense',
+    'webhookLog',
     'user',
 ] as const);
 
@@ -79,14 +86,16 @@ const SOFT_DELETE_MODELS = new Set([
 export function getTenantClient(userOrTenantId: any | string | null) {
     let finalTenantId: string | null = null;
 
-    if (userOrTenantId && typeof userOrTenantId === "object" && "role" in userOrTenantId) {
+    if (userOrTenantId === undefined || userOrTenantId === null) {
+        finalTenantId = null;
+    } else if (typeof userOrTenantId === "object" && "role" in userOrTenantId) {
         // It's a JwtPayload
         const tenantId = userOrTenantId.tenantId ?? userOrTenantId.tenant_id ?? null;
         const isPlatformSuperAdmin = userOrTenantId.role === "SUPER_ADMIN" && !tenantId;
         finalTenantId = isPlatformSuperAdmin ? null : tenantId;
     } else {
-        // It's a raw string or null
-        finalTenantId = userOrTenantId as string | null;
+        // It's a raw string
+        finalTenantId = userOrTenantId as string;
     }
 
     return prisma.$extends({

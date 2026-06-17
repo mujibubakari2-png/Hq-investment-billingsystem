@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import prisma from "@/lib/prisma";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import { errorResponse, jsonResponse, hashPassword, signToken } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/rateLimiter";
 import logger from "@/lib/logger";
@@ -68,7 +68,8 @@ export async function POST(req: NextRequest) {
         }
 
         // Look up existing user by email or username
-        let user = await prisma.user.findFirst({
+        const db = getTenantClient(null);
+        let user = await db.user.findFirst({
             where: { OR: [{ email }, { username: email }] }
         });
 
@@ -76,10 +77,10 @@ export async function POST(req: NextRequest) {
             if (action === "login") {
                 return errorResponse("user_not_found_needs_registration", 404);
             }
-            
+
             // First-time Google sign-in → auto-register as a new tenant ADMIN
             // (not SUPER_ADMIN — that must be set manually in the database)
-            const plan = await prisma.saasPlan.findFirst();
+            const plan = await db.saasPlan.findFirst();
             if (!plan) return errorResponse("No SaaS plans available. Contact support.", 400);
 
             const companyName = `${fullName}'s Company`;
@@ -90,7 +91,7 @@ export async function POST(req: NextRequest) {
             const trialEnd = new Date(now);
             trialEnd.setDate(trialEnd.getDate() + 10);
 
-            const result = await prisma.$transaction(async (tx) => {
+            const result = await db.$transaction(async (tx) => {
                 const tenant = await tx.tenant.create({
                     data: {
                         name: companyName,
@@ -128,7 +129,7 @@ export async function POST(req: NextRequest) {
         }
 
         // Update last login
-        await prisma.user.update({
+        await db.user.update({
             where: { id: user.id },
             data: { lastLogin: new Date() },
         });

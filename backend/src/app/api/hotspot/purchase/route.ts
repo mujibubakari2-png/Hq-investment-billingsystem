@@ -1,6 +1,5 @@
 import { NextRequest } from "next/server";
 import { randomUUID } from "node:crypto";
-import prisma from "@/lib/prisma";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 import { getMikroTikService, sanitizeMikroTikName } from "@/lib/mikrotik";
@@ -43,18 +42,22 @@ export async function POST(req: NextRequest) {
 
     const cleanPhone = formatPhoneTZ(phone);
 
-    const router = await prisma.router.findUnique({
+    const lookupDb = getTenantClient(null);
+    const router = await lookupDb.router.findUnique({
       where: { id: routerId },
       select: { id: true, tenantId: true },
     });
     if (!router) {
       return errorResponse("Router not found", 404);
     }
+    if (!router.tenantId) {
+      return errorResponse("Invalid router configuration", 400);
+    }
 
     const db = getTenantClient(router.tenantId);
 
     // ── Find Package ─────────────────────────────────────────────────────────
-    let pkg = await prisma.package.findUnique({
+    let pkg = await db.package.findUnique({
       where: { id: packageId },
       include: { router: true },
     });
@@ -131,7 +134,7 @@ export async function POST(req: NextRequest) {
     if (existingClient) {
       clientId = existingClient.id;
       if (macAddress && existingClient.macAddress !== macAddress) {
-        await prisma.client.update({
+        await db.client.update({
           where: { id: clientId },
           data: { macAddress },
         });
@@ -320,7 +323,8 @@ async function completeHotspotPurchase(
     case "MONTHS": expiresAt.setMonth(expiresAt.getMonth() + pkg.duration); break;
   }
 
-  await prisma.$transaction(async (tx) => {
+  const tenantDb = getTenantClient(pkg.tenantId);
+  await tenantDb.$transaction(async (tx) => {
     await tx.transaction.update({
       where: { id: transactionId },
       data: { status: "COMPLETED", expiryDate: expiresAt },
@@ -348,7 +352,8 @@ async function completeHotspotPurchase(
 
   // Sync to RADIUS
   try {
-    const client = await prisma.client.findUnique({ where: { id: clientId } });
+    const db = getTenantClient(pkg.tenantId);
+    const client = await db.client.findUnique({ where: { id: clientId } });
     if (client) {
       let rateLimit: string | undefined;
       if (pkg.uploadSpeed && pkg.downloadSpeed) {
@@ -375,7 +380,8 @@ async function completeHotspotPurchase(
   if (routerId) {
     try {
       const mikrotik = await getMikroTikService(routerId);
-      const client = await prisma.client.findUnique({ where: { id: clientId } });
+      const db = getTenantClient(pkg.tenantId);
+      const client = await db.client.findUnique({ where: { id: clientId } });
       const password = client?.phone || "123456";
       await mikrotik.activateService(
         client?.username || `HS-${clientId.slice(0, 8)}`,
@@ -385,7 +391,7 @@ async function completeHotspotPurchase(
         expiresAt
       );
 
-      await prisma.routerLog.create({
+      await db.routerLog.create({
         data: {
           routerId,
           action: "HOTSPOT_USER_CREATED",
@@ -396,7 +402,8 @@ async function completeHotspotPurchase(
       });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Unknown";
-      await prisma.routerLog.create({
+      const db = getTenantClient(pkg.tenantId);
+      await db.routerLog.create({
         data: {
           routerId,
           action: "HOTSPOT_USER_CREATED_FAILED",

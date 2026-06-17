@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import nodemailer from "nodemailer";
 
 // Bug #8 FIX: Resolve app URL from env at startup to avoid hardcoded IPs leaking into emails.
@@ -21,14 +21,15 @@ export async function GET(req: Request) {
         }
 
         const now = new Date();
-        
+
         // E15 FIX: Widened window from exactly 2.1 days to 23h–25h (±1 hour around the 24h mark).
         // This guarantees exactly one notification per account per day even if the cron runs
         // slightly late or early, eliminating the silent miss from the original 2.1-day window.
         const windowStart = new Date(now.getTime() + 23 * 60 * 60 * 1000); // 23 hours from now
-        const windowEnd   = new Date(now.getTime() + 25 * 60 * 60 * 1000); // 25 hours from now
+        const windowEnd = new Date(now.getTime() + 25 * 60 * 60 * 1000); // 25 hours from now
 
-        const expiringTenants = await prisma.tenant.findMany({
+        const db = getTenantClient(null);
+        const expiringTenants = await db.tenant.findMany({
             where: {
                 status: "ACTIVE",
                 OR: [
@@ -91,8 +92,8 @@ export async function GET(req: Request) {
             }
         }
 
-        return NextResponse.json({ 
-            message: `Cron executed successfully. Reminders sent to ${sentCount} out of ${expiringTenants.length} tenants.` 
+        return NextResponse.json({
+            message: `Cron executed successfully. Reminders sent to ${sentCount} out of ${expiringTenants.length} tenants.`
         });
 
     } catch (e: any) {
