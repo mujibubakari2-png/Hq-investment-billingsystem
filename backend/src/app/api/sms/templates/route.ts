@@ -2,12 +2,14 @@ import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { getTenantFilter, getAssignTenantId } from "@/lib/tenant";
+import { requirePermission } from "@/lib/rbac";
 
 // GET /api/sms/templates
 export async function GET(req: NextRequest) {
     try {
-        const userPayload = getUserFromRequest(req);
-        if (!userPayload) return errorResponse("Unauthorized", 401);
+        const guard = requirePermission(req, "sms:read");
+        if (guard.error) return guard.error;
+        const userPayload = guard.user;
         const db = getTenantClient(userPayload);
 
         const { filter } = getTenantFilter(userPayload);
@@ -35,8 +37,9 @@ export async function GET(req: NextRequest) {
 // POST /api/sms/templates
 export async function POST(req: NextRequest) {
     try {
-        const userPayload = getUserFromRequest(req);
-        if (!userPayload) return errorResponse("Unauthorized", 401);
+        const guard = requirePermission(req, "sms:write");
+        if (guard.error) return guard.error;
+        const userPayload = guard.user;
         const db = getTenantClient(userPayload);
 
         const tenantId = getAssignTenantId(userPayload);

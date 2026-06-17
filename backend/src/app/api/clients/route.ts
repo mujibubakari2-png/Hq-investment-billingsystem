@@ -1,14 +1,16 @@
 import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
+import { requirePermission } from "@/lib/rbac";
 import { toISOSafe } from "@/lib/dateUtils";
 import { ClientCreateSchema } from "@/lib/validators";
 
 // GET /api/clients - List all clients
 export async function GET(req: NextRequest) {
     try {
-        const userPayload = getUserFromRequest(req);
-        if (!userPayload) return errorResponse("Unauthorized", 401);
+        const guard = requirePermission(req, "clients:read");
+        if (guard.error) return guard.error;
+        const userPayload = guard.user;
 
         const db = getTenantClient(userPayload);
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
@@ -133,8 +135,9 @@ export async function POST(req: NextRequest) {
             return errorResponse("Invalid email format");
         }
 
-        const userPayload = getUserFromRequest(req);
-        if (!userPayload) return errorResponse("Unauthorized", 401);
+        const guard = requirePermission(req, "clients:write");
+        if (guard.error) return guard.error;
+        const userPayload = guard.user;
 
         const db = getTenantClient(userPayload);
 

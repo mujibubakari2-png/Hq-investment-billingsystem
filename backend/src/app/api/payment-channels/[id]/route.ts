@@ -1,18 +1,17 @@
 import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
+import { requirePermission } from "@/lib/rbac";
 import { encryptPaymentChannelFields } from "@/lib/encryption";
 import { PaymentChannelUpdateSchema } from "@/lib/validators";
 import { canAccessTenant } from "@/lib/tenant";
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const userPayload = getUserFromRequest(req);
-        if (!userPayload) return errorResponse("Unauthorized", 401);
+        const guard = requirePermission(req, "payment-channels:write");
+        if (guard.error) return guard.error;
+        const userPayload = guard.user;
         const db = getTenantClient(userPayload);
-        if (userPayload.role !== "SUPER_ADMIN") {
-            return errorResponse("Forbidden: Only the tenant Super Admin can manage payment channels", 403);
-        }
 
         const { id } = await params;
         const body = await req.json();
@@ -80,12 +79,10 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const userPayload = getUserFromRequest(req);
-        if (!userPayload) return errorResponse("Unauthorized", 401);
+        const guard = requirePermission(req, "payment-channels:write");
+        if (guard.error) return guard.error;
+        const userPayload = guard.user;
         const db = getTenantClient(userPayload);
-        if (userPayload.role !== "SUPER_ADMIN") {
-            return errorResponse("Forbidden: Only the tenant Super Admin can manage payment channels", 403);
-        }
 
         const { id } = await params;
         const existing = await db.paymentChannel.findUnique({ where: { id } });

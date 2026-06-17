@@ -1,18 +1,19 @@
 import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
+import { getTenantFilter } from "@/lib/tenant";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
+import { requirePermission } from "@/lib/rbac";
 import { encrypt, decrypt } from "@/lib/encryption";
 import { VpnUserCreateSchema } from "@/lib/validators";
 
 // GET /api/vpn – list VPN users (from ppp secrets stored in a table)
 export async function GET(req: NextRequest) {
     try {
-        const userPayload = getUserFromRequest(req);
-        if (!userPayload) return errorResponse("Unauthorized", 401);
+        const guard = requirePermission(req, "vpn:read");
+        if (guard.error) return guard.error;
+        const userPayload = guard.user;
         const db = getTenantClient(userPayload);
-
-        const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
-        const tenantFilter = isSuperAdmin ? {} : { tenantId: userPayload.tenantId };
+        const { filter: tenantFilter } = getTenantFilter(userPayload);
 
         const vpnUsers = await db.vpnUser.findMany({
             where: { ...tenantFilter },
@@ -50,8 +51,9 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
     try {
-        const userPayload = getUserFromRequest(req);
-        if (!userPayload) return errorResponse("Unauthorized", 401);
+        const guard = requirePermission(req, "vpn:write");
+        if (guard.error) return guard.error;
+        const userPayload = guard.user;
         const db = getTenantClient(userPayload);
 
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";

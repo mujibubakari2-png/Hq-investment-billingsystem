@@ -1,18 +1,20 @@
 import { NextRequest } from "next/server";
-import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
+import { jsonResponse, errorResponse } from "@/lib/auth";
 import { getMikroTikService } from "@/lib/mikrotik";
+import { requirePermission } from "@/lib/rbac";
 
 // GET /api/routers/[id]/profiles — List bandwidth profiles
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const userPayload = getUserFromRequest(req);
-        if (!userPayload) return errorResponse("Unauthorized", 401);
+        const guard = requirePermission(req, "routers:read");
+        if (guard.error) return guard.error;
+        const userPayload = guard.user;
 
         const { id } = await params;
         const url = new URL(req.url);
         const type = url.searchParams.get("type") || "all";
 
-        const service = await getMikroTikService(id, userPayload.role === "SUPER_ADMIN" ? null : userPayload.tenantId);
+        const service = await getMikroTikService(id, userPayload.tenantId ?? null);
 
         if (type === "pppoe") {
             return jsonResponse(await service.listPPPoEProfiles());
@@ -38,8 +40,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 // POST /api/routers/[id]/profiles — Create bandwidth profile
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const userPayload = getUserFromRequest(req);
-        if (!userPayload) return errorResponse("Unauthorized", 401);
+        const guard = requirePermission(req, "routers:write");
+        if (guard.error) return guard.error;
+        const userPayload = guard.user;
 
         const { id } = await params;
         const body = await req.json();
@@ -48,7 +51,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             return errorResponse("name, rateLimit, and type (pppoe/hotspot) are required");
         }
 
-        const service = await getMikroTikService(id, userPayload.role === "SUPER_ADMIN" ? null : userPayload.tenantId);
+        const service = await getMikroTikService(id, userPayload.tenantId ?? null);
 
         if (body.type === "pppoe") {
             const profile = await service.createPPPoEProfile({

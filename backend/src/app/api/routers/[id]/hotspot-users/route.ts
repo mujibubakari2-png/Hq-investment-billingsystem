@@ -1,15 +1,17 @@
 import { NextRequest } from "next/server";
-import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
+import { jsonResponse, errorResponse } from "@/lib/auth";
 import { getMikroTikService } from "@/lib/mikrotik";
+import { requirePermission } from "@/lib/rbac";
 
 // GET /api/routers/[id]/hotspot — List Hotspot users
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const userPayload = getUserFromRequest(req);
-        if (!userPayload) return errorResponse("Unauthorized", 401);
+        const guard = requirePermission(req, "routers:read");
+        if (guard.error) return guard.error;
+        const userPayload = guard.user;
 
         const { id } = await params;
-        const service = await getMikroTikService(id, userPayload.role === "SUPER_ADMIN" ? null : userPayload.tenantId);
+        const service = await getMikroTikService(id, userPayload.tenantId ?? null);
         const users = await service.listHotspotUsers();
         return jsonResponse(users);
     } catch (err: any) {
@@ -20,8 +22,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 // POST /api/routers/[id]/hotspot — Create Hotspot user
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const userPayload = getUserFromRequest(req);
-        if (!userPayload) return errorResponse("Unauthorized", 401);
+        const guard = requirePermission(req, "routers:write");
+        if (guard.error) return guard.error;
+        const userPayload = guard.user;
 
         const { id } = await params;
         const body = await req.json();
@@ -30,7 +33,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             return errorResponse("Username and password are required");
         }
 
-        const service = await getMikroTikService(id, userPayload.role === "SUPER_ADMIN" ? null : userPayload.tenantId);
+        const service = await getMikroTikService(id, userPayload.tenantId ?? null);
         const user = await service.createHotspotUser({
             name: body.name,
             password: body.password,

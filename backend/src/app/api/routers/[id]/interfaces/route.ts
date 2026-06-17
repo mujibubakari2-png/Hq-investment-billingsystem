@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
-import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
+import { jsonResponse, errorResponse } from "@/lib/auth";
 import { getMikroTikService } from "@/lib/mikrotik";
+import { requirePermission } from "@/lib/rbac";
 
 
 export async function GET(
@@ -9,10 +10,11 @@ export async function GET(
 ) {
     try {
         const { id } = await params;
-        const userPayload = getUserFromRequest(req);
-        if (!userPayload) return errorResponse("Unauthorized", 401);
+        const guard = requirePermission(req, "routers:read");
+        if (guard.error) return guard.error;
+        const userPayload = guard.user;
 
-        const service = await getMikroTikService(id, userPayload.role === "SUPER_ADMIN" ? null : userPayload.tenantId);
+        const service = await getMikroTikService(id, userPayload.tenantId ?? null);
         const interfaces = await service.listInterfaces();
 
         return jsonResponse(interfaces);

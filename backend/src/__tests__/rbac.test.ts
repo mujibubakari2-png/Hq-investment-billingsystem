@@ -52,7 +52,19 @@ describe('hasPermission', () => {
         expect(hasPermission('ADMIN', 'payment-channels:write')).toBe(false);
     });
 
-    // â”€â”€ AGENT access â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    it('ADMIN can read invoices', () => {
+        expect(hasPermission('ADMIN', 'invoices:read')).toBe(true);
+    });
+
+    it('ADMIN can write invoices', () => {
+        expect(hasPermission('ADMIN', 'invoices:write')).toBe(true);
+    });
+
+    it('ADMIN can delete invoices', () => {
+        expect(hasPermission('ADMIN', 'invoices:delete')).toBe(true);
+    });
+
+    // â”€â”€ AGENT access â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     it('AGENT can read clients', () => {
         expect(hasPermission('AGENT', 'clients:read')).toBe(true);
     });

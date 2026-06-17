@@ -1,16 +1,17 @@
 import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
-import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
+import { getTenantFilter } from "@/lib/tenant";
+import { jsonResponse, errorResponse } from "@/lib/auth";
+import { requirePermission } from "@/lib/rbac";
 
 // GET /api/routers/logs — List all router action logs
 export async function GET(req: NextRequest) {
     try {
-        const userPayload = getUserFromRequest(req);
-        if (!userPayload) return errorResponse("Unauthorized", 401);
+        const guard = requirePermission(req, "routers:read");
+        if (guard.error) return guard.error;
+        const userPayload = guard.user;
         const db = getTenantClient(userPayload);
-
-        const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
-        const tenantFilter = isSuperAdmin ? {} : { tenantId: userPayload.tenantId };
+        const { filter: tenantFilter } = getTenantFilter(userPayload);
 
         const url = new URL(req.url);
         const routerId = url.searchParams.get("routerId");

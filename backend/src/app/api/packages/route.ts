@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 import { requirePermission } from "@/lib/rbac";
+import { getTenantFilter, getAssignTenantId } from "@/lib/tenant";
 import { createPackageSchema, validateData } from "@/lib/validation";
 import { PackageCreateSchema } from "@/lib/validators";
 import { getMikroTikService } from "@/lib/mikrotik";
@@ -13,9 +14,7 @@ export async function GET(req: NextRequest) {
         if (guard.error) return guard.error;
         const userPayload = guard.user;
         const db = getTenantClient(userPayload);
-
-        const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
-        const tenantFilter = isSuperAdmin ? {} : { tenantId: userPayload.tenantId };
+        const { filter: tenantFilter } = getTenantFilter(userPayload);
 
         const { searchParams } = new URL(req.url);
         const type = searchParams.get("type") || "";
@@ -94,9 +93,7 @@ export async function POST(req: NextRequest) {
         if (guard.error) return guard.error;
         const userPayload = guard.user;
         const db = getTenantClient(userPayload);
-
-        const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
-        const tenantFilter = isSuperAdmin ? {} : { tenantId: userPayload.tenantId };
+        const { filter: tenantFilter } = getTenantFilter(userPayload);
 
         const body = await req.json() as any;
 
@@ -148,14 +145,14 @@ export async function POST(req: NextRequest) {
                 ...validatedData,
                 routerId: routerId || null,
                 status: "ACTIVE",
-                tenantId: isSuperAdmin ? routerTenantId : userPayload.tenantId
+                tenantId: getAssignTenantId(userPayload, routerTenantId)
             },
         });
 
         // Best-effort: sync MikroTik bandwidth profile to match this package
         if (pkg.routerId) {
             try {
-                const mikrotik = await getMikroTikService(pkg.routerId, isSuperAdmin ? null : userPayload.tenantId);
+                const mikrotik = await getMikroTikService(pkg.routerId, userPayload.tenantId ?? null);
                 await mikrotik.createProfileFromPackage(
                     pkg.name,
                     pkg.uploadSpeed,

@@ -1,16 +1,15 @@
 import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
-import { hashPassword, jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
+import { hashPassword, jsonResponse, errorResponse } from "@/lib/auth";
 import { canAccessTenant } from "@/lib/tenant";
+import { requireRole } from "@/lib/rbac";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const userPayload = getUserFromRequest(req);
-        if (!userPayload) return errorResponse("Unauthorized", 401);
+        const guard = requireRole(req, "SUPER_ADMIN");
+        if (guard.error) return guard.error;
+        const userPayload = guard.user;
         const db = getTenantClient(userPayload);
-        if (userPayload.role !== "SUPER_ADMIN") {
-            return errorResponse("Forbidden", 403);
-        }
 
         const { id } = await params;
         const user = await db.user.findUnique({
@@ -39,12 +38,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const userPayload = getUserFromRequest(req);
-        if (!userPayload) return errorResponse("Unauthorized", 401);
+        const guard = requireRole(req, "SUPER_ADMIN");
+        if (guard.error) return guard.error;
+        const userPayload = guard.user;
         const db = getTenantClient(userPayload);
-        if (userPayload.role !== "SUPER_ADMIN") {
-            return errorResponse("Forbidden", 403);
-        }
 
         const { id } = await params;
         const body = await req.json();
@@ -104,12 +101,10 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const userPayload = getUserFromRequest(req);
-        if (!userPayload) return errorResponse("Unauthorized", 401);
+        const guard = requireRole(req, "SUPER_ADMIN");
+        if (guard.error) return guard.error;
+        const userPayload = guard.user;
         const db = getTenantClient(userPayload);
-        if (userPayload.role !== "SUPER_ADMIN") {
-            return errorResponse("Forbidden", 403);
-        }
 
         const { id } = await params;
 

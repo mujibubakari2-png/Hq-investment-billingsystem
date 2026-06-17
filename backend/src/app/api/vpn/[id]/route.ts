@@ -15,13 +15,13 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
         const { id } = await params;
 
         // ── 1. Fetch user to get routerId and username ──
-        const vpnUser = await db.vpnUser.findFirst({ where: userPayload.role === "SUPER_ADMIN" ? { id } : { id, tenantId: userPayload.tenantId } });
+        const vpnUser = await db.vpnUser.findFirst({ where: { id } });
         if (!vpnUser) return errorResponse("VPN user not found", 404);
 
         // ── 2. Delete from MikroTik ──
         try {
             const { getMikroTikService } = await import("@/lib/mikrotik");
-            const mt = await getMikroTikService(vpnUser.routerId, userPayload.tenantId);
+            const mt = await getMikroTikService(vpnUser.routerId, userPayload.tenantId ?? null);
 
             if (vpnUser.protocol === "WireGuard") {
                 // Delete peer by public key (stored in password) or comment

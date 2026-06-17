@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
+import { getTenantFilter } from "@/lib/tenant";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 import { requireRole } from "@/lib/rbac";
 import { toISOSafe, parseSafeDate } from "@/lib/dateUtils";
@@ -12,9 +13,7 @@ export async function GET(req: NextRequest) {
         if (guard.error) return guard.error;
         const userPayload = guard.user;
         const db = getTenantClient(userPayload);
-
-        const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
-        const tenantFilter = isSuperAdmin ? {} : { tenantId: userPayload.tenantId };
+        const { filter: tenantFilter } = getTenantFilter(userPayload);
 
         const { searchParams } = new URL(req.url);
         const status = searchParams.get("status") || "";
@@ -93,6 +92,7 @@ export async function POST(req: NextRequest) {
                     quantity: parseInt(String(item.quantity)),
                     unitPrice: parseFloat(String(item.unitPrice)),
                     total: parseFloat(String(item.total)),
+                    tenantId: userPayload.tenantId ?? null,
                 })),
             },
         };

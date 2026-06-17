@@ -4,6 +4,7 @@ import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { encryptPaymentChannelFields, decryptPaymentChannelFields } from "@/lib/encryption";
 import { getJwtTenantId, getTenantFilter, isPlatformSuperAdmin } from "@/lib/tenant";
+import { requirePermission } from "@/lib/rbac";
 
 // ── Validation schema (API-001) ───────────────────────────────────────────────
 const PROVIDERS = ["PALMPESA", "ZENOPAY", "MONGIKE", "HARAKAPAY", "CASH", "BANK_TRANSFER", "OTHER"] as const;
@@ -33,8 +34,9 @@ function maskField(value: string | null | undefined): string | null {
 // GET /api/payment-channels
 export async function GET(req: NextRequest) {
     try {
-        const userPayload = getUserFromRequest(req);
-        if (!userPayload) return errorResponse("Unauthorized", 401);
+        const guard = requirePermission(req, "payment-channels:read");
+        if (guard.error) return guard.error;
+        const userPayload = guard.user;
         const db = getTenantClient(userPayload);
 
         const platformAdmin = isPlatformSuperAdmin(userPayload);
@@ -80,13 +82,10 @@ export async function GET(req: NextRequest) {
 // POST /api/payment-channels
 export async function POST(req: NextRequest) {
     try {
-        const userPayload = getUserFromRequest(req);
-        if (!userPayload) return errorResponse("Unauthorized", 401);
+        const guard = requirePermission(req, "payment-channels:write");
+        if (guard.error) return guard.error;
+        const userPayload = guard.user;
         const db = getTenantClient(userPayload);
-
-        if (userPayload.role !== "SUPER_ADMIN") {
-            return errorResponse("Forbidden: Only the tenant Super Admin can manage payment channels", 403);
-        }
 
         const body = await req.json();
 

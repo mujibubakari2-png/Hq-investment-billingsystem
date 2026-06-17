@@ -1,6 +1,8 @@
 import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
+import { getTenantFilter } from "@/lib/tenant";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
+import { requirePermission } from "@/lib/rbac";
 import { SubscriptionCreateSchema, SubscriptionUpdateSchema } from "@/lib/validators";
 import { getMikroTikService } from "@/lib/mikrotik";
 import { syncRadiusUser } from "@/lib/radius";
@@ -11,12 +13,11 @@ import { invalidateNamespace } from "@/lib/cache";
 // GET /api/subscriptions
 export async function GET(req: NextRequest) {
     try {
-        const userPayload = getUserFromRequest(req);
-        if (!userPayload) return errorResponse("Unauthorized", 401);
+        const guard = requirePermission(req, "subscriptions:read");
+        if (guard.error) return guard.error;
+        const userPayload = guard.user;
         const db = getTenantClient(userPayload);
-
-        const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
-        const tenantFilter = isSuperAdmin ? {} : { tenantId: userPayload.tenantId };
+        const { filter: tenantFilter } = getTenantFilter(userPayload);
 
         const { searchParams } = new URL(req.url);
         const status = searchParams.get("status") || "";
@@ -96,8 +97,9 @@ export async function GET(req: NextRequest) {
 // POST /api/subscriptions
 export async function POST(req: NextRequest) {
     try {
-        const userPayload = getUserFromRequest(req);
-        if (!userPayload) return errorResponse("Unauthorized", 401);
+        const guard = requirePermission(req, "subscriptions:write");
+        if (guard.error) return guard.error;
+        const userPayload = guard.user;
         const db = getTenantClient(userPayload);
 
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";

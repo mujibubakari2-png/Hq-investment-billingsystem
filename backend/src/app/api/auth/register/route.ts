@@ -220,10 +220,11 @@ export async function POST(req: NextRequest) {
             tenant: result.tenant
         }, 201);
 
-        const isSecure = req.headers.get("x-forwarded-proto") === "https" || (req as any).nextUrl?.protocol === "https:";
-        const sameSiteStr = isSecure ? 'None; Secure' : 'Lax';
-        response.headers.append('Set-Cookie', `accessToken=${token}; Path=/; HttpOnly; SameSite=${sameSiteStr}; Max-Age=1800`);
-        response.headers.append('Set-Cookie', `refreshToken=${refreshToken}; Path=/; HttpOnly; SameSite=${sameSiteStr}; Max-Age=604800`);
+        const secureFlag = isProd ? "Secure; " : "";
+        const sameSite = isProd ? "Strict" : "Lax";
+        const cookieBase = `Path=/; HttpOnly; ${secureFlag}SameSite=${sameSite}`;
+        response.headers.append('Set-Cookie', `accessToken=${token}; ${cookieBase}; Max-Age=1800`);
+        response.headers.append('Set-Cookie', `refreshToken=${refreshToken}; ${cookieBase}; Max-Age=604800`);
 
         return response;
     } catch (e) {

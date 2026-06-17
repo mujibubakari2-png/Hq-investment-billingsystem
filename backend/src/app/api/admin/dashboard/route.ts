@@ -1,14 +1,13 @@
 import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
-import { errorResponse, jsonResponse, getUserFromRequest } from "@/lib/auth";
+import { errorResponse, jsonResponse } from "@/lib/auth";
+import { requireRole } from "@/lib/rbac";
 
 export async function GET(req: NextRequest) {
     try {
+        const guard = requireRole(req, "SUPER_ADMIN");
+        if (guard.error) return guard.error;
         const db = getTenantClient(null);
-        const user = getUserFromRequest(req);
-        if (!user || user.role !== "SUPER_ADMIN" || user.tenantId) {
-            return errorResponse("Forbidden: Platform Admin access required", 403);
-        }
 
         const [
             totalTenants,

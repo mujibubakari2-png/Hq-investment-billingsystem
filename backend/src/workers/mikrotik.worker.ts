@@ -22,10 +22,16 @@ const CONCURRENCY = 5;
 
 // ── Load router + build service ───────────────────────────────────────────────
 
-async function getService(routerId: string) {
+async function getService(routerId: string, expectedTenantId: string | null = null) {
   const db = getTenantClient(null);
   const router = await db.router.findUnique({ where: { id: routerId } });
   if (!router) throw new Error(`Router not found: ${routerId}`);
+
+  // SAFETY: If the job provided a tenantId, ensure the router belongs to that tenant.
+  // This prevents a misrouted job or a buggy producer from operating on the wrong tenant's router.
+  if (expectedTenantId && router.tenantId && router.tenantId !== expectedTenantId) {
+    throw new Error(`Tenant mismatch for router ${routerId}: expected ${expectedTenantId} but router belongs to ${router.tenantId}`);
+  }
 
   const dec = decryptRouterFields(router);
   assertSafeRouterHost(dec.host);
@@ -54,7 +60,7 @@ async function log(routerId: string, tenantId: string | null, action: string, st
 const handlers: Record<string, (data: MikroTikJobData) => Promise<unknown>> = {
 
   'create-pppoe-user': async ({ routerId, tenantId, payload }) => {
-    const { service } = await getService(routerId);
+    const { service } = await getService(routerId, tenantId);
     const r = await service.createPPPoEUser({
       name: payload.username as string,
       password: payload.password as string,
@@ -67,14 +73,14 @@ const handlers: Record<string, (data: MikroTikJobData) => Promise<unknown>> = {
   },
 
   'delete-pppoe-user': async ({ routerId, tenantId, payload }) => {
-    const { service } = await getService(routerId);
+    const { service } = await getService(routerId, tenantId);
     const r = await service.deletePPPoEUser(payload.username as string);
     await log(routerId, tenantId, 'delete-pppoe-user', 'success', `user: ${payload.username}`);
     return r;
   },
 
   'update-pppoe-user': async ({ routerId, tenantId, payload }) => {
-    const { service } = await getService(routerId);
+    const { service } = await getService(routerId, tenantId);
     const r = await service.updatePPPoEUser(payload.username as string, {
       password: payload.password as string | undefined,
       profile: payload.profile as string | undefined,
@@ -85,7 +91,7 @@ const handlers: Record<string, (data: MikroTikJobData) => Promise<unknown>> = {
   },
 
   'create-hotspot-user': async ({ routerId, tenantId, payload }) => {
-    const { service } = await getService(routerId);
+    const { service } = await getService(routerId, tenantId);
     const r = await service.createHotspotUser({
       name: payload.username as string,
       password: payload.password as string,
@@ -98,14 +104,14 @@ const handlers: Record<string, (data: MikroTikJobData) => Promise<unknown>> = {
   },
 
   'delete-hotspot-user': async ({ routerId, tenantId, payload }) => {
-    const { service } = await getService(routerId);
+    const { service } = await getService(routerId, tenantId);
     const r = await service.deleteHotspotUser(payload.username as string);
     await log(routerId, tenantId, 'delete-hotspot-user', 'success', `user: ${payload.username}`);
     return r;
   },
 
   'disconnect-session': async ({ routerId, tenantId, payload }) => {
-    const { service } = await getService(routerId);
+    const { service } = await getService(routerId, tenantId);
     // Use disconnectPPPoESession (the actual method name on MikroTikService)
     const r = await service.disconnectPPPoESession(payload.sessionId as string);
     await log(routerId, tenantId, 'disconnect-session', 'success', `session: ${payload.sessionId}`);
@@ -113,7 +119,7 @@ const handlers: Record<string, (data: MikroTikJobData) => Promise<unknown>> = {
   },
 
   'sync-subscription': async ({ routerId, tenantId, payload }) => {
-    const { service } = await getService(routerId);
+    const { service } = await getService(routerId, tenantId);
     const r = await service.updatePPPoEUser(payload.username as string, {
       profile: payload.profile as string | undefined,
       disabled: payload.disabled as boolean | undefined,

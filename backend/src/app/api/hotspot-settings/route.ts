@@ -1,6 +1,8 @@
 import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
-import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
+import { jsonResponse, errorResponse } from "@/lib/auth";
+import { requirePermission, requireRole } from "@/lib/rbac";
+import { canAccessTenant } from "@/lib/tenant";
 
 // GET /api/hotspot-settings?routerId=...
 export async function GET(req: NextRequest) {
@@ -12,14 +14,15 @@ export async function GET(req: NextRequest) {
             return errorResponse("routerId is required", 400);
         }
 
-        const userPayload = getUserFromRequest(req);
-        if (!userPayload) return errorResponse("Unauthorized", 401);
+        const guard = requirePermission(req, "hotspot-settings:read");
+        if (guard.error) return guard.error;
+        const userPayload = guard.user;
         const db = getTenantClient(userPayload);
 
         const router = await db.router.findUnique({ where: { id: routerId } });
         if (!router) return errorResponse("Router not found", 404);
-        
-        if (userPayload.role !== "SUPER_ADMIN" && router.tenantId !== userPayload.tenantId) {
+
+        if (!canAccessTenant(userPayload, router.tenantId)) {
             return errorResponse("Unauthorized to access this router's settings", 403);
         }
 
@@ -54,19 +57,17 @@ export async function POST(req: NextRequest) {
             return errorResponse("routerId is required", 400);
         }
 
-        const userPayload = getUserFromRequest(req);
-        if (!userPayload) return errorResponse("Unauthorized", 401);
+        const guard = requireRole(req, "SUPER_ADMIN");
+        if (guard.error) return guard.error;
+        const userPayload = guard.user;
         const db = getTenantClient(userPayload);
 
-        // Only SUPER_ADMIN can update hotspot settings
-        if (userPayload.role !== "SUPER_ADMIN") {
-            return errorResponse("Forbidden: Super Admin access required", 403);
-        }
+        // Only SUPER_ADMIN can update hotspot settings (enforced above)
 
         const router = await db.router.findUnique({ where: { id: routerId } });
         if (!router) return errorResponse("Router not found", 404);
-        
-        if (router.tenantId && router.tenantId !== userPayload.tenantId) {
+
+        if (!canAccessTenant(userPayload, router.tenantId)) {
             return errorResponse("Unauthorized to update this router's settings", 403);
         }
 

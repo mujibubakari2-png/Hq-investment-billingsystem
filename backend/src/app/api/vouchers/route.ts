@@ -1,6 +1,8 @@
 import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
-import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
+import { getTenantFilter } from "@/lib/tenant";
+import { jsonResponse, errorResponse } from "@/lib/auth";
+import { requirePermission } from "@/lib/rbac";
 import { VoucherCreateSchema } from '@/lib/validators';
 
 import { toISOSafe, toTimestampSafe } from "@/lib/dateUtils";
@@ -8,12 +10,11 @@ import { toISOSafe, toTimestampSafe } from "@/lib/dateUtils";
 // GET /api/vouchers
 export async function GET(req: NextRequest) {
     try {
-        const userPayload = getUserFromRequest(req);
-        if (!userPayload) return errorResponse("Unauthorized", 401);
+        const guard = requirePermission(req, "vouchers:read");
+        if (guard.error) return guard.error;
+        const userPayload = guard.user;
         const db = getTenantClient(userPayload);
-
-        const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
-        const tenantFilter = isSuperAdmin ? {} : { tenantId: userPayload.tenantId };
+        const { filter: tenantFilter } = getTenantFilter(userPayload);
 
         const { searchParams } = new URL(req.url);
         const status = searchParams.get("status") || "";
@@ -72,6 +73,10 @@ export async function GET(req: NextRequest) {
 // POST /api/vouchers - single voucher creation
 export async function POST(req: NextRequest) {
     try {
+        const guard = requirePermission(req, "vouchers:create");
+        if (guard.error) return guard.error;
+        const userPayload = guard.user;
+        const db = getTenantClient(userPayload);
         const body = await req.json();
         const parsed = VoucherCreateSchema.safeParse(body);
         if (!parsed.success) {
@@ -82,19 +87,14 @@ export async function POST(req: NextRequest) {
 
         if (!packageId) return errorResponse("packageId is required");
 
-        // Prefer logged-in user from JWT token, then body, then admin fallback
-        const currentUser = getUserFromRequest(req);
-        if (!currentUser) return errorResponse("Unauthorized", 401);
-
-        const db = getTenantClient(currentUser);
-
+        // Prefer logged-in user from guard (already validated)
         let pkg = await db.package.findUnique({ where: { id: packageId } });
         if (!pkg) pkg = await db.package.findFirst({ where: { name: packageId } });
         if (!pkg) return errorResponse("Package not found", 404);
 
-        const isSuperAdmin = currentUser.role === "SUPER_ADMIN";
+        const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
 
-        if (!isSuperAdmin && pkg.tenantId !== currentUser.tenantId) {
+        if (!isSuperAdmin && pkg.tenantId !== userPayload.tenantId) {
             return errorResponse("Forbidden: Package belongs to another tenant", 403);
         }
 
@@ -104,13 +104,13 @@ export async function POST(req: NextRequest) {
         if (routerIdValue) {
             const router = await db.router.findUnique({ where: { id: routerIdValue } });
             if (!router) return errorResponse("Router not found", 404);
-            if (!isSuperAdmin && router.tenantId !== currentUser.tenantId) {
+            if (!isSuperAdmin && router.tenantId !== userPayload.tenantId) {
                 return errorResponse("Forbidden: Router belongs to another tenant", 403);
             }
         }
 
-        const tenantFilter = { tenantId: isSuperAdmin ? undefined : currentUser.tenantId };
-        let finalCreatedById = currentUser?.userId || createdById;
+        const { filter: tenantFilter } = getTenantFilter(userPayload);
+        let finalCreatedById = userPayload?.userId || createdById;
         if (!finalCreatedById) {
             const admin = await db.user.findFirst({ where: { role: { in: ["ADMIN", "SUPER_ADMIN"] } } });
             finalCreatedById = admin?.id;
@@ -119,7 +119,7 @@ export async function POST(req: NextRequest) {
         if (!finalCreatedById) return errorResponse("Creator user ID is required");
 
         const finalCode = code || Math.floor(100000 + Math.random() * 900000).toString();
-        const tenantIdValue = isSuperAdmin ? pkg.tenantId : currentUser.tenantId;
+        const tenantIdValue = isSuperAdmin ? pkg.tenantId : userPayload.tenantId;
 
         // Ensure code is unique for friendly error message
         const exists = await db.voucher.findFirst({ where: { code: finalCode, tenantId: tenantIdValue } });

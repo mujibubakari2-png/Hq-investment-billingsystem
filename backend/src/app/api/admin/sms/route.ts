@@ -1,16 +1,15 @@
 import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
-import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
+import { jsonResponse, errorResponse } from "@/lib/auth";
+import { requireRole } from "@/lib/rbac";
 
 
 // GET /api/admin/sms - list all SMS messages across all tenants (Super Admin only)
 export async function GET(req: NextRequest) {
     try {
+        const guard = requireRole(req, "SUPER_ADMIN");
+        if (guard.error) return guard.error;
         const db = getTenantClient(null);
-        const user = getUserFromRequest(req);
-        if (!user || user.role !== "SUPER_ADMIN" || user.tenantId) {
-            return errorResponse("Forbidden: Super Admin access required", 403);
-        }
 
         const messages = await db.smsMessage.findMany({
             include: {
@@ -42,11 +41,10 @@ export async function GET(req: NextRequest) {
 // POST /api/admin/sms - send global SMS (Super Admin only)
 export async function POST(req: NextRequest) {
     try {
+        const guard = requireRole(req, "SUPER_ADMIN");
+        if (guard.error) return guard.error;
         const db = getTenantClient(null);
-        const user = getUserFromRequest(req);
-        if (!user || user.role !== "SUPER_ADMIN" || user.tenantId) {
-            return errorResponse("Forbidden: Super Admin access required", 403);
-        }
+        const user = guard.user;
 
         const body = await req.json();
         const { recipient, message, tenantId } = body;

@@ -1,14 +1,16 @@
 import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
-import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
+import { jsonResponse, errorResponse } from "@/lib/auth";
+import { requirePermission } from "@/lib/rbac";
 import { toISOSafe } from "@/lib/dateUtils";
 import { getJwtTenantId, isPlatformSuperAdmin } from "@/lib/tenant";
 import { getSubUserLimitForPlan } from "@/lib/userLimits";
 
 export async function GET(req: NextRequest) {
     try {
-        const userPayload = getUserFromRequest(req);
-        if (!userPayload) return errorResponse("Unauthorized", 401);
+        const guard = requirePermission(req, "license:read");
+        if (guard.error) return guard.error;
+        const userPayload = guard.user;
         const db = getTenantClient(userPayload);
 
         if (isPlatformSuperAdmin(userPayload)) {
@@ -44,7 +46,7 @@ export async function GET(req: NextRequest) {
 
         const now = new Date();
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-        
+
         let daysRemaining = 0;
         let expiresAt: Date | null = tenant.licenseExpiresAt || tenant.trialEnd || null;
         const hasAnyExpiry = !!(tenant.licenseExpiresAt || tenant.trialEnd);

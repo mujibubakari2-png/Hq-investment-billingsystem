@@ -1,24 +1,24 @@
 import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
-import { errorResponse, jsonResponse, getUserFromRequest } from "@/lib/auth";
+import { errorResponse, jsonResponse } from "@/lib/auth";
+import { requirePermission } from "@/lib/rbac";
+import { canAccessTenant } from "@/lib/tenant";
 
 // Environment variables or settings for PalmPesa API
 const PALMPESA_BASE_URL = process.env.PALMPESA_API_URL;
 const PALMPESA_API_URL = PALMPESA_BASE_URL
-  ? (PALMPESA_BASE_URL.endsWith("/payments/stk-push")
-    ? PALMPESA_BASE_URL
-    : `${PALMPESA_BASE_URL}/payments/stk-push`)
-  : undefined;
+    ? (PALMPESA_BASE_URL.endsWith("/payments/stk-push")
+        ? PALMPESA_BASE_URL
+        : `${PALMPESA_BASE_URL}/payments/stk-push`)
+    : undefined;
 const PALMPESA_API_KEY = process.env.PALMPESA_API_KEY;
 
 export async function POST(req: NextRequest) {
     try {
-        const userPayload = getUserFromRequest(req);
-        if (!userPayload) return errorResponse("Unauthorized", 401);
+        const guard = requirePermission(req, "transactions:write");
+        if (guard.error) return guard.error;
+        const userPayload = guard.user;
         const db = getTenantClient(userPayload);
-        if (userPayload.role !== "SUPER_ADMIN" && userPayload.role !== "ADMIN") {
-            return errorResponse("Forbidden: Admin access required", 403);
-        }
 
         const body = await req.json();
         const { tenantInvoiceId, phone } = body;
@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
         if (!invoice) {
             return errorResponse("Invoice not found", 404);
         }
-        if (userPayload.role !== "SUPER_ADMIN" && invoice.tenantId !== userPayload.tenantId) {
+        if (!canAccessTenant(userPayload, invoice.tenantId)) {
             return errorResponse("Forbidden", 403);
         }
 

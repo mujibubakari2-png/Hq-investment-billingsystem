@@ -1,17 +1,17 @@
 import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
+import { requirePermission } from "@/lib/rbac";
+import { canAccessTenant } from "@/lib/tenant";
 import { parseOptionalDate } from "@/lib/dateUtils";
 import { InvoiceUpdateSchema } from "@/lib/validators";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const userPayload = getUserFromRequest(req);
-        if (!userPayload) return errorResponse("Unauthorized", 401);
+        const guard = requirePermission(req, "invoices:read");
+        if (guard.error) return guard.error;
+        const userPayload = guard.user;
         const db = getTenantClient(userPayload);
-        if (userPayload.role !== "SUPER_ADMIN" && userPayload.role !== "ADMIN") {
-            return errorResponse("Forbidden", 403);
-        }
 
         const { id } = await params;
         const invoice = await db.invoice.findUnique({
@@ -27,12 +27,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const userPayload = getUserFromRequest(req);
-        if (!userPayload) return errorResponse("Unauthorized", 401);
+        const guard = requirePermission(req, "invoices:write");
+        if (guard.error) return guard.error;
+        const userPayload = guard.user;
         const db = getTenantClient(userPayload);
-        if (userPayload.role !== "SUPER_ADMIN" && userPayload.role !== "ADMIN") {
-            return errorResponse("Forbidden", 403);
-        }
 
         const { id } = await params;
         const body = await req.json();
@@ -62,7 +60,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
         const existing = await db.invoice.findUnique({ where: { id } });
         if (!existing) return errorResponse("Invoice not found", 404);
-        if (userPayload.role !== "SUPER_ADMIN" && existing.tenantId !== userPayload.tenantId) return errorResponse("Forbidden", 403);
+        if (!canAccessTenant(userPayload, existing.tenantId)) return errorResponse("Forbidden", 403);
 
         const invoice = await db.invoice.update({
             where: { id },
@@ -81,14 +79,16 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const userPayload = getUserFromRequest(req);
-        if (!userPayload) return errorResponse("Unauthorized", 401);
+        const guard = requirePermission(req, "invoices:delete");
+        if (guard.error) return guard.error;
+        const userPayload = guard.user;
         const db = getTenantClient(userPayload);
-        if (userPayload.role !== "SUPER_ADMIN" && userPayload.role !== "ADMIN") {
-            return errorResponse("Forbidden", 403);
-        }
 
         const { id } = await params;
+        const existing = await db.invoice.findUnique({ where: { id } });
+        if (!existing) return errorResponse("Invoice not found", 404);
+        if (!canAccessTenant(userPayload, existing.tenantId)) return errorResponse("Forbidden", 403);
+
         await db.invoice.delete({ where: { id } });
         return jsonResponse({ message: "Invoice deleted" });
     } catch {

@@ -1,12 +1,14 @@
 import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
-import { hashPassword, comparePassword, jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
+import { hashPassword, comparePassword, jsonResponse, errorResponse } from "@/lib/auth";
+import { requirePermission } from "@/lib/rbac";
 
 // GET /api/auth/profile - Get own profile
 export async function GET(req: NextRequest) {
     try {
-        const userPayload = getUserFromRequest(req);
-        if (!userPayload) return errorResponse("Unauthorized", 401);
+        const guard = requirePermission(req, "users:read");
+        if (guard.error) return guard.error;
+        const userPayload = guard.user;
         const db = getTenantClient(userPayload);
 
         const user = await db.user.findUnique({
@@ -25,8 +27,9 @@ export async function GET(req: NextRequest) {
 // PUT /api/auth/profile - Update own profile
 export async function PUT(req: NextRequest) {
     try {
-        const userPayload = getUserFromRequest(req);
-        if (!userPayload) return errorResponse("Unauthorized", 401);
+        const guard = requirePermission(req, "users:write");
+        if (guard.error) return guard.error;
+        const userPayload = guard.user;
         const db = getTenantClient(userPayload);
 
         const body = await req.json();

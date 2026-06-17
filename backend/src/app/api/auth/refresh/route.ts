@@ -36,9 +36,11 @@ export async function POST(req: NextRequest) {
             user: newPayload
         });
 
-        const isSecure = req.headers.get("x-forwarded-proto") === "https" || req.nextUrl.protocol === "https:";
-        const sameSiteStr = isSecure ? 'None; Secure' : 'Lax';
-        response.headers.append('Set-Cookie', `accessToken=${token}; Path=/; HttpOnly; SameSite=${sameSiteStr}; Max-Age=1800`);
+        const isProd = process.env.NODE_ENV === "production";
+        const secureFlag = isProd ? "Secure; " : "";
+        const sameSite = isProd ? "Strict" : "Lax";
+        const cookieBase = `Path=/; HttpOnly; ${secureFlag}SameSite=${sameSite}`;
+        response.headers.append('Set-Cookie', `accessToken=${token}; ${cookieBase}; Max-Age=1800`);
 
         return response;
     } catch (e: unknown) {

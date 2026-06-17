@@ -2,14 +2,16 @@ import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
 
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
+import { requirePermission } from "@/lib/rbac";
 import { getTenantFilter, getAssignTenantId } from "@/lib/tenant";
 import { RadiusUserCreateSchema } from '@/lib/validators';
 
 // GET /api/radius/users – list RADIUS users (tenant-isolated)
 export async function GET(req: NextRequest) {
     try {
-        const userPayload = getUserFromRequest(req);
-        if (!userPayload) return errorResponse("Unauthorized", 401);
+        const guard = requirePermission(req, "radius:read");
+        if (guard.error) return guard.error;
+        const userPayload = guard.user;
         const db = getTenantClient(userPayload);
 
         const { filter } = getTenantFilter(userPayload);
@@ -46,8 +48,9 @@ export async function GET(req: NextRequest) {
 // POST /api/radius/users – create RADIUS user (tenant-isolated)
 export async function POST(req: NextRequest) {
     try {
-        const userPayload = getUserFromRequest(req);
-        if (!userPayload) return errorResponse("Unauthorized", 401);
+        const guard = requirePermission(req, "radius:write");
+        if (guard.error) return guard.error;
+        const userPayload = guard.user;
         const db = getTenantClient(userPayload);
 
         const body = await req.json();

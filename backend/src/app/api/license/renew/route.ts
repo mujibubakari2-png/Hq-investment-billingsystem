@@ -1,20 +1,23 @@
 import { NextRequest } from "next/server";
 import { randomUUID } from "node:crypto";
 import { getTenantClient } from "@/lib/tenantPrisma";
-import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
+import { jsonResponse, errorResponse } from "@/lib/auth";
+import { requirePermission } from "@/lib/rbac";
 import { getPaymentProvider } from "@/lib/payments/registry";
 import { formatPhoneTZ } from "@/lib/payments/utils";
 import { getJwtTenantId, isPlatformSuperAdmin } from "@/lib/tenant";
 
 export async function POST(req: NextRequest) {
     try {
-        const userPayload = getUserFromRequest(req);
-        if (!userPayload) return errorResponse("Unauthorized", 401);
-        const db = getTenantClient(userPayload);
-        if (userPayload.role !== "SUPER_ADMIN" || isPlatformSuperAdmin(userPayload)) {
+        const guard = requirePermission(req, "license:renew");
+        if (guard.error) return guard.error;
+        const userPayload = guard.user;
+
+        if (isPlatformSuperAdmin(userPayload)) {
             return errorResponse("Forbidden: Only the tenant Super Admin can renew licenses", 403);
         }
 
+        const db = getTenantClient(userPayload);
         const tenantId = getJwtTenantId(userPayload);
         if (!tenantId) return errorResponse("Tenant ID missing", 400);
 
@@ -27,31 +30,33 @@ export async function POST(req: NextRequest) {
 
         const tenant = await db.tenant.findUnique({
             where: { id: tenantId },
-            include: { plan: true }
+            include: { plan: true },
         });
 
         if (!tenant) return errorResponse("Tenant not found", 404);
 
         let invoice;
-        
+
         if (invoiceId) {
             invoice = await db.tenantInvoice.findUnique({
-                where: { id: invoiceId }
+                where: { id: invoiceId },
             });
             if (!invoice) return errorResponse("Invoice not found", 404);
             if (invoice.tenantId !== tenant.id) return errorResponse("Forbidden", 403);
         } else {
-            // FIX: Avoid duplicating PENDING invoices. Delete any existing PENDING invoice before creating a new one.
             await db.tenantInvoice.deleteMany({
-                where: { 
+                where: {
                     tenantId: tenant.id,
                     status: "PENDING",
-                    planId: tenant.planId
-                }
+                    planId: tenant.planId,
+                },
             });
 
-            // CREATE NEW PENDING INVOICE
-            const invoiceNumber = `INV-${new Date().getFullYear()}-${randomUUID().replace(/-/g, "").slice(0, 8).toUpperCase()}`;
+            const invoiceNumber = `INV-${new Date().getFullYear()}-${randomUUID()
+                .replace(/-/g, "")
+                .slice(0, 8)
+                .toUpperCase()}`;
+
             invoice = await db.tenantInvoice.create({
                 data: {
                     invoiceNumber,
@@ -61,7 +66,7 @@ export async function POST(req: NextRequest) {
                     amount: Number(amount),
                     status: "PENDING",
                     dueDate: new Date(),
-                }
+                },
             });
         }
 
@@ -70,14 +75,11 @@ export async function POST(req: NextRequest) {
             return errorResponse("Server payment callback URL is not configured", 500);
         }
 
-        // Dynamically resolve payment provider from environment or DB configuration
-        let providerName = "PALMPESA"; // default
-        
-        // Prefer the configured global PaymentChannel for the platform
+        let providerName = "PALMPESA";
         const systemChannel = await db.paymentChannel.findFirst({
-            where: { status: "ACTIVE", tenantId: null }
+            where: { status: "ACTIVE", tenantId: null },
         });
-        
+
         if (systemChannel && systemChannel.provider) {
             providerName = systemChannel.provider;
         } else if (process.env.ZENOPAY_API_KEY) {
@@ -99,17 +101,20 @@ export async function POST(req: NextRequest) {
                 phone: cleanPhone,
                 reference: invoice.invoiceNumber,
                 description: `SaaS License Renewal - ${packageMonths} Month(s)`,
-                callbackUrl: callbackUrl,
+                callbackUrl,
                 buyerName: tenant.name,
                 buyerEmail: tenant.email,
             });
 
             if (result.success) {
-                return jsonResponse({
-                    success: true,
-                    message: "STK push initiated! Please enter your mobile money PIN to complete the transaction.",
-                    status: "processing"
-                });
+                return jsonResponse(
+                    {
+                        success: true,
+                        message: " Please enter your mobile money PIN to complete the transaction.",
+                        status: "processing",
+                    },
+                    200
+                );
             } else {
                 return errorResponse(result.message || "Failed to initiate STK Push", 500);
             }
@@ -117,10 +122,8 @@ export async function POST(req: NextRequest) {
             console.error("STK push error during license renewal:", paymentErr);
             return errorResponse(paymentErr.message || "Payment provider error", 500);
         }
-
     } catch (error) {
         console.error("License Renew API Error:", error);
         return errorResponse("Internal server error", 500);
     }
 }
-

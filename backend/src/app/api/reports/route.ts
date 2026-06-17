@@ -1,12 +1,14 @@
 import { getTenantClient } from "@/lib/tenantPrisma";
-import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
+import { jsonResponse, errorResponse } from "@/lib/auth";
+import { requirePermission } from "@/lib/rbac";
 import { NextRequest } from "next/server";
 
 // GET /api/reports
 export async function GET(req: NextRequest) {
     try {
-        const userPayload = getUserFromRequest(req);
-        if (!userPayload) return errorResponse("Unauthorized", 401);
+        const guard = requirePermission(req, "reports:read");
+        if (guard.error) return guard.error;
+        const userPayload = guard.user;
         const db = getTenantClient(userPayload);
 
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
@@ -72,7 +74,7 @@ export async function GET(req: NextRequest) {
                     db.client.count({ where: { createdAt: { gte: startDate }, ...tenantFilter } }),
                 ]);
 
-                data = { 
+                data = {
                     total, active, inactive, newClients,
                     revenue: 0, // Dashboard requirements
                     router_status: "N/A", // Dashboard requirements
@@ -88,7 +90,7 @@ export async function GET(req: NextRequest) {
                     db.subscription.count({ where: { ...tenantFilter } }),
                 ]);
 
-                data = { 
+                data = {
                     active, expired, total,
                     revenue: 0, // Dashboard requirements
                     router_status: "N/A", // Dashboard requirements
@@ -101,9 +103,9 @@ export async function GET(req: NextRequest) {
                 return errorResponse("Invalid report type");
         }
 
-        return jsonResponse({ 
-            period, 
-            type, 
+        return jsonResponse({
+            period,
+            type,
             data,
             revenue: data.revenue,
             router_status: data.router_status,

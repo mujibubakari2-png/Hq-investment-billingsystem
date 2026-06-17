@@ -1,16 +1,18 @@
 import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
+import { requireRole } from "@/lib/rbac";
 import { getJwtTenantId, isPlatformSuperAdmin } from "@/lib/tenant";
 
 // POST /api/license/change-plan
 export async function POST(req: NextRequest) {
     try {
-        const userPayload = getUserFromRequest(req);
-        if (!userPayload) return errorResponse("Unauthorized", 401);
+        const guard = requireRole(req, "SUPER_ADMIN");
+        if (guard.error) return guard.error;
+        const userPayload = guard.user;
         const db = getTenantClient(userPayload);
-        if (userPayload.role !== "SUPER_ADMIN" || isPlatformSuperAdmin(userPayload)) {
-            return errorResponse("Forbidden: Only the tenant Super Admin can change plans", 403);
+        if (isPlatformSuperAdmin(userPayload)) {
+            return errorResponse("Forbidden: Only tenant-scoped SUPER_ADMIN users can change plans", 403);
         }
 
         const tenantId = getJwtTenantId(userPayload);

@@ -1,12 +1,15 @@
 import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
-import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
+import { jsonResponse, errorResponse } from "@/lib/auth";
+import { requirePermission } from "@/lib/rbac";
+import { canAccessTenant } from "@/lib/tenant";
 import { VoucherCreateSchema } from "@/lib/validators";
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const userPayload = getUserFromRequest(req);
-        if (!userPayload) return errorResponse("Unauthorized", 401);
+        const guard = requirePermission(req, "vouchers:write");
+        if (guard.error) return guard.error;
+        const userPayload = guard.user;
         const db = getTenantClient(userPayload);
 
         const resolvedParams = await params;
@@ -21,9 +24,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
         const existingVoucher = await db.voucher.findUnique({ where: { id: resolvedParams.id } });
         if (!existingVoucher) return errorResponse("Voucher not found", 404);
-
-        if (userPayload.role !== "SUPER_ADMIN" && existingVoucher.tenantId !== userPayload.tenantId) {
-            return errorResponse("Forbidden", 403);
+        if (!canAccessTenant(userPayload, existingVoucher.tenantId)) {
+            return errorResponse("Voucher not found", 404);
         }
 
         const updated = await db.voucher.update({
@@ -45,17 +47,17 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const userPayload = getUserFromRequest(req);
-        if (!userPayload) return errorResponse("Unauthorized", 401);
+        const guard = requirePermission(req, "vouchers:delete");
+        if (guard.error) return guard.error;
+        const userPayload = guard.user;
         const db = getTenantClient(userPayload);
 
         const resolvedParams = await params;
 
         const existingVoucher = await db.voucher.findUnique({ where: { id: resolvedParams.id } });
         if (!existingVoucher) return errorResponse("Voucher not found", 404);
-
-        if (userPayload.role !== "SUPER_ADMIN" && existingVoucher.tenantId !== userPayload.tenantId) {
-            return errorResponse("Forbidden", 403);
+        if (!canAccessTenant(userPayload, existingVoucher.tenantId)) {
+            return errorResponse("Voucher not found", 404);
         }
 
         await db.voucher.delete({

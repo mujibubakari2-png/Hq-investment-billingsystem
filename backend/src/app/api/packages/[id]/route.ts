@@ -1,14 +1,17 @@
 import { NextRequest } from "next/server";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
+import { requirePermission } from "@/lib/rbac";
 import { getMikroTikService } from "@/lib/mikrotik";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import { PackageUpdateSchema } from "@/lib/validators";
+import { getTenantFilter } from "@/lib/tenant";
 
 // GET /api/packages/[id]
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const userPayload = getUserFromRequest(req);
-        if (!userPayload) return errorResponse("Unauthorized", 401);
+        const guard = requirePermission(req, "packages:read");
+        if (guard.error) return guard.error;
+        const userPayload = guard.user;
         const db = getTenantClient(userPayload);
 
         const { id } = await params;
@@ -26,8 +29,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 // PUT /api/packages/[id]
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const userPayload = getUserFromRequest(req);
-        if (!userPayload) return errorResponse("Unauthorized", 401);
+        const guard = requirePermission(req, "packages:write");
+        if (guard.error) return guard.error;
+        const userPayload = guard.user;
         const db = getTenantClient(userPayload);
 
         const { id } = await params;
@@ -40,9 +44,10 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         }
         const update = parsed.data as any;
 
+        const { filter: tenantFilter } = getTenantFilter(userPayload);
         const routerId = update.routerId || body.routerId || body.router;
         const router = routerId
-            ? await db.router.findFirst({ where: { OR: [{ id: routerId }, { name: routerId }], tenantId: userPayload.tenantId } })
+            ? await db.router.findFirst({ where: { OR: [{ id: routerId }, { name: routerId }], ...tenantFilter } })
             : null;
 
         const dataToUpdate: any = {};
@@ -110,8 +115,9 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 // DELETE /api/packages/[id]
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const userPayload = getUserFromRequest(req);
-        if (!userPayload) return errorResponse("Unauthorized", 401);
+        const guard = requirePermission(req, "packages:write");
+        if (guard.error) return guard.error;
+        const userPayload = guard.user;
         const db = getTenantClient(userPayload);
 
         const { id } = await params;

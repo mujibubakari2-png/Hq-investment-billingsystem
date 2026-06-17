@@ -66,11 +66,17 @@ export const PERMISSIONS = {
   // Vouchers — AGENT can create (their primary tool), VIEWER read-only
   "vouchers:create": ["SUPER_ADMIN", "ADMIN", "AGENT"],         // VIEWER removed
   "vouchers:read": ["SUPER_ADMIN", "ADMIN", "AGENT", "VIEWER"],
+  "vouchers:write": ["SUPER_ADMIN", "ADMIN", "AGENT"],
   "vouchers:delete": ["SUPER_ADMIN", "ADMIN"],                  // AGENT + VIEWER removed
 
   // Transactions — all read, only managers write
   "transactions:read": ["SUPER_ADMIN", "ADMIN", "AGENT", "VIEWER"],
   "transactions:write": ["SUPER_ADMIN", "ADMIN"],
+
+  // Invoices — tenant managers only
+  "invoices:read": ["SUPER_ADMIN", "ADMIN"],
+  "invoices:write": ["SUPER_ADMIN", "ADMIN"],
+  "invoices:delete": ["SUPER_ADMIN", "ADMIN"],
 
   // Dashboard & reports — all roles
   "dashboard:read": ["SUPER_ADMIN", "ADMIN", "AGENT", "VIEWER"],
@@ -96,6 +102,20 @@ export const PERMISSIONS = {
   "vpn:read": ["SUPER_ADMIN", "ADMIN"],
   "vpn:write": ["SUPER_ADMIN"],
 
+  // Radius operations
+  "radius:read": ["SUPER_ADMIN", "ADMIN"],
+  "radius:write": ["SUPER_ADMIN", "ADMIN"],
+  "radius:sync": ["SUPER_ADMIN", "ADMIN"],
+
+  // SMS operations
+  "sms:read": ["SUPER_ADMIN", "ADMIN", "AGENT", "VIEWER"],
+  "sms:write": ["SUPER_ADMIN", "ADMIN", "AGENT"],
+  "sms:send": ["SUPER_ADMIN", "ADMIN", "AGENT"],
+
+  // User profile / account management
+  "users:read": ["SUPER_ADMIN", "ADMIN", "AGENT", "VIEWER"],
+  "users:write": ["SUPER_ADMIN", "ADMIN", "AGENT"],
+
   // Expenses — AGENT can log, managers approve/delete
   "expenses:read": ["SUPER_ADMIN", "ADMIN", "AGENT", "VIEWER"],
   "expenses:write": ["SUPER_ADMIN", "ADMIN", "AGENT"],
@@ -107,19 +127,19 @@ export const PERMISSIONS = {
   "equipment:delete": ["SUPER_ADMIN", "ADMIN"],
 } as const;
 
-export type Permission = keyof typeof PERMISSIONS;
+export type Permission = string;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-export function hasPermission(role: string, permission: Permission): boolean {
-  const allowed = PERMISSIONS[permission] as readonly AppRole[] | undefined;
+export function hasPermission(role: string, permission: string): boolean {
+  const allowed = (PERMISSIONS as any)[permission as Permission] as readonly AppRole[] | undefined;
   if (!allowed) return false;
   return allowed.includes(role as AppRole);
 }
 
 export function requirePermission(
   req: NextRequest,
-  permission: Permission
+  permission: string
 ): { user: JwtPayload; error: null } | { user: null; error: Response } {
   const user = getUserFromRequest(req);
   if (!user) {

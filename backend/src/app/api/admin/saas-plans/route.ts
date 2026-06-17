@@ -1,15 +1,14 @@
 import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
-import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
+import { jsonResponse, errorResponse } from "@/lib/auth";
+import { requireRole } from "@/lib/rbac";
 
 // GET /api/admin/saas-plans - list all SaaS plans (Super Admin only)
 export async function GET(req: NextRequest) {
     try {
+        const guard = requireRole(req, "SUPER_ADMIN");
+        if (guard.error) return guard.error;
         const db = getTenantClient(null);
-        const user = getUserFromRequest(req);
-        if (!user || user.role !== "SUPER_ADMIN" || user.tenantId) {
-            return errorResponse("Forbidden: Platform Admin access required", 403);
-        }
 
         const plans = await db.saasPlan.findMany({
             orderBy: { price: 'asc' }
@@ -25,11 +24,10 @@ export async function GET(req: NextRequest) {
 // POST /api/admin/saas-plans - create/update SaaS plans (Super Admin only)
 export async function POST(req: NextRequest) {
     try {
+        const guard = requireRole(req, "SUPER_ADMIN");
+        if (guard.error) return guard.error;
         const db = getTenantClient(null);
-        const user = getUserFromRequest(req);
-        if (!user || user.role !== "SUPER_ADMIN" || user.tenantId) {
-            return errorResponse("Forbidden: Platform Admin access required", 403);
-        }
+        const user = guard.user;
 
         const body = await req.json();
         const { action, planId, name, price, pppoeLimit, hotspotLimit, maxRouters } = body;

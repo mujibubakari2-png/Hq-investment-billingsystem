@@ -1,11 +1,13 @@
 import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
-import { getUserFromRequest, jsonResponse, errorResponse } from "@/lib/auth";
+import { jsonResponse, errorResponse } from "@/lib/auth";
+import { requirePermission } from "@/lib/rbac";
 
 export async function GET(req: NextRequest) {
     try {
-        const payload = getUserFromRequest(req);
-        if (!payload) return errorResponse("Unauthorized", 401);
+        const guard = requirePermission(req, "users:read");
+        if (guard.error) return guard.error;
+        const payload = guard.user;
         const db = getTenantClient(payload);
 
         const user = await db.user.findUnique({

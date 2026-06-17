@@ -1,22 +1,24 @@
 import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
-import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
+import { jsonResponse, errorResponse } from "@/lib/auth";
+import { requirePermission } from "@/lib/rbac";
+import { getTenantFilter } from "@/lib/tenant";
 import { toISOSafe, toTimestampSafe, getStartOfTodayTZ, getStartOfMonthTZ, getEndOfMonthTZ } from "@/lib/dateUtils";
 
 export async function GET(req: NextRequest) {
     try {
-        const userPayload = getUserFromRequest(req);
-        if (!userPayload) return errorResponse("Unauthorized", 401);
+        const guard = requirePermission(req, "transactions:read");
+        if (guard.error) return guard.error;
+        const userPayload = guard.user;
         const db = getTenantClient(userPayload);
 
-        const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
-        const tenantFilter: { tenantId?: string | null } = isSuperAdmin ? {} : { tenantId: userPayload.tenantId };
+        const { filter: tenantFilter, isPlatformSuperAdmin, isTenantSuperAdmin } = getTenantFilter(userPayload);
 
         // Super Admin can override tenant filter via query param
         const url = new URL(req.url);
         const searchParams = url.searchParams;
         const targetTenantId = searchParams.get("tenantId");
-        if (isSuperAdmin && targetTenantId) {
+        if ((isPlatformSuperAdmin || isTenantSuperAdmin) && targetTenantId) {
             tenantFilter.tenantId = targetTenantId;
         }
 
@@ -24,7 +26,7 @@ export async function GET(req: NextRequest) {
         let gwSetting = await db.systemSetting.findFirst({ where: { key: 'paymentGateways', ...tenantFilter } });
 
         // Fallback to global setting if no tenant-specific override exists
-        if (!gwSetting && !isSuperAdmin) {
+        if (!gwSetting && !(isPlatformSuperAdmin || isTenantSuperAdmin)) {
             gwSetting = await db.systemSetting.findFirst({ where: { key: 'paymentGateways', tenantId: null } });
         }
 

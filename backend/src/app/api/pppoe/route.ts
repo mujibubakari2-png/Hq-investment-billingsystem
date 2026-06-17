@@ -1,13 +1,15 @@
 import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
-import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
+import { jsonResponse, errorResponse } from "@/lib/auth";
+import { requirePermission } from "@/lib/rbac";
 
 
 // GET /api/pppoe - list all PPPoE subscribers for the tenant
 export async function GET(req: NextRequest) {
     try {
-        const userPayload = getUserFromRequest(req);
-        if (!userPayload) return errorResponse("Unauthorized", 401);
+        const guard = requirePermission(req, "subscriptions:read");
+        if (guard.error) return guard.error;
+        const userPayload = guard.user;
         const db = getTenantClient(userPayload);
 
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
@@ -21,10 +23,10 @@ export async function GET(req: NextRequest) {
         const limit = limitParam === "All" ? 999999 : parseInt(limitParam);
 
         // Filter for ACTIVE subscriptions with client type PPPOE
-        const whereCondition: any = { 
-            status: "ACTIVE", 
+        const whereCondition: any = {
+            status: "ACTIVE",
             client: { serviceType: "PPPOE" },
-            ...tenantFilter 
+            ...tenantFilter
         };
 
         if (routerId !== "All") {
@@ -59,8 +61,8 @@ export async function GET(req: NextRequest) {
         }));
 
         if (search) {
-            const filtered = mapped.filter(s => 
-                s.username.toLowerCase().includes(search) || 
+            const filtered = mapped.filter(s =>
+                s.username.toLowerCase().includes(search) ||
                 s.fullName.toLowerCase().includes(search)
             );
             return jsonResponse({ data: filtered, total: filtered.length });

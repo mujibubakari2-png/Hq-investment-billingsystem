@@ -280,9 +280,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
         if (action === "push-config") {
             try {
-                const service = await getMikroTikService(id, userPayload.role === "SUPER_ADMIN" ? null : userPayload.tenantId);
-
-                console.log(`[PUSH-CONFIG] Starting unified config for router: ${router.name}`);
+                const service = await getMikroTikService(id, userPayload.tenantId ?? null);
 
                 // ──────────────────────────────────────────────────────────
                 // STEP 0: CLEANUP OLD HQINVESTMENT RULES & CONFIGS (NO DUPLICATES!)

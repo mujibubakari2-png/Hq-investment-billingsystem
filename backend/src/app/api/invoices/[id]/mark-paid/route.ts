@@ -3,6 +3,8 @@ import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { syncRadiusUser } from "@/lib/radius";
 import { getMikroTikService } from "@/lib/mikrotik";
+import { requireRole } from "@/lib/rbac";
+import { canAccessTenant } from "@/lib/tenant";
 
 /**
  * INV-003: POST /api/invoices/[id]/mark-paid
@@ -18,12 +20,10 @@ export async function POST(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const userPayload = getUserFromRequest(req);
-        if (!userPayload) return errorResponse("Unauthorized", 401);
+        const guard = requireRole(req, "SUPER_ADMIN", "ADMIN");
+        if (guard.error) return guard.error;
+        const userPayload = guard.user;
         const db = getTenantClient(userPayload);
-        if (!["SUPER_ADMIN", "ADMIN"].includes(userPayload.role)) {
-            return errorResponse("Forbidden", 403);
-        }
 
         const { id } = await params;
         const body = await req.json().catch(() => ({}));
@@ -36,7 +36,7 @@ export async function POST(
 
         if (!invoice) return errorResponse("Invoice not found", 404);
 
-        if (userPayload.role !== "SUPER_ADMIN" && invoice.tenantId !== userPayload.tenantId) {
+        if (!canAccessTenant(userPayload, invoice.tenantId)) {
             return errorResponse("Forbidden", 403);
         }
 
@@ -94,9 +94,9 @@ export async function POST(
             const expiresAt = new Date(now);
             switch (pkg.durationUnit) {
                 case "MINUTES": expiresAt.setMinutes(expiresAt.getMinutes() + pkg.duration); break;
-                case "HOURS":   expiresAt.setHours(expiresAt.getHours() + pkg.duration); break;
-                case "DAYS":    expiresAt.setDate(expiresAt.getDate() + pkg.duration); break;
-                case "MONTHS":  expiresAt.setMonth(expiresAt.getMonth() + pkg.duration); break;
+                case "HOURS": expiresAt.setHours(expiresAt.getHours() + pkg.duration); break;
+                case "DAYS": expiresAt.setDate(expiresAt.getDate() + pkg.duration); break;
+                case "MONTHS": expiresAt.setMonth(expiresAt.getMonth() + pkg.duration); break;
             }
 
             const existingSub = await db.subscription.findFirst({
@@ -154,7 +154,7 @@ export async function POST(
                     await db.subscription.update({
                         where: { id: newSub.id },
                         data: { syncStatus: "PENDING_RADIUS_SYNC" },
-                    }).catch(() => {});
+                    }).catch(() => { });
                 }
             }
 

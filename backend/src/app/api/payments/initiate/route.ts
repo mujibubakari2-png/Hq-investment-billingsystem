@@ -6,15 +6,18 @@
  */
 
 import { NextRequest } from "next/server";
-import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
+import { jsonResponse, errorResponse } from "@/lib/auth";
+import { requirePermission } from "@/lib/rbac";
+import { canAccessTenant, getAssignTenantId } from '@/lib/tenant';
 import { paymentService } from "@/lib/payments/service";
 import { isSupportedProvider, SUPPORTED_PROVIDERS } from "@/lib/payments/registry";
 import { isValidAmount, formatPhoneTZ } from "@/lib/payments/utils";
 
 export async function POST(req: NextRequest) {
   try {
-    const userPayload = getUserFromRequest(req);
-    if (!userPayload) return errorResponse("Unauthorized", 401);
+    const guard = requirePermission(req, "transactions:write");
+    if (guard.error) return guard.error;
+    const userPayload = guard.user;
 
     const body = await req.json();
     const {
@@ -52,9 +55,12 @@ export async function POST(req: NextRequest) {
     }
 
     // Use tenant from JWT payload (non-super-admin is scoped to their tenant)
-    const tenantId = userPayload.role === "SUPER_ADMIN"
-      ? (body.tenantId ?? userPayload.tenantId ?? null)
-      : userPayload.tenantId ?? null;
+    const tenantId = getAssignTenantId(userPayload, body.tenantId ?? null);
+
+    // Ensure the acting user can access the target tenant
+    if (!canAccessTenant(userPayload, tenantId)) {
+      return errorResponse("Forbidden", 403);
+    }
 
     // ── Initiate ────────────────────────────────────────────────────────────
     const result = await paymentService.initiatePayment({
