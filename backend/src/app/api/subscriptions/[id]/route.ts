@@ -20,6 +20,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
             include: { client: true, package: true, router: true },
         });
         if (!sub) return errorResponse("Subscription not found", 404);
+        // MT-002 FIX: Explicit tenant verification for defense-in-depth
+        if (!canAccessTenant(userPayload, sub.tenantId)) {
+            return errorResponse("Subscription not found", 404);
+        }
         return jsonResponse(sub);
     } catch {
         return errorResponse("Internal server error", 500);
@@ -75,6 +79,10 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
         const { id } = await params;
         const existing = await db.subscription.findUnique({ where: { id } });
         if (!existing) return errorResponse("Subscription not found", 404);
+        // MT-002 FIX: Explicit tenant verification for defense-in-depth
+        if (!canAccessTenant(userPayload, existing.tenantId)) {
+            return errorResponse("Subscription not found", 404);
+        }
 
         if (userPayload.role === "VIEWER") return errorResponse("Forbidden", 403);
 

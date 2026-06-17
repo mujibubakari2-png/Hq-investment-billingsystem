@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
-import { requirePermission } from "@/lib/rbac";
 import { canAccessTenant } from "@/lib/tenant";
+import { requirePermission } from "@/lib/rbac";
 import { parseOptionalDate } from "@/lib/dateUtils";
 import { InvoiceUpdateSchema } from "@/lib/validators";
 
@@ -19,6 +19,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
             include: { client: true, items: true },
         });
         if (!invoice) return errorResponse("Invoice not found", 404);
+        // MT-002 FIX: Explicit tenant verification for defense-in-depth
+        if (!canAccessTenant(userPayload, invoice.tenantId)) {
+            return errorResponse("Invoice not found", 404);
+        }
         return jsonResponse(invoice);
     } catch {
         return errorResponse("Internal server error", 500);

@@ -54,7 +54,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 
 # Create a non-root user
 RUN addgroup --system --gid 1001 nodejs \
- && adduser  --system --uid 1001 nextjs
+    && adduser  --system --uid 1001 nextjs
 
 # Copy only the standalone build output + static assets
 COPY --from=builder /app/public            ./public
@@ -76,5 +76,9 @@ EXPOSE ${PORT:-3000}
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
-# Run migrate deploy then start (migrate deploy is idempotent — safe on every boot)
-CMD ["sh", "-c", "npx prisma migrate deploy && node server.js"]
+# Copy startup script for database initialization
+COPY scripts/startup-init-db.sh /app/startup-init-db.sh
+RUN chmod +x /app/startup-init-db.sh
+
+# Run database initialization then start (idempotent — safe on every boot)
+CMD ["sh", "-c", "bash /app/startup-init-db.sh && node server.js"]

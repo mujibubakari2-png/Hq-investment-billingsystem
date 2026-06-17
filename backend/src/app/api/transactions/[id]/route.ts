@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import { requirePermission } from "@/lib/rbac";
+import { canAccessTenant } from "@/lib/tenant";
 
 // GET /api/transactions/[id]
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -17,6 +18,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
             include: { client: true },
         });
         if (!transaction) return errorResponse("Transaction not found", 404);
+        // MT-002 FIX: Explicit tenant verification for defense-in-depth
+        if (!canAccessTenant(userPayload, transaction.tenantId)) {
+            return errorResponse("Transaction not found", 404);
+        }
         return jsonResponse(transaction);
     } catch {
         return errorResponse("Internal server error", 500);
