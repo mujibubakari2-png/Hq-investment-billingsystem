@@ -1,6 +1,5 @@
 import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
-import prisma from "@/lib/prisma";
 import { requireAuth, hashPassword, comparePassword, jsonResponse, errorResponse } from "@/lib/auth";
 import logger from "@/lib/logger";
 
@@ -49,3 +48,4 @@ export async function POST(req: NextRequest) {
         return errorResponse("Internal server error", 500);
     }
 }
+

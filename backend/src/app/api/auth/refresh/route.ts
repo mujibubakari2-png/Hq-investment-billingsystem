@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
-import { signToken, verifyToken, jsonResponse, errorResponse } from "@/lib/auth";
+import { getTenantClient } from "@/lib/tenantPrisma";
+import { signToken, verifyRefreshToken, jsonResponse, errorResponse } from "@/lib/auth";
 import logger from "@/lib/logger";
 
 export async function POST(req: NextRequest) {
@@ -12,12 +12,13 @@ export async function POST(req: NextRequest) {
             return errorResponse("No refresh token provided", 401);
         }
 
-        const payload = verifyToken(refreshTokenStr);
+        const payload = verifyRefreshToken(refreshTokenStr);
         if (!payload) {
             return errorResponse("Invalid or expired refresh token", 401);
         }
 
-        const user = await prisma.user.findUnique({ where: { id: payload.userId } });
+        const db = getTenantClient(payload);
+        const user = await db.user.findUnique({ where: { id: payload.userId } });
         if (!user || user.status !== "ACTIVE") {
             return errorResponse("User not found or disabled", 401);
         }

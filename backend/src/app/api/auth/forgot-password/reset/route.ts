@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server";
-import prisma from "@/lib/prisma";
 import { errorResponse, jsonResponse, hashPassword } from "@/lib/auth";
 import { verifyAndConsumeOtp } from "@/lib/otp";
 import { checkRateLimit } from "@/lib/rateLimiter";
+import { getTenantClient } from "@/lib/tenantPrisma";
 
 export async function POST(req: NextRequest) {
     try {
@@ -31,7 +31,8 @@ export async function POST(req: NextRequest) {
         const hashedPassword = await hashPassword(password);
 
         // Update user
-        await prisma.user.update({
+        const db = getTenantClient(null);
+        await db.user.update({
             where: { email },
             data: { password: hashedPassword }
         });

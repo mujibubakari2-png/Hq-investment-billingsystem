@@ -1,7 +1,6 @@
 import { NextRequest } from "next/server";
 import { randomUUID } from "node:crypto";
 import { getTenantClient } from "@/lib/tenantPrisma";
-import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { getPaymentProvider } from "@/lib/payments/registry";
 import { formatPhoneTZ } from "@/lib/payments/utils";
@@ -124,3 +123,4 @@ export async function POST(req: NextRequest) {
         return errorResponse("Internal server error", 500);
     }
 }
+

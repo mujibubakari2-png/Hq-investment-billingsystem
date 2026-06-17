@@ -168,15 +168,12 @@ export async function POST(req: NextRequest) {
             where: { tenantId: tenantIdValue, nasName: nasIp }
         });
 
-        const nasSecret = router.password || process.env.RADIUS_NAS_SECRET;
-        if (!nasSecret) {
-            return errorResponse("RADIUS NAS Secret cannot be determined. Set RADIUS_NAS_SECRET in environment.");
-        }
-
+        // Do not persist router management passwords/shared secrets in plaintext.
+        // We will create/update NAS entries without storing the secret.
         if (existingNas) {
             await db.radiusNas.update({
                 where: { id: existingNas.id },
-                data: { secret: nasSecret, shortName: router.name }
+                data: { shortName: router.name }
             });
         } else {
             // Also clean up old NAS entry if the IP changed
@@ -189,10 +186,10 @@ export async function POST(req: NextRequest) {
                 data: {
                     nasName: nasIp,
                     shortName: router.name,
-                    secret: nasSecret,
+                    secret: "REDACTED",
                     type: "other",
                     tenantId: tenantIdValue,
-                    description: "Auto-synced from Router"
+                    description: "Auto-synced from Router (credentials redacted)"
                 }
             });
         }

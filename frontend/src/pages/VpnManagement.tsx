@@ -125,7 +125,7 @@ export default function VpnManagement() {
             {/* View Modal */}
             {viewUser && (
                 <div className="modal-overlay" onClick={() => setViewUser(null)}>
-                    <div className="modal" style={{ maxWidth: 520 }} onClick={e => e.stopPropagation()}>
+                    <div className="modal modal-sm" onClick={e => e.stopPropagation()}>
                         <div className="modal-header">
                             <h2 className="modal-title"><VpnKeyIcon fontSize="small" /> VPN User Details</h2>
                             <button className="modal-close" onClick={() => setViewUser(null)}>✕</button>
@@ -175,7 +175,7 @@ export default function VpnManagement() {
             {/* Add Modal */}
             {showAddModal && (
                 <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
-                    <div className="modal" style={{ maxWidth: 560 }} onClick={e => e.stopPropagation()}>
+                    <div className="modal modal-sm" onClick={e => e.stopPropagation()}>
                         <div className="modal-header">
                             <h2 className="modal-title"><VpnKeyIcon fontSize="small" /> Add VPN User</h2>
                             <button className="modal-close" onClick={() => setShowAddModal(false)}>✕</button>

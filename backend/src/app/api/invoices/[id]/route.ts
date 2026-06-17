@@ -1,6 +1,5 @@
 import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
-import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { parseOptionalDate } from "@/lib/dateUtils";
 import { InvoiceUpdateSchema } from "@/lib/validators";

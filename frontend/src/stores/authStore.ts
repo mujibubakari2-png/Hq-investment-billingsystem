@@ -16,6 +16,7 @@ export interface AuthUser {
     companyLogo?: string | null;
     companyEmail?: string | null;
     tenantSlug?: string | null;
+    isPlatformAdmin?: boolean;
 }
 
 export interface AuthState {

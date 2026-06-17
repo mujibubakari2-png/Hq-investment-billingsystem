@@ -16,7 +16,7 @@ import { NextRequest } from 'next/server';
 import { jsonResponse, errorResponse, signToken, signRefreshToken } from '@/lib/auth';
 import { verifyMfaAtLogin } from '@/lib/mfa';
 import jwt from 'jsonwebtoken';
-import prisma from '@/lib/prisma';
+import { getTenantClient } from '@/lib/tenantPrisma';
 
 const TEMP_TOKEN_SECRET =
   (process.env.JWT_ACCESS_SECRET ?? process.env.JWT_SECRET ?? '') + '_mfa_pending';
@@ -63,7 +63,8 @@ export async function POST(req: NextRequest) {
   }
 
   // MFA passed — load full user to build JWT payload
-  const user = await prisma.user.findUnique({
+  const globalDb = getTenantClient(null);
+  const user = await globalDb.user.findUnique({
     where: { id: decoded.userId },
     select: {
       id: true,
@@ -79,6 +80,8 @@ export async function POST(req: NextRequest) {
     return errorResponse('Account is not active.', 403);
   }
 
+  const db = getTenantClient(user.tenantId ?? null);
+
   // Issue real access + refresh tokens
   const payload = {
     userId: user.id,
@@ -87,11 +90,11 @@ export async function POST(req: NextRequest) {
     tenantId: user.tenantId ?? null,
   };
 
-  const accessToken  = signToken(payload);
+  const accessToken = signToken(payload);
   const refreshToken = signRefreshToken(payload);
 
   // Update last login timestamp
-  await prisma.user.update({
+  await db.user.update({
     where: { id: user.id },
     data: { lastLogin: new Date() },
   });

@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import prisma from "@/lib/prisma";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import { errorResponse, jsonResponse } from "@/lib/auth";
 import { sendOtpEmail } from "@/lib/email";
 import { generateAndStoreOtp } from "@/lib/otp";
@@ -13,7 +13,8 @@ export async function POST(req: NextRequest) {
             return errorResponse("Email or phone is required");
         }
 
-        const user = await prisma.user.findFirst({
+        const db = getTenantClient(null);
+        const user = await db.user.findFirst({
             where: {
                 OR: [
                     { email: identifier },

@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
         const db = getTenantClient(userPayload);
 
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
-        const body = await req.json();
+        const body = await req.json() as any;
         const parsed = InvoiceCreateSchema.safeParse(body);
         if (!parsed.success) {
             const msg = parsed.error.issues.map((e: any) => `${e.path.join('.')}: ${e.message}`).join('; ');
@@ -80,24 +80,29 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        const invoice = await db.invoice.create({
-            data: {
-                invoiceNumber: data.invoiceNumber || `INV-${Date.now()}`,
-                clientId: data.clientId,
-                amount: data.amount,
-                status: data.status || "DRAFT",
-                dueDate: parseSafeDate(data.dueDate) || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-                issuedDate: parseSafeDate(data.issuedDate) || new Date(),
-                tenantId: userPayload.tenantId ?? null,
-                items: {
-                    create: (data.items || []).map((item: { description: string; quantity: number; unitPrice: number; total: number }) => ({
-                        description: item.description,
-                        quantity: parseInt(String(item.quantity)),
-                        unitPrice: parseFloat(String(item.unitPrice)),
-                        total: parseFloat(String(item.total)),
-                    })),
-                },
+        const invoiceData: any = {
+            invoiceNumber: data.invoiceNumber || `INV-${Date.now()}`,
+            amount: data.amount,
+            status: (data.status || "DRAFT") as any,
+            dueDate: parseSafeDate(data.dueDate) || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+            issuedDate: parseSafeDate(data.issuedDate) || new Date(),
+            tenantId: userPayload.tenantId ?? null,
+            items: {
+                create: (data.items || []).map((item: { description: string; quantity: number; unitPrice: number; total: number }) => ({
+                    description: item.description,
+                    quantity: parseInt(String(item.quantity)),
+                    unitPrice: parseFloat(String(item.unitPrice)),
+                    total: parseFloat(String(item.total)),
+                })),
             },
+        };
+
+        if (data.clientId) {
+            invoiceData.clientId = data.clientId;
+        }
+
+        const invoice = await db.invoice.create({
+            data: invoiceData,
             include: { items: true },
         });
 

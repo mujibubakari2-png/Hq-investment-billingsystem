@@ -1,6 +1,5 @@
 import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
-import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { suspendRadiusUser } from "@/lib/radius";
 import { toISOSafe } from "@/lib/dateUtils";
@@ -149,3 +148,4 @@ export async function GET(req: NextRequest) {
         return errorResponse("Internal server error", 500);
     }
 }
+

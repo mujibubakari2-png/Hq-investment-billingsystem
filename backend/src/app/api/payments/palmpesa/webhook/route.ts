@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import prisma from "@/lib/prisma";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import { errorResponse, jsonResponse } from "@/lib/auth";
 import { sendEmail } from "@/lib/email";
 import { env } from "@/lib/env";
@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
         }
 
         const body = await req.json();
-        
+
         // Example payload from PalmPesa
         const {
             TransactionId, // e.g. "PXX123456"
@@ -40,7 +40,8 @@ export async function POST(req: NextRequest) {
         }
 
         // Find the invoice
-        const invoice = await prisma.tenantInvoice.findUnique({
+        const db = getTenantClient(null);
+        const invoice = await db.tenantInvoice.findUnique({
             where: { invoiceNumber: AccountReference },
             include: { tenant: true }
         });
@@ -54,7 +55,7 @@ export async function POST(req: NextRequest) {
         }
 
         // Run updates inside a transaction
-        await prisma.$transaction(async (tx) => {
+        await db.$transaction(async (tx) => {
             // 1. Update invoice status
             await tx.tenantInvoice.update({
                 where: { id: invoice.id },
@@ -70,7 +71,7 @@ export async function POST(req: NextRequest) {
                     amount: Number(Amount),
                     transactionId: TransactionId,
                     status: "COMPLETED",
-                    paymentMethod: "PALMPESA" 
+                    paymentMethod: "PALMPESA"
                 }
             });
 
@@ -85,7 +86,7 @@ export async function POST(req: NextRequest) {
 
             await tx.tenant.update({
                 where: { id: invoice.tenantId },
-                data: { 
+                data: {
                     status: "ACTIVE",
                     licenseExpiresAt: newExpiry
                 }

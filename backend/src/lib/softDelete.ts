@@ -22,7 +22,7 @@
  *   await restore('client', id);
  */
 
-import prisma from '@/lib/prisma';
+import { getTenantClient } from '@/lib/tenantPrisma';
 
 export type SoftDeletableModel =
   | 'client'
@@ -42,8 +42,9 @@ export async function softDelete(
 ): Promise<{ id: string; deletedAt: Date | null } | null> {
   const now = new Date();
 
+  const db = getTenantClient(null);
   // Prisma's dynamic model access requires type assertion
-  const delegate = (prisma as any)[model];
+  const delegate = (db as any)[model];
   if (!delegate?.update) {
     throw new Error(`Soft delete not supported for model: ${model}`);
   }
@@ -68,7 +69,8 @@ export async function restore(
   model: SoftDeletableModel,
   id: string
 ): Promise<{ id: string; deletedAt: Date | null } | null> {
-  const delegate = (prisma as any)[model];
+  const db = getTenantClient(null);
+  const delegate = (db as any)[model];
   if (!delegate?.update) {
     throw new Error(`Restore not supported for model: ${model}`);
   }
@@ -121,13 +123,14 @@ export function onlyDeleted(): { deletedAt: { not: null } } {
 export async function purgeOldSoftDeleted(daysOld = 90): Promise<Record<string, number>> {
   const cutoff = new Date(Date.now() - daysOld * 24 * 60 * 60 * 1000);
 
+  const db = getTenantClient(null);
   const [clients, users, subscriptions, routers, packages, transactions] = await Promise.all([
-    prisma.client.deleteMany({ where: { deletedAt: { lte: cutoff } } }),
-    prisma.user.deleteMany({ where: { deletedAt: { lte: cutoff } } }),
-    prisma.subscription.deleteMany({ where: { deletedAt: { lte: cutoff } } }),
-    prisma.router.deleteMany({ where: { deletedAt: { lte: cutoff } } }),
-    prisma.package.deleteMany({ where: { deletedAt: { lte: cutoff } } }),
-    prisma.transaction.deleteMany({ where: { deletedAt: { lte: cutoff } } }),
+    db.client.deleteMany({ where: { deletedAt: { lte: cutoff } } }),
+    db.user.deleteMany({ where: { deletedAt: { lte: cutoff } } }),
+    db.subscription.deleteMany({ where: { deletedAt: { lte: cutoff } } }),
+    db.router.deleteMany({ where: { deletedAt: { lte: cutoff } } }),
+    db.package.deleteMany({ where: { deletedAt: { lte: cutoff } } }),
+    db.transaction.deleteMany({ where: { deletedAt: { lte: cutoff } } }),
   ]);
 
   return {

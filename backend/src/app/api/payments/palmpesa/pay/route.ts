@@ -1,6 +1,5 @@
 import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
-import prisma from "@/lib/prisma";
 import { errorResponse, jsonResponse, getUserFromRequest } from "@/lib/auth";
 
 // Environment variables or settings for PalmPesa API
@@ -89,3 +88,4 @@ export async function POST(req: NextRequest) {
         return errorResponse("Internal server error", 500);
     }
 }
+

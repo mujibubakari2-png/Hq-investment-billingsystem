@@ -31,16 +31,16 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         const db = getTenantClient(userPayload);
 
         const { id } = await params;
-        const body = await req.json();
+        const body = await req.json() as any;
 
         const parsed = PackageUpdateSchema.safeParse(body);
         if (!parsed.success) {
             const msg = parsed.error.issues.map((e: any) => `${e.path.join('.')}: ${e.message}`).join('; ');
             return errorResponse(`Invalid request body: ${msg}`, 400);
         }
-        const update = parsed.data;
+        const update = parsed.data as any;
 
-        const routerId = update.routerId || update.router || body.routerId || body.router;
+        const routerId = update.routerId || body.routerId || body.router;
         const router = routerId
             ? await db.router.findFirst({ where: { OR: [{ id: routerId }, { name: routerId }], tenantId: userPayload.tenantId } })
             : null;
@@ -57,10 +57,11 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         if (update.duration) dataToUpdate.duration = update.duration;
         if (update.durationUnit) dataToUpdate.durationUnit = update.durationUnit?.toUpperCase();
         if (typeof update.burstEnabled !== 'undefined') dataToUpdate.burstEnabled = update.burstEnabled;
-        if (update.hotspotType) dataToUpdate.hotspotType = update.hotspotType === "Data-capped" ? "DATA_CAPPED" : update.hotspotType === "Unlimited" ? "UNLIMITED" : update.hotspotType;
+        const hotspotType = typeof body.hotspotType === 'string' ? body.hotspotType : update.hotspotType;
+        if (hotspotType) dataToUpdate.hotspotType = hotspotType === "Data-capped" ? "DATA_CAPPED" : hotspotType === "Unlimited" ? "UNLIMITED" : hotspotType;
         if (typeof update.devices !== 'undefined') dataToUpdate.devices = update.devices;
-        if (update.paymentType) dataToUpdate.paymentType = update.paymentType;
-        if (update.status) dataToUpdate.status = update.status;
+        if (update.paymentType) dataToUpdate.paymentType = update.paymentType as any;
+        if (update.status) dataToUpdate.status = update.status as any;
         if (router) dataToUpdate.routerId = router.id;
 
         const pkg = await db.package.update({ where: { id }, data: dataToUpdate });

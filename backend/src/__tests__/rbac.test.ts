@@ -40,6 +40,10 @@ describe('hasPermission', () => {
         expect(hasPermission('ADMIN', 'clients:delete')).toBe(true);
     });
 
+    it('ADMIN can delete equipment', () => {
+        expect(hasPermission('ADMIN', 'equipment:delete')).toBe(true);
+    });
+
     it('ADMIN cannot access license:read (SUPER_ADMIN only)', () => {
         expect(hasPermission('ADMIN', 'license:read')).toBe(false);
     });
@@ -71,6 +75,14 @@ describe('hasPermission', () => {
 
     it('AGENT can read dashboard', () => {
         expect(hasPermission('AGENT', 'dashboard:read')).toBe(true);
+    });
+
+    it('AGENT cannot delete equipment', () => {
+        expect(hasPermission('AGENT', 'equipment:delete')).toBe(false);
+    });
+
+    it('AGENT cannot delete VPN users', () => {
+        expect(hasPermission('AGENT', 'vpn:write')).toBe(false);
     });
 
     // â”€â”€ VIEWER access (read-only enforcement â€” MT-002 fix) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -108,6 +120,10 @@ describe('hasPermission', () => {
 
     it('VIEWER cannot access audit-logs:read (SUPER_ADMIN only)', () => {
         expect(hasPermission('VIEWER', 'audit-logs:read')).toBe(false);
+    });
+
+    it('VIEWER cannot delete equipment', () => {
+        expect(hasPermission('VIEWER', 'equipment:delete')).toBe(false);
     });
 
     // â”€â”€ Unknown role â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€

@@ -1,6 +1,5 @@
 import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
-import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { VoucherCreateSchema } from "@/lib/validators";
 
@@ -11,14 +10,14 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         const db = getTenantClient(userPayload);
 
         const resolvedParams = await params;
-        const body = await req.json();
+        const body = await req.json() as any;
 
         const parsed = VoucherCreateSchema.partial().safeParse(body);
         if (!parsed.success) {
             const msg = parsed.error.issues.map((e: any) => `${e.path.join('.')}: ${e.message}`).join('; ');
             return errorResponse(`Invalid request body: ${msg}`, 400);
         }
-        const { status, usedBy, customer, code } = parsed.data;
+        const { status, usedBy, customer, code } = parsed.data as any;
 
         const existingVoucher = await db.voucher.findUnique({ where: { id: resolvedParams.id } });
         if (!existingVoucher) return errorResponse("Voucher not found", 404);
@@ -31,9 +30,9 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
             where: { id: resolvedParams.id },
             data: {
                 code,
-                status,
+                status: status as any,
                 usedBy,
-                customer: customer ? parseInt(customer) : null
+                customer: typeof customer === 'number' ? customer : customer ? parseInt(String(customer), 10) : null,
             }
         });
 

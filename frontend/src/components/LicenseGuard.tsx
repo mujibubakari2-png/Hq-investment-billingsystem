@@ -9,13 +9,14 @@ export default function LicenseGuard() {
     const { user } = authStore.useAuth();
     const location = useLocation();
     const [status, setStatus] = useState<'checking' | 'active' | 'restricted' | 'pending_approval' | 'error'>('checking');
+    const isPlatformAdmin = user?.isPlatformAdmin === true || (user?.role === 'SUPER_ADMIN' && !user?.tenantId);
 
     useEffect(() => {
         let mounted = true;
         
         async function checkLicense() {
             try {
-                if (user?.role === 'SUPER_ADMIN') {
+                if (isPlatformAdmin) {
                     if (mounted) setStatus('active');
                     return;
                 }
@@ -51,7 +52,7 @@ export default function LicenseGuard() {
             clearInterval(intervalId);
             window.removeEventListener('focus', checkLicense);
         };
-    }, [user?.role]);
+    }, [isPlatformAdmin]);
 
     if (status === 'checking') {
         return (

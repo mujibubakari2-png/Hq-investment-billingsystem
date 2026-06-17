@@ -1,0 +1,201 @@
+import { useState, useEffect, useRef } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import MenuIcon from '@mui/icons-material/Menu';
+import DarkModeIcon from '@mui/icons-material/DarkMode';
+import LightModeIcon from '@mui/icons-material/LightMode';
+import LogoutIcon from '@mui/icons-material/Logout';
+import PersonIcon from '@mui/icons-material/Person';
+import { licenseApi, type LicenseResponse } from '../../api';
+// Adjusted import path to match project structure
+import authStore from '../stores/authStore';
+import './Header.css';
+
+// Map paths to friendly page titles
+const pageTitles: Record<string, string> = {
+    '/dashboard': 'Dashboard',
+    '/clients': 'Clients',
+    '/active-subscribers': 'Active Subscribers',
+    '/expired-subscribers': 'Expired Subscribers',
+    '/packages': 'Packages',
+    '/voucher-codes': 'Voucher Codes',
+    '/all-transactions': 'Payment Records',
+    '/mobile-transactions': 'Mobile Transactions',
+    '/expense-tracking': 'Expense Tracking',
+    '/invoices': 'Invoices',
+    '/mikrotiks': 'Mikrotiks',
+    '/equipments': 'Equipments',
+    '/sms-messages': 'SMS Messages',
+    '/message-templates': 'Message Templates',
+    '/system-settings': 'System Settings',
+    '/payment-channels': 'Payment Channels',
+    '/system-users': 'System Users',
+    '/license-management': 'License Management',
+    '/reports': 'Reports & Analytics',
+    '/tutorial-videos': 'Tutorial Videos',
+    '/technical-support': 'Technical Support',
+    '/profile': 'My Profile',
+    '/system-tenants': 'System Tenants',
+    '/hotspot-customizer': 'Hotspot Customizer',
+    '/vpn-management': 'VPN Management',
+};
+
+// Human-readable role label shown in the header dropdown
+function roleLabel(role: string): string {
+    switch (role) {
+        case 'SUPER_ADMIN': return 'Super Admin';
+        case 'ADMIN': return 'Admin';
+        case 'AGENT': return 'Agent';
+        case 'VIEWER': return 'Viewer';
+        default: return role;
+    }
+}
+
+interface HeaderProps {
+    onToggleSidebar: () => void;
+    darkMode: boolean;
+    onToggleDarkMode: () => void;
+}
+
+export default function Header({ onToggleSidebar, darkMode, onToggleDarkMode }: HeaderProps) {
+    const { user } = authStore.useAuth();
+    const navigate = useNavigate();
+    const location = useLocation();
+    const [showMenu, setShowMenu] = useState(false);
+    const [license, setLicense] = useState<LicenseResponse | null>(null);
+    const menuRef = useRef<HTMLDivElement>(null);
+
+    // Fetch license expiry only for non-SUPER_ADMIN users (they're always active)
+    useEffect(() => {
+        if (user && user.role !== 'SUPER_ADMIN') {
+            licenseApi.getLicense().then(setLicense).catch(console.error);
+        }
+    }, [user]);
+
+    // Close dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+                setShowMenu(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const displayName = user?.fullName || user?.username || 'User';
+    const initials = displayName
+        .split(' ')
+        .map((n: string) => n[0])
+        .join('')
+        .slice(0, 2)
+        .toUpperCase() || 'U';
+
+    const pageTitle = pageTitles[location.pathname] || 'Dashboard';
+
+    // BRAND-001: Company name comes from the auth user object (set at login/register),
+    // so we never need an extra API call just to render the header.
+    const companyName = user?.companyName || 'HQ INVESTMENT';
+
+    const handleLogout = () => {
+        setShowMenu(false);
+        authStore.logout();
+        navigate('/login', { replace: true });
+    };
+
+    return (
+        <div className="header-root">
+            {/* License expiry warning banner — only for non-SUPER_ADMIN nearing expiry */}
+            {license &&
+                typeof license.daysRemaining === 'number' &&
+                license.daysRemaining > 0 &&
+                license.daysRemaining <= 7 && (
+                    <div className={`header-license-banner ${license.daysRemaining <= 2 ? 'danger' : ''}`}>
+                        <span>{license.daysRemaining <= 2 ? '🚨' : '⚠️'}</span>
+                        <span>
+                            Your account will be restricted in{' '}
+                            <strong>{license.daysRemaining}</strong>{' '}
+                            {license.daysRemaining === 1 ? 'day' : 'days'}.
+                        </span>
+                        <span className="header-license-action" onClick={() => navigate('/renew')}>
+                            Renew now
+                        </span>
+                    </div>
+                )}
+
+            <header className="header">
+                <div className="header-left">
+                    <button
+                        className="hamburger-btn"
+                        onClick={onToggleSidebar}
+                        aria-label="Toggle sidebar"
+                    >
+                        <MenuIcon />
+                    </button>
+                    <span className="header-title">{pageTitle}</span>
+                </div>
+
+                <div className="header-right">
+                    {/* Company name badge — BRAND-001 */}
+                    <span className="header-company-name">
+                        {user?.companyLogo && (
+                            <img src={user.companyLogo} alt="Logo" />
+                        )}
+                        <span>{companyName}</span>
+                    </span>
+
+                    <button
+                        className="header-icon-btn"
+                        onClick={onToggleDarkMode}
+                        aria-label="Toggle dark mode"
+                    >
+                        {darkMode ? <LightModeIcon fontSize="small" /> : <DarkModeIcon fontSize="small" />}
+                    </button>
+
+                    <div className="header-user" ref={menuRef}>
+                        <div
+                            className="header-avatar"
+                            onClick={() => setShowMenu(v => !v)}
+                            aria-label="User menu"
+                            role="button"
+                            tabIndex={0}
+                            onKeyDown={e => e.key === 'Enter' && setShowMenu(v => !v)}
+                        >
+                            {initials}
+                        </div>
+
+                        {showMenu && (
+                            <div className="header-dropdown">
+                                <div className="header-dropdown-info">
+                                    <div className="header-dropdown-name">{displayName}</div>
+                                    <div className="header-dropdown-role">{roleLabel(user?.role ?? '')}</div>
+                                    {/* Show company name in dropdown for context */}
+                                    {companyName && companyName !== 'HQ INVESTMENT' && (
+                                        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 2 }}>
+                                            {companyName}
+                                        </div>
+                                    )}
+                                </div>
+                                <button
+                                    className="header-dropdown-btn"
+                                    onClick={() => { setShowMenu(false); navigate('/profile'); }}
+                                >
+                                    <PersonIcon fontSize="small" />
+                                    My Profile
+                                </button>
+                                <button
+                                    className="header-dropdown-btn danger"
+                                    onClick={handleLogout}
+                                >
+                                    <LogoutIcon fontSize="small" />
+                                    Logout
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </header>
+
+            {/* Show company name on tablets and up */}
+        </div>
+    );
+}

@@ -153,8 +153,7 @@ export function isRateLimited(request: NextRequest, userId?: string): { limited:
  * Rate limiting middleware for Next.js
  */
 export function rateLimitMiddleware(request: NextRequest): NextResponse | null {
-    const userId = request.headers.get('x-user-id');
-    const result = isRateLimited(request, userId || undefined);
+    const result = isRateLimited(request);
 
     if (result.limited) {
         return NextResponse.json(

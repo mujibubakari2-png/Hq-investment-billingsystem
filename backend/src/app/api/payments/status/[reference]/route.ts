@@ -12,7 +12,6 @@
 import { NextRequest } from "next/server";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 import { getTenantClient } from "@/lib/tenantPrisma";
-import prisma from "@/lib/prisma";
 import { paymentService } from "@/lib/payments/service";
 import { isSupportedProvider } from "@/lib/payments/registry";
 
@@ -29,7 +28,8 @@ export async function GET(
     const providerRef = searchParams.get("providerRef");
 
     // ── DB Lookup ────────────────────────────────────────────────────────────
-    const transaction = await prisma.transaction.findFirst({
+    const globalDb = getTenantClient(null);
+    const transaction = await globalDb.transaction.findFirst({
       where: { reference },
       include: {
         client: {
@@ -61,7 +61,6 @@ export async function GET(
       });
 
       baseResponse.username = transaction.client.username;
-      baseResponse.password = transaction.client.phone;
       baseResponse.expiresAt = subscription?.expiresAt?.toISOString() ?? transaction.expiryDate?.toISOString();
       baseResponse.autoConnect = true;
       baseResponse.message = "Payment confirmed! You can now connect.";

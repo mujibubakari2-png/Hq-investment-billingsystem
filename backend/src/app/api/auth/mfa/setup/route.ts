@@ -8,7 +8,7 @@
 import { NextRequest } from 'next/server';
 import { requireAuth, jsonResponse, errorResponse } from '@/lib/auth';
 import { generateMfaSetup } from '@/lib/mfa';
-import prisma from '@/lib/prisma';
+import { getTenantClient } from '@/lib/tenantPrisma';
 
 export async function POST(req: NextRequest) {
   let user;
@@ -18,7 +18,8 @@ export async function POST(req: NextRequest) {
     return errorResponse('Unauthorized', 401);
   }
 
-  const dbUser = await prisma.user.findUnique({
+  const db = getTenantClient(user);
+  const dbUser = await db.user.findUnique({
     where: { id: user.userId },
     select: { email: true, mfaEnabled: true },
   });
@@ -30,8 +31,8 @@ export async function POST(req: NextRequest) {
 
   // Return setup info — do NOT persist the secret yet (user must confirm first)
   return jsonResponse({
-    secret:      setup.secret,      // Show for manual entry fallback
-    qrDataUrl:   setup.qrDataUrl,   // Render as <img src={qrDataUrl} />
+    secret: setup.secret,      // Show for manual entry fallback
+    qrDataUrl: setup.qrDataUrl,   // Render as <img src={qrDataUrl} />
     backupCodes: setup.backupCodes, // Show ONCE — user must save these
   });
 }

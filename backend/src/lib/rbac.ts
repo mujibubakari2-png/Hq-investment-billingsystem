@@ -104,6 +104,7 @@ export const PERMISSIONS = {
   // Equipment — managers only
   "equipment:read": ["SUPER_ADMIN", "ADMIN", "AGENT", "VIEWER"],
   "equipment:write": ["SUPER_ADMIN", "ADMIN"],
+  "equipment:delete": ["SUPER_ADMIN", "ADMIN"],
 } as const;
 
 export type Permission = keyof typeof PERMISSIONS;

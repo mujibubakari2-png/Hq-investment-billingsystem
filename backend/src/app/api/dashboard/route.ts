@@ -1,6 +1,5 @@
 import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
-import prisma from "@/lib/prisma";
 import { withCache, invalidateNamespace, buildKey, TTL } from "@/lib/cache";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { requirePermission } from "@/lib/rbac";
@@ -25,20 +24,22 @@ export async function GET(req: NextRequest) {
         if (guard.error) return guard.error;
         const userPayload = guard.user;
         const db = getTenantClient(userPayload);
+        const globalDb = getTenantClient(null);
 
         const isAdmin = userPayload.role === "SUPER_ADMIN" || userPayload.role === "ADMIN";
         const isPlatformAdmin = isPlatformSuperAdmin(userPayload);
-
-        // Base filter for tenant isolation
-        const tenantFilter = { tenantId: userPayload.tenantId };
-
-        // Super Admin can override tenant filter to see specific tenant dashboard via query param
         const { searchParams: queryParams } = new URL(req.url);
         const targetTenantId = queryParams.get("tenantId");
         const routerId = queryParams.get("routerId");
 
-        if (isPlatformAdmin && targetTenantId) {
-            tenantFilter.tenantId = targetTenantId;
+        // Base filter for tenant isolation
+        let tenantFilter: any = {};
+        if (isPlatformAdmin) {
+            if (targetTenantId) {
+                tenantFilter.tenantId = targetTenantId;
+            }
+        } else {
+            tenantFilter.tenantId = userPayload.tenantId;
         }
 
         // Router filter for stats (clients, subscriptions, transactions)
@@ -54,11 +55,11 @@ export async function GET(req: NextRequest) {
         const lockAcquired = await redis.set(syncLockKey, "1", "PX", RADIUS_SYNC_INTERVAL_MS, "NX");
         const shouldSync = lockAcquired === "OK";
 
-        if (shouldSync) {
+        if (shouldSync && isPlatformAdmin) {
 
             // Ensure all radacct records have a tenantId by mapping nasipaddress to Router table.
             try {
-                const routers = await prisma.router.findMany({
+                const routers = await globalDb.router.findMany({
                     where: { tenantId: { not: null } },
                     select: { host: true, tenantId: true, wgTunnelIp: true }
                 });
@@ -66,7 +67,7 @@ export async function GET(req: NextRequest) {
                 for (const router of routers) {
                     const possibleIps = [router.host, router.wgTunnelIp].filter(Boolean) as string[];
                     if (possibleIps.length > 0) {
-                        await prisma.radAcct.updateMany({
+                        await globalDb.radAcct.updateMany({
                             where: {
                                 nasipaddress: { in: possibleIps },
                                 tenantId: null
@@ -86,7 +87,7 @@ export async function GET(req: NextRequest) {
         // Bug #5 FIX: Also throttled to avoid heavy DB writes on every 30s refresh.
         if (shouldSync) {
             try {
-                const activeRadiusSessions = await prisma.radAcct.findMany({
+                const activeRadiusSessions = await db.radAcct.findMany({
                     where: { acctstoptime: null, ...tenantFilter },
                     select: { username: true },
                     distinct: ["username"],
@@ -95,7 +96,7 @@ export async function GET(req: NextRequest) {
                 const onlineUsernames = new Set(activeRadiusSessions.map((s) => s.username));
 
                 // Get all active subscriptions with their client usernames
-                const activeSubscriptions = await prisma.subscription.findMany({
+                const activeSubscriptions = await db.subscription.findMany({
                     where: { status: "ACTIVE", ...tenantFilter },
                     select: {
                         id: true,
@@ -119,13 +120,13 @@ export async function GET(req: NextRequest) {
                 }
 
                 if (toSetOnline.length > 0) {
-                    await prisma.subscription.updateMany({
+                    await db.subscription.updateMany({
                         where: { id: { in: toSetOnline } },
                         data: { onlineStatus: "ONLINE" },
                     });
                 }
                 if (toSetOffline.length > 0) {
-                    await prisma.subscription.updateMany({
+                    await db.subscription.updateMany({
                         where: { id: { in: toSetOffline } },
                         data: { onlineStatus: "OFFLINE" },
                     });
@@ -170,14 +171,14 @@ export async function GET(req: NextRequest) {
             hotspotOnlineUsers,
             pppoeOnlineUsers,
         ] = await Promise.all([
-            prisma.client.count({ where: tenantFilter }),
-            prisma.subscription.count({ where: { status: "ACTIVE", ...tenantFilter, ...routerFilter } }),
-            prisma.subscription.count({ where: { status: "EXPIRED", ...tenantFilter, ...routerFilter } }),
-            isAdmin ? prisma.transaction.aggregate({
+            db.client.count({ where: tenantFilter }),
+            db.subscription.count({ where: { status: "ACTIVE", ...tenantFilter, ...routerFilter } }),
+            db.subscription.count({ where: { status: "EXPIRED", ...tenantFilter, ...routerFilter } }),
+            isAdmin ? db.transaction.aggregate({
                 where: { status: "COMPLETED", ...tenantFilter },
                 _sum: { amount: true },
             }) : Promise.resolve({ _sum: { amount: 0 } }),
-            isAdmin ? prisma.transaction.aggregate({
+            isAdmin ? db.transaction.aggregate({
                 where: {
                     status: "COMPLETED",
                     createdAt: { gte: monthStart },
@@ -186,12 +187,12 @@ export async function GET(req: NextRequest) {
                 _sum: { amount: true },
             }) : Promise.resolve({ _sum: { amount: 0 } }),
             // Online users count from subscriptions (already synced from RADIUS above)
-            prisma.subscription.count({
+            db.subscription.count({
                 where: { status: "ACTIVE", onlineStatus: "ONLINE", ...tenantFilter, ...routerFilter },
             }),
-            prisma.router.count({ where: { ...tenantFilter, ...(routerId ? { id: routerId } : {}) } }),
-            prisma.router.count({ where: { status: "ONLINE", ...tenantFilter, ...(routerId ? { id: routerId } : {}) } }),
-            isAdmin ? prisma.transaction.aggregate({
+            db.router.count({ where: { ...tenantFilter, ...(routerId ? { id: routerId } : {}) } }),
+            db.router.count({ where: { status: "ONLINE", ...tenantFilter, ...(routerId ? { id: routerId } : {}) } }),
+            isAdmin ? db.transaction.aggregate({
                 where: {
                     status: "COMPLETED",
                     createdAt: { gte: todayStart },
@@ -200,7 +201,7 @@ export async function GET(req: NextRequest) {
                 _sum: { amount: true },
             }) : Promise.resolve({ _sum: { amount: 0 } }),
             // Recent transactions - include today only, with payment channel info
-            prisma.transaction.findMany({
+            db.transaction.findMany({
                 where: {
                     ...tenantFilter,
                     createdAt: { gte: todayStart },
@@ -210,7 +211,7 @@ export async function GET(req: NextRequest) {
                 orderBy: { createdAt: "desc" },
                 include: { client: { select: { username: true } } },
             }),
-            prisma.subscription.findMany({
+            db.subscription.findMany({
                 where: { ...tenantFilter, ...routerFilter },
                 take: 10,
                 orderBy: { createdAt: "desc" },
@@ -220,7 +221,7 @@ export async function GET(req: NextRequest) {
                 },
             }),
             // Tenant login activity for system activity (last 5 days)
-            isAdmin ? prisma.user.findMany({
+            isAdmin ? db.user.findMany({
                 where: {
                     lastLogin: {
                         not: null,
@@ -233,27 +234,27 @@ export async function GET(req: NextRequest) {
                 select: { username: true, role: true, email: true, lastLogin: true, fullName: true },
             }) : Promise.resolve([]),
             // Voucher stats
-            isAdmin ? prisma.transaction.aggregate({
+            isAdmin ? db.transaction.aggregate({
                 where: { status: "COMPLETED", type: "VOUCHER", createdAt: { gte: todayStart }, ...tenantFilter },
                 _sum: { amount: true }
             }) : Promise.resolve({ _sum: { amount: 0 } }),
-            isAdmin ? prisma.transaction.aggregate({
+            isAdmin ? db.transaction.aggregate({
                 where: { status: "COMPLETED", type: "VOUCHER", createdAt: { gte: monthStart }, ...tenantFilter },
                 _sum: { amount: true }
             }) : Promise.resolve({ _sum: { amount: 0 } }),
-            prisma.voucher.count({ where: { createdAt: { gte: todayStart }, ...tenantFilter, ...routerFilter } }),
-            prisma.voucher.count({ where: { status: "USED", usedAt: { gte: todayStart }, ...tenantFilter, ...routerFilter } }),
-            prisma.voucher.count({ where: { createdAt: { gte: monthStart }, ...tenantFilter, ...routerFilter } }),
-            prisma.voucher.count({ where: { status: "USED", usedAt: { gte: monthStart }, ...tenantFilter, ...routerFilter } }),
-            prisma.transaction.count({ where: { status: "COMPLETED", type: "VOUCHER", createdAt: { gte: todayStart }, ...tenantFilter } }),
-            prisma.transaction.count({ where: { status: "COMPLETED", type: "MOBILE", createdAt: { gte: todayStart }, ...tenantFilter } }),
-            prisma.transaction.count({ where: { status: "COMPLETED", type: "MOBILE", createdAt: { gte: monthStart }, ...tenantFilter } }),
-            prisma.client.count({ where: { createdAt: { gte: monthStart }, ...tenantFilter } }),
-            prisma.package.findMany({ where: { ...tenantFilter, ...routerFilter }, include: { _count: { select: { subscriptions: true } } } }),
+            db.voucher.count({ where: { createdAt: { gte: todayStart }, ...tenantFilter, ...routerFilter } }),
+            db.voucher.count({ where: { status: "USED", usedAt: { gte: todayStart }, ...tenantFilter, ...routerFilter } }),
+            db.voucher.count({ where: { createdAt: { gte: monthStart }, ...tenantFilter, ...routerFilter } }),
+            db.voucher.count({ where: { status: "USED", usedAt: { gte: monthStart }, ...tenantFilter, ...routerFilter } }),
+            db.transaction.count({ where: { status: "COMPLETED", type: "VOUCHER", createdAt: { gte: todayStart }, ...tenantFilter } }),
+            db.transaction.count({ where: { status: "COMPLETED", type: "MOBILE", createdAt: { gte: todayStart }, ...tenantFilter } }),
+            db.transaction.count({ where: { status: "COMPLETED", type: "MOBILE", createdAt: { gte: monthStart }, ...tenantFilter } }),
+            db.client.count({ where: { createdAt: { gte: monthStart }, ...tenantFilter } }),
+            db.package.findMany({ where: { ...tenantFilter, ...routerFilter }, include: { _count: { select: { subscriptions: true } } } }),
             // RADIUS-based hotspot online count (acctstoptime IS NULL, not PPP)
-            prisma.radAcct.count({ where: { acctstoptime: null, framedprotocol: { not: "PPP" }, ...tenantFilter } }),
+            db.radAcct.count({ where: { acctstoptime: null, framedprotocol: { not: "PPP" }, ...tenantFilter } }),
             // RADIUS-based PPPoE online count (acctstoptime IS NULL, framedprotocol = PPP)
-            prisma.radAcct.count({ where: { acctstoptime: null, framedprotocol: "PPP", ...tenantFilter } }),
+            db.radAcct.count({ where: { acctstoptime: null, framedprotocol: "PPP", ...tenantFilter } }),
         ]);
 
         let revenueChartData: any[] = [];
@@ -262,13 +263,13 @@ export async function GET(req: NextRequest) {
             try {
                 // By day (last 30 days)
                 const rawDaily = isPlatformAdmin && !targetTenantId
-                    ? await prisma.$queryRaw<any[]>`
+                    ? await db.$queryRaw<any[]>`
                         SELECT TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY-MM-DD') as name, SUM(amount) as value
                         FROM transactions
                         WHERE status = 'COMPLETED' AND timezone('Africa/Dar_es_Salaam', "createdAt") >= timezone('Africa/Dar_es_Salaam', NOW()) - INTERVAL '30 days'
                         GROUP BY TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY-MM-DD')
                         ORDER BY name ASC`
-                    : await prisma.$queryRaw<any[]>`
+                    : await db.$queryRaw<any[]>`
                         SELECT TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY-MM-DD') as name, SUM(amount) as value
                         FROM transactions
                         WHERE status = 'COMPLETED' AND timezone('Africa/Dar_es_Salaam', "createdAt") >= timezone('Africa/Dar_es_Salaam', NOW()) - INTERVAL '30 days'
@@ -278,13 +279,13 @@ export async function GET(req: NextRequest) {
 
                 // By week (last 12 weeks)
                 const rawWeekly = isPlatformAdmin && !targetTenantId
-                    ? await prisma.$queryRaw<any[]>`
+                    ? await db.$queryRaw<any[]>`
                         SELECT TO_CHAR(DATE_TRUNC('week', timezone('Africa/Dar_es_Salaam', "createdAt")), 'YYYY-MM-DD') as name, SUM(amount) as value
                         FROM transactions
                         WHERE status = 'COMPLETED' AND timezone('Africa/Dar_es_Salaam', "createdAt") >= timezone('Africa/Dar_es_Salaam', NOW()) - INTERVAL '12 weeks'
                         GROUP BY DATE_TRUNC('week', timezone('Africa/Dar_es_Salaam', "createdAt"))
                         ORDER BY DATE_TRUNC('week', timezone('Africa/Dar_es_Salaam', "createdAt")) ASC`
-                    : await prisma.$queryRaw<any[]>`
+                    : await db.$queryRaw<any[]>`
                         SELECT TO_CHAR(DATE_TRUNC('week', timezone('Africa/Dar_es_Salaam', "createdAt")), 'YYYY-MM-DD') as name, SUM(amount) as value
                         FROM transactions
                         WHERE status = 'COMPLETED' AND timezone('Africa/Dar_es_Salaam', "createdAt") >= timezone('Africa/Dar_es_Salaam', NOW()) - INTERVAL '12 weeks'
@@ -294,13 +295,13 @@ export async function GET(req: NextRequest) {
 
                 // By month (last 12 months)
                 const rawMonthly = isPlatformAdmin && !targetTenantId
-                    ? await prisma.$queryRaw<any[]>`
+                    ? await db.$queryRaw<any[]>`
                         SELECT TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY-MM') as name, SUM(amount) as value
                         FROM transactions
                         WHERE status = 'COMPLETED' AND timezone('Africa/Dar_es_Salaam', "createdAt") >= timezone('Africa/Dar_es_Salaam', NOW()) - INTERVAL '12 months'
                         GROUP BY TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY-MM')
                         ORDER BY name ASC`
-                    : await prisma.$queryRaw<any[]>`
+                    : await db.$queryRaw<any[]>`
                         SELECT TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY-MM') as name, SUM(amount) as value
                         FROM transactions
                         WHERE status = 'COMPLETED' AND timezone('Africa/Dar_es_Salaam', "createdAt") >= timezone('Africa/Dar_es_Salaam', NOW()) - INTERVAL '12 months'
@@ -310,13 +311,13 @@ export async function GET(req: NextRequest) {
 
                 // By year
                 const rawYearly = isPlatformAdmin && !targetTenantId
-                    ? await prisma.$queryRaw<any[]>`
+                    ? await db.$queryRaw<any[]>`
                         SELECT TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY') as name, SUM(amount) as value
                         FROM transactions
                         WHERE status = 'COMPLETED'
                         GROUP BY TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY')
                         ORDER BY name ASC`
-                    : await prisma.$queryRaw<any[]>`
+                    : await db.$queryRaw<any[]>`
                         SELECT TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY') as name, SUM(amount) as value
                         FROM transactions
                         WHERE status = 'COMPLETED'
@@ -340,12 +341,12 @@ export async function GET(req: NextRequest) {
         let subscriberGrowthData: any[] = [];
         try {
             const rawGrowth = isPlatformAdmin && !targetTenantId
-                ? await prisma.$queryRaw<any[]>`
+                ? await db.$queryRaw<any[]>`
                     SELECT TO_CHAR("createdAt", 'Mon') as month, COUNT(*) as clients
                     FROM clients
                     WHERE "createdAt" >= NOW() - INTERVAL '6 months'
                     GROUP BY TO_CHAR("createdAt", 'Mon')`
-                : await prisma.$queryRaw<any[]>`
+                : await db.$queryRaw<any[]>`
                     SELECT TO_CHAR("createdAt", 'Mon') as month, COUNT(*) as clients
                     FROM clients
                     WHERE "createdAt" >= NOW() - INTERVAL '6 months'
@@ -405,7 +406,7 @@ export async function GET(req: NextRequest) {
         // Mobile transactions metrics
         let mobileTransactionsStats: any[] = [];
         try {
-            mobileTransactionsStats = await prisma.transaction.groupBy({
+            mobileTransactionsStats = await db.transaction.groupBy({
                 by: ["status"],
                 where: { type: "MOBILE", ...tenantFilter },
                 _count: { _all: true },

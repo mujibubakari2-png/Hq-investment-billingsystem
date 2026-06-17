@@ -10,7 +10,7 @@
 import https from "https";
 import { isIPv4 } from "net";
 import { env } from "@/lib/env";
-import prisma from "./prisma";
+import { getTenantClient } from "./tenantPrisma";
 import { decryptRouterFields } from "./encryption";
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -133,12 +133,14 @@ export class MikroTikService {
     private conn: MikroTikConnection;
     private routerId: string;
     private tenantId: string | null;
+    private db: ReturnType<typeof getTenantClient>;
     private baseUrl: string;
 
     constructor(conn: MikroTikConnection, routerId: string, tenantId?: string | null) {
         this.conn = conn;
         this.routerId = routerId;
         this.tenantId = tenantId || null;
+        this.db = getTenantClient(this.tenantId);
         // E22 FIX: Use the explicit restPort field when set (allows custom REST API ports per router).
         // Fall back to auto-mapping: terminal API ports 8728/8729 are mapped to 80 (HTTP) or 443 (HTTPS).
         const useHttps = env.MIKROTIK_USE_HTTPS;
@@ -257,7 +259,7 @@ export class MikroTikService {
 
     private async log(action: string, details?: string, status: string = "success", username?: string) {
         try {
-            await prisma.routerLog.create({
+            await this.db.routerLog.create({
                 data: {
                     routerId: this.routerId,
                     action,
@@ -306,7 +308,7 @@ export class MikroTikService {
             };
 
             // Update router status in DB
-            await prisma.router.update({
+            await this.db.router.update({
                 where: { id: this.routerId },
                 data: {
                     status: "ONLINE",
@@ -322,7 +324,7 @@ export class MikroTikService {
             await this.log("connection_test", `Connected successfully. RouterOS ${info.version}`, "success");
             return { success: true, message: "Connected successfully", info };
         } catch (err: any) {
-            await prisma.router.update({
+            await this.db.router.update({
                 where: { id: this.routerId },
                 data: { status: "OFFLINE" },
             });
@@ -612,7 +614,7 @@ export class MikroTikService {
         if (hotspot.status === "fulfilled") sessions.push(...hotspot.value);
 
         // Update active user count
-        await prisma.router.update({
+        await this.db.router.update({
             where: { id: this.routerId },
             data: { activeUsers: sessions.length },
         });
@@ -962,7 +964,8 @@ export class MikroTikService {
 // ── Factory Function ────────────────────────────────────────────────────────
 
 export async function getMikroTikService(routerId: string, tenantId?: string | null): Promise<MikroTikService> {
-    const router = await prisma.router.findUnique({ where: { id: routerId } });
+    const db = getTenantClient(tenantId ?? null);
+    const router = await db.router.findUnique({ where: { id: routerId } });
     if (!router) throw new Error("Router not found");
 
     // Strict tenant isolation check

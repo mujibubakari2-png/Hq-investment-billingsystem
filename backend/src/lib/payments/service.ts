@@ -537,4 +537,21 @@ export class PaymentService {
 
     // 9. Mark webhook as processed
     await db.webhookLog.update({
-      ate({
+      where: { id: webhookLog.id },
+      data: {
+        status: "COMPLETED",
+        processedAt: new Date(),
+      },
+    });
+
+    return {
+      processed: true,
+      transactionRef: parsed.transactionRef,
+      status: "COMPLETED",
+      message: "Payment processed successfully",
+    };
+  }
+}
+
+export const paymentService = new PaymentService();
+

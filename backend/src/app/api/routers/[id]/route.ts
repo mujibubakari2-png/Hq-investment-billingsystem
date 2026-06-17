@@ -28,7 +28,21 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
             return errorResponse("Unauthorized to access this router", 403);
         }
 
-        return jsonResponse(router);
+        // Mask sensitive fields for non-super-admins
+        function mask(v: string | null | undefined) {
+            if (!v) return null;
+            if (v.length <= 4) return "****";
+            return `****${v.slice(-4)}`;
+        }
+
+        const safeRouter = {
+            ...router,
+            password: userPayload.role === "SUPER_ADMIN" ? router.password : mask(router.password),
+            wgPrivateKey: userPayload.role === "SUPER_ADMIN" ? router.wgPrivateKey : null,
+            wgPresharedKey: userPayload.role === "SUPER_ADMIN" ? router.wgPresharedKey : null,
+        };
+
+        return jsonResponse(safeRouter);
     } catch {
         return errorResponse("Internal server error", 500);
     }
@@ -56,7 +70,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
             const msg = parsed.error.issues.map((e: any) => `${e.path.join('.')}: ${e.message}`).join('; ');
             return errorResponse(`Invalid request body: ${msg}`, 400);
         }
-        const update = parsed.data;
+        const update = parsed.data as any;
 
         const data: any = {};
         // Handle aliases
@@ -93,9 +107,11 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         });
 
         if (existingNas) {
+            // Do not store router management passwords in plaintext in the radiusNas table.
+            // If a password is provided on the router record, store only a masked indicator or encrypt it.
             await db.radiusNas.update({
                 where: { id: existingNas.id },
-                data: { secret: router.password || process.env.RADIUS_NAS_SECRET || 'hqinvestment_radius_secret', shortName: router.name }
+                data: { shortName: router.name }
             });
         } else {
             // Clean up old NAS entry if the IP changed
@@ -108,10 +124,12 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
                 data: {
                     nasName: nasIp,
                     shortName: router.name,
-                    secret: router.password || process.env.RADIUS_NAS_SECRET || 'hqinvestment_radius_secret',
+                    // Avoid persisting plaintext shared secrets. If callers need the secret, they
+                    // must be SUPER_ADMIN and retrieve it from the router record (not from radiusNas).
+                    secret: "REDACTED",
                     type: "other",
                     tenantId: existingRouter.tenantId,
-                    description: "Auto-synced from Router"
+                    description: "Auto-synced from Router (credentials redacted)"
                 }
             });
         }

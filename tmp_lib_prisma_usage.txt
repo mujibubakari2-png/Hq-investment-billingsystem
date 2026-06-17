@@ -1,0 +1,71 @@
+﻿C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\payments\service.ts:8: import prisma from "@/lib/prisma";
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\payments\service.ts:56: return prisma.paymentChannel.findFirst({
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\payments\service.ts:95: const existingTx = await prisma.transaction.findFirst({
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\payments\service.ts:177: const webhookLog = await prisma.webhookLog.create({
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\payments\service.ts:189: await prisma.webhookLog.update({
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\payments\service.ts:199: await prisma.webhookLog.update({
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\payments\service.ts:208: await prisma.webhookLog.update({
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\payments\service.ts:217: const transaction = await (prisma.transaction.findFirst as any)({
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\payments\service.ts:226: await prisma.webhookLog.update({
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\payments\service.ts:239: await prisma.webhookLog.update({
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\payments\service.ts:253: await prisma.$transaction(async (tx) => {
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\payments\service.ts:260: await prisma.webhookLog.update({
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\payments\service.ts:278: await prisma.$transaction(async (tx) => {
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\payments\service.ts:285: await prisma.webhookLog.update({
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\payments\service.ts:306: const pkg = await prisma.package.findFirst({
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\payments\service.ts:316: const result = await prisma.$transaction(async (tx) => {
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\payments\service.ts:430: await prisma.webhookLog.update({
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\payments\service.ts:472: await prisma.subscription.update({
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\payments\service.ts:490: await prisma.subscription.update({
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\payments\service.ts:496: await prisma.routerLog.create({
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\payments\service.ts:509: await prisma.routerLog.create({
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\payments\service.ts:522: await prisma.webhookLog.update({
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\accountNotifications.ts:1: import prisma from "@/lib/prisma";
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\accountNotifications.ts:31: await prisma.smsMessage.create({
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\auditLog.ts:8: import prisma from "@/lib/prisma";
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\auditLog.ts:27: await prisma.auditLog.create({
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\mfa.ts:23: import prisma from '@/lib/prisma';
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\mfa.ts:134: await prisma.user.update({
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\mfa.ts:151: await prisma.user.update({
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\mfa.ts:171: const user = await prisma.user.findUnique({
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\mfa.ts:199: await prisma.user.update({
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\mikrotik.ts:13: import prisma from "./prisma";
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\mikrotik.ts:260: await prisma.routerLog.create({
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\mikrotik.ts:309: await prisma.router.update({
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\mikrotik.ts:325: await prisma.router.update({
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\mikrotik.ts:615: await prisma.router.update({
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\mikrotik.ts:965: const router = await prisma.router.findUnique({ where: { id: routerId } });
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\otp.ts:19: import prisma from "@/lib/prisma";
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\otp.ts:52: await prisma.userOtp.updateMany({
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\otp.ts:57: const record = await prisma.userOtp.create({
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\otp.ts:84: const candidates = await prisma.userOtp.findMany({
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\otp.ts:106: await prisma.userOtp.update({
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\prisma.ts:2: import { PrismaClient } from "../generated/prisma";
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\prisma.ts:73: // Export as a Proxy so existing code using `prisma.xxx` still works transparently,
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\radius.ts:1: import prisma from "./prisma";
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\radius.ts:25: *   prisma.$executeRaw() INSERT ... ON CONFLICT DO UPDATE statement.
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\radius.ts:49: await prisma.$executeRaw`
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\radius.ts:68: await prisma.$executeRaw`
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\radius.ts:81: await prisma.radReply.deleteMany({
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\radius.ts:91: await prisma.radCheck.deleteMany({
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\radius.ts:119: let radiusUser = await prisma.radiusUser.findFirst({
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\radius.ts:133: radiusUser = await prisma.radiusUser.update({
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\radius.ts:141: radiusUser = await prisma.radiusUser.create({
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\radius.ts:203: await prisma.radiusUser.updateMany({
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\radius.ts:225: prisma.radCheck.deleteMany({ where: { username, tenantId } }),
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\radius.ts:226: prisma.radReply.deleteMany({ where: { username, tenantId } }),
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\radius.ts:227: prisma.radiusUser.deleteMany({ where: { username, tenantId } }),
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\softDelete.ts:18: *   // Instead of: await prisma.client.delete({ where: { id } })
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\softDelete.ts:25: import prisma from '@/lib/prisma';
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\softDelete.ts:100: *   await prisma.client.findMany({
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\softDelete.ts:125: prisma.client.deleteMany({ where: { deletedAt: { lte: cutoff } } }),
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\softDelete.ts:126: prisma.user.deleteMany({ where: { deletedAt: { lte: cutoff } } }),
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\softDelete.ts:127: prisma.subscription.deleteMany({ where: { deletedAt: { lte: cutoff } } }),
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\softDelete.ts:128: prisma.router.deleteMany({ where: { deletedAt: { lte: cutoff } } }),
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\softDelete.ts:129: prisma.package.deleteMany({ where: { deletedAt: { lte: cutoff } } }),
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\softDelete.ts:130: prisma.transaction.deleteMany({ where: { deletedAt: { lte: cutoff } } }),
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\tenantPrisma.ts:33: import prisma from './prisma';
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\tenantPrisma.ts:99: return prisma.$extends({
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\userLimits.ts:1: import prisma from "@/lib/prisma";
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\userLimits.ts:20: const tenant = await prisma.tenant.findUnique({
+C:\Users\hqbak\HQ INVESTMENT\backend\src\lib\userLimits.ts:32: const used = await prisma.user.count({

@@ -8,7 +8,7 @@
 import { NextRequest } from 'next/server';
 import { requireAuth, jsonResponse, errorResponse, comparePassword } from '@/lib/auth';
 import { disableMfa } from '@/lib/mfa';
-import prisma from '@/lib/prisma';
+import { getTenantClient } from '@/lib/tenantPrisma';
 
 export async function POST(req: NextRequest) {
   let user;
@@ -17,6 +17,8 @@ export async function POST(req: NextRequest) {
   } catch {
     return errorResponse('Unauthorized', 401);
   }
+
+  const db = getTenantClient(user);
 
   let body: { password?: string };
   try {
@@ -29,7 +31,7 @@ export async function POST(req: NextRequest) {
     return errorResponse('Password is required to disable MFA', 400);
   }
 
-  const dbUser = await prisma.user.findUnique({
+  const dbUser = await db.user.findUnique({
     where: { id: user.userId },
     select: { password: true, mfaEnabled: true },
   });

@@ -1,6 +1,4 @@
 import { NextResponse, NextRequest } from 'next/server';
-import prisma from '@/lib/prisma';
-import crypto from 'crypto';
 import { checkRateLimit } from '@/lib/rateLimiter';
 
 // [DEPRECATED] Legacy Webhook Handler for Gateways
@@ -12,7 +10,7 @@ export async function POST(req: NextRequest) {
         if (rateLimitRes) return rateLimitRes;
 
         console.error("[DEPRECATED] Webhook hit disabled legacy route /api/webhooks. Rejecting with 410.");
-        
+
         // Return 410 Gone to signal the provider that this URL is permanently removed.
         // Providers will typically alert the merchant to update their Webhook URL.
         return NextResponse.json(

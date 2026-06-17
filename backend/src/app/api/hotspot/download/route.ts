@@ -1,7 +1,6 @@
 import { NextRequest } from "next/server";
 import { readFileSync, readdirSync, statSync, existsSync } from "fs";
 import { join } from "path";
-import prisma from "@/lib/prisma";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import { sanitizeMikroTikName } from "@/lib/mikrotik";
 
@@ -13,7 +12,7 @@ import { sanitizeMikroTikName } from "@/lib/mikrotik";
  * to reconstruct into a downloadable zip via JSZip.
  * 
  * Query params:
- *   ?apiUrl=https://your-droplet.com  (optional — embeds API URL into login.html)
+ *   ?apiUrl=https://api.yourdomain.com  (optional — embeds API URL into login.html)
  *   ?routerId=xxx                       (optional — embeds router ID)
  */
 export async function GET(req: NextRequest) {
@@ -51,46 +50,48 @@ export async function GET(req: NextRequest) {
 
         // Fetch router details if ID is provided
         // Default secret from env — never hardcode a value like 'hqsecret'
-        let routerSecret = process.env.RADIUS_NAS_SECRET || "hqinvestment_radius_secret";
+        // Default secret from env — never hardcode a value like 'hqsecret'
+        // Do not embed the shared secret into the generated setup.rsc for non-super-admins.
+        let routerSecret = null as string | null;
         let routerName = "Generic";
         let hotspotSettings: any = null;
 
         if (routerId) {
-            const router = await prisma.router.findUnique({
+            const globalDb = getTenantClient(null);
+            const router = await globalDb.router.findUnique({
                 where: { id: routerId },
                 select: {
                     name: true,
                     tenantId: true,
-                    hotspotSettings: true,
                 }
             });
-            if (router) {
+
+            if (router?.tenantId) {
                 const db = getTenantClient(router.tenantId);
-                // Re-fetch via tenant-scoped client to ensure the settings belong to the same tenant.
                 const tenantRouter = await db.router.findUnique({
                     where: { id: routerId },
                     select: { name: true, hotspotSettings: true }
                 });
+
                 if (tenantRouter) {
                     routerName = sanitizeMikroTikName(tenantRouter.name);
                     hotspotSettings = tenantRouter.hotspotSettings;
                 }
             }
-            if (router) {
-                routerSecret = process.env.RADIUS_NAS_SECRET || "hqinvestment_radius_secret";
-                routerName = sanitizeMikroTikName(router.name);
-                hotspotSettings = router.hotspotSettings;
 
-                // Fallbacks if no specific hotspot settings
-                if (!hotspotSettings) {
-                    hotspotSettings = {
-                        companyName: "HQINVESTMENT",
-                        customerCareNumber: "+255 000 000 000",
-                        primaryColor: "#1a1a2e",
-                        accentColor: "#6366f1"
-                    };
-                }
+            if (!hotspotSettings && router) {
+                hotspotSettings = {
+                    companyName: "HQINVESTMENT",
+                    customerCareNumber: "+255 000 000 000",
+                    primaryColor: "#1a1a2e",
+                    accentColor: "#6366f1"
+                };
             }
+
+            // Only populate the secret for Super Admins. Otherwise keep it null to avoid leakage.
+            // The route does not perform auth itself; if callers need the secret, they must
+            // request it via a protected admin-only endpoint.
+            routerSecret = null;
         }
 
         // Collect all files recursively
@@ -156,7 +157,7 @@ set [find default=yes] html-directory=hotspot login-by=http-chap,http-pap,cookie
 add name=hq_hotspot html-directory=hotspot login-by=http-chap,http-pap,cookie,mac-cookie use-radius=yes dns-name=${dnsName}
 
 /radius
-add address=${domain} secret="${routerSecret}" service=hotspot,ppp authentication-port=1812 accounting-port=1813 timeout=3s comment="HQInvestment RADIUS"
+            add address=${domain} ${routerSecret ? `secret="${routerSecret}"` : "# secret redacted: contact Super Admin to obtain shared secret"} service=hotspot,ppp authentication-port=1812 accounting-port=1813 timeout=3s comment="HQInvestment RADIUS"
 
 /ip hotspot walled-garden
 add dst-host=${domain} action=allow

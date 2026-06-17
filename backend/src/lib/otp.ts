@@ -16,7 +16,7 @@
 
 import { randomInt } from "node:crypto";
 import bcrypt from "bcryptjs";
-import prisma from "@/lib/prisma";
+import { getTenantClient } from "@/lib/tenantPrisma";
 
 const OTP_EXPIRY_MINUTES = 30;
 const OTP_BCRYPT_ROUNDS = 10;
@@ -48,13 +48,15 @@ export async function generateAndStoreOtp(
   const code = randomInt(100000, 1000000).toString();
   const hash = await bcrypt.hash(code, OTP_BCRYPT_ROUNDS);
 
+  const db = getTenantClient(tenantId ?? null);
+
   // Invalidate all previous unexpired OTPs for this email (prevent accumulation)
-  await prisma.userOtp.updateMany({
+  await db.userOtp.updateMany({
     where: { email, used: false, expiresAt: { gt: new Date() } },
     data: { used: true },
   });
 
-  const record = await prisma.userOtp.create({
+  const record = await db.userOtp.create({
     data: {
       email,
       // SEC-003 FIX: Store bcrypt hash, never the plaintext code
@@ -81,7 +83,8 @@ export async function verifyOtp(
   submittedCode: string
 ): Promise<{ id: string } | null> {
   // Fetch all unexpired, unused OTPs for this email (should be at most 1)
-  const candidates = await prisma.userOtp.findMany({
+  const db = getTenantClient(null);
+  const candidates = await db.userOtp.findMany({
     where: { email, used: false, expiresAt: { gt: new Date() } },
     select: { id: true, otp: true },
     orderBy: { createdAt: "desc" },
@@ -103,7 +106,8 @@ export async function verifyOtp(
  * Mark an OTP record as used (idempotent).
  */
 export async function consumeOtp(otpId: string): Promise<void> {
-  await prisma.userOtp.update({
+  const db = getTenantClient(null);
+  await db.userOtp.update({
     where: { id: otpId },
     data: { used: true },
   });

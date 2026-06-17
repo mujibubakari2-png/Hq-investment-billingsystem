@@ -1,6 +1,5 @@
 import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
-import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { SubscriptionCreateSchema, SubscriptionUpdateSchema } from "@/lib/validators";
 import { getMikroTikService } from "@/lib/mikrotik";
@@ -103,13 +102,18 @@ export async function POST(req: NextRequest) {
 
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
 
-        const body = await req.json();
+        const body = await req.json() as any;
         const parsed = SubscriptionCreateSchema.safeParse(body);
         if (!parsed.success) {
             const msg = parsed.error.issues.map((e: any) => `${e.path.join('.')}: ${e.message}`).join('; ');
             return errorResponse(`Invalid request body: ${msg}`, 400);
         }
-        const { clientId, packageId, routerId, expiresAt, method } = parsed.data;
+        const data = parsed.data as any;
+        const clientId = data.clientId;
+        const packageId = data.packageId;
+        const routerId = data.routerId;
+        const expiresAt = data.expiresAt;
+        const method = data.method;
 
         if (!clientId || !packageId) {
             return errorResponse(`clientId and packageId are required. Got clientId: ${clientId}, packageId: ${packageId}`);
@@ -129,15 +133,15 @@ export async function POST(req: NextRequest) {
                 clientId,
                 packageId,
                 routerId,
-                method: body.method || "MANUAL",
-                expiresAt: parseSafeDate(body.expiresAt) || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+                method: method || "MANUAL",
+                expiresAt: parseSafeDate(expiresAt) || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
                 activatedAt: parseSafeDate(body.activatedAt) || new Date(),
                 status: "ACTIVE",
                 syncStatus: "PENDING",
                 tenantId: tenantIdValue,
             },
             include: { client: true, package: true, router: true },
-        });
+        }) as any;
 
         // ── Sync to RADIUS (always, regardless of router availability) ─────────
         if (sub.client && sub.package) {
@@ -227,3 +231,4 @@ export async function POST(req: NextRequest) {
         return errorResponse("Internal server error", 500);
     }
 }
+

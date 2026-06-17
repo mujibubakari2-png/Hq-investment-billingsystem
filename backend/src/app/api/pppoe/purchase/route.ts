@@ -1,6 +1,5 @@
 import { NextRequest } from "next/server";
 import { randomUUID } from "node:crypto";
-import prisma from "@/lib/prisma";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 import { paymentService } from "@/lib/payments/service";
@@ -36,7 +35,8 @@ export async function POST(req: NextRequest) {
     let cleanPhone = phone ? formatPhoneTZ(phone) : undefined;
 
     // ── Find Package ─────────────────────────────────────────────────────────
-    const router = await prisma.router.findUnique({
+    const globalDb = getTenantClient(null);
+    const router = await globalDb.router.findUnique({
       where: { id: routerId },
       select: { id: true, tenantId: true },
     });

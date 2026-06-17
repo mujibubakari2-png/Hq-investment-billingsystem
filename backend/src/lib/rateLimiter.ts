@@ -1,206 +1,215 @@
 /**
- * DB-Backed Rate Limiter
- *
- * Uses the existing `RateLimit` Prisma model so limits survive server
- * restarts and work across multiple instances. Replaces the in-memory Map.
+ * Rate Limiting Middleware
+ * Implements tiered rate limiting based on user role and endpoint
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import logger from '@/lib/logger';
 import { getUserFromRequest } from '@/lib/auth';
-import { Redis } from 'ioredis';
-
-const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
-  lazyConnect: true,
-});
-redis.on('error', (err) => {
-  logger.warn('Redis rateLimiter error', { error: err.message });
-});
 
 interface RateLimitConfig {
-  windowMs: number;
-  maxRequests: number;
-  message?: string;
+    windowMs: number; // Time window in milliseconds
+    maxRequests: number; // Max requests per window
+    message?: string; // Custom message
 }
 
-const endpointLimits: Record<string, { anonymous: RateLimitConfig; user: RateLimitConfig; admin: RateLimitConfig }> = {
-  '/api/auth/login': {
-    anonymous: { windowMs: 15 * 60 * 1000, maxRequests: 5, message: 'Too many login attempts' },
-    user:      { windowMs: 15 * 60 * 1000, maxRequests: 20 },
-    admin:     { windowMs: 15 * 60 * 1000, maxRequests: 50 },
-  },
-  '/api/auth/register/request-otp': {
-    anonymous: { windowMs: 15 * 60 * 1000, maxRequests: 3, message: 'Too many OTP requests' },
-    user:      { windowMs: 15 * 60 * 1000, maxRequests: 10 },
-    admin:     { windowMs: 15 * 60 * 1000, maxRequests: 20 },
-  },
-  '/api/auth/register': {
-    anonymous: { windowMs: 60 * 60 * 1000, maxRequests: 3, message: 'Registration limit exceeded, try later' },
-    user:      { windowMs: 60 * 60 * 1000, maxRequests: 5  },
-    admin:     { windowMs: 60 * 60 * 1000, maxRequests: 10 },
-  },
-  '/api/auth/forgot-password': {
-    anonymous: { windowMs: 15 * 60 * 1000, maxRequests: 3, message: 'Too many password reset attempts' },
-    user:      { windowMs: 15 * 60 * 1000, maxRequests: 10 },
-    admin:     { windowMs: 15 * 60 * 1000, maxRequests: 20 },
-  },
-  '/api/webhooks': {
-    // Payment gateways can send bursts of webhooks, limit to 200 per minute per IP
-    anonymous: { windowMs: 60 * 1000, maxRequests: 200, message: 'Too many webhooks' },
-    user:      { windowMs: 60 * 1000, maxRequests: 200 },
-    admin:     { windowMs: 60 * 1000, maxRequests: 200 },
-  },
+interface UserRateLimitConfig {
+    anonymous: RateLimitConfig;
+    user: RateLimitConfig;
+    admin: RateLimitConfig;
+}
+
+// Store for tracking requests by IP/User
+const requestStore = new Map<string, { count: number; resetTime: number }>();
+
+// Endpoint-specific rate limits
+const endpointLimits: Record<string, UserRateLimitConfig> = {
+    // Authentication endpoints - stricter limits
+    '/api/auth/login': {
+        anonymous: { windowMs: 5 * 60 * 1000, maxRequests: 5, message: 'Too many login attempts, try again later' },
+        user: { windowMs: 5 * 60 * 1000, maxRequests: 20 },
+        admin: { windowMs: 5 * 60 * 1000, maxRequests: 50 },
+    },
+    '/api/auth/register': {
+        anonymous: { windowMs: 60 * 60 * 1000, maxRequests: 3, message: 'Registration limit exceeded, try later' },
+        user: { windowMs: 60 * 60 * 1000, maxRequests: 5 },
+        admin: { windowMs: 60 * 60 * 1000, maxRequests: 10 },
+    },
+    '/api/auth/forgot-password': {
+        anonymous: { windowMs: 15 * 60 * 1000, maxRequests: 3, message: 'Too many password reset attempts' },
+        user: { windowMs: 15 * 60 * 1000, maxRequests: 10 },
+        admin: { windowMs: 15 * 60 * 1000, maxRequests: 20 },
+    },
+
+    // API endpoints - moderate limits
+    '/api/default': {
+        anonymous: { windowMs: 60 * 1000, maxRequests: 10 },
+        user: { windowMs: 60 * 1000, maxRequests: 60 },
+        admin: { windowMs: 60 * 1000, maxRequests: 300 },
+    },
+
+    // File upload endpoints - stricter limits
+    '/api/upload': {
+        anonymous: { windowMs: 60 * 60 * 1000, maxRequests: 0, message: 'Anonymous users cannot upload' },
+        user: { windowMs: 60 * 60 * 1000, maxRequests: 10 },
+        admin: { windowMs: 60 * 60 * 1000, maxRequests: 50 },
+    },
+
+    // Export endpoints - moderate limits
+    '/api/export': {
+        anonymous: { windowMs: 60 * 60 * 1000, maxRequests: 0, message: 'Anonymous users cannot export' },
+        user: { windowMs: 60 * 1000, maxRequests: 5 },
+        admin: { windowMs: 60 * 1000, maxRequests: 20 },
+    },
 };
 
-const defaultLimit = {
-  anonymous: { windowMs: 60 * 1000, maxRequests: 30  },
-  user:      { windowMs: 60 * 1000, maxRequests: 100 },
-  admin:     { windowMs: 60 * 1000, maxRequests: 500 },
+// Default limit
+const defaultLimit: UserRateLimitConfig = {
+    anonymous: { windowMs: 60 * 1000, maxRequests: 30 },
+    user: { windowMs: 60 * 1000, maxRequests: 100 },
+    admin: { windowMs: 60 * 1000, maxRequests: 500 },
 };
 
-function getClientKey(req: NextRequest, userId?: string): string {
-  const ip =
-    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-    req.headers.get('x-real-ip') ||
-    'unknown';
-  return userId ? `${ip}:${userId}` : ip;
-}
-
-// Bug #13 FIX: Extract role from the verified JWT token instead of the
-// x-user-role header, which any client could spoof to bypass rate limits.
-function getRole(req: NextRequest): 'admin' | 'user' | 'anonymous' {
-  try {
-    const payload = getUserFromRequest(req);
-    if (!payload) return 'anonymous';
-    if (payload.role === 'ADMIN' || payload.role === 'SUPER_ADMIN') return 'admin';
-    return 'user';
-  } catch {
-    return 'anonymous';
-  }
-}
-
-function getConfig(path: string, role: 'admin' | 'user' | 'anonymous'): RateLimitConfig {
-  for (const [pattern, cfg] of Object.entries(endpointLimits)) {
-    if (path.startsWith(pattern)) return cfg[role];
-  }
-  return defaultLimit[role];
+/**
+ * Get rate limit key (IP + User ID)
+ */
+function getRateLimitKey(request: NextRequest, userId?: string): string {
+    const ip = request.headers.get('x-forwarded-for') ||
+        request.headers.get('x-real-ip') ||
+        request.headers.get('x-forwarded-proto') ||
+        'unknown';
+    return userId ? `${ip}:${userId}` : ip;
 }
 
 /**
- * Check rate limit against Redis.
- * Returns null if OK, or a 429 NextResponse if the limit is exceeded.
+ * Derive role from verified JWT to prevent header spoofing.
  */
-export async function checkRateLimit(
-  req: NextRequest,
-  userId?: string,
-): Promise<NextResponse | null> {
-  try {
-    const path   = new URL(req.url).pathname;
-    const role   = getRole(req);
-    const config = getConfig(path, role);
-    const key    = `rl:${path}:${getClientKey(req, userId)}`;
-    
-    const count = await redis.incr(key);
-    if (count === 1) {
-      await redis.pexpire(key, config.windowMs);
+function getUserRole(request: NextRequest): 'admin' | 'user' | 'anonymous' {
+    try {
+        const payload = getUserFromRequest(request);
+        if (!payload) return 'anonymous';
+        if (payload.role === 'ADMIN' || payload.role === 'SUPER_ADMIN') return 'admin';
+        return 'user';
+    } catch {
+        return 'anonymous';
     }
-    
-    const ttlMs = await redis.pttl(key);
-    const resetAt = Date.now() + (ttlMs > 0 ? ttlMs : config.windowMs);
+}
 
-    if (count > config.maxRequests) {
-      const retryAfter = Math.ceil(ttlMs / 1000);
-      const message    = config.message ?? `Rate limit exceeded. Retry in ${retryAfter}s`;
-      logger.warn('Rate limit exceeded', { key, count, path });
-      return NextResponse.json(
-        { error: message, code: 'RATE_LIMIT_EXCEEDED' },
-        {
-          status: 429,
-          headers: {
-            'Retry-After':           String(retryAfter),
-            'X-RateLimit-Limit':     String(config.maxRequests),
-            'X-RateLimit-Remaining': '0',
-            'X-RateLimit-Reset':     String(Math.ceil(resetAt / 1000)),
-          },
-        },
-      );
+/**
+ * Get rate limit config for endpoint
+ */
+function getRateLimitConfig(path: string, role: 'admin' | 'user' | 'anonymous'): RateLimitConfig {
+    // Check for exact match
+    if (endpointLimits[path]) {
+        return endpointLimits[path][role];
     }
 
-    return null;
-  } catch (err: unknown) {
-    // Fail open or use in-memory fallback if Redis is temporarily unavailable
-    logger.error('Rate limiter Redis error — using in-memory fallback', {
-      error: err instanceof Error ? err.message : String(err),
-    });
+    // Check for pattern match
+    for (const [pattern, config] of Object.entries(endpointLimits)) {
+        if (pattern.includes('*')) {
+            const regex = new RegExp('^' + pattern.replace(/\*/g, '.*') + '$');
+            if (regex.test(path)) {
+                return config[role];
+            }
+        }
+    }
 
-    const path = new URL(req.url).pathname;
-    const role = getRole(req);
-    const config = getConfig(path, role);
-    const key = `rl:${path}:${getClientKey(req, userId)}`;
+    // Use default
+    return defaultLimit[role];
+}
+
+/**
+ * Check if request should be rate limited
+ */
+export function isRateLimited(request: NextRequest, userId?: string): { limited: boolean; message: string; retryAfter?: number } {
+    const key = getRateLimitKey(request, userId || getUserFromRequest(request)?.userId);
+    const role = getUserRole(request);
+    const path = new URL(request.url).pathname;
+    const config = getRateLimitConfig(path, role);
+
     const now = Date.now();
+    const record = requestStore.get(key);
 
-    const record = memoryRateLimitStore.get(key);
-    if (!record || record.resetAt <= now) {
-        memoryRateLimitStore.set(key, { count: 1, resetAt: now + config.windowMs });
-        return null;
+    if (!record || now > record.resetTime) {
+        // Initialize new record
+        requestStore.set(key, { count: 1, resetTime: now + config.windowMs });
+        return { limited: false, message: '' };
     }
 
     if (record.count >= config.maxRequests) {
-        const retryAfter = Math.ceil((record.resetAt - now) / 1000);
+        const retryAfter = Math.ceil((record.resetTime - now) / 1000);
+        const message = config.message || `Rate limit exceeded. Try again in ${retryAfter} seconds`;
+        return {
+            limited: true,
+            message,
+            retryAfter,
+        };
+    }
+
+    record.count++;
+    return { limited: false, message: '' };
+}
+
+/**
+ * Rate limiting middleware for Next.js
+ *
+ * FIX: Do not trust client-supplied user headers for rate-limit identity.
+ * Role and userId are derived from authenticated JWT payload only.
+ */
+export function rateLimitMiddleware(request: NextRequest): NextResponse | null {
+    const result = isRateLimited(request);
+
+    if (result.limited) {
         return NextResponse.json(
-            { error: config.message ?? `Rate limit exceeded. Retry in ${retryAfter}s`, code: 'RATE_LIMIT_EXCEEDED' },
+            { error: result.message, code: 'RATE_LIMIT_EXCEEDED' },
             {
                 status: 429,
                 headers: {
-                    'Retry-After': String(retryAfter),
-                    'X-RateLimit-Limit': String(config.maxRequests),
+                    'Retry-After': String(result.retryAfter || 60),
+                    'X-RateLimit-Limit': '100', // Could be dynamic
                     'X-RateLimit-Remaining': '0',
-                    'X-RateLimit-Reset': String(Math.ceil(record.resetAt / 1000)),
+                    'X-RateLimit-Reset': String(Math.ceil(Date.now() / 1000) + (result.retryAfter || 60)),
                 },
-            },
+            }
         );
     }
-    
-    record.count += 1;
+
     return null;
-  }
 }
-
-// In-memory fallback map for when Redis is down
-const memoryRateLimitStore = new Map<string, { count: number; resetAt: number }>();
-
-// Cleanup in-memory store periodically to avoid memory leaks
-setInterval(() => {
-    const now = Date.now();
-    for (const [key, record] of memoryRateLimitStore.entries()) {
-        if (record.resetAt <= now) {
-            memoryRateLimitStore.delete(key);
-        }
-    }
-}, 60 * 1000);
 
 /**
- * Cleanup expired rate limit records.
- * Redis handles expiration automatically, so this is a no-op.
+ * Clean up old records periodically (call this in a cron job)
  */
-export async function cleanupExpiredRateLimits(): Promise<number> {
-  return 0;
+export function cleanupRateLimitStore(): void {
+    const now = Date.now();
+    for (const [key, record] of requestStore.entries()) {
+        if (now > record.resetTime) {
+            requestStore.delete(key);
+        }
+    }
 }
 
-// ── Legacy compatibility exports (used by src/middleware/rateLimiter.ts) ───────
-/** @deprecated Use checkRateLimit() instead */
-export function isRateLimited() {
-  return { limited: false, message: '' };
+/**
+ * Reset rate limit for specific user (admin action)
+ */
+export function resetRateLimit(identifier: string): void {
+    requestStore.delete(identifier);
 }
-/** @deprecated Use checkRateLimit() instead */
-export function rateLimitMiddleware() {
-  return null;
+
+/**
+ * Check request rate limit and return a NextResponse when limited.
+ */
+export async function checkRateLimit(request: NextRequest) {
+    return rateLimitMiddleware(request);
 }
-/** @deprecated No-op — cleanup is now automatic via DB TTL */
-export function cleanupRateLimitStore() {}
-/** @deprecated No-op */
-export function resetRateLimit(_id: string) {}
-/** @deprecated */
+
+/**
+ * Get rate limit stats for monitoring
+ */
 export function getRateLimitStats() {
-  return { totalKeys: 0, activeKeys: 0 };
+    return {
+        totalKeys: requestStore.size,
+        activeKeys: Array.from(requestStore.entries())
+            .filter(([_, record]) => Date.now() <= record.resetTime)
+            .length,
+    };
 }

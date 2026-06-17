@@ -1,5 +1,4 @@
 import { NextRequest } from "next/server";
-import prisma from "@/lib/prisma";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 
@@ -21,7 +20,8 @@ export async function GET(req: NextRequest) {
             return errorResponse("routerId is required", 400);
         }
 
-        const router = await prisma.router.findUnique({
+        const globalDb = getTenantClient(null);
+        const router = await globalDb.router.findUnique({
             where: { id: routerId },
             select: { id: true, tenantId: true },
         });

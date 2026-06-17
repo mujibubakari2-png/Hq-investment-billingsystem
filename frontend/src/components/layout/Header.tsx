@@ -62,13 +62,14 @@ export default function Header({ onToggleSidebar, darkMode, onToggleDarkMode }: 
     const [showMenu, setShowMenu] = useState(false);
     const [license, setLicense] = useState<LicenseResponse | null>(null);
     const menuRef = useRef<HTMLDivElement>(null);
+    const isPlatformAdmin = user?.isPlatformAdmin === true || (user?.role === 'SUPER_ADMIN' && !user?.tenantId);
 
-    // Fetch license expiry only for non-SUPER_ADMIN users (they're always active)
+    // Fetch tenant license expiry for every tenant user, including tenant SUPER_ADMIN.
     useEffect(() => {
-        if (user && user.role !== 'SUPER_ADMIN') {
+        if (user && !isPlatformAdmin) {
             licenseApi.getLicense().then(setLicense).catch(console.error);
         }
-    }, [user]);
+    }, [user, isPlatformAdmin]);
 
     // Close dropdown when clicking outside
     useEffect(() => {

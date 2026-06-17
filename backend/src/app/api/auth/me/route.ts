@@ -1,6 +1,5 @@
 import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
-import prisma from "@/lib/prisma";
 import { getUserFromRequest, jsonResponse, errorResponse } from "@/lib/auth";
 
 export async function GET(req: NextRequest) {

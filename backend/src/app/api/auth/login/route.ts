@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server";
 import jwt from "jsonwebtoken";
-import prisma from "@/lib/prisma";
 import { comparePassword, signToken, signRefreshToken, jsonResponse, errorResponse } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/rateLimiter";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import logger from "@/lib/logger";
 
 // ── CRIT-002 FIX: MFA temp-token ──────────────────────────────────────────────
@@ -50,7 +50,8 @@ export async function POST(req: NextRequest) {
             return errorResponse("Username and password are required");
         }
 
-        const user = await prisma.user.findFirst({
+        const db = getTenantClient(null);
+        const user = await db.user.findFirst({
             where: {
                 OR: [{ username }, { email: username }],
             },
@@ -104,7 +105,7 @@ export async function POST(req: NextRequest) {
         }
 
         // ── Standard login (MFA not enabled) ─────────────────────────────────
-        await prisma.user.update({
+        await db.user.update({
             where: { id: user.id },
             data: { lastLogin: new Date() },
         });

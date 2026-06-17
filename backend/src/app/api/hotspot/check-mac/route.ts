@@ -1,5 +1,4 @@
 import { NextRequest } from "next/server";
-import prisma from "@/lib/prisma";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 
@@ -28,7 +27,8 @@ export async function GET(req: NextRequest) {
             return errorResponse("Invalid MAC address format", 400);
         }
 
-        const router = await prisma.router.findUnique({
+        const globalDb = getTenantClient(null);
+        const router = await globalDb.router.findUnique({
             where: { id: routerId },
             select: { id: true, tenantId: true },
         });
@@ -77,7 +77,7 @@ export async function GET(req: NextRequest) {
 
         let password = subscription.client.phone;
         if (subscription.method === "VOUCHER") {
-            const lastVoucher = await prisma.voucher.findFirst({
+            const lastVoucher = await db.voucher.findFirst({
                 where: { usedBy: subscription.client.username, status: "USED", tenantId: router.tenantId },
                 orderBy: { usedAt: "desc" },
             });

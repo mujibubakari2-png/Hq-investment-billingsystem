@@ -1,6 +1,5 @@
 import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
-import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { getTenantFilter, getAssignTenantId } from "@/lib/tenant";
 
@@ -18,13 +17,20 @@ export async function GET(req: NextRequest) {
             orderBy: { createdAt: "desc" },
         });
 
+        function maskSecret(s: string | null | undefined) {
+            if (!s) return null;
+            if (s.length <= 4) return "****";
+            return `****${s.slice(-4)}`;
+        }
+
         const result = nasList.map(n => ({
             id: n.id,
             nasName: n.nasName,
             shortName: n.shortName || "",
             type: n.type,
             ports: n.ports,
-            secret: n.secret,
+            // Only reveal the raw secret to SUPER_ADMINs — others get a masked value
+            secret: userPayload.role === "SUPER_ADMIN" ? n.secret : maskSecret(n.secret),
             server: n.server || "",
             description: n.description || "",
             createdAt: new Date(n.createdAt).toLocaleDateString(),
@@ -72,3 +78,4 @@ export async function POST(req: NextRequest) {
         return errorResponse("Internal server error", 500);
     }
 }
+

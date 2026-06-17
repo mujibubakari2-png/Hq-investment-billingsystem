@@ -1,6 +1,5 @@
 import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
-import prisma from "@/lib/prisma";
 import { hashPassword, comparePassword, jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 
 // GET /api/auth/profile - Get own profile
@@ -62,3 +61,4 @@ export async function PUT(req: NextRequest) {
         return errorResponse("Internal server error", 500);
     }
 }
+

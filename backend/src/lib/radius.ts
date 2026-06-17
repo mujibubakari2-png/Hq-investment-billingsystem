@@ -1,3 +1,4 @@
+import { getTenantClient } from "./tenantPrisma";
 import prisma from "./prisma";
 import bcrypt from "bcryptjs";
 import { createHash } from "crypto";
@@ -111,12 +112,14 @@ export async function syncRadiusUser(params: {
 }) {
     const { username, password, tenantId, fullName, expiresAt, status, rateLimit, profileName, simultaneousUse } = params;
 
-    // ── 1. Manage RadiusUser (high-level tracking model) ──────────────────────
+    const db = getTenantClient(tenantId);
+
+    // ── 1. Manage RadiusUser (high-level tracking model) ─────────────────────
     const sessionTimeoutSecs = expiresAt
         ? Math.max(0, Math.floor((expiresAt.getTime() - Date.now()) / 1000))
         : null;
 
-    let radiusUser = await prisma.radiusUser.findFirst({
+    let radiusUser = await db.radiusUser.findFirst({
         where: { username, tenantId: tenantId || null },
     });
 
@@ -130,7 +133,7 @@ export async function syncRadiusUser(params: {
     };
 
     if (radiusUser) {
-        radiusUser = await prisma.radiusUser.update({
+        radiusUser = await db.radiusUser.update({
             where: { id: radiusUser.id },
             data: updateData,
         });
@@ -138,7 +141,7 @@ export async function syncRadiusUser(params: {
         if (!password) {
             throw new Error("[RADIUS] Cannot create RadiusUser without a password — password is required.");
         }
-        radiusUser = await prisma.radiusUser.create({
+        radiusUser = await db.radiusUser.create({
             data: {
                 username,
                 password,
@@ -167,7 +170,7 @@ export async function syncRadiusUser(params: {
 
     // ── 4. radcheck: Expiration (FreeRADIUS rejects if date passed) ───────────
     const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
-                    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     if (expiresAt) {
         const expStr = `${months[expiresAt.getMonth()]} ${String(expiresAt.getDate()).padStart(2, "0")} ${expiresAt.getFullYear()} ${String(expiresAt.getHours()).padStart(2, "0")}:${String(expiresAt.getMinutes()).padStart(2, "0")}:${String(expiresAt.getSeconds()).padStart(2, "0")}`;
         await upsertRadCheck(username, "Expiration", expStr, ":=", tenantId);
@@ -199,8 +202,10 @@ export async function syncRadiusUser(params: {
  * Suspend a user in RADIUS — immediately rejects all new auth attempts.
  */
 export async function suspendRadiusUser(username: string, tenantId: string | null) {
+    const db = getTenantClient(tenantId);
+
     // 1. Mark high-level model as Inactive
-    await prisma.radiusUser.updateMany({
+    await db.radiusUser.updateMany({
         where: { username, tenantId },
         data: { status: "Inactive" },
     });
@@ -208,7 +213,7 @@ export async function suspendRadiusUser(username: string, tenantId: string | nul
     // 2. Set Expiration in the past → FreeRADIUS rejects immediately
     const past = new Date(Date.now() - 86400000); // yesterday
     const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
-                    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     const expStr = `${months[past.getMonth()]} ${String(past.getDate()).padStart(2, "0")} ${past.getFullYear()} 00:00:00`;
     await upsertRadCheck(username, "Expiration", expStr, ":=", tenantId);
 
@@ -221,9 +226,11 @@ export async function suspendRadiusUser(username: string, tenantId: string | nul
  * Call this when a client is deleted or permanently banned.
  */
 export async function deleteRadiusUser(username: string, tenantId: string | null) {
+    const db = getTenantClient(tenantId);
+
     await Promise.allSettled([
-        prisma.radCheck.deleteMany({ where: { username, tenantId } }),
-        prisma.radReply.deleteMany({ where: { username, tenantId } }),
-        prisma.radiusUser.deleteMany({ where: { username, tenantId } }),
+        db.radCheck.deleteMany({ where: { username, tenantId } }),
+        db.radReply.deleteMany({ where: { username, tenantId } }),
+        db.radiusUser.deleteMany({ where: { username, tenantId } }),
     ]);
 }

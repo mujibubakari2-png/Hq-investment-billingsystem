@@ -14,37 +14,39 @@ import { getRedisConnection, MikroTikJobData } from '@/lib/queue';
 import { getMikroTikService } from '@/lib/mikrotik';
 import { assertSafeRouterHost } from '@/lib/networkSafety';
 import { decryptRouterFields } from '@/lib/encryption';
-import prisma from '@/lib/prisma';
+import { getTenantClient } from '@/lib/tenantPrisma';
 import logger from '@/lib/logger';
 
-const QUEUE_NAME   = 'mikrotik-ops';
-const CONCURRENCY  = 5;
+const QUEUE_NAME = 'mikrotik-ops';
+const CONCURRENCY = 5;
 
 // ── Load router + build service ───────────────────────────────────────────────
 
 async function getService(routerId: string) {
-  const router = await prisma.router.findUnique({ where: { id: routerId } });
+  const db = getTenantClient(null);
+  const router = await db.router.findUnique({ where: { id: routerId } });
   if (!router) throw new Error(`Router not found: ${routerId}`);
 
   const dec = decryptRouterFields(router);
   assertSafeRouterHost(dec.host);
 
-  const host     = dec.host;
+  const host = dec.host;
   const username = dec.username ?? 'admin';
   const password = dec.password ?? '';
-  const port     = dec.port ?? 8728;
+  const port = dec.port ?? 8728;
 
   // getMikroTikService takes a routerId string — it handles DB lookup internally
-  const service  = await getMikroTikService(routerId);
+  const service = await getMikroTikService(routerId);
   return { service, host };
 }
 
 // ── RouterLog helper ──────────────────────────────────────────────────────────
 
 async function log(routerId: string, tenantId: string | null, action: string, status: 'success' | 'failed', details?: string) {
-  await prisma.routerLog.create({
+  const db = getTenantClient(null);
+  await db.routerLog.create({
     data: { routerId, tenantId, action, status, details: details?.slice(0, 500) ?? null },
-  }).catch(() => {});
+  }).catch(() => { });
 }
 
 // ── Handlers ──────────────────────────────────────────────────────────────────
@@ -75,7 +77,7 @@ const handlers: Record<string, (data: MikroTikJobData) => Promise<unknown>> = {
     const { service } = await getService(routerId);
     const r = await service.updatePPPoEUser(payload.username as string, {
       password: payload.password as string | undefined,
-      profile:  payload.profile  as string | undefined,
+      profile: payload.profile as string | undefined,
       disabled: payload.disabled as boolean | undefined,
     });
     await log(routerId, tenantId, 'update-pppoe-user', 'success', `user: ${payload.username}`);
@@ -85,10 +87,10 @@ const handlers: Record<string, (data: MikroTikJobData) => Promise<unknown>> = {
   'create-hotspot-user': async ({ routerId, tenantId, payload }) => {
     const { service } = await getService(routerId);
     const r = await service.createHotspotUser({
-      name:     payload.username as string,
+      name: payload.username as string,
       password: payload.password as string,
-      profile:  payload.profile  as string,
-      server:   'all',
+      profile: payload.profile as string,
+      server: 'all',
       disabled: false,
     });
     await log(routerId, tenantId, 'create-hotspot-user', 'success', `user: ${payload.username}`);
@@ -113,7 +115,7 @@ const handlers: Record<string, (data: MikroTikJobData) => Promise<unknown>> = {
   'sync-subscription': async ({ routerId, tenantId, payload }) => {
     const { service } = await getService(routerId);
     const r = await service.updatePPPoEUser(payload.username as string, {
-      profile:  payload.profile  as string | undefined,
+      profile: payload.profile as string | undefined,
       disabled: payload.disabled as boolean | undefined,
     });
     await log(routerId, tenantId, 'sync-subscription', 'success', `user: ${payload.username}`);
@@ -152,8 +154,8 @@ export function startMikroTikWorker(): Worker<MikroTikJobData> {
   );
 
   worker.on('completed', (job) => logger.info(`[Worker] completed: ${job.data.name}`, { jobId: job.id }));
-  worker.on('failed',    (job, err) => logger.error('[Worker] permanently failed', { jobId: job?.id, name: job?.data?.name, error: err.message }));
-  worker.on('error',     (err)      => logger.error('[Worker] worker error', { error: err.message }));
+  worker.on('failed', (job, err) => logger.error('[Worker] permanently failed', { jobId: job?.id, name: job?.data?.name, error: err.message }));
+  worker.on('error', (err) => logger.error('[Worker] worker error', { error: err.message }));
 
   logger.info(`[MikroTik Worker] started — concurrency: ${CONCURRENCY}`);
   return worker;
@@ -169,5 +171,5 @@ if (require.main === module) {
     process.exit(0);
   };
   process.on('SIGTERM', shutdown);
-  process.on('SIGINT',  shutdown);
+  process.on('SIGINT', shutdown);
 }

@@ -1,0 +1,200 @@
+import { useState, useEffect } from 'react';
+import ReceiptIcon from '@mui/icons-material/Receipt';
+import CloseIcon from '@mui/icons-material/Close';
+import CheckIcon from '@mui/icons-material/Check';
+import AddIcon from '@mui/icons-material/Add';
+import DeleteIcon from '@mui/icons-material/Delete';
+import { clientsApi } from '../api';
+import type { ClientListItem } from '../api/clientsApi';
+
+interface InvoiceItem {
+    description: string;
+    quantity: number;
+    unitPrice: number;
+}
+
+interface CreateInvoiceModalProps {
+    onClose: () => void;
+    onSave: (data: Record<string, unknown>) => void;
+}
+
+export default function CreateInvoiceModal({ onClose, onSave }: CreateInvoiceModalProps) {
+    // Use clientId (UUID) instead of client name text input
+    const [clientId, setClientId] = useState('');
+    const [clients, setClients] = useState<ClientListItem[]>([]);
+    const [clientsLoading, setClientsLoading] = useState(true);
+    const [dueDate, setDueDate] = useState(() => new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0]);
+    const [status, setStatus] = useState('Draft');
+    const [items, setItems] = useState<InvoiceItem[]>([{ description: '', quantity: 1, unitPrice: 0 }]);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+
+    // ESC key handler
+    useEffect(() => {
+        const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+        document.addEventListener('keydown', handler);
+        return () => document.removeEventListener('keydown', handler);
+    }, [onClose]);
+
+    // Load clients list for select dropdown
+    useEffect(() => {
+        clientsApi.list()
+            .then(r => {
+                const data = Array.isArray(r) ? r : (r as any)?.data || [];
+                setClients(data);
+            })
+            .catch(() => setError('Failed to load clients list.'))
+            .finally(() => setClientsLoading(false));
+    }, []);
+
+    const addItem = () => {
+        setItems([...items, { description: '', quantity: 1, unitPrice: 0 }]);
+    };
+
+    const removeItem = (index: number) => {
+        setItems(items.filter((_, i) => i !== index));
+    };
+
+    const updateItem = (index: number, field: keyof InvoiceItem, value: string | number) => {
+        const updated = [...items];
+        if (field === 'description' && typeof value === 'string') {
+            updated[index].description = value;
+        } else if (field === 'quantity' && typeof value === 'number') {
+            updated[index].quantity = value;
+        } else if (field === 'unitPrice' && typeof value === 'number') {
+            updated[index].unitPrice = value;
+        }
+        setItems(updated);
+    };
+
+    const total = items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
+
+    const handleSave = async () => {
+        if (!clientId) return;
+        setLoading(true);
+        setError('');
+        try {
+            onSave({
+                clientId, // Send clientId (UUID) instead of client name
+                dueDate,
+                status,
+                amount: total,
+                items: items.map(item => ({
+                    ...item,
+                    total: item.quantity * item.unitPrice,
+                })),
+            });
+        } catch (err: any) {
+            setError(err.message || 'Failed to create invoice');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal modal-md" onClick={e => e.stopPropagation()}>
+                <div className="modal-header">
+                    <div className="modal-header-left">
+                        <div className="modal-header-icon" style={{ background: 'var(--info-light)', color: 'var(--info)' }}>
+                            <ReceiptIcon fontSize="small" />
+                        </div>
+                        <div>
+                            <div className="modal-title">Create Invoice</div>
+                            <div className="modal-subtitle">Generate a new invoice for a client</div>
+                        </div>
+                    </div>
+                    <button className="modal-close" onClick={onClose}><CloseIcon fontSize="small" /></button>
+                </div>
+
+                <div className="modal-body">
+                    {/* Error display */}
+                    {error && (
+                        <div style={{
+                            background: '#fee2e2', color: '#dc2626', padding: '10px 14px',
+                            borderRadius: 8, marginBottom: 16, fontSize: '0.82rem', fontWeight: 500,
+                            border: '1px solid #fecaca'
+                        }}>
+                            {error}
+                        </div>
+                    )}
+
+                    <div className="form-row">
+                        <div className="form-group">
+                            {/* Searchable client select instead of text input */}
+                            <label className="form-label">Client <span className="required">*</span></label>
+                            {clientsLoading ? (
+                                <div style={{ padding: '10px 0', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Loading clients...</div>
+                            ) : (
+                                <select className="form-select" value={clientId} onChange={e => setClientId(e.target.value)}>
+                                    <option value="">Select Client</option>
+                                    {clients.map(c => (
+                                        <option key={c.id} value={c.id}>{c.fullName} (@{c.username})</option>
+                                    ))}
+                                </select>
+                            )}
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label">Due Date <span className="required">*</span></label>
+                            <input type="date" className="form-input" value={dueDate} onChange={e => setDueDate(e.target.value)} />
+                        </div>
+                    </div>
+
+                    <div className="form-group">
+                        <label className="form-label">Status</label>
+                        <select className="form-select" value={status} onChange={e => setStatus(e.target.value)}>
+                            <option>Draft</option>
+                            <option>Unpaid</option>
+                            <option>Paid</option>
+                        </select>
+                    </div>
+
+                    <div style={{ marginTop: 16 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                            <label className="form-label" style={{ margin: 0, fontWeight: 600 }}>Invoice Items</label>
+                            <button className="btn btn-secondary btn-sm" onClick={addItem} type="button">
+                                <AddIcon fontSize="small" /> Add Item
+                            </button>
+                        </div>
+
+                        <div style={{ overflowX: 'auto' }}>
+                            {items.map((item, i) => (
+                                <div key={i} style={{ display: 'grid', gridTemplateColumns: 'minmax(120px, 2fr) 80px 120px 40px', gap: 8, marginBottom: 8, alignItems: 'end' }}>
+                                    <div className="form-group" style={{ margin: 0 }}>
+                                        {i === 0 && <label className="form-label" style={{ fontSize: '0.75rem' }}>Description</label>}
+                                        <input type="text" className="form-input" placeholder="Item description" value={item.description} onChange={e => updateItem(i, 'description', e.target.value)} />
+                                    </div>
+                                    <div className="form-group" style={{ margin: 0 }}>
+                                        {i === 0 && <label className="form-label" style={{ fontSize: '0.75rem' }}>Qty</label>}
+                                        <input type="number" className="form-input" min={1} value={item.quantity} onChange={e => updateItem(i, 'quantity', Number(e.target.value))} />
+                                    </div>
+                                    <div className="form-group" style={{ margin: 0 }}>
+                                        {i === 0 && <label className="form-label" style={{ fontSize: '0.75rem' }}>Unit Price</label>}
+                                        <input type="number" className="form-input" min={0} value={item.unitPrice} onChange={e => updateItem(i, 'unitPrice', Number(e.target.value))} />
+                                    </div>
+                                    <button className="btn-icon delete" onClick={() => removeItem(i)} disabled={items.length <= 1} style={{ height: 36 }}>
+                                        <DeleteIcon style={{ fontSize: 16 }} />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+
+                        <div style={{ textAlign: 'right', fontWeight: 700, fontSize: '1.1rem', marginTop: 12, padding: '12px 0', borderTop: '2px solid var(--border)' }}>
+                            Total: {total.toLocaleString()} TZS
+                        </div>
+                    </div>
+                </div>
+
+                <div className="modal-footer">
+                    <div className="modal-footer-left" />
+                    <div className="modal-footer-right">
+                        <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
+                        <button className="btn btn-primary" onClick={handleSave} disabled={loading || !clientId || !dueDate || items.every(i => !i.description)}>
+                            <CheckIcon fontSize="small" /> {loading ? 'Creating...' : 'Create Invoice'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}

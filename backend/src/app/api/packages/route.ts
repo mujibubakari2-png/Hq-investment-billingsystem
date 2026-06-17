@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
-import prisma from "@/lib/prisma";
-import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
+import { jsonResponse, errorResponse } from "@/lib/auth";
+import { requirePermission } from "@/lib/rbac";
 import { createPackageSchema, validateData } from "@/lib/validation";
 import { PackageCreateSchema } from "@/lib/validators";
 import { getMikroTikService } from "@/lib/mikrotik";
@@ -9,8 +9,9 @@ import { getMikroTikService } from "@/lib/mikrotik";
 // GET /api/packages
 export async function GET(req: NextRequest) {
     try {
-        const userPayload = getUserFromRequest(req);
-        if (!userPayload) return errorResponse("Unauthorized", 401);
+        const guard = requirePermission(req, "packages:read");
+        if (guard.error) return guard.error;
+        const userPayload = guard.user;
         const db = getTenantClient(userPayload);
 
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
@@ -89,14 +90,15 @@ export async function GET(req: NextRequest) {
 // POST /api/packages
 export async function POST(req: NextRequest) {
     try {
-        const userPayload = getUserFromRequest(req);
-        if (!userPayload) return errorResponse("Unauthorized", 401);
+        const guard = requirePermission(req, "packages:write");
+        if (guard.error) return guard.error;
+        const userPayload = guard.user;
         const db = getTenantClient(userPayload);
 
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
         const tenantFilter = isSuperAdmin ? {} : { tenantId: userPayload.tenantId };
 
-        const body = await req.json();
+        const body = await req.json() as any;
 
         // Normalize frontend display values → schema enum values before validation
         const normalized = {
@@ -202,3 +204,4 @@ export async function POST(req: NextRequest) {
         return errorResponse(msg, 500);
     }
 }
+

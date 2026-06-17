@@ -20,7 +20,7 @@
 import { generateSecret, generateURI, verifySync } from 'otplib';
 import QRCode from 'qrcode';
 import { encrypt, decrypt } from '@/lib/encryption';
-import prisma from '@/lib/prisma';
+import { getTenantClient } from '@/lib/tenantPrisma';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -123,6 +123,7 @@ export async function enableMfa(
     return false;
   }
 
+  const db = getTenantClient(null);
   const encryptedSecret = encrypt(plainSecret)!;
 
   // Hash each backup code separately (bcrypt, run in parallel)
@@ -131,7 +132,7 @@ export async function enableMfa(
     backupCodes.map((code) => bcrypt.hash(code, 10))
   );
 
-  await prisma.user.update({
+  await db.user.update({
     where: { id: userId },
     data: {
       mfaSecret: encryptedSecret,
@@ -148,7 +149,8 @@ export async function enableMfa(
  * Requires re-verification — never disable without confirming identity first.
  */
 export async function disableMfa(userId: string): Promise<void> {
-  await prisma.user.update({
+  const db = getTenantClient(null);
+  await db.user.update({
     where: { id: userId },
     data: {
       mfaSecret: null,
@@ -168,7 +170,8 @@ export async function verifyMfaAtLogin(
   userId: string,
   token: string
 ): Promise<'valid' | 'invalid' | 'no_mfa'> {
-  const user = await prisma.user.findUnique({
+  const db = getTenantClient(null);
+  const user = await db.user.findUnique({
     where: { id: userId },
     select: { mfaEnabled: true, mfaSecret: true, mfaBackupCodes: true },
   });
@@ -196,7 +199,7 @@ export async function verifyMfaAtLogin(
       const remainingCodes = user.mfaBackupCodes.filter(
         (_: string, idx: number) => idx !== i
       );
-      await prisma.user.update({
+      await db.user.update({
         where: { id: userId },
         data: { mfaBackupCodes: remainingCodes },
       });

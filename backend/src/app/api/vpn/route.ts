@@ -1,6 +1,5 @@
 import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
-import prisma from "@/lib/prisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { encrypt, decrypt } from "@/lib/encryption";
 import { VpnUserCreateSchema } from "@/lib/validators";
@@ -57,13 +56,13 @@ export async function POST(req: NextRequest) {
 
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
 
-        const body = await req.json();
+        const body = await req.json() as any;
         const parsed = VpnUserCreateSchema.safeParse(body);
         if (!parsed.success) {
             const msg = parsed.error.issues.map((e: any) => `${e.path.join('.')}: ${e.message}`).join('; ');
             return errorResponse(`Invalid request body: ${msg}`, 400);
         }
-        const { username, password, fullName, protocol, profile, localAddress, remoteAddress, routerId, service } = parsed.data;
+        const { username, password, fullName, protocol, profile, localAddress, remoteAddress, routerId, service } = parsed.data as any;
 
         // Verify router belongs to user's tenant
         const router = await db.router.findUnique({ where: { id: routerId } });
@@ -148,3 +147,4 @@ export async function POST(req: NextRequest) {
         return errorResponse("Internal server error", 500);
     }
 }
+

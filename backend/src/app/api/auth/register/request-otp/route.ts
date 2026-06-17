@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server";
-import prisma from "@/lib/prisma";
 import { errorResponse, jsonResponse } from "@/lib/auth";
 import { sendOtpEmail } from "@/lib/email";
 import { generateAndStoreOtp } from "@/lib/otp";
+import { getTenantClient } from "@/lib/tenantPrisma";
 
 export async function POST(req: NextRequest) {
     try {
@@ -12,7 +12,8 @@ export async function POST(req: NextRequest) {
             return errorResponse("Email is required");
         }
 
-        const existing = await prisma.user.findUnique({ where: { email } });
+        const db = getTenantClient(null);
+        const existing = await db.user.findUnique({ where: { email } });
         if (existing) {
             return errorResponse("Email is already registered");
         }

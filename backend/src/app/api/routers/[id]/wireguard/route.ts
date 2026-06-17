@@ -9,42 +9,47 @@ import { exec } from "child_process";
 import { promisify } from "util";
 const execAsync = promisify(exec);
 
-// ── Raw SQL helpers (bypass Prisma client validation for new fields) ────────
-
 async function getRouterWgFields(db: ReturnType<typeof getTenantClient>, routerId: string) {
-    const rows = await db.$queryRawUnsafe(
-        `SELECT "wgPrivateKey", "wgPublicKey", "wgPeerPublicKey", "wgPresharedKey",
-                "wgTunnelIp", "wgServerEndpoint", "wgListenPort", "wgEnabled", "wgConfiguredAt",
-                "host", "name", "id", "tenantId", "port", "apiPort", "password", "username"
-         FROM "routers" WHERE "id" = $1 LIMIT 1`,
-        routerId,
-    ) as any[];
-    return rows[0] || null;
+    return await db.router.findFirst({
+        where: { id: routerId },
+        select: {
+            wgPrivateKey: true,
+            wgPublicKey: true,
+            wgPeerPublicKey: true,
+            wgPresharedKey: true,
+            wgTunnelIp: true,
+            wgServerEndpoint: true,
+            wgListenPort: true,
+            wgEnabled: true,
+            wgConfiguredAt: true,
+            host: true,
+            name: true,
+            id: true,
+            tenantId: true,
+            port: true,
+            apiPort: true,
+            password: true,
+            username: true,
+        },
+    });
 }
 
 async function updateRouterWgFields(db: ReturnType<typeof getTenantClient>, routerId: string, data: Record<string, any>) {
-    const setClauses: string[] = [];
-    const values: any[] = [];
-    let idx = 1;
-
-    for (const [key, val] of Object.entries(data)) {
-        setClauses.push(`"${key}" = $${idx}`);
-        values.push(val);
-        idx++;
-    }
-
-    values.push(routerId);
-    await db.$executeRawUnsafe(
-        `UPDATE "routers" SET ${setClauses.join(", ")} WHERE "id" = $${idx}`,
-        ...values,
+    const sanitizedData = Object.fromEntries(
+        Object.entries(data).filter(([, value]) => value !== undefined)
     );
+    if (Object.keys(sanitizedData).length === 0) return;
+    await db.router.update({
+        where: { id: routerId },
+        data: sanitizedData,
+    });
 }
 
 // ── GET /api/routers/[id]/wireguard — Get or generate WireGuard config ──────
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const guard = requirePermission(req, "routers:read");
+        const guard = requirePermission(req, "vpn:read");
         if (guard.error) return guard.error;
         const userPayload = guard.user;
         const db = getTenantClient(userPayload);

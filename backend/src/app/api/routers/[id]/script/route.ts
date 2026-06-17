@@ -1,6 +1,5 @@
 import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
-import prisma from "@/lib/prisma";
 import { getUserFromRequest, errorResponse } from "@/lib/auth";
 
 /**
@@ -135,7 +134,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         const radiusAddr = router.wgTunnelIp ? vpnIp : (publicIp || requestHost || "YOUR_SERVER_IP");
         const srcAddrPart = router.wgTunnelIp ? `src-address=${router.wgTunnelIp}` : "";
 
-        script += `
+        // Avoid embedding raw secrets in generated scripts for non-super-admins.
+        // Only SUPER_ADMIN should receive a script containing plaintext credentials.
+        if (userPayload.role === "SUPER_ADMIN") {
+            script += `
 # 11. RADIUS Configuration
 :if ([:len [/radius find where comment="HQInvestment RADIUS"]] = 0) do={
     /radius add address=${radiusAddr} secret="${router.password || 'hqsecret'}" service=hotspot,ppp timeout=3000ms ${srcAddrPart} comment="HQInvestment RADIUS"
@@ -155,6 +157,19 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 /log info "HQInvestment Configuration completed successfully!"
 /log info "Your router should now be reachable by the billing system."
 `;
+        } else {
+            script += `
+# 11. RADIUS Configuration (REDACTED)
+# Your account doesn't have permission to view router credentials. Contact a Super Admin to obtain a full setup script.
+# To manually configure RADIUS, add a NAS entry on the billing server with this router's IP and shared secret.
+
+# 12. Enable RADIUS for Hotspot and PPP Services (no secret embedded)
+/ip hotspot profile set [find default=yes] use-radius=yes
+/ppp profile set [find name=default] use-radius=yes
+# 13. Success Notification
+/log info "HQInvestment Configuration completed (credentials redacted)."
+`;
+        }
 
         const safeFilename = router.name
             .trim()
