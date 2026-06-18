@@ -13,6 +13,8 @@ describe('PHASE 2: Multi-Tenant Security - IDOR Fixes (MT-002)', () => {
 
     // Mock user payloads for different tenants
     const tenantAUser = {
+        userId: 'user-1',
+        username: 'admin@tenantA.com',
         id: 'user-1',
         email: 'admin@tenantA.com',
         role: 'ADMIN',
@@ -20,6 +22,8 @@ describe('PHASE 2: Multi-Tenant Security - IDOR Fixes (MT-002)', () => {
     };
 
     const tenantBUser = {
+        userId: 'user-2',
+        username: 'admin@tenantB.com',
         id: 'user-2',
         email: 'admin@tenantB.com',
         role: 'ADMIN',
@@ -27,6 +31,8 @@ describe('PHASE 2: Multi-Tenant Security - IDOR Fixes (MT-002)', () => {
     };
 
     const superAdmin = {
+        userId: 'superadmin',
+        username: 'superadmin@platform.com',
         id: 'superadmin',
         email: 'superadmin@platform.com',
         role: 'SUPER_ADMIN',
@@ -176,7 +182,7 @@ describe('PHASE 2: Multi-Tenant Security - IDOR Fixes (MT-002)', () => {
             // const resource = await db.model.findUnique({ where: { id } });
             // if (!resource) return 404;
             // if (!canAccessTenant(user, resource.tenantId)) return 404; // ← explicit check
-            
+
             const simulateRouteLogic = (user: any, resourceTenantId: string) => {
                 if (resourceTenantId === undefined) return 404;
                 if (!canAccessTenant(user, resourceTenantId)) return 404;
@@ -220,7 +226,7 @@ describe('PHASE 2: Multi-Tenant Security - IDOR Fixes (MT-002)', () => {
             // if (!resource) return 404; // not found
             // if (!canAccessTenant(...)) return 404; // access denied but same response
             // This prevents enumeration attacks
-            
+
             const shouldReturn404 = (user: any, resourceTenantId: string | undefined) => {
                 if (resourceTenantId === undefined) return true; // not found
                 if (!canAccessTenant(user, resourceTenantId)) return true; // unauthorized
