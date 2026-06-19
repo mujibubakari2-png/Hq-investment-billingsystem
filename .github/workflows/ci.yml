@@ -80,9 +80,9 @@ jobs:
         working-directory: backend
         run: npx prisma generate
 
-      - name: Run Prisma migrations on test DB
+      - name: Synchronize test DB schema
         working-directory: backend
-        run: npx prisma migrate deploy
+        run: npx prisma db push --accept-data-loss
 
       - name: Run backend tests
         run: pnpm --filter backend test
