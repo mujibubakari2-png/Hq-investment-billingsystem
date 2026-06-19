@@ -179,11 +179,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download frontend build
-        uses: actions/download-artifact@v4
-        with:
-          name: frontend-dist
-          path: frontend/dist
 
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1
@@ -229,7 +224,11 @@ jobs:
             # Rebuild backend
             pnpm --filter backend next:build
 
-            # Copy frontend dist
+            # Build frontend on server
+            pnpm --filter frontend build
+
+            # Copy fresh frontend dist to nginx web root
+            sudo rm -rf /var/www/html/billing/*
             sudo cp -r frontend/dist/* /var/www/html/billing/
 
             # Restart backend + landing page with PM2
