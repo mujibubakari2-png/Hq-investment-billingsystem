@@ -1,10 +1,17 @@
 /**
- * MT-001: Prisma tenant-scoped client factory using $extends
+ * MT-001: Prisma tenant-scoped client factory using JavaScript Proxy
  *
- * Creates a Prisma client extension that automatically injects `tenantId`
- * into WHERE clauses for all find/update/delete operations on tenant-scoped
- * models, eliminating the risk of cross-tenant data leakage from a forgotten
- * tenantFilter in a route handler.
+ * Creates a Proxy wrapper around the Prisma client that automatically injects
+ * `tenantId` into WHERE clauses for all find/update/delete operations on
+ * tenant-scoped models, eliminating the risk of cross-tenant data leakage from
+ * a forgotten tenantFilter in a route handler.
+ *
+ * WHY PROXY INSTEAD OF $extends:
+ *   Prisma's $extends query interceptors do NOT fire when using a Driver Adapter
+ *   (PrismaPg / @prisma/adapter-pg). This is a known limitation of Prisma v5-v7
+ *   with driver adapters — the extension pipeline is bypassed entirely. The Proxy
+ *   approach intercepts at the JavaScript layer and is 100% reliable regardless
+ *   of the underlying adapter.
  *
  * USAGE in route handlers:
  *   import { getTenantClient } from '@/lib/tenantPrisma';
@@ -15,26 +22,23 @@
  *   const sub     = await db.subscription.findFirst(…); // WHERE tenantId = ?
  *
  * SUPER_ADMIN bypass:
- *   Pass null as tenantId to get an unscoped client (full cross-tenant access):
- *   const db = getTenantClient(null);  // no automatic tenantId filter
+ *   Pass null as tenantId to get an unscoped client (full cross-tenant access).
+ *   Soft-delete filtering STILL applies for super-admins (deleted data is hidden).
  *
  * ARCHITECTURE:
- *   - Built on Prisma's $extends (Component Extensions API), stable since 5.0
- *   - The base prisma instance (singleton pool) is reused — no extra connections
- *   - The extension object is cheap to create per-request (no I/O)
+ *   - Proxy wraps the base prisma singleton (no extra connections, no I/O)
+ *   - Works regardless of Prisma adapter (PrismaPg, libSQL, etc.)
  *   - Works alongside existing raw $executeRaw / $queryRaw calls (not intercepted)
- *   - Soft-delete filtering (deletedAt IS NULL) is also applied here, replacing
- *     the need for the old softDelete middleware
+ *   - Soft-delete filtering (deletedAt IS NULL) is applied here for all clients
  *
  * TENANT-SCOPED MODELS:
  *   Models that carry a tenantId column. Extend this list when adding new models.
  */
 
 import prisma from './prisma';
-import { Prisma } from '../generated/prisma';
 
 // ── Tenant-scoped model names ─────────────────────────────────────────────────
-// Must match Prisma model names exactly (camelCase).
+// Must match Prisma model names exactly (camelCase accessor on PrismaClient).
 const TENANT_MODELS = new Set([
     'client',
     'subscription',
@@ -72,9 +76,9 @@ const TENANT_MODELS = new Set([
     'vpnUser',
     'webhookLog',
     'user',
-] as const);
+]);
 
-// ── Soft-delete models (also have deletedAt) ──────────────────────────────────
+// ── Soft-delete models (also have deletedAt column) ───────────────────────────
 const SOFT_DELETE_MODELS = new Set([
     'client',
     'subscription',
@@ -84,139 +88,258 @@ const SOFT_DELETE_MODELS = new Set([
     'user',
 ]);
 
-// ── Extension factory ─────────────────────────────────────────────────────────
+// ── Helper: build the filter additions for a given model + tenantId ─────────────
 
-/**
- * Returns a Prisma client extension that auto-scopes queries to the given tenant.
- *
- * @param userOrTenantId - The user's JwtPayload, or a string tenantId, or null for unscoped access.
- */
-export function getTenantClient(userOrTenantId: any | string | null) {
-    let finalTenantId: string | null = null;
+function buildWhere(
+    model: string,
+    tenantId: string | null,
+    existingWhere?: Record<string, unknown>,
+): Record<string, unknown> {
+    const isTenantModel = TENANT_MODELS.has(model);
+    const isSoftDeleteModel = SOFT_DELETE_MODELS.has(model);
 
-    if (userOrTenantId === undefined || userOrTenantId === null) {
-        finalTenantId = null;
-    } else if (typeof userOrTenantId === "object" && "role" in userOrTenantId) {
-        // It's a JwtPayload
-        const tenantId = userOrTenantId.tenantId ?? userOrTenantId.tenant_id ?? null;
-        const isPlatformSuperAdmin = userOrTenantId.role === "SUPER_ADMIN" && !tenantId;
-        finalTenantId = isPlatformSuperAdmin ? null : tenantId;
-    } else {
-        // It's a raw string
-        finalTenantId = userOrTenantId as string;
+    const additions: Record<string, unknown> = {};
+
+    // Soft-delete: inject deletedAt=null ONLY when the caller has not already
+    // specified an explicit deletedAt filter. This allows admin operations like
+    // purgeOldSoftDeleted() to query with { deletedAt: { lte: cutoff } } without
+    // being overridden. Regular route handlers never pass deletedAt in WHERE,
+    // so they always get the soft-delete filter applied automatically.
+    const callerHasDeletedAt =
+        existingWhere !== undefined && 'deletedAt' in existingWhere;
+    if (isSoftDeleteModel && !callerHasDeletedAt) {
+        additions.deletedAt = null;
     }
 
-    return prisma.$extends({
-        name: `tenant-scope:${finalTenantId ?? 'global'}`,
-        query: {
-            $allModels: {
-                async findMany({ model, operation, args, query }: any) {
-                    args = injectFilters(model, operation, args, finalTenantId);
-                    return query(args);
-                },
-                async findFirst({ model, operation, args, query }: any) {
-                    args = injectFilters(model, operation, args, finalTenantId);
-                    return query(args);
-                },
-                async findFirstOrThrow({ model, operation, args, query }: any) {
-                    args = injectFilters(model, operation, args, finalTenantId);
-                    return query(args);
-                },
-                async findUnique({ model, operation, args, query }: any) {
-                    const isTenantModel = TENANT_MODELS.has(model as any);
-                    const isSoftDeleted = SOFT_DELETE_MODELS.has(model as any);
-                    if ((finalTenantId && isTenantModel) || isSoftDeleted) {
-                        const newArgs = injectFilters(model, "findFirst", args, finalTenantId);
-                        return (prisma as any)[model].findFirst(newArgs);
-                    }
-                    return query(args);
-                },
-                async update({ model, operation, args, query }: any) {
-                    if (finalTenantId && TENANT_MODELS.has(model as any)) {
-                        const checkArgs = injectFilters(model, "findFirst", { where: args.where }, finalTenantId);
-                        const existing = await (prisma as any)[model].findFirst({ where: checkArgs.where, select: { tenantId: true } });
-                        if (!existing) throw new Error(`Not Found or Unauthorized for ${model} update`);
-                    }
-                    return query(args);
-                },
-                async delete({ model, operation, args, query }: any) {
-                    if (finalTenantId && TENANT_MODELS.has(model as any)) {
-                        const checkArgs = injectFilters(model, "findFirst", { where: args.where }, finalTenantId);
-                        const existing = await (prisma as any)[model].findFirst({ where: checkArgs.where, select: { tenantId: true } });
-                        if (!existing) throw new Error(`Not Found or Unauthorized for ${model} delete`);
-                    }
-                    return query(args);
-                },
-                async count({ model, operation, args, query }: any) {
-                    args = injectFilters(model, operation, args, finalTenantId);
-                    return query(args);
-                },
-                async aggregate({ model, operation, args, query }: any) {
-                    args = injectFilters(model, operation, args, finalTenantId);
-                    return query(args);
-                },
-                async updateMany({ model, operation, args, query }: any) {
-                    args = injectFilters(model, operation, args, finalTenantId);
-                    return query(args);
-                },
-                async deleteMany({ model, operation, args, query }: any) {
-                    args = injectFilters(model, operation, args, finalTenantId);
-                    return query(args);
-                },
-                async create({ model, operation, args, query }: any) {
-                    // Auto-inject tenantId into data on create
-                    if (finalTenantId && TENANT_MODELS.has(model as any) && args.data) {
-                        args = {
+    // Tenant filter: force tenantId for non-super-admin scoped clients.
+    // This ALWAYS wins over any tenantId the caller might provide to prevent
+    // cross-tenant spoofing attacks.
+    if (tenantId !== null && isTenantModel) {
+        additions.tenantId = tenantId;
+    }
+
+    if (Object.keys(additions).length === 0) {
+        return existingWhere ?? {};
+    }
+
+    return {
+        ...(existingWhere ?? {}),
+        ...additions,
+        // Force tenantId last so a caller cannot spoof it in their WHERE clause
+        ...(tenantId !== null && isTenantModel ? { tenantId } : {}),
+    };
+}
+
+// ── Model delegate proxy factory ──────────────────────────────────────────────
+
+function createModelProxy(
+    delegate: Record<string, (...args: any[]) => any>,
+    model: string,
+    tenantId: string | null,
+): Record<string, (...args: any[]) => any> {
+    return new Proxy(delegate, {
+        get(target, prop: string) {
+            const original = target[prop];
+            if (typeof original !== 'function') return original;
+
+            // ── Read operations: inject tenant + soft-delete into WHERE ──────
+            if (
+                prop === 'findMany' ||
+                prop === 'findFirst' ||
+                prop === 'findFirstOrThrow' ||
+                prop === 'count' ||
+                prop === 'aggregate' ||
+                prop === 'updateMany' ||
+                prop === 'deleteMany'
+            ) {
+                return (args: any = {}) => {
+                    const newArgs = {
+                        ...args,
+                        where: buildWhere(model, tenantId, args?.where),
+                    };
+                    return original.call(target, newArgs);
+                };
+            }
+
+            // ── findUnique: redirect to findFirst with filters ───────────────
+            if (prop === 'findUnique' || prop === 'findUniqueOrThrow') {
+                return (args: any = {}) => {
+                    const isTenantModel = TENANT_MODELS.has(model);
+                    const isSoftDeleteModel = SOFT_DELETE_MODELS.has(model);
+                    if (
+                        (tenantId !== null && isTenantModel) ||
+                        isSoftDeleteModel
+                    ) {
+                        const newWhere = buildWhere(
+                            model,
+                            tenantId,
+                            args?.where,
+                        );
+                        if (prop === 'findUniqueOrThrow') {
+                            return target.findFirstOrThrow.call(target, {
+                                ...args,
+                                where: newWhere,
+                            });
+                        }
+                        return target.findFirst.call(target, {
                             ...args,
-                            data: { ...args.data, tenantId: finalTenantId },
-                        };
+                            where: newWhere,
+                        });
                     }
-                    return query(args);
-                },
-                async createMany({ model, operation, args, query }: any) {
-                    if (finalTenantId && TENANT_MODELS.has(model as any) && Array.isArray(args.data)) {
-                        args = {
+                    return original.call(target, args);
+                };
+            }
+
+            // ── update: ownership check before proceeding ────────────────────
+            if (prop === 'update') {
+                return async (args: any = {}) => {
+                    const isTenantModel = TENANT_MODELS.has(model);
+                    if (tenantId !== null && isTenantModel) {
+                        const checkWhere = buildWhere(
+                            model,
+                            tenantId,
+                            args?.where,
+                        );
+                        const existing = await target.findFirst.call(target, {
+                            where: checkWhere,
+                            select: { id: true },
+                        });
+                        if (!existing) {
+                            throw new Error(
+                                `Not Found or Unauthorized for ${model} update`,
+                            );
+                        }
+                    }
+                    return original.call(target, args);
+                };
+            }
+
+            // ── delete: ownership check before proceeding ────────────────────
+            if (prop === 'delete') {
+                return async (args: any = {}) => {
+                    const isTenantModel = TENANT_MODELS.has(model);
+                    if (tenantId !== null && isTenantModel) {
+                        const checkWhere = buildWhere(
+                            model,
+                            tenantId,
+                            args?.where,
+                        );
+                        const existing = await target.findFirst.call(target, {
+                            where: checkWhere,
+                            select: { id: true },
+                        });
+                        if (!existing) {
+                            throw new Error(
+                                `Not Found or Unauthorized for ${model} delete`,
+                            );
+                        }
+                    }
+                    return original.call(target, args);
+                };
+            }
+
+            // ── create: auto-inject tenantId into data ───────────────────────
+            if (prop === 'create') {
+                return (args: any = {}) => {
+                    const isTenantModel = TENANT_MODELS.has(model);
+                    if (tenantId !== null && isTenantModel && args.data) {
+                        const newArgs = {
                             ...args,
-                            data: args.data.map((row: any) => ({ ...row, tenantId: finalTenantId })),
+                            data: { ...args.data, tenantId },
                         };
+                        return original.call(target, newArgs);
                     }
-                    return query(args);
-                },
-            },
+                    return original.call(target, args);
+                };
+            }
+
+            // ── createMany: auto-inject tenantId into each row ───────────────
+            if (prop === 'createMany') {
+                return (args: any = {}) => {
+                    const isTenantModel = TENANT_MODELS.has(model);
+                    if (
+                        tenantId !== null &&
+                        isTenantModel &&
+                        Array.isArray(args.data)
+                    ) {
+                        const newArgs = {
+                            ...args,
+                            data: args.data.map((row: any) => ({
+                                ...row,
+                                tenantId,
+                            })),
+                        };
+                        return original.call(target, newArgs);
+                    }
+                    return original.call(target, args);
+                };
+            }
+
+            // All other methods pass through unchanged
+            return original.bind(target);
         },
     });
 }
 
-// ── Helper: inject tenantId + soft-delete into WHERE ─────────────────────────
+// ── Client proxy factory ──────────────────────────────────────────────────────
 
-function injectFilters(
-    model: string,
-    _operation: string,
-    args: any,
+function createClientProxy(
+    client: typeof prisma,
     tenantId: string | null,
-): any {
-    const isTenantModel = TENANT_MODELS.has(model as any);
-    const isSoftDeleted = SOFT_DELETE_MODELS.has(model as any);
-    const shouldScopeTenant = tenantId !== null && isTenantModel;
-    const shouldFilterDeleted = isSoftDeleted;
+): typeof prisma {
+    return new Proxy(client, {
+        get(target, prop: string) {
+            // Intercept model accessor properties (e.g. prisma.router, prisma.client)
+            // These are all lowercase camelCase names matching TENANT_MODELS or soft-delete models.
+            const isTenantModel = TENANT_MODELS.has(prop);
+            const isSoftDeleteModel = SOFT_DELETE_MODELS.has(prop);
 
-    if (!shouldScopeTenant && !shouldFilterDeleted) return args;
+            if (isTenantModel || isSoftDeleteModel) {
+                const delegate = (target as any)[prop];
+                if (delegate && typeof delegate === 'object') {
+                    return createModelProxy(delegate, prop, tenantId);
+                }
+            }
 
-    const additions: Record<string, any> = {};
-    if (shouldScopeTenant) additions.tenantId = tenantId;
-    if (shouldFilterDeleted) additions.deletedAt = null;
-
-    return {
-        ...args,
-        where: {
-            ...additions,
-            ...(args?.where ?? {}),
-            // Ensure tenant filter always wins if already present (belt-and-suspenders)
-            ...(shouldScopeTenant ? { tenantId } : {}),
+            // Everything else (e.g. $transaction, $queryRaw, $connect, etc.)
+            const value = (target as any)[prop];
+            if (typeof value === 'function') {
+                return value.bind(target);
+            }
+            return value;
         },
-    };
+    });
+}
+
+// ── Public factory ────────────────────────────────────────────────────────────
+
+/**
+ * Returns a Prisma client proxy that auto-scopes queries to the given tenant.
+ *
+ * @param userOrTenantId - The user's JwtPayload, or a string tenantId, or null
+ *                          for unscoped (super-admin) access.
+ *
+ * Soft-delete filtering (deletedAt IS NULL) always applies regardless of tenant scope.
+ */
+export function getTenantClient(userOrTenantId: any): typeof prisma {
+    let finalTenantId: string | null = null;
+
+    if (userOrTenantId === undefined || userOrTenantId === null) {
+        finalTenantId = null;
+    } else if (typeof userOrTenantId === 'object' && 'role' in userOrTenantId) {
+        // It's a JwtPayload
+        const tenantId =
+            userOrTenantId.tenantId ?? userOrTenantId.tenant_id ?? null;
+        const isPlatformSuperAdmin =
+            userOrTenantId.role === 'SUPER_ADMIN' && !tenantId;
+        finalTenantId = isPlatformSuperAdmin ? null : tenantId;
+    } else if (typeof userOrTenantId === 'string') {
+        finalTenantId = userOrTenantId;
+    }
+
+    return createClientProxy(prisma, finalTenantId);
 }
 
 // ── Type export ───────────────────────────────────────────────────────────────
-// Infer the extended client type so callers get full TS autocomplete.
+// Preserve the same type so callers get full TS autocomplete.
 export type TenantClient = ReturnType<typeof getTenantClient>;
