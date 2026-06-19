@@ -32,6 +32,9 @@ jobs:
       - name: Type-check frontend
         run: pnpm --filter frontend tsc --noEmit
 
+      - name: Type-check & Lint landing-page
+        run: pnpm --filter landing-page lint
+
   # ── Backend Tests ──────────────────────────────────────────────────────────
   test-backend:
     name: Test Backend
@@ -175,12 +178,45 @@ jobs:
           path: frontend/dist
           retention-days: 7
 
+  # ── Landing Page Build ───────────────────────────────────────────────────────
+  build-landing-page:
+    name: Build Landing Page
+    runs-on: ubuntu-latest
+    needs: [lint-and-typecheck]
+    env:
+      NEXT_TELEMETRY_DISABLED: 1
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Cache Next.js build (Landing Page)
+        uses: actions/cache@v4
+        with:
+          path: landing-page/.next/cache
+          key: ${{ runner.os }}-nextjs-landing-${{ hashFiles('**/pnpm-lock.yaml') }}-${{ hashFiles('landing-page/**.[jt]s', 'landing-page/**.[jt]sx') }}
+          restore-keys: |
+            ${{ runner.os }}-nextjs-landing-${{ hashFiles('**/pnpm-lock.yaml') }}-
+
+      - name: Build landing page
+        run: pnpm --filter landing-page build
+
   # ── Deploy to Production (main branch only) ────────────────────────────────
   deploy:
     name: Deploy to Production
     runs-on: ubuntu-latest
     # ALL test and build jobs must pass before deployment runs
-    needs: [build-backend, build-frontend]
+    needs: [build-backend, build-frontend, build-landing-page]
     if: github.ref == 'refs/heads/master' && github.event_name == 'push'
     environment: production
     steps:
@@ -233,6 +269,9 @@ jobs:
 
             # Build frontend on server
             pnpm --filter frontend build
+
+            # Build landing page on server
+            pnpm --filter landing-page build
 
             # Copy fresh frontend dist to nginx web root
             sudo rm -rf /var/www/html/billing/*
