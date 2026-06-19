@@ -81,7 +81,8 @@ jobs:
         run: npx prisma generate
 
       - name: Run backend tests
-        run: pnpm --filter backend test
+        working-directory: backend
+        run: pnpm run test
 
   # ── Frontend Tests ─────────────────────────────────────────────────────────
   test-frontend:
