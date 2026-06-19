@@ -8,8 +8,7 @@ import SaveIcon from '@mui/icons-material/Save';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SyncIcon from '@mui/icons-material/Sync';
 import { useNavigate, useParams, Link } from 'react-router-dom';
-import type { ApiResponse } from '../api/httpClient';
-import { get, isApiErrorResponse } from '../api/httpClient';
+import { get } from '../api/httpClient';
 import { subscriptionsApi, packagesApi, routersApi } from '../api';
 
 interface SubscriptionDetail {
@@ -100,16 +99,11 @@ export default function EditPlan() {
             packagesApi.list(),
             routersApi.list(),
             // Also fetch the specific subscription detail
-            get<ApiResponse<SubscriptionDetail>>(`/subscriptions/${id}`),
+            get<SubscriptionDetail>(`/subscriptions/${id}`),
         ])
             .then(([, pkgs, rtrs, subData]) => {
                 setPackages(pkgs as unknown as PkgOption[]);
                 setRouters(rtrs as unknown as RouterOption[]);
-
-                if (isApiErrorResponse(subData)) {
-                    setError(subData.error);
-                    return;
-                }
 
                 setSub(subData);
 
