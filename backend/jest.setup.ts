@@ -6,9 +6,12 @@
 process.env.NODE_ENV = 'test';
 
 // Database — use TEST_DATABASE_URL first, then DATABASE_URL, then localhost placeholder
-process.env.DATABASE_URL ||=
-    process.env.TEST_DATABASE_URL ||
+const rawUrl = process.env.TEST_DATABASE_URL ||
+    process.env.DATABASE_URL ||
     'postgresql://test_user:test_password_placeholder@127.0.0.1:5432/testdb';
+
+// Force the database name to 'testdb' to match what setup-test-db.js uses for `db push`
+process.env.DATABASE_URL = rawUrl.replace(/\/[^/?]+(\?.*)?$/, '/testdb$1');
 
 // JWT — test-only keys (never share with production)
 process.env.JWT_SECRET         ||= 'ci_test_jwt_secret_must_be_32_chars_long!!';
