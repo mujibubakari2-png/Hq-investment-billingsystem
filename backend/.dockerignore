@@ -37,11 +37,17 @@ coverage/
 # Debug scripts and temp files
 fix_*.ps1
 fix_*.sh
+fix-*.js
 diff.txt
 dry_run.js
 extract-error.js
 refactor_prisma.js
 test-prisma.ts
+
+# One-off admin/maintenance scripts (never needed inside Docker image)
+clear_data_keep_admins.js
+ensure_user.ts
+ensure_*.ts
 
 # Python dev utilities
 *.py
