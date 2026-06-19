@@ -74,7 +74,12 @@ function getPrisma(): PrismaClient {
 // while the actual client is only created on the first method call.
 export const prisma = new Proxy({} as PrismaClient, {
     get(_target, prop) {
-        return (getPrisma() as any)[prop];
+        const client = getPrisma() as any;
+        const value = client[prop];
+        if (typeof value === 'function') {
+            return value.bind(client);
+        }
+        return value;
     },
 });
 
