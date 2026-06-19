@@ -13,16 +13,5 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
-  postgres-test:
-    image: postgres:16-alpine
-    container_name: hqinvestment-test-db
-    restart: always
-    environment:
-      POSTGRES_USER: test
-      POSTGRES_PASSWORD: test
-      POSTGRES_DB: testdb
-    ports:
-      - "127.0.0.1:5433:5432"
-
 volumes:
   postgres_data:

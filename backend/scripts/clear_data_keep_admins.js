@@ -1,7 +1,13 @@
 const pkg = require('pg');
 const { Pool } = pkg;
 
-const connectionString = "postgresql://enterprisedb:Muu@66487125@localhost:5444/hqinvestment_isp?schema=public";
+// SECURITY: Never hardcode credentials. Set DATABASE_URL in your environment.
+const connectionString = process.env.DATABASE_URL;
+if (!connectionString) {
+    console.error('ERROR: DATABASE_URL environment variable is not set.');
+    console.error('Usage: DATABASE_URL="postgresql://user:pass@host:port/db" node clear_data_keep_admins.js');
+    process.exit(1);
+}
 const pool = new Pool({ connectionString });
 
 async function clearData() {
