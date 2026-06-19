@@ -122,10 +122,13 @@ describe('Route Integration Tests: Packages and WireGuard', () => {
         it('Tenant 1 cannot see Tenant 2 packages', async () => {
             const db1 = getTenantClient(tenant1Id);
             const packages = await db1.package.findMany({
-                where: { tenantId: tenant2Id },
+                where: { tenantId: tenant2Id }, // User tries to spoof tenant2Id
             });
 
-            expect(packages).toHaveLength(0);
+            // The Proxy overrides the spoofed tenantId with the caller's true tenantId.
+            // So instead of returning Tenant 2's packages (or 0 if none), it returns
+            // Tenant 1's own packages, effectively ignoring the spoof attempt.
+            expect(packages.every(p => p.tenantId === tenant1Id)).toBe(true);
         });
 
         it('Super admin can see all packages', async () => {
