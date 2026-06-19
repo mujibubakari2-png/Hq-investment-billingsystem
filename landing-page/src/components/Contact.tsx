@@ -34,7 +34,7 @@ export default function Contact() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 md:gap-14 lg:gap-20 items-center">
           <div>
-            <h2 className="text-3xl md:text-5xl font-bold text-primary mb-6">Let's Find the Right Plan for Your Network</h2>
+            <h2 className="text-3xl md:text-5xl font-bold text-primary mb-6">Let&apos;s Find the Right Plan for Your Network</h2>
             <p className="text-lg text-gray-600 mb-10 leading-relaxed">
               Have questions? Need a custom quote? Our team of ISP billing experts typically responds within a few hours — not days.
             </p>
@@ -102,7 +102,7 @@ export default function Contact() {
               >
                 {status === "loading" ? "Sending..." : "Send Message →"}
               </button>
-              {status === "success" && <p className="text-green-600 font-medium text-center">Message received! We'll get back to you within a few hours.</p>}
+              {status === "success" && <p className="text-green-600 font-medium text-center">Message received! We&apos;ll get back to you within a few hours.</p>}
               {status === "error" && <p className="text-red-600 font-medium text-center">Something went wrong. Please try again or email us directly at support@yourdomain.com</p>}
             </form>
           </motion.div>
