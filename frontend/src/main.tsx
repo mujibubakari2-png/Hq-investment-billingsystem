@@ -1,7 +1,6 @@
-import { StrictMode } from 'react';
+import { StrictMode, lazy, Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import ErrorBoundary from './components/ErrorBoundary';
 import './index.css';
@@ -36,6 +35,18 @@ function GoogleOAuthWrapper({ children }: { children: React.ReactNode }) {
   return <GoogleOAuthProvider clientId={googleClientId!}>{children}</GoogleOAuthProvider>;
 }
 
+// ── DevTools (development only) ───────────────────────────────────────────────
+// Lazy-loaded so Vite's dead-code elimination removes this entire module from
+// the production bundle. `import.meta.env.DEV` is false at production build time,
+// so the lazy() call and its import are never evaluated.
+const ReactQueryDevtools = import.meta.env.DEV
+  ? lazy(() =>
+      import('@tanstack/react-query-devtools').then((m) => ({
+        default: m.ReactQueryDevtools,
+      }))
+    )
+  : null;
+
 // ── App Root ──────────────────────────────────────────────────────────────────
 
 createRoot(document.getElementById('root')!).render(
@@ -46,8 +57,13 @@ createRoot(document.getElementById('root')!).render(
           <App />
         </GoogleOAuthWrapper>
       </ErrorBoundary>
-      {/* DevTools only loaded in development (tree-shaken in production build) */}
-      <ReactQueryDevtools initialIsOpen={false} buttonPosition="bottom-right" />
+      {/* DevTools: lazy-loaded in development only — fully tree-shaken in production.
+          ReactQueryDevtools is null in production builds (see above). */}
+      {ReactQueryDevtools && (
+        <Suspense fallback={null}>
+          <ReactQueryDevtools initialIsOpen={false} buttonPosition="bottom-right" />
+        </Suspense>
+      )}
     </QueryClientProvider>
   </StrictMode>
 );

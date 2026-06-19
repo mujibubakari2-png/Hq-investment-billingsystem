@@ -81,3 +81,23 @@ NODE_ENV=production
 
 # The URL to the frontend billing system (used for Login/Register buttons)
 NEXT_PUBLIC_BILLING_SYSTEM_URL=${frontend.PUBLIC_URL}
+
+# ─── GITHUB ACTIONS SECRETS (repository Settings → Secrets → Actions) ─────────
+# These are REQUIRED for the CI/CD pipeline to run tests before deploying.
+# Go to: https://github.com/YOUR_ORG/YOUR_REPO/settings/secrets/actions
+# Add each of the following as a repository secret:
+#
+# Secret Name              | How to generate
+# ─────────────────────────────────────────────────────────────────────────────
+# CI_JWT_ACCESS_SECRET     | node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
+# CI_JWT_REFRESH_SECRET    | node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
+# CI_JWT_SECRET            | node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+# CI_FIELD_ENCRYPTION_KEY  | node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+# CI_CRON_SECRET           | node -e "console.log(require('crypto').randomBytes(16).toString('hex'))"
+# DROPLET_HOST             | IP address of your DigitalOcean droplet
+# DROPLET_USER             | SSH username (e.g., root or deploy)
+# DROPLET_SSH_KEY          | Private SSH key (contents of ~/.ssh/id_rsa)
+#
+# IMPORTANT: These are CI-only secrets — never the same as production secrets.
+# CI secrets only authenticate against the temporary test database that the
+# pipeline spins up. They have zero access to production data.

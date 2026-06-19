@@ -2,10 +2,14 @@
 node_modules/
 dist/
 
-# Test
+# Test infrastructure
 coverage/
 *.test.ts
 *.test.tsx
+*.spec.ts
+*.spec.tsx
+vitest.config.ts
+src/test/
 
 # Env
 .env

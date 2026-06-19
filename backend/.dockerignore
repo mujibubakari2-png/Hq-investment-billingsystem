@@ -10,11 +10,15 @@ node_modules/
 .next/
 out/
 
-# Test files
+# Test files and test configuration
 src/__tests__/
 jest.config.ts
+jest.setup.ts
 coverage/
 *.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
 
 # Local env files — secrets are injected at runtime via docker-compose env
 .env
@@ -34,6 +38,21 @@ coverage/
 fix_*.ps1
 fix_*.sh
 diff.txt
+dry_run.js
+extract-error.js
+refactor_prisma.js
+test-prisma.ts
+
+# Python dev utilities
+*.py
+tmp_*.py
+
+# Audit / debug log files
+tenantIsolation.log
+tenant_prisma_audit.txt
+
+# Scratch / exploratory scripts
+scratch/
 
 # Documentation (not needed in image)
 *.md

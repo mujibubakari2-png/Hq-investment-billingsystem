@@ -54,8 +54,11 @@ async function resolveDatabaseUrl() {
   }
 
   if (!baseDbUrl) {
-    baseDbUrl = 'postgresql://enterprisedb:Muu%4066487125@127.0.0.1:5432/hqinvestment_isp';
-    source = 'fallback';
+    // No credential fallback — require TEST_DATABASE_URL or DATABASE_URL to be set.
+    // If neither is available, we fall back to a local postgres with a placeholder
+    // credential that will fail loudly rather than silently using a real password.
+    baseDbUrl = 'postgresql://test_user:test_password_placeholder@127.0.0.1:5432/hqinvestment_isp';
+    source = 'fallback (placeholder — set TEST_DATABASE_URL or DATABASE_URL)';
   }
 
   const testDbUrl = replaceDatabaseName(baseDbUrl, 'testdb');
@@ -64,11 +67,10 @@ async function resolveDatabaseUrl() {
   if (parsed && parsed.hostname && parsed.port) {
     const reachable = await isTcpReachable(parsed.hostname, Number(parsed.port));
     if (!reachable) {
-      const localFallbackUrl = 'postgresql://enterprisedb:Muu%4066487125@127.0.0.1:5432/testdb';
-      if (testDbUrl !== localFallbackUrl) {
-        console.warn(`Database host ${parsed.hostname}:${parsed.port} is unreachable. Falling back to local test DB ${localFallbackUrl}`);
-        return { url: localFallbackUrl, source: 'local fallback' };
-      }
+      // Cannot reach the configured DB host — bail out rather than falling back
+      // to a hardcoded credential. Callers must provide a reachable TEST_DATABASE_URL.
+      console.warn(`Database host ${parsed.hostname}:${parsed.port} is unreachable. Set TEST_DATABASE_URL to a reachable test database.`);
+      process.exit(1);
     }
   }
 
@@ -89,18 +91,8 @@ function runDbPush(dbUrl) {
     console.log('Test database setup complete.');
   } catch (error) {
     console.warn('Primary test database setup failed:', error.message);
-    const localFallbackUrl = 'postgresql://enterprisedb:Muu%4066487125@127.0.0.1:5432/testdb';
-    if (process.env.DATABASE_URL !== localFallbackUrl) {
-      console.log('Attempting local fallback test database at ' + localFallbackUrl + ' ...');
-      try {
-        runDbPush(localFallbackUrl);
-        process.env.DATABASE_URL = localFallbackUrl;
-        console.log('Test database setup complete using local fallback.');
-        return;
-      } catch (fallbackError) {
-        console.error('Local fallback test database setup failed:', fallbackError.message);
-      }
-    }
+    // No fallback to hardcoded credentials — require environment variables.
+    console.error('Set TEST_DATABASE_URL or DATABASE_URL to a reachable test database.');
     console.error('Failed to set up test database:', error.message);
     process.exit(1);
   }
