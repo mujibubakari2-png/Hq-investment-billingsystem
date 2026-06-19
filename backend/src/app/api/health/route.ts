@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { PrismaClient } from "../../../generated/prisma";
+import { getTenantClient } from "@/lib/tenantPrisma";
 
 /**
  * GET /api/health
@@ -14,15 +14,6 @@ import { PrismaClient } from "../../../generated/prisma";
  * Used by: load balancers, monitoring tools, deployment orchestrators
  * Response times: typically <100ms for healthy system
  */
-
-let prisma: PrismaClient | null = null;
-
-function getPrisma() {
-    if (!prisma) {
-        prisma = new PrismaClient();
-    }
-    return prisma;
-}
 
 interface HealthStatus {
     status: "ok" | "degraded" | "critical";
@@ -55,18 +46,18 @@ export async function GET() {
     };
 
     try {
-        const prisma = getPrisma();
+        const db = getTenantClient(null);
 
         // Test database connection
         const dbStart = Date.now();
-        await prisma.$queryRaw`SELECT 1 as test`;
+        await db.$queryRaw`SELECT 1 as test`;
         const dbLatency = Date.now() - dbStart;
         response.database.connected = true;
         response.database.latency_ms = dbLatency;
 
         // Verify schema (check for critical tables)
         try {
-            const tableQuery = await prisma.$queryRaw<
+            const tableQuery = await db.$queryRaw<
                 { tablename: string }[]
             >`SELECT tablename FROM pg_tables WHERE schemaname = 'public' LIMIT 1`;
 
@@ -82,9 +73,9 @@ export async function GET() {
         // Test access to critical tables
         try {
             await Promise.all([
-                prisma.user.count(),
-                prisma.tenant.count(),
-                prisma.client.count(),
+                db.user.count(),
+                db.tenant.count(),
+                db.client.count(),
             ]);
             response.database.critical_tables_accessible = true;
         } catch (error) {

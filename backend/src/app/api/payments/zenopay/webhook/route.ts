@@ -4,7 +4,7 @@ import { errorResponse, jsonResponse } from "@/lib/auth";
 import { sendEmail } from "@/lib/email";
 import { env } from "@/lib/env";
 import { rateLimitMiddleware } from "@/middleware/rateLimiter";
-import crypto from "crypto";
+import { computeHmac, timingSafeEqual } from "@/lib/payments/utils";
 
 export async function POST(req: NextRequest) {
     try {
@@ -15,16 +15,29 @@ export async function POST(req: NextRequest) {
         }
 
         const webhookSecret = env.ZENOPAY_WEBHOOK_SECRET || env.PAYMENT_WEBHOOK_SECRET;
-        if (webhookSecret) {
-            const providedSecret = (req.headers.get("x-webhook-secret") || req.headers.get("x-zeno-signature") || "").toString();
-            const providedDigest = crypto.createHash("sha256").update(providedSecret).digest();
-            const secretDigest = crypto.createHash("sha256").update(webhookSecret).digest();
-            if (!crypto.timingSafeEqual(providedDigest, secretDigest)) {
-                return errorResponse("Unauthorized webhook signature", 401);
-            }
+        if (!webhookSecret) {
+            console.error("[ZENOPAY WEBHOOK] Webhook secret is not configured");
+            return errorResponse("Webhook secret is not configured", 500);
         }
 
-        const body = await req.json();
+        const rawBody = await req.text();
+        const providedHmac = req.headers.get("x-zeno-signature");
+        const providedSecret = req.headers.get("x-webhook-secret");
+
+        if (providedHmac) {
+            const expected = computeHmac(webhookSecret, rawBody);
+            if (!timingSafeEqual(providedHmac, expected)) {
+                return errorResponse("Unauthorized webhook signature", 401);
+            }
+        } else if (providedSecret) {
+            if (!timingSafeEqual(providedSecret, webhookSecret)) {
+                return errorResponse("Unauthorized webhook signature", 401);
+            }
+        } else {
+            return errorResponse("Missing webhook signature", 401);
+        }
+
+        const body = JSON.parse(rawBody);
 
         // ZenoPay payload extraction
         const orderId = (body?.order_id as string) || (body?.reference as string) || "";
@@ -54,48 +67,63 @@ export async function POST(req: NextRequest) {
             return errorResponse("Invoice not found", 404);
         }
 
+        if (!invoice.tenantId) {
+            return errorResponse("Invalid invoice tenant data", 500);
+        }
+
+        if (!invoice.tenant) {
+            return errorResponse("Invoice tenant details are missing", 500);
+        }
+
         if (invoice.status === "PAID") {
             return jsonResponse({ message: "Already paid" });
         }
 
-        // Run updates inside a transaction
+        // Run updates inside a transaction. Make processing idempotent.
         const tenantDb = getTenantClient(invoice.tenantId);
-        await tenantDb.$transaction(async (tx: any) => {
-            // 1. Update invoice status
-            await tx.tenantInvoice.update({
-                where: { id: invoice.id },
-                data: { status: "PAID" }
-            });
+        try {
+            await tenantDb.$transaction(async (tx: any) => {
+                const res = await tx.tenantInvoice.updateMany({
+                    where: { id: invoice.id, status: { not: 'PAID' } },
+                    data: { status: 'PAID' },
+                });
 
-            // 2. Create payment record
-            await tx.tenantPayment.create({
-                data: {
-                    invoiceId: invoice.id,
-                    tenantId: invoice.tenantId,
-                    amount: amount || invoice.amount,
-                    transactionId: transactionId || null,
-                    status: "COMPLETED",
-                    paymentMethod: "ZENOPAY"
+                if (res.count === 0) {
+                    throw new Error('ALREADY_PROCESSED');
                 }
+
+                // Create payment record
+                await tx.tenantPayment.create({
+                    data: {
+                        invoiceId: invoice.id,
+                        tenantId: invoice.tenantId,
+                        amount: amount || invoice.amount,
+                        transactionId: transactionId || null,
+                        status: 'COMPLETED',
+                        paymentMethod: 'ZENOPAY',
+                    },
+                });
+
+                // Activate the Tenant and Push Expiration Date Forward
+                const now = new Date();
+                let currentExpiry = invoice.tenant.licenseExpiresAt || invoice.tenant.trialEnd || now;
+                if (currentExpiry < now) currentExpiry = now; // Prevent backdating
+
+                const monthsToExtend = invoice.packageMonths || 0;
+                const newExpiry = new Date(currentExpiry);
+                newExpiry.setMonth(newExpiry.getMonth() + monthsToExtend);
+
+                await tx.tenant.update({
+                    where: { id: invoice.tenantId },
+                    data: { status: 'ACTIVE', licenseExpiresAt: newExpiry },
+                });
             });
-
-            // 3. Activate the Tenant and Push Expiration Date Forward
-            const now = new Date();
-            let currentExpiry = invoice.tenant.licenseExpiresAt || invoice.tenant.trialEnd || now;
-            if (currentExpiry < now) currentExpiry = now; // Prevent backdating
-
-            const monthsToExtend = invoice.packageMonths || 0;
-            const newExpiry = new Date(currentExpiry);
-            newExpiry.setMonth(newExpiry.getMonth() + monthsToExtend);
-
-            await tx.tenant.update({
-                where: { id: invoice.tenantId },
-                data: {
-                    status: "ACTIVE",
-                    licenseExpiresAt: newExpiry
-                }
-            });
-        });
+        } catch (err: any) {
+            if (err?.message === 'ALREADY_PROCESSED') {
+                return jsonResponse({ message: 'Already paid' });
+            }
+            throw err;
+        }
 
         // Send activation email
         try {

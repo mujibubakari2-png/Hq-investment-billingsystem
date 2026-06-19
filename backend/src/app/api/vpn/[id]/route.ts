@@ -3,6 +3,7 @@ import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 import { requirePermission } from "@/lib/rbac";
 import { decrypt } from "@/lib/encryption";
+import { canAccessTenant } from "@/lib/tenant";
 
 // DELETE /api/vpn/[id]
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -17,6 +18,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
         // ── 1. Fetch user to get routerId and username ──
         const vpnUser = await db.vpnUser.findFirst({ where: { id } });
         if (!vpnUser) return errorResponse("VPN user not found", 404);
+        if (!canAccessTenant(userPayload, vpnUser.tenantId)) return errorResponse("VPN user not found", 404);
 
         // ── 2. Delete from MikroTik ──
         try {

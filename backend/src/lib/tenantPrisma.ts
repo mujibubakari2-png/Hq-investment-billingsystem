@@ -57,6 +57,7 @@ const TENANT_MODELS = new Set([
     'auditLog',
     'expense',
     'invoice',
+    'invoiceItem',
     'equipment',
     'hotspotSettings',
     'messageTemplate',

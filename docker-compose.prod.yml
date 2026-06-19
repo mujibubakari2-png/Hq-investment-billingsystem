@@ -31,17 +31,17 @@ services:
     container_name: hq-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER:     ${POSTGRES_USER}
+      POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB:       ${POSTGRES_DB}
+      POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       # Run custom init SQL (partitioning, extensions) on first start
       - ./backend/prisma/migrations/combined_schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
     ports:
-      - "127.0.0.1:5432:5432"   # bind to loopback only — not exposed externally
+      - "127.0.0.1:5432:5432" # bind to loopback only — not exposed externally
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -66,7 +66,7 @@ services:
     ports:
       - "127.0.0.1:6379:6379"
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      test: [ "CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -90,27 +90,43 @@ services:
       redis:
         condition: service_healthy
     environment:
-      NODE_ENV:              production
-      PORT:                  3000
-      DATABASE_URL:          ${DATABASE_URL}
-      REDIS_URL:             ${REDIS_URL}
-      JWT_SECRET:            ${JWT_SECRET}
-      JWT_REFRESH_SECRET:    ${JWT_REFRESH_SECRET}
-      NEXTAUTH_SECRET:       ${JWT_SECRET}
-      NEXT_PUBLIC_APP_URL:   ${NEXT_PUBLIC_APP_URL:-https://api.yourdomain.com}
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      # Use JWT_ACCESS_SECRET (not legacy JWT_SECRET) — backend throws FATAL if missing
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://api.yourdomain.com}
+      APP_URL: ${APP_URL:-https://api.yourdomain.com}
+      CORS_ORIGIN: ${CORS_ORIGIN}
       # SMS / Payment gateway keys (injected at runtime, not baked into image)
-      SMS_API_KEY:           ${SMS_API_KEY:-}
-      HARAKAPAY_SECRET:      ${HARAKAPAY_SECRET:-}
-      HARAKAPAY_API_URL:     ${HARAKAPAY_API_URL:-}
-      ENCRYPTION_KEY:        ${ENCRYPTION_KEY}
+      SMS_API_KEY: ${SMS_API_KEY:-}
+      HARAKAPAY_SECRET: ${HARAKAPAY_SECRET:-}
+      HARAKAPAY_API_URL: ${HARAKAPAY_API_URL:-}
+      # FIELD_ENCRYPTION_KEY (not ENCRYPTION_KEY) — backend throws FATAL if missing
+      FIELD_ENCRYPTION_KEY: ${FIELD_ENCRYPTION_KEY}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      PAYMENT_ENVIRONMENT: ${PAYMENT_ENVIRONMENT:-live}
     ports:
       - "127.0.0.1:3000:3000"
+    # Run as non-root user
+    user: "1001:1001"
+    # Resource limits prevent one container starving others
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 1G
+        reservations:
+          memory: 256M
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health || exit 1"]
+      test: [ "CMD-SHELL", "wget -qO- http://localhost:3000/api/health || exit 1" ]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 60s   # give Next.js time to start up
+      start_period: 60s # give Next.js time to start up
     networks:
       - hq-internal
     logging:
@@ -125,8 +141,8 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        NODE_VERSION:       22-alpine
-        VITE_API_URL:       ${VITE_API_URL:-https://api.yourdomain.com}
+        NODE_VERSION: 22-alpine
+        VITE_API_URL: ${VITE_API_URL:-https://api.yourdomain.com}
         VITE_HARAKAPAY_URL: ${VITE_HARAKAPAY_URL:-}
     image: hqinvestment-frontend:latest
     container_name: hq-frontend
@@ -136,8 +152,17 @@ services:
         condition: service_healthy
     ports:
       - "127.0.0.1:5175:80"
+    # Run as non-root user
+    user: "101:101"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          memory: 64M
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:80/health || exit 1"]
+      test: [ "CMD-SHELL", "wget -qO- http://localhost:80/health || exit 1" ]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -153,7 +178,7 @@ services:
 networks:
   hq-internal:
     driver: bridge
-    internal: false   # set to true if you want no external egress from containers
+    internal: false # set to true if you want no external egress from containers
 
 volumes:
   postgres_data:

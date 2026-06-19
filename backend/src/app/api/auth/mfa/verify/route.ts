@@ -23,7 +23,10 @@ const TEMP_TOKEN_SECRET =
 
 function verifyTempToken(token: string): { userId: string } | null {
   try {
-    return jwt.verify(token, TEMP_TOKEN_SECRET) as { userId: string };
+    const payload = jwt.verify(token, TEMP_TOKEN_SECRET) as any;
+    // Ensure token was issued for MFA pending purpose
+    if (payload?.purpose !== 'mfa_pending') return null;
+    return { userId: payload.userId };
   } catch {
     return null;
   }

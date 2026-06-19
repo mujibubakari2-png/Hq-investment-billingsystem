@@ -4,6 +4,7 @@ import { errorResponse, jsonResponse } from "@/lib/auth";
 import { sendEmail } from "@/lib/email";
 import { env } from "@/lib/env";
 import { rateLimitMiddleware } from "@/middleware/rateLimiter";
+import { timingSafeEqual } from "@/lib/payments/utils";
 
 export async function POST(req: NextRequest) {
     try {
@@ -12,12 +13,16 @@ export async function POST(req: NextRequest) {
         if (rateLimited) {
             return rateLimited;
         }
+
         const webhookSecret = env.PALMPESA_WEBHOOK_SECRET || env.PAYMENT_WEBHOOK_SECRET;
-        if (webhookSecret) {
-            const providedSecret = req.headers.get("x-webhook-secret") || req.nextUrl?.searchParams?.get("secret");
-            if (providedSecret !== webhookSecret) {
-                return errorResponse("Unauthorized webhook signature", 401);
-            }
+        if (!webhookSecret) {
+            console.error("[PALMPESA WEBHOOK] Webhook secret is not configured");
+            return errorResponse("Webhook secret is not configured", 500);
+        }
+
+        const providedSecret = req.headers.get("x-webhook-secret") || req.headers.get("x-palmpesa-signature");
+        if (!providedSecret || !timingSafeEqual(providedSecret, webhookSecret)) {
+            return errorResponse("Unauthorized webhook signature", 401);
         }
 
         const body = await req.json();
@@ -40,8 +45,8 @@ export async function POST(req: NextRequest) {
         }
 
         // Find the invoice
-        const db = getTenantClient(null);
-        const invoice = await db.tenantInvoice.findUnique({
+        const globalDb = getTenantClient(null);
+        const invoice = await globalDb.tenantInvoice.findUnique({
             where: { invoiceNumber: AccountReference },
             include: { tenant: true }
         });
@@ -50,48 +55,65 @@ export async function POST(req: NextRequest) {
             return errorResponse("Invoice not found", 404);
         }
 
+        if (!invoice.tenantId) {
+            return errorResponse("Invalid invoice tenant data", 500);
+        }
+
+        if (!invoice.tenant) {
+            return errorResponse("Invoice tenant details are missing", 500);
+        }
+
         if (invoice.status === "PAID") {
             return jsonResponse({ message: "Already paid" });
         }
 
-        // Run updates inside a transaction
-        await db.$transaction(async (tx) => {
-            // 1. Update invoice status
-            await tx.tenantInvoice.update({
-                where: { id: invoice.id },
-                data: { status: "PAID" }
-            });
+        const tenantDb = getTenantClient(invoice.tenantId);
 
-            // 2. Create payment record
-            // Determine payment method if PalmPesa provides it, else default to PALMPESA
-            await tx.tenantPayment.create({
-                data: {
-                    invoiceId: invoice.id,
-                    tenantId: invoice.tenantId,
-                    amount: Number(Amount),
-                    transactionId: TransactionId,
-                    status: "COMPLETED",
-                    paymentMethod: "PALMPESA"
+        // Run updates inside a tenant-scoped transaction.
+        // Use conditional update to make webhook processing idempotent under retries.
+        try {
+            await tenantDb.$transaction(async (tx) => {
+                const res = await tx.tenantInvoice.updateMany({
+                    where: { id: invoice.id, status: { not: 'PAID' } },
+                    data: { status: 'PAID' },
+                });
+
+                if (res.count === 0) {
+                    throw new Error('ALREADY_PROCESSED');
                 }
+
+                // Create payment record
+                await tx.tenantPayment.create({
+                    data: {
+                        invoiceId: invoice.id,
+                        tenantId: invoice.tenantId,
+                        amount: Number(Amount),
+                        transactionId: TransactionId,
+                        status: 'COMPLETED',
+                        paymentMethod: 'PALMPESA',
+                    },
+                });
+
+                // Activate the Tenant and Push Expiration Date Forward
+                const now = new Date();
+                let currentExpiry = invoice.tenant.licenseExpiresAt || invoice.tenant.trialEnd || now;
+                if (currentExpiry < now) currentExpiry = now; // Prevent backdating
+
+                const monthsToExtend = invoice.packageMonths || 0;
+                const newExpiry = new Date(currentExpiry);
+                newExpiry.setMonth(newExpiry.getMonth() + monthsToExtend);
+
+                await tx.tenant.update({
+                    where: { id: invoice.tenantId },
+                    data: { status: 'ACTIVE', licenseExpiresAt: newExpiry },
+                });
             });
-
-            // 3. Activate the Tenant and Push Expiration Date Forward
-            const now = new Date();
-            let currentExpiry = invoice.tenant.licenseExpiresAt || invoice.tenant.trialEnd || now;
-            if (currentExpiry < now) currentExpiry = now; // Prevent backdating
-
-            const monthsToExtend = invoice.packageMonths || 0;
-            const newExpiry = new Date(currentExpiry);
-            newExpiry.setMonth(newExpiry.getMonth() + monthsToExtend);
-
-            await tx.tenant.update({
-                where: { id: invoice.tenantId },
-                data: {
-                    status: "ACTIVE",
-                    licenseExpiresAt: newExpiry
-                }
-            });
-        });
+        } catch (err: any) {
+            if (err?.message === 'ALREADY_PROCESSED') {
+                return jsonResponse({ message: 'Already paid' });
+            }
+            throw err;
+        }
 
         // Send activation email
         try {

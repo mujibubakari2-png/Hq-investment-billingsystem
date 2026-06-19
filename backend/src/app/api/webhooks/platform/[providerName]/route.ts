@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkRateLimit } from "@/lib/rateLimiter";
-import { getTenantClient } from "@/lib/tenantPrisma";
+import { paymentService } from "@/lib/payments/service";
 
 export async function POST(
   req: NextRequest,
@@ -13,44 +13,19 @@ export async function POST(
     if (rateLimitRes) return rateLimitRes;
 
     const { providerName } = resolvedParams;
-
-    // Platform-level webhook uses global ENV secret, not tenant-specific config
-    const webhookSecret = process.env[`${providerName.toUpperCase()}_WEBHOOK_SECRET`] || process.env.WEBHOOK_SECRET;
-    if (!webhookSecret) {
-      return NextResponse.json({ error: "Platform webhook secret not configured" }, { status: 500 });
-    }
-
     const rawBody = await req.text();
-    let payload;
-    try {
-      payload = JSON.parse(rawBody);
-    } catch {
-      payload = {};
+    const headers: Record<string, string> = {};
+    req.headers.forEach((value, key) => {
+      headers[key.toLowerCase()] = value;
+    });
+
+    const result = await paymentService.processWebhook(providerName, headers, rawBody);
+
+    if (!result.processed && result.message?.includes("rejected")) {
+      return NextResponse.json({ error: result.message }, { status: 401 });
     }
 
-    // Verify signature logic (implementation depends on provider)
-    // For M-Pesa / simple providers:
-    const providedSignature = req.headers.get("x-webhook-secret") || req.headers.get("x-signature") || "";
-    // Note: Actual verification logic will be provider-specific, omitted here for brevity
-
-    const transactionId = payload.TransactionID || payload.transactionId || payload.reference;
-
-    console.log(`[PLATFORM WEBHOOK] Received for ${providerName}:`, transactionId);
-
-    // Update Platform Transaction / TenantPayment logic
-    if (transactionId) {
-      const db = getTenantClient(null);
-      const tx = await db.tenantPayment.findUnique({ where: { transactionId } });
-      if (tx && tx.status !== "COMPLETED") {
-        await db.tenantPayment.update({
-          where: { id: tx.id },
-          data: { status: "COMPLETED" }
-        });
-        // Update TenantInvoice / TenantLicense as well
-      }
-    }
-
-    return NextResponse.json({ message: "Platform webhook processed" }, { status: 200 });
+    return NextResponse.json({ message: result.message }, { status: 200 });
 
   } catch (error: any) {
     console.error(`[PLATFORM WEBHOOK ERROR] provider: ${resolvedParams?.providerName}`, error);

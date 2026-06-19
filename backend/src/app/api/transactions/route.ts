@@ -131,13 +131,26 @@ export async function POST(req: NextRequest) {
 
         if (!clientId) return errorResponse("Client ID or Username is required", 400);
 
+        // SEC-FIN-001 FIX: Validate amount is a positive, finite integer within the allowed range.
+        // Math.round(parseFloat()) silently coerces NaN → 0 and Infinity → Infinity.
+        // An unbounded amount allows revenue report manipulation and financial integrity failures.
+        const rawAmount = parseFloat(body.amount);
+        if (!isFinite(rawAmount) || isNaN(rawAmount) || rawAmount <= 0) {
+            return errorResponse("Invalid amount: must be a positive number", 400);
+        }
+        const amount = Math.round(rawAmount);
+        if (amount > 10_000_000) {
+            return errorResponse("Invalid amount: exceeds maximum transaction limit of 10,000,000 TZS", 400);
+        }
+
         const tenantIdValue = userPayload.tenantId;
 
         const transaction = await db.transaction.create({
             data: {
                 clientId: clientId,
                 planName: planName || "Manual Transaction",
-                amount: Math.round(parseFloat(body.amount)), // TZS has no subdivisions — always integer
+                amount, // SEC-FIN-001 FIX: validated integer amount
+
                 type: (body.type || "MANUAL").toUpperCase(),
                 method: body.method || "Cash",
                 status: (body.status || "COMPLETED").toUpperCase(),

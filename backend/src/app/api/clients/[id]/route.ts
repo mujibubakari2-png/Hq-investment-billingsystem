@@ -66,7 +66,9 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         if (update.macAddress) dataToUpdate.macAddress = update.macAddress;
         if (update.device) dataToUpdate.device = update.device;
 
-        const client = await db.client.update({ where: { id }, data: dataToUpdate });
+        // Include tenantId in WHERE clause — prevents TOCTOU race where
+        // the pre-check passes but the record belongs to a different tenant by update time.
+        const client = await db.client.update({ where: { id, tenantId: userPayload.tenantId! }, data: dataToUpdate });
 
         return jsonResponse(client);
     } catch {

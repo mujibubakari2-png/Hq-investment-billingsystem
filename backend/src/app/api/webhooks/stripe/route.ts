@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
         // Must use req.text() — JSON.parse() would alter whitespace and break HMAC
         const rawBody = await req.text();
         const headers: Record<string, string> = {};
-        req.headers.forEach((value, key) => { headers[key] = value; });
+        req.headers.forEach((value, key) => { headers[key.toLowerCase()] = value; });
 
         const result = await paymentService.processWebhook("STRIPE", headers, rawBody);
 

@@ -61,17 +61,19 @@ export async function POST(req: NextRequest) {
 
         // Handle failed payments
         if (ResultCode !== "0" && ResultCode !== 0) {
-            // Update transaction to FAILED
+            // Update transaction to FAILED if the transaction record exists and has tenant context.
             const failedTx = await globalDb.transaction.findUnique({
                 where: { reference: AccountReference },
             });
             if (failedTx) {
-                // Ensure we include tenantId in the where clause to avoid accidental
-                // cross-tenant updates when using the global DB client.
-                await globalDb.transaction.update({
-                    where: { id: failedTx.id, tenantId: failedTx.tenantId },
-                    data: { status: "FAILED" },
-                });
+                if (!failedTx.tenantId) {
+                    console.error("TPESA failed payment record missing tenantId", failedTx.id);
+                } else {
+                    await globalDb.transaction.update({
+                        where: { id: failedTx.id, tenantId: failedTx.tenantId },
+                        data: { status: "FAILED" },
+                    });
+                }
             }
             return jsonResponse({ message: "Payment failure acknowledged" });
         }
@@ -87,13 +89,18 @@ export async function POST(req: NextRequest) {
             return errorResponse("Transaction not found", 404);
         }
 
-        if (transaction.status === "COMPLETED") {
-            return jsonResponse({ message: "Already processed" });
-        }
-
         if (!transaction.tenantId) {
             console.error("Transaction missing tenantId:", transaction.id);
             return errorResponse("Invalid transaction tenant data", 500);
+        }
+
+        if (!transaction.client) {
+            console.error("Transaction missing client relation:", transaction.id);
+            return errorResponse("Invalid transaction client data", 500);
+        }
+
+        if (transaction.status === "COMPLETED") {
+            return jsonResponse({ message: "Already processed" });
         }
 
         const tenantDb = getTenantClient(transaction.tenantId);
@@ -141,40 +148,55 @@ export async function POST(req: NextRequest) {
                 break;
         }
 
-        // Complete the purchase in a tenant-scoped transaction
-        const [updatedTx, newSub] = await tenantDb.$transaction(async (tx) => {
-            // 1. Update transaction
-            const utx = await tx.transaction.update({
-                where: { id: transaction.id },
-                data: {
-                    status: "COMPLETED",
-                    expiryDate: expiresAt,
-                },
+        // Complete the purchase in a tenant-scoped transaction.
+        // Use an atomic conditional update to make this webhook idempotent
+        // and safe under concurrent webhook deliveries.
+        let updatedTx: any = null;
+        let newSub: any = null;
+        try {
+            [updatedTx, newSub] = await tenantDb.$transaction(async (tx) => {
+                // Atomically mark the transaction COMPLETED only if it wasn't already.
+                const res = await tx.transaction.updateMany({
+                    where: { id: transaction.id, status: { not: 'COMPLETED' } },
+                    data: { status: 'COMPLETED', expiryDate: expiresAt },
+                });
+
+                if (res.count === 0) {
+                    // Another worker already processed this transaction.
+                    throw new Error('ALREADY_PROCESSED');
+                }
+
+                // Re-read the updated transaction for logging
+                const utx = await tx.transaction.findUnique({ where: { id: transaction.id } });
+
+                // Create subscription
+                const sub = await tx.subscription.create({
+                    data: {
+                        clientId: transaction.clientId,
+                        packageId: pkg.id,
+                        routerId: pkg.routerId || undefined,
+                        status: 'ACTIVE',
+                        method: 'MOBILE',
+                        activatedAt: now,
+                        expiresAt,
+                        onlineStatus: 'ONLINE',
+                        syncStatus: 'PENDING',
+                    },
+                });
+
+                // Update client status
+                await tx.client.update({ where: { id: transaction.clientId }, data: { status: 'ACTIVE' } });
+
+                return [utx, sub];
             });
 
-            // 2. Create subscription
-            const sub = await tx.subscription.create({
-                data: {
-                    clientId: transaction.clientId,
-                    packageId: pkg.id,
-                    routerId: pkg.routerId || undefined,
-                    status: "ACTIVE",
-                    method: "MOBILE",
-                    activatedAt: now,
-                    expiresAt,
-                    onlineStatus: "ONLINE",
-                    syncStatus: "PENDING",
-                },
-            });
-
-            // 3. Update client status
-            await tx.client.update({
-                where: { id: transaction.clientId },
-                data: { status: "ACTIVE" },
-            });
-
-            return [utx, sub];
-        });
+            // proceed as before with sync/activation...
+        } catch (err: any) {
+            if (err?.message === 'ALREADY_PROCESSED') {
+                return jsonResponse({ message: 'Already processed' });
+            }
+            throw err;
+        }
 
         // 4. Sync to RADIUS
         try {

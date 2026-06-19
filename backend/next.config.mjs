@@ -12,6 +12,30 @@ const nextConfig = {
         ignoreBuildErrors: true,
     },
 
+    // SEC-API-004 FIX: Add security headers to all API responses.
+    // HSTS is intentionally omitted here — it should be set by the Nginx reverse proxy
+    // so that it only applies to verified HTTPS connections (not HTTP internally).
+    async headers() {
+        return [
+            {
+                // Apply to all routes — API and page routes alike
+                source: '/:path*',
+                headers: [
+                    // Prevent browsers from MIME-sniffing responses away from the declared Content-Type
+                    { key: 'X-Content-Type-Options', value: 'nosniff' },
+                    // Disallow embedding this application in any frame (clickjacking protection)
+                    { key: 'X-Frame-Options', value: 'DENY' },
+                    // Only send origin on same-origin requests; no referrer on cross-origin
+                    { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+                    // Disable browser features not used by this API server
+                    { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(), payment=()' },
+                    // Basic XSS auditor (legacy browsers)
+                    { key: 'X-XSS-Protection', value: '1; mode=block' },
+                ],
+            },
+        ];
+    },
+
     // Build optimizations for production deployment
     compiler: {
         removeConsole: process.env.NODE_ENV === "production",
@@ -39,3 +63,4 @@ const nextConfig = {
 };
 
 export default nextConfig;
+

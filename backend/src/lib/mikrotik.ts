@@ -20,7 +20,7 @@ export interface MikroTikConnection {
     port: number;
     username: string;
     password: string;
-    /** E22 FIX: Optional dedicated REST API port. If not set, port 8728/8729 is auto-mapped to 80/443. */
+    /** Optional dedicated REST API port. If not set, port 8728/8729 is auto-mapped to 80/443. */
     restPort?: number;
 }
 
@@ -191,9 +191,15 @@ export class MikroTikService {
             try {
                 res = await fetch(url, fetchOptions);
             } catch (firstErr: any) {
-                // If the base URL was HTTPS and the request failed (or timed out), try HTTP as a fallback
-                if (this.baseUrl.startsWith('https')) {
+                // Only allow HTTPS→HTTP fallback when explicitly opted-in.
+                // Without this guard, a network adversary can force cleartext communication
+                // by dropping HTTPS connections, exposing RouterOS credentials.
+                // Set MIKROTIK_ALLOW_HTTP_FALLBACK=true only in dev/lab environments.
+                const allowHttpFallback = process.env.MIKROTIK_ALLOW_HTTP_FALLBACK === 'true';
+                if (this.baseUrl.startsWith('https') && allowHttpFallback) {
                     clearTimeout(timeout);
+                    console.warn(`[SECURITY WARNING] HTTPS failed for ${this.conn.host}, falling back to HTTP. ` +
+                        `MIKROTIK_ALLOW_HTTP_FALLBACK=true — disable in production.`);
                     const httpUrl = url.replace('https://', 'http://');
 
                     // Create a fresh controller for the fallback attempt
@@ -375,8 +381,9 @@ export class MikroTikService {
 
     async findPPPoEUserByName(username: string): Promise<PPPoEUser | null> {
         try {
-            // RouterOS REST API filter syntax
-            const users = await this.apiRequest(`/ppp/secret?name=${username}`);
+            // URL-encode the username to prevent parameter injection
+            // even though validateUsername() blocks most payloads, defence-in-depth.
+            const users = await this.apiRequest(`/ppp/secret?name=${encodeURIComponent(username)}`);
             if (!users || !Array.isArray(users) || users.length === 0) return null;
             const u = users[0];
             return {
@@ -478,7 +485,8 @@ export class MikroTikService {
 
     async findHotspotUserByName(username: string): Promise<HotspotUser | null> {
         try {
-            const users = await this.apiRequest(`/ip/hotspot/user?name=${username}`);
+            // URL-encode the username to prevent parameter injection.
+            const users = await this.apiRequest(`/ip/hotspot/user?name=${encodeURIComponent(username)}`);
             if (!users || !Array.isArray(users) || users.length === 0) return null;
             const u = users[0];
             return {

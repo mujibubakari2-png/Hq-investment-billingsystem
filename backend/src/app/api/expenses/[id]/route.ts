@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 import { requirePermission } from "@/lib/rbac";
+import { canAccessTenant } from "@/lib/tenant";
 import { parseOptionalDate } from "@/lib/dateUtils";
 import { ExpenseUpdateSchema } from "@/lib/validators";
 
@@ -17,6 +18,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
             include: { createdBy: { select: { username: true } } },
         });
         if (!expense) return errorResponse("Expense not found", 404);
+        if (!canAccessTenant(guard.user, expense.tenantId)) return errorResponse("Expense not found", 404);
         return jsonResponse(expense);
     } catch {
         return errorResponse("Internal server error", 500);
@@ -40,6 +42,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
         const existing = await db.expense.findFirst({ where: { id } });
         if (!existing) return errorResponse("Expense not found", 404);
+        if (!canAccessTenant(guard.user, existing.tenantId)) return errorResponse("Expense not found", 404);
 
         const update = parsed.data;
         const dataToUpdate: any = {};
@@ -67,6 +70,8 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
         const { id } = await params;
         const existing = await db.expense.findFirst({ where: { id } });
         if (!existing) return errorResponse("Expense not found", 404);
+
+        if (!canAccessTenant(guard.user, existing.tenantId)) return errorResponse("Expense not found", 404);
 
         await db.expense.delete({ where: { id } });
         return jsonResponse({ message: "Expense deleted" });

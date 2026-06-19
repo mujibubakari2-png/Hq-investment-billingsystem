@@ -48,6 +48,8 @@ export async function GET(req: NextRequest) {
             routerFilter.routerId = routerId;
         }
 
+        const statsDb = isPlatformAdmin && !targetTenantId ? globalDb : db;
+
         // ── RADIUS Accounting Cleanup (Multi-tenancy fix) ──
         // Bug #5 FIX: Throttle sync operations to run at most once per 60 seconds
         // using a Redis mutex to prevent simultaneous syncs across PM2 processes.
@@ -263,67 +265,67 @@ export async function GET(req: NextRequest) {
             try {
                 // By day (last 30 days)
                 const rawDaily = isPlatformAdmin && !targetTenantId
-                    ? await db.$queryRaw<any[]>`
-                        SELECT TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY-MM-DD') as name, SUM(amount) as value
-                        FROM transactions
-                        WHERE status = 'COMPLETED' AND timezone('Africa/Dar_es_Salaam', "createdAt") >= timezone('Africa/Dar_es_Salaam', NOW()) - INTERVAL '30 days'
-                        GROUP BY TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY-MM-DD')
-                        ORDER BY name ASC`
-                    : await db.$queryRaw<any[]>`
-                        SELECT TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY-MM-DD') as name, SUM(amount) as value
-                        FROM transactions
-                        WHERE status = 'COMPLETED' AND timezone('Africa/Dar_es_Salaam', "createdAt") >= timezone('Africa/Dar_es_Salaam', NOW()) - INTERVAL '30 days'
-                          AND "tenantId" = ${tenantFilter.tenantId}
-                        GROUP BY TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY-MM-DD')
-                        ORDER BY name ASC`;
+                    ? await statsDb.$queryRaw<any[]>`
+                                                SELECT TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY-MM-DD') as name, SUM(amount) as value
+                                                FROM transactions
+                                                WHERE status = 'COMPLETED' AND timezone('Africa/Dar_es_Salaam', "createdAt") >= timezone('Africa/Dar_es_Salaam', NOW()) - INTERVAL '30 days'
+                                                GROUP BY TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY-MM-DD')
+                                                ORDER BY name ASC`
+                    : await statsDb.$queryRaw<any[]>`
+                                                SELECT TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY-MM-DD') as name, SUM(amount) as value
+                                                FROM transactions
+                                                WHERE status = 'COMPLETED' AND timezone('Africa/Dar_es_Salaam', "createdAt") >= timezone('Africa/Dar_es_Salaam', NOW()) - INTERVAL '30 days'
+                                                    AND "tenantId" = ${tenantFilter.tenantId}
+                                                GROUP BY TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY-MM-DD')
+                                                ORDER BY name ASC`;
 
                 // By week (last 12 weeks)
                 const rawWeekly = isPlatformAdmin && !targetTenantId
-                    ? await db.$queryRaw<any[]>`
-                        SELECT TO_CHAR(DATE_TRUNC('week', timezone('Africa/Dar_es_Salaam', "createdAt")), 'YYYY-MM-DD') as name, SUM(amount) as value
-                        FROM transactions
-                        WHERE status = 'COMPLETED' AND timezone('Africa/Dar_es_Salaam', "createdAt") >= timezone('Africa/Dar_es_Salaam', NOW()) - INTERVAL '12 weeks'
-                        GROUP BY DATE_TRUNC('week', timezone('Africa/Dar_es_Salaam', "createdAt"))
-                        ORDER BY DATE_TRUNC('week', timezone('Africa/Dar_es_Salaam', "createdAt")) ASC`
-                    : await db.$queryRaw<any[]>`
-                        SELECT TO_CHAR(DATE_TRUNC('week', timezone('Africa/Dar_es_Salaam', "createdAt")), 'YYYY-MM-DD') as name, SUM(amount) as value
-                        FROM transactions
-                        WHERE status = 'COMPLETED' AND timezone('Africa/Dar_es_Salaam', "createdAt") >= timezone('Africa/Dar_es_Salaam', NOW()) - INTERVAL '12 weeks'
-                          AND "tenantId" = ${tenantFilter.tenantId}
-                        GROUP BY DATE_TRUNC('week', timezone('Africa/Dar_es_Salaam', "createdAt"))
-                        ORDER BY DATE_TRUNC('week', timezone('Africa/Dar_es_Salaam', "createdAt")) ASC`;
+                    ? await statsDb.$queryRaw<any[]>`
+                                                SELECT TO_CHAR(DATE_TRUNC('week', timezone('Africa/Dar_es_Salaam', "createdAt")), 'YYYY-MM-DD') as name, SUM(amount) as value
+                                                FROM transactions
+                                                WHERE status = 'COMPLETED' AND timezone('Africa/Dar_es_Salaam', "createdAt") >= timezone('Africa/Dar_es_Salaam', NOW()) - INTERVAL '12 weeks'
+                                                GROUP BY DATE_TRUNC('week', timezone('Africa/Dar_es_Salaam', "createdAt"))
+                                                ORDER BY DATE_TRUNC('week', timezone('Africa/Dar_es_Salaam', "createdAt")) ASC`
+                    : await statsDb.$queryRaw<any[]>`
+                                                SELECT TO_CHAR(DATE_TRUNC('week', timezone('Africa/Dar_es_Salaam', "createdAt")), 'YYYY-MM-DD') as name, SUM(amount) as value
+                                                FROM transactions
+                                                WHERE status = 'COMPLETED' AND timezone('Africa/Dar_es_Salaam', "createdAt") >= timezone('Africa/Dar_es_Salaam', NOW()) - INTERVAL '12 weeks'
+                                                    AND "tenantId" = ${tenantFilter.tenantId}
+                                                GROUP BY DATE_TRUNC('week', timezone('Africa/Dar_es_Salaam', "createdAt"))
+                                                ORDER BY DATE_TRUNC('week', timezone('Africa/Dar_es_Salaam', "createdAt")) ASC`;
 
                 // By month (last 12 months)
                 const rawMonthly = isPlatformAdmin && !targetTenantId
-                    ? await db.$queryRaw<any[]>`
-                        SELECT TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY-MM') as name, SUM(amount) as value
-                        FROM transactions
-                        WHERE status = 'COMPLETED' AND timezone('Africa/Dar_es_Salaam', "createdAt") >= timezone('Africa/Dar_es_Salaam', NOW()) - INTERVAL '12 months'
-                        GROUP BY TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY-MM')
-                        ORDER BY name ASC`
-                    : await db.$queryRaw<any[]>`
-                        SELECT TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY-MM') as name, SUM(amount) as value
-                        FROM transactions
-                        WHERE status = 'COMPLETED' AND timezone('Africa/Dar_es_Salaam', "createdAt") >= timezone('Africa/Dar_es_Salaam', NOW()) - INTERVAL '12 months'
-                          AND "tenantId" = ${tenantFilter.tenantId}
-                        GROUP BY TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY-MM')
-                        ORDER BY name ASC`;
+                    ? await statsDb.$queryRaw<any[]>`
+                                                SELECT TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY-MM') as name, SUM(amount) as value
+                                                FROM transactions
+                                                WHERE status = 'COMPLETED' AND timezone('Africa/Dar_es_Salaam', "createdAt") >= timezone('Africa/Dar_es_Salaam', NOW()) - INTERVAL '12 months'
+                                                GROUP BY TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY-MM')
+                                                ORDER BY name ASC`
+                    : await statsDb.$queryRaw<any[]>`
+                                                SELECT TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY-MM') as name, SUM(amount) as value
+                                                FROM transactions
+                                                WHERE status = 'COMPLETED' AND timezone('Africa/Dar_es_Salaam', "createdAt") >= timezone('Africa/Dar_es_Salaam', NOW()) - INTERVAL '12 months'
+                                                    AND "tenantId" = ${tenantFilter.tenantId}
+                                                GROUP BY TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY-MM')
+                                                ORDER BY name ASC`;
 
                 // By year
                 const rawYearly = isPlatformAdmin && !targetTenantId
-                    ? await db.$queryRaw<any[]>`
-                        SELECT TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY') as name, SUM(amount) as value
-                        FROM transactions
-                        WHERE status = 'COMPLETED'
-                        GROUP BY TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY')
-                        ORDER BY name ASC`
-                    : await db.$queryRaw<any[]>`
-                        SELECT TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY') as name, SUM(amount) as value
-                        FROM transactions
-                        WHERE status = 'COMPLETED'
-                          AND "tenantId" = ${tenantFilter.tenantId}
-                        GROUP BY TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY')
-                        ORDER BY name ASC`;
+                    ? await statsDb.$queryRaw<any[]>`
+                                                SELECT TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY') as name, SUM(amount) as value
+                                                FROM transactions
+                                                WHERE status = 'COMPLETED'
+                                                GROUP BY TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY')
+                                                ORDER BY name ASC`
+                    : await statsDb.$queryRaw<any[]>`
+                                                SELECT TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY') as name, SUM(amount) as value
+                                                FROM transactions
+                                                WHERE status = 'COMPLETED'
+                                                    AND "tenantId" = ${tenantFilter.tenantId}
+                                                GROUP BY TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY')
+                                                ORDER BY name ASC`;
 
                 revenueAnalytics.daily = rawDaily.map(d => ({ name: d.name, value: Number(d.value) || 0 }));
                 revenueAnalytics.weekly = rawWeekly.map(d => ({ name: d.name, value: Number(d.value) || 0 }));
@@ -341,12 +343,12 @@ export async function GET(req: NextRequest) {
         let subscriberGrowthData: any[] = [];
         try {
             const rawGrowth = isPlatformAdmin && !targetTenantId
-                ? await db.$queryRaw<any[]>`
+                ? await statsDb.$queryRaw<any[]>`
                     SELECT TO_CHAR("createdAt", 'Mon') as month, COUNT(*) as clients
                     FROM clients
                     WHERE "createdAt" >= NOW() - INTERVAL '6 months'
                     GROUP BY TO_CHAR("createdAt", 'Mon')`
-                : await db.$queryRaw<any[]>`
+                : await statsDb.$queryRaw<any[]>`
                     SELECT TO_CHAR("createdAt", 'Mon') as month, COUNT(*) as clients
                     FROM clients
                     WHERE "createdAt" >= NOW() - INTERVAL '6 months'

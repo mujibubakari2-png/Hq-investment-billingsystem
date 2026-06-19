@@ -203,7 +203,7 @@ model Router {
   deletedAt        DateTime?
   tenantId         String?
   apiPort          Int?             @default(8728)
-  // E22 FIX: Optional REST API port, separate from the terminal/Winbox port (8728).
+  // Optional REST API port, separate from the terminal/Winbox port (8728).
   // RouterOS REST API runs on 80 (HTTP) or 443 (HTTPS) by default, but can be custom.
   // If null, getMikroTikService() auto-maps port 8728/8729 → 80/443 as before.
   restPort         Int?
@@ -228,6 +228,8 @@ model Router {
   vpnUsers         VpnUser[]
 
   @@unique([name, tenantId])
+  // Add tenantId index — findMany({ where: { tenantId } }) was doing a full table scan
+  @@index([tenantId])
   @@map("routers")
 }
 
@@ -244,6 +246,10 @@ model RouterLog {
   router    Router   @relation(fields: [routerId], references: [id], onDelete: Cascade)
   tenant    Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
+  // Add tenantId and routerId indexes for common log query patterns
+  @@index([routerId])
+  @@index([tenantId])
+  @@index([createdAt])
   @@map("router_logs")
 }
 
@@ -287,6 +293,9 @@ model Equipment {
   router       Router?         @relation(fields: [routerId], references: [id])
   tenant       Tenant?         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
+  // Add tenantId index — equipment listing by tenant was doing full table scan
+  @@index([tenantId])
+  @@index([status])
   @@map("equipments")
 }
 
@@ -309,6 +318,9 @@ model Voucher {
   tenant      Tenant?       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@unique([code, tenantId])
+  // Add tenantId index for voucher listing queries
+  @@index([tenantId])
+  @@index([status])
   @@map("vouchers")
 }
 
@@ -327,6 +339,9 @@ model Expense {
   createdBy   User     @relation(fields: [createdById], references: [id])
   tenant      Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
+  // Add tenantId and date indexes for expense reporting queries
+  @@index([tenantId])
+  @@index([date])
   @@map("expenses")
 }
 

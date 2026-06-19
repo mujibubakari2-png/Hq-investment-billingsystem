@@ -72,9 +72,9 @@ export async function POST(req: NextRequest) {
             return errorResponse("Invalid email format");
         }
 
-        // Validate password length
-        if (password.length < 6) {
-            return errorResponse("Password must be at least 6 characters long", 400);
+        // Validate password length (min 8, consistent with password-reset policy)
+        if (password.length < 8) {
+            return errorResponse("Password must be at least 8 characters long", 400);
         }
 
         // Verify if email already exists
@@ -97,15 +97,17 @@ export async function POST(req: NextRequest) {
             return errorResponse("Verification Code (OTP) is explicitly required to create an account", 400);
         }
 
-        // Strictly verify that the OTP was validated at Step 2
+        // Strictly verify that an OTP was validated at Step 2.
+        // NOTE: OTPs are stored as bcrypt hashes, so we cannot match plaintext here.
+        // Instead confirm that a recent OTP record for this email was marked `used`.
         if (inputOtp || isProd) {
             const verifiedOtpMatch = await db.userOtp.findFirst({
                 where: {
                     email,
-                    otp: inputOtp || "NOT_PROVIDED",
-                    used: true, // Step 2 marked it as used
+                    used: true,
                     expiresAt: { gt: new Date() }
-                }
+                },
+                orderBy: { createdAt: 'desc' }
             });
 
             if (!verifiedOtpMatch) {

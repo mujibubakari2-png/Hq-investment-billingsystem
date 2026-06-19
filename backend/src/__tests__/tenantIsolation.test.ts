@@ -75,10 +75,20 @@ describe("Tenant Isolation (tenantPrisma)", () => {
     });
 
     afterAll(async () => {
-        // Clean up
-        await prisma.client.deleteMany({ where: { id: { in: [clientId1, clientId2] } } });
-        await prisma.tenant.deleteMany({ where: { id: { in: [tenant1Id, tenant2Id] } } });
-        await prisma.saasPlan.delete({ where: { id: planId } });
+        // Clean up only the IDs that were created successfully.
+        const clientIds = [clientId1, clientId2].filter(Boolean);
+        if (clientIds.length > 0) {
+            await prisma.client.deleteMany({ where: { id: { in: clientIds } } });
+        }
+
+        const tenantIds = [tenant1Id, tenant2Id].filter(Boolean);
+        if (tenantIds.length > 0) {
+            await prisma.tenant.deleteMany({ where: { id: { in: tenantIds } } });
+        }
+
+        if (planId) {
+            await prisma.saasPlan.delete({ where: { id: planId } });
+        }
     });
 
     it("should only return clients for tenant 1 when using tenant 1 client", async () => {

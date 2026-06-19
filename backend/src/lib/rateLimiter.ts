@@ -73,9 +73,11 @@ const defaultLimit: UserRateLimitConfig = {
  * Get rate limit key (IP + User ID)
  */
 function getRateLimitKey(request: NextRequest, userId?: string): string {
-    const ip = request.headers.get('x-forwarded-for') ||
+    // x-forwarded-proto is a scheme (http/https), NOT an IP address.
+    // Removed from fallback chain to prevent all scheme-less requests sharing one key.
+    // Also split x-forwarded-for on commas — format is "client, proxy1, proxy2".
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0].trim() ||
         request.headers.get('x-real-ip') ||
-        request.headers.get('x-forwarded-proto') ||
         'unknown';
     return userId ? `${ip}:${userId}` : ip;
 }

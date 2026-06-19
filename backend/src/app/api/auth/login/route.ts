@@ -4,6 +4,7 @@ import { comparePassword, signToken, signRefreshToken, jsonResponse, errorRespon
 import { checkRateLimit } from "@/lib/rateLimiter";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import logger from "@/lib/logger";
+import { cacheGet, cacheSet, invalidateTenant } from "@/lib/cache";
 
 // ── CRIT-002 FIX: MFA temp-token ──────────────────────────────────────────────
 // If a user has MFA enabled, we issue a short-lived (5 min) "pending" token
@@ -81,6 +82,18 @@ export async function POST(req: NextRequest) {
             return errorResponse("Invalid credentials", 401);
         }
 
+        // Account lockout check (defense-in-depth)
+        const LOCKOUT_THRESHOLD = Number(process.env.LOCKOUT_THRESHOLD ?? 5);
+        const LOCKOUT_DURATION = Number(process.env.LOCKOUT_DURATION_SEC ?? 15 * 60); // seconds
+        const failedKey = `failed_login:${user.email}`;
+        const lockoutKey = `lockout:${user.email}`;
+        try {
+            const locked = await cacheGet<boolean>(lockoutKey);
+            if (locked) return errorResponse("Account temporarily locked due to multiple failed login attempts", 403);
+        } catch (err) {
+            // cache errors are non-fatal
+        }
+
         if (user.status !== "ACTIVE") {
             return errorResponse("Account is disabled", 403);
         }
@@ -88,6 +101,17 @@ export async function POST(req: NextRequest) {
         const valid = await comparePassword(password, user.password);
         logger.info("Login result", { username, success: valid });
         if (!valid) {
+            // Increment failed attempts counter
+            try {
+                const prev = (await cacheGet<number>(failedKey)) ?? 0;
+                const nowCount = prev + 1;
+                await cacheSet(failedKey, nowCount, Number(process.env.LOCKOUT_WINDOW_SEC ?? 15 * 60));
+                if (nowCount >= LOCKOUT_THRESHOLD) {
+                    await cacheSet(lockoutKey, true, LOCKOUT_DURATION);
+                }
+            } catch (err) {
+                // ignore cache errors
+            }
             return errorResponse("Invalid credentials", 401);
         }
 
@@ -97,6 +121,8 @@ export async function POST(req: NextRequest) {
         if (user.mfaEnabled) {
             logger.info("MFA challenge issued", { username });
             const tempToken = issueMfaTempToken(user.id);
+            // Reset failed attempts on successful password validation
+            try { await cacheSet(failedKey, 0, 60); } catch { }
             return jsonResponse({
                 mfaRequired: true,
                 tempToken,
@@ -118,6 +144,8 @@ export async function POST(req: NextRequest) {
         };
         const token = signToken(payload);
         const refreshToken = signRefreshToken(payload);
+        // Reset failed attempts on successful login
+        try { await cacheSet(failedKey, 0, 60); } catch { }
 
         const response = jsonResponse({
             token,

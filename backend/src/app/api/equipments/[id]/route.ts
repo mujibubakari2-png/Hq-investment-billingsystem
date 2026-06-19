@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 import { requirePermission } from "@/lib/rbac";
 import { getTenantClient } from "@/lib/tenantPrisma";
+import { canAccessTenant } from "@/lib/tenant";
 import { parseOptionalDate } from "@/lib/dateUtils";
 import { EquipmentUpdateSchema } from "@/lib/validators";
 
@@ -17,6 +18,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
             include: { router: true },
         });
         if (!eq) return errorResponse("Equipment not found", 404);
+        if (!canAccessTenant(guard.user, eq.tenantId)) return errorResponse("Equipment not found", 404);
         return jsonResponse(eq);
     } catch {
         return errorResponse("Internal server error", 500);
@@ -41,6 +43,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
         const existing = await db.equipment.findFirst({ where: { id } });
         if (!existing) return errorResponse("Equipment not found", 404);
+        if (!canAccessTenant(currentUser, existing.tenantId)) return errorResponse("Equipment not found", 404);
 
         const update = parsed.data;
         const dataToUpdate: any = {};
@@ -72,6 +75,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
         const { id } = await params;
         const existing = await db.equipment.findFirst({ where: { id } });
         if (!existing) return errorResponse("Equipment not found", 404);
+        if (!canAccessTenant(currentUser, existing.tenantId)) return errorResponse("Equipment not found", 404);
 
         await db.equipment.delete({ where: { id } });
         return jsonResponse({ message: "Equipment deleted" });

@@ -26,6 +26,7 @@ export async function GET(req: NextRequest) {
             select: { id: true, tenantId: true },
         });
         if (!router) return errorResponse("Router not found", 404);
+        if (!router.tenantId) return errorResponse("Invalid router configuration", 400);
         const db = getTenantClient(router.tenantId);
 
         const packages = await db.package.findMany({

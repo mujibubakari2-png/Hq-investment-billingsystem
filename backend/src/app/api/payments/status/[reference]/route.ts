@@ -42,6 +42,10 @@ export async function GET(
       return errorResponse("Transaction not found", 404);
     }
 
+    if (!transaction.tenantId) {
+      return errorResponse("Invalid transaction tenant data", 500);
+    }
+
     // ── Build Base Response ──────────────────────────────────────────────────
     const baseResponse: Record<string, unknown> = {
       reference: transaction.reference,

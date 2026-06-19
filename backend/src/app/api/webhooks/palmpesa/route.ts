@@ -15,9 +15,9 @@ export async function POST(req: NextRequest) {
   try {
     const rawBody = await req.text();
 
-    // Convert headers to plain object
+    // Convert headers to plain object with lowercase keys for consistent provider verification
     const headers: Record<string, string> = {};
-    req.headers.forEach((value, key) => { headers[key] = value; });
+    req.headers.forEach((value, key) => { headers[key.toLowerCase()] = value; });
 
     const result = await paymentService.processWebhook(
       "PALMPESA",

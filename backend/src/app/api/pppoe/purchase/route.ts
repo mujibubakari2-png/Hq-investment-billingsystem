@@ -43,6 +43,9 @@ export async function POST(req: NextRequest) {
     if (!router) {
       return errorResponse("Router not found", 404);
     }
+    if (!router.tenantId) {
+      return errorResponse("Invalid router configuration", 400);
+    }
 
     const db = getTenantClient(router.tenantId);
 
@@ -62,6 +65,7 @@ export async function POST(req: NextRequest) {
     if (!pkg) {
       pkg = await db.package.findFirst({
         where: {
+          tenantId: router.tenantId,
           OR: [
             { name: packageId },
             ...(/^\d+$/.test(packageId) ? [{ status: "ACTIVE" as const }] : []),

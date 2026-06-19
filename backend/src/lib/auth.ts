@@ -1,6 +1,8 @@
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { NextRequest } from "next/server";
+import crypto from "crypto";
+import { cacheGet, cacheSet } from "@/lib/cache";
 
 
 function isNextBuild(): boolean {
@@ -106,8 +108,10 @@ export function signToken(payload: JwtPayload): string {
  * Uses JWT_REFRESH_SECRET. Embeds tokenType: "refresh" claim.
  */
 export function signRefreshToken(payload: JwtPayload): string {
+    // Embed a unique token identifier (jti) for rotation & revocation support
+    const jti = (crypto as any).randomUUID ? (crypto as any).randomUUID() : crypto.randomBytes(16).toString("hex");
     return jwt.sign(
-        { ...payload, tokenType: "refresh" },
+        { ...payload, tokenType: "refresh", jti },
         getRefreshSecret(),
         {
             expiresIn: "7d",
@@ -142,16 +146,28 @@ export function verifyToken(token: string): JwtPayload | null {
  * Verify a refresh token.
  * Uses JWT_REFRESH_SECRET; rejects access tokens submitted here.
  */
-export function verifyRefreshToken(token: string): JwtPayload | null {
+export async function verifyRefreshToken(token: string): Promise<JwtPayload | null> {
     try {
         const payload = jwt.verify(token, getRefreshSecret(), {
             issuer: "hq-investment-isp",
             audience: "hq-investment-refresh",
-        }) as JwtPayload;
+        }) as JwtPayload & { jti?: string };
 
         if (payload.tokenType && payload.tokenType !== "refresh") {
             return null;
         }
+
+        // If token has a jti, ensure it is not revoked
+        if (payload.jti) {
+            try {
+                const key = `revoked_refresh:${payload.jti}`;
+                const revoked = await cacheGet<boolean>(key);
+                if (revoked) return null;
+            } catch (err) {
+                // Cache errors should not block verification; log upstream when needed
+            }
+        }
+
         return payload;
     } catch {
         return null;

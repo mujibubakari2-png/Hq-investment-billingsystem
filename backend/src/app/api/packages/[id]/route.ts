@@ -4,7 +4,7 @@ import { requirePermission } from "@/lib/rbac";
 import { getMikroTikService } from "@/lib/mikrotik";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import { PackageUpdateSchema } from "@/lib/validators";
-import { getTenantFilter } from "@/lib/tenant";
+import { getTenantFilter, canAccessTenant } from "@/lib/tenant";
 
 // GET /api/packages/[id]
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -15,11 +15,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         const db = getTenantClient(userPayload);
 
         const { id } = await params;
-        const pkg = await db.package.findUnique({
-            where: { id },
-            include: { router: true },
-        });
+        const pkg = await db.package.findUnique({ where: { id }, include: { router: true } });
         if (!pkg) return errorResponse("Package not found", 404);
+        if (!canAccessTenant(userPayload, pkg.tenantId)) return errorResponse("Forbidden", 403);
         return jsonResponse(pkg);
     } catch {
         return errorResponse("Internal server error", 500);
@@ -45,6 +43,9 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         const update = parsed.data as any;
 
         const { filter: tenantFilter } = getTenantFilter(userPayload);
+        const existingPkg = await db.package.findUnique({ where: { id } });
+        if (!existingPkg) return errorResponse("Package not found", 404);
+        if (!canAccessTenant(userPayload, existingPkg.tenantId)) return errorResponse("Forbidden", 403);
         const routerId = update.routerId || body.routerId || body.router;
         const router = routerId
             ? await db.router.findFirst({ where: { OR: [{ id: routerId }, { name: routerId }], ...tenantFilter } })
@@ -121,6 +122,9 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
         const db = getTenantClient(userPayload);
 
         const { id } = await params;
+        const existingPkg2 = await db.package.findUnique({ where: { id } });
+        if (!existingPkg2) return errorResponse("Package not found", 404);
+        if (!canAccessTenant(userPayload, existingPkg2.tenantId)) return errorResponse("Forbidden", 403);
 
         // Manual cascade delete to handle foreign key constraints
         await db.$transaction([
