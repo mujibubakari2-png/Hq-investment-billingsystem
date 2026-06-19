@@ -87,9 +87,9 @@ function getRateLimitKey(request: NextRequest, userId?: string): string {
 /**
  * Derive role from verified JWT to prevent header spoofing.
  */
-function getUserRole(request: NextRequest): 'admin' | 'user' | 'anonymous' {
+async function getUserRole(request: NextRequest): Promise<'admin' | 'user' | 'anonymous'> {
     try {
-        const payload = getUserFromRequest(request);
+        const payload = await getUserFromRequest(request);
         if (!payload) return 'anonymous';
         if (payload.role === 'ADMIN' || payload.role === 'SUPER_ADMIN') return 'admin';
         return 'user';
@@ -124,9 +124,10 @@ function getRateLimitConfig(path: string, role: 'admin' | 'user' | 'anonymous'):
 /**
  * Check if request should be rate limited
  */
-export function isRateLimited(request: NextRequest, userId?: string): { limited: boolean; message: string; retryAfter?: number } {
-    const key = getRateLimitKey(request, userId || getUserFromRequest(request)?.userId);
-    const role = getUserRole(request);
+export async function isRateLimited(request: NextRequest, userId?: string): Promise<{ limited: boolean; message: string; retryAfter?: number }> {
+    const resolvedUser = await getUserFromRequest(request);
+    const key = getRateLimitKey(request, userId || resolvedUser?.userId);
+    const role = await getUserRole(request);
     const path = new URL(request.url).pathname;
     const config = getRateLimitConfig(path, role);
 
@@ -156,8 +157,8 @@ export function isRateLimited(request: NextRequest, userId?: string): { limited:
 /**
  * Rate limiting middleware for Next.js
  */
-export function rateLimitMiddleware(request: NextRequest): NextResponse | null {
-    const result = isRateLimited(request);
+export async function rateLimitMiddleware(request: NextRequest): Promise<NextResponse | null> {
+    const result = await isRateLimited(request);
 
     if (result.limited) {
         return NextResponse.json(

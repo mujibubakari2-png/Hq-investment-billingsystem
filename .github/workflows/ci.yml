@@ -117,6 +117,7 @@ jobs:
       JWT_ACCESS_SECRET: ${{ secrets.CI_JWT_ACCESS_SECRET }}
       NODE_ENV: production
       FIELD_ENCRYPTION_KEY: ${{ secrets.CI_FIELD_ENCRYPTION_KEY }}
+      NEXT_TELEMETRY_DISABLED: 1
     steps:
       - uses: actions/checkout@v4
 
@@ -133,7 +134,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build backend
-        run: pnpm --filter backend next:build
+        run: pnpm --filter backend build
 
   # ── Frontend Build ─────────────────────────────────────────────────────────
   build-frontend:
@@ -190,7 +191,7 @@ jobs:
             cd /var/www/Hq-investment-billingsystem
 
             # Pull latest code
-            git pull origin main
+            git pull origin master
 
             # ── Remove test/dev files from the VPS deployment ─────────────────
             # Tests live in the repo for CI/CD but must NOT be present on the
@@ -220,8 +221,8 @@ jobs:
             # Run DB migrations
             cd backend && pnpm prisma migrate deploy && cd ..
 
-            # Rebuild backend
-            pnpm --filter backend next:build
+            # Rebuild backend (prisma generate + next build)
+            pnpm --filter backend build
 
             # Build frontend on server
             pnpm --filter frontend build

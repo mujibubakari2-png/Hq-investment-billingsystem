@@ -5,11 +5,15 @@
  * run inside the Next.js Edge Runtime (middleware). It intentionally has ZERO
  * imports of Node.js-only packages (ioredis, bcryptjs, crypto, etc.).
  *
+ * jose is used instead of jsonwebtoken because jose uses Web Crypto API
+ * (crypto.subtle) and has NO Node.js-only dependencies. It is fully
+ * compatible with Edge Runtime, Node.js, Deno, Bun, and browsers.
+ *
  * Do NOT add cache imports here — ioredis cannot run in Edge Runtime.
  * Full auth utilities (hashing, signing, cache invalidation) remain in auth.ts.
  */
 
-import jwt from "jsonwebtoken";
+import { jwtVerify } from "jose";
 import { NextRequest } from "next/server";
 
 export interface JwtPayload {
@@ -29,33 +33,37 @@ export class UnauthorizedError extends Error {
     }
 }
 
-function getAccessSecret(): string {
+function getAccessSecret(): Uint8Array | null {
     const secret = process.env.JWT_ACCESS_SECRET;
     if (!secret) {
-        // In Edge Runtime during startup — return empty string so middleware
+        // In Edge Runtime during startup — return null so middleware
         // simply treats all tokens as invalid (returns null from verifyToken)
-        return "";
+        return null;
     }
-    return secret;
+    return new TextEncoder().encode(secret);
 }
 
 /**
  * Verify an access token — Edge-safe (no ioredis, no bcrypt).
+ * Uses jose which is built on Web Crypto API (crypto.subtle).
  * Returns null if invalid, expired, or wrong token type.
  */
-export function verifyToken(token: string): JwtPayload | null {
+export async function verifyToken(token: string): Promise<JwtPayload | null> {
     try {
         const secret = getAccessSecret();
         if (!secret) return null;
-        const payload = jwt.verify(token, secret, {
+
+        const { payload } = await jwtVerify(token, secret, {
             issuer: "hq-investment-isp",
             audience: "hq-investment-app",
-        }) as JwtPayload;
+        });
 
-        if (payload.tokenType && payload.tokenType !== "access") {
+        const jwtPayload = payload as unknown as JwtPayload;
+
+        if (jwtPayload.tokenType && jwtPayload.tokenType !== "access") {
             return null;
         }
-        return payload;
+        return jwtPayload;
     } catch {
         return null;
     }
@@ -78,7 +86,7 @@ export function getTokenFromRequest(req: NextRequest): string | null {
  * Return the verified JWT payload for the request, or null.
  * Safe to call from Edge Runtime middleware.
  */
-export function getUserFromRequest(req: NextRequest): JwtPayload | null {
+export async function getUserFromRequest(req: NextRequest): Promise<JwtPayload | null> {
     const token = getTokenFromRequest(req);
     if (!token) return null;
     return verifyToken(token);

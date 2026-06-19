@@ -4,7 +4,8 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import crypto from 'crypto';
+// Web Crypto API — available on Edge Runtime, Node.js ≥16, and browsers.
+// No import needed: `crypto` is a global in all three runtimes.
 
 const CSRF_TOKEN_COOKIE = 'csrf-token';
 const CSRF_TOKEN_HEADER = 'x-csrf-token';
@@ -17,7 +18,9 @@ const csrfTokenStore = new Map<string, { token: string; expiresAt: number }>();
  * Generate CSRF token
  */
 export function generateCsrfToken(): string {
-    return crypto.randomBytes(CSRF_TOKEN_LENGTH).toString('hex');
+    const bytes = new Uint8Array(CSRF_TOKEN_LENGTH);
+    crypto.getRandomValues(bytes);
+    return Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
 /**

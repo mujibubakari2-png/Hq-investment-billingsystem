@@ -3,9 +3,9 @@ import { proxy } from "./proxy";
 import { rateLimitMiddleware } from "./middleware/rateLimiter";
 import { csrfMiddleware } from "./middleware/csrfProtection";
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
     // First apply rate limiting
-    const rateLimitResult = rateLimitMiddleware(request);
+    const rateLimitResult = await rateLimitMiddleware(request);
     if (rateLimitResult) {
         return rateLimitResult;
     }
