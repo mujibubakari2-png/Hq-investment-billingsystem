@@ -77,10 +77,12 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Generate Prisma client
-        run: pnpm --filter backend prisma generate
+        working-directory: backend
+        run: npx prisma generate
 
       - name: Run Prisma migrations on test DB
-        run: pnpm --filter backend prisma migrate deploy
+        working-directory: backend
+        run: npx prisma migrate deploy
 
       - name: Run backend tests
         run: pnpm --filter backend test

@@ -6,9 +6,8 @@
  */
 
 // â”€â”€ Mock prisma before importing the module â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-jest.mock('../lib/prisma', () => ({
-    __esModule: true,
-    default: {
+jest.mock('../lib/prisma', () => {
+    const mockPrisma = {
         client: {
             update: jest.fn(),
             deleteMany: jest.fn(),
@@ -33,8 +32,12 @@ jest.mock('../lib/prisma', () => ({
             update: jest.fn(),
             deleteMany: jest.fn(),
         },
-    },
-}));
+        // $extends is used by getTenantClient() — return the mock itself
+        // so all model-level mocks remain accessible after the extend call
+        $extends: jest.fn().mockImplementation(function(this: any) { return mockPrisma; }),
+    };
+    return { __esModule: true, default: mockPrisma };
+});
 
 import prismaMock from '../lib/prisma';
 import {
