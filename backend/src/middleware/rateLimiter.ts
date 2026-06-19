@@ -4,7 +4,9 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserFromRequest } from '@/lib/auth';
+// Import from auth-edge, NOT auth — auth.ts imports cache.ts → ioredis which
+// cannot run in the Next.js Edge Runtime (V8 isolate, no Node.js APIs).
+import { getUserFromRequest } from '@/lib/auth-edge';
 
 interface RateLimitConfig {
     windowMs: number; // Time window in milliseconds
@@ -73,9 +75,11 @@ const defaultLimit: UserRateLimitConfig = {
  * Get rate limit key (IP + User ID)
  */
 function getRateLimitKey(request: NextRequest, userId?: string): string {
-    const ip = request.headers.get('x-forwarded-for') ||
+    // x-forwarded-proto is a scheme (http/https), NOT an IP address.
+    // Removed from fallback chain to prevent all scheme-less requests sharing one key.
+    // Also split x-forwarded-for on commas — format is "client, proxy1, proxy2".
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0].trim() ||
         request.headers.get('x-real-ip') ||
-        request.headers.get('x-forwarded-proto') ||
         'unknown';
     return userId ? `${ip}:${userId}` : ip;
 }
@@ -162,7 +166,7 @@ export function rateLimitMiddleware(request: NextRequest): NextResponse | null {
                 status: 429,
                 headers: {
                     'Retry-After': String(result.retryAfter || 60),
-                    'X-RateLimit-Limit': '100', // Could be dynamic
+                    'X-RateLimit-Limit': '100',
                     'X-RateLimit-Remaining': '0',
                     'X-RateLimit-Reset': String(Math.ceil(Date.now() / 1000) + (result.retryAfter || 60)),
                 },

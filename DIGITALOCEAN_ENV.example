@@ -54,12 +54,12 @@ HARAKAPAY_WEBHOOK_SECRET=harakapay-secret
 WEBHOOK_SECRET=generic-webhook-secret
 
 # ─── Payment Settings ────────────────────────────────────────────────────────
-# E03 FIX: CRITICAL — set to 'live' in production so real payments are processed
+# CRITICAL — set to 'live' in production so real payments are processed
 # If left as 'sandbox', payments will go to the test gateway and money is NOT credited.
 PAYMENT_ENVIRONMENT=live
 
 # ─── Cron Security ───────────────────────────────────────────────────────────
-# E17 FIX: Set a random secret of at least 16 characters to protect the cron endpoint
+# Set a random secret of at least 16 characters to protect the cron endpoint
 # Generate: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 CRON_SECRET=replace-with-random-32-char-secret-here
 

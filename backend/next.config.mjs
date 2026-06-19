@@ -44,9 +44,18 @@ const nextConfig = {
     images: {
         unoptimized: true, // Disable image optimization to speed up builds
     },
-    // Build performance
-    webpack: (config, { buildId, dev, isServer, defaultLoaders, webpack }) => {
-        // Reduce memory usage during build
+    // Build performance + fix for pnpm monorepo node: URI scheme imports.
+    // Some packages (e.g. pino, ioredis) use `import 'node:diagnostics_channel'`
+    // which webpack can't resolve without the NormalModuleReplacementPlugin below.
+    webpack: (config, { dev, isServer, webpack }) => {
+        // Strip the node: prefix so webpack resolves built-ins normally
+        config.plugins.push(
+            new webpack.NormalModuleReplacementPlugin(/^node:/, (resource) => {
+                resource.request = resource.request.replace(/^node:/, '');
+            })
+        );
+
+        // Reduce memory usage during production client build
         if (!dev && !isServer) {
             config.optimization.splitChunks.cacheGroups = {
                 ...config.optimization.splitChunks.cacheGroups,
