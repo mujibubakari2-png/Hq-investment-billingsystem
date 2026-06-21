@@ -71,17 +71,17 @@ const defaultLimit: UserRateLimitConfig = {
     admin: { windowMs: 60 * 1000, maxRequests: 500 },
 };
 
-/**
- * Get rate limit key (IP + User ID)
- */
-function getRateLimitKey(request: NextRequest, userId?: string): string {
-    // x-forwarded-proto is a scheme (http/https), NOT an IP address.
-    // Removed from fallback chain to prevent all scheme-less requests sharing one key.
-    // Also split x-forwarded-for on commas — format is "client, proxy1, proxy2".
+function getRateLimitKey(request: NextRequest, body: any, userId?: string): string {
+    const origin = request.headers.get('origin') || request.headers.get('host') || 'global';
+
     const ip = request.headers.get('x-forwarded-for')?.split(',')[0].trim() ||
         request.headers.get('x-real-ip') ||
         'unknown';
-    return userId ? `${ip}:${userId}` : ip;
+        
+    let tenantId = body?.tenantId || 'global';
+    let userIdentifier = userId || body?.username || body?.email || 'anonymous';
+        
+    return `${tenantId}:${userIdentifier}:${ip}`;
 }
 
 /**
@@ -126,7 +126,15 @@ function getRateLimitConfig(path: string, role: 'admin' | 'user' | 'anonymous'):
  */
 export async function isRateLimited(request: NextRequest, userId?: string): Promise<{ limited: boolean; message: string; retryAfter?: number }> {
     const resolvedUser = await getUserFromRequest(request);
-    const key = getRateLimitKey(request, userId || resolvedUser?.userId);
+    
+    let body = null;
+    if (request.method === 'POST' || request.method === 'PUT') {
+        try {
+            body = await request.clone().json();
+        } catch { }
+    }
+
+    const key = getRateLimitKey(request, body, userId || resolvedUser?.userId);
     const role = await getUserRole(request);
     const path = new URL(request.url).pathname;
     const config = getRateLimitConfig(path, role);

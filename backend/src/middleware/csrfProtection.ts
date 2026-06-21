@@ -114,7 +114,7 @@ export function addCsrfTokenToResponse(response: NextResponse, sessionId: string
     response.cookies.set(CSRF_TOKEN_COOKIE, token, {
         httpOnly: false, // CSRF tokens must be readable by JS to be submitted as a header (they are not secrets)
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
+        sameSite: 'lax',
         maxAge: 24 * 60 * 60, // 24 hours
         path: '/',
     });

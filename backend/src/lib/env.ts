@@ -1,17 +1,35 @@
 import { z } from "zod";
 
+const emptyToUndefined = <T extends z.ZodTypeAny>(schema: T) =>
+  z.preprocess((val) => (val === "" ? undefined : val), schema);
+
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   DATABASE_URL: z.string().url(),
 
   // App Config
-  NEXT_PUBLIC_APP_URL: z.string().url().optional(),
-  APP_URL: z.string().url().optional(),
+  NEXT_PUBLIC_APP_URL: emptyToUndefined(z.string().url().optional()),
+  APP_URL: emptyToUndefined(z.string().url().optional()),
   APP_NAME: z.string().default("HQ INVESTMENT"),
 
-  // JWT
-  JWT_SECRET: z.string().min(32).optional(),
-  NEXTAUTH_SECRET: z.string().min(32).optional(),
+  // ─── JWT — Required at runtime (validated early so startup fails fast) ───────
+  // auth.ts and auth-edge.ts read these directly from process.env.
+  // They are NOT used during `next build` (isNextBuild() guard bypasses them).
+  JWT_ACCESS_SECRET: emptyToUndefined(
+    z.string().min(32, "JWT_ACCESS_SECRET must be at least 32 characters").optional()
+  ),
+  JWT_REFRESH_SECRET: emptyToUndefined(
+    z.string().min(32, "JWT_REFRESH_SECRET must be at least 32 characters").optional()
+  ),
+  // Legacy alias kept for backward-compatibility (MFA routes use this)
+  JWT_SECRET: emptyToUndefined(z.string().min(32).optional()),
+  NEXTAUTH_SECRET: emptyToUndefined(z.string().min(32).optional()),
+
+  // ─── Field Encryption — Required in all envs ──────────────────────────────
+  // encryption.ts reads this directly; must be a 64-char hex string (32 bytes).
+  FIELD_ENCRYPTION_KEY: emptyToUndefined(
+    z.string().length(64, "FIELD_ENCRYPTION_KEY must be exactly 64 hex characters (32 bytes)").optional()
+  ),
 
   // ─── Email — Resend API ────────────────────────────────────────────────────
   // EMAIL-001: SMTP replaced with Resend HTTP API (see src/lib/email.ts).
@@ -38,21 +56,21 @@ const envSchema = z.object({
   WEBHOOK_SECRET: z.string().optional(),
 
   // ─── PalmPesa ─────────────────────────────────────────────────────────────
-  PALMPESA_API_URL: z.string().url().optional(),
+  PALMPESA_API_URL: emptyToUndefined(z.string().url().optional()),
   PALMPESA_API_KEY: z.string().optional(),
 
   // ─── ZenoPay ──────────────────────────────────────────────────────────────
-  ZENOPAY_API_URL: z.string().url().optional(),
+  ZENOPAY_API_URL: emptyToUndefined(z.string().url().optional()),
   ZENOPAY_API_KEY: z.string().optional(),
   ZENOPAY_ACCOUNT_ID: z.string().optional(),
 
   // ─── Mongike ──────────────────────────────────────────────────────────────
-  MONGIKE_API_URL: z.string().url().optional(),
+  MONGIKE_API_URL: emptyToUndefined(z.string().url().optional()),
   MONGIKE_API_KEY: z.string().optional(),
   MONGIKE_API_SECRET: z.string().optional(),
 
   // ─── HarakaPay ────────────────────────────────────────────────────────────
-  HARAKAPAY_API_URL: z.string().url().optional(),
+  HARAKAPAY_API_URL: emptyToUndefined(z.string().url().optional()),
   HARAKAPAY_API_KEY: z.string().optional(),
   HARAKAPAY_API_SECRET: z.string().optional(),
 
@@ -75,7 +93,8 @@ const envSchema = z.object({
 const parsedEnv = envSchema.safeParse(process.env);
 
 if (!parsedEnv.success) {
-  console.error("❌ Invalid environment variables:", parsedEnv.error.format());
+  // Use console.warn because console.error gets stripped by compiler.removeConsole in production!
+  console.warn("❌ Invalid environment variables:", parsedEnv.error.format());
   process.exit(1);
 }
 

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
 
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/health
  * 

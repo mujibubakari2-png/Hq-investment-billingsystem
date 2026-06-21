@@ -4,6 +4,7 @@ import { jsonResponse, errorResponse } from "@/lib/auth";
 import { requirePermission } from "@/lib/rbac";
 import { canAccessTenant } from "@/lib/tenant";
 import { RouterUpdateSchema } from "@/lib/validators";
+import { encryptRouterFields, decryptRouterFields } from "@/lib/encryption";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
@@ -35,11 +36,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
             return `****${v.slice(-4)}`;
         }
 
+        const decryptedRouter = decryptRouterFields(router);
+
         const safeRouter = {
-            ...router,
-            password: userPayload.role === "SUPER_ADMIN" ? router.password : mask(router.password),
-            wgPrivateKey: userPayload.role === "SUPER_ADMIN" ? router.wgPrivateKey : null,
-            wgPresharedKey: userPayload.role === "SUPER_ADMIN" ? router.wgPresharedKey : null,
+            ...decryptedRouter,
+            password: userPayload.role === "SUPER_ADMIN" ? decryptedRouter.password : mask(decryptedRouter.password),
+            wgPrivateKey: userPayload.role === "SUPER_ADMIN" ? decryptedRouter.wgPrivateKey : null,
+            wgPresharedKey: userPayload.role === "SUPER_ADMIN" ? decryptedRouter.wgPresharedKey : null,
         };
 
         return jsonResponse(safeRouter);
@@ -98,7 +101,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         if (update.status) data.status = update.status.toUpperCase();
         if (typeof update.accountingEnabled !== 'undefined') data.accountingEnabled = !!update.accountingEnabled;
 
-        const router = await db.router.update({ where: { id }, data });
+        const encryptedData = encryptRouterFields(data);
+        const router = await db.router.update({ where: { id }, data: encryptedData });
 
         // Synchronize with RADIUS NAS table to manage RADIUS via VPN
         const nasIp = router.wgTunnelIp || router.host;
@@ -106,12 +110,17 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
             where: { tenantId: existingRouter.tenantId, nasName: nasIp }
         });
 
+        const decryptedExistingRouter = decryptRouterFields(existingRouter);
+        const radiusSecret = password || decryptedExistingRouter.password || process.env.RADIUS_NAS_SECRET || "hqsecret";
+
         if (existingNas) {
-            // Do not store router management passwords in plaintext in the radiusNas table.
-            // If a password is provided on the router record, store only a masked indicator or encrypt it.
+            // RADIUS NAS secret MUST be stored in plaintext. FreeRADIUS daemon does not support AES-GCM.
             await db.radiusNas.update({
                 where: { id: existingNas.id },
-                data: { shortName: router.name }
+                data: { 
+                    shortName: router.name,
+                    secret: radiusSecret 
+                }
             });
         } else {
             // Clean up old NAS entry if the IP changed
@@ -124,12 +133,10 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
                 data: {
                     nasName: nasIp,
                     shortName: router.name,
-                    // Avoid persisting plaintext shared secrets. If callers need the secret, they
-                    // must be SUPER_ADMIN and retrieve it from the router record (not from radiusNas).
-                    secret: "REDACTED",
+                    secret: radiusSecret,
                     type: "other",
                     tenantId: existingRouter.tenantId,
-                    description: "Auto-synced from Router (credentials redacted)"
+                    description: "Auto-synced from Router"
                 }
             });
         }

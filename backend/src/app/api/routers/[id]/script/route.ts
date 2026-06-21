@@ -3,6 +3,7 @@ import { getTenantClient } from "@/lib/tenantPrisma";
 import { errorResponse } from "@/lib/auth";
 import { requirePermission } from "@/lib/rbac";
 import { canAccessTenant } from "@/lib/tenant";
+import { decryptRouterFields } from "@/lib/encryption";
 
 /**
  * GET /api/routers/[id]/script
@@ -18,12 +19,14 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         const db = getTenantClient(userPayload);
 
         const { id } = await params;
-        const router = await db.router.findUnique({ where: { id } });
+        const routerRaw = await db.router.findUnique({ where: { id } });
 
-        if (!router) return errorResponse("Router not found", 404);
-        if (!canAccessTenant(userPayload, router.tenantId)) {
+        if (!routerRaw) return errorResponse("Router not found", 404);
+        if (!canAccessTenant(userPayload, routerRaw.tenantId)) {
             return errorResponse("Unauthorized", 403);
         }
+
+        const router = decryptRouterFields(routerRaw);
 
         const apiPort = router.apiPort || 80;
         const serverUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || "";

@@ -5,9 +5,43 @@ const API_URL = (import.meta.env.VITE_API_URL as string) ?? '';
 export const CLEAN_API_URL = API_URL.endsWith('/') ? API_URL.slice(0, -1) : API_URL;
 const BASE = `${CLEAN_API_URL}/api`;
 
+let memoryCsrfToken: string | null = null;
+
+function getCookie(name: string): string | null {
+    const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+    return match ? match[2] : null;
+}
+
 function authHeaders(): Record<string, string> {
+    const headers: Record<string, string> = {};
     // Auth token is stored in HttpOnly cookies — no manual header needed.
-    return {};
+    // However, CSRF requires a manual header read from the non-HttpOnly cookie or memory
+    const csrfToken = getCookie('csrf-token') || memoryCsrfToken;
+    if (csrfToken) {
+        headers['x-csrf-token'] = csrfToken;
+    }
+    return headers;
+}
+
+// Fetch CSRF token explicitly for cold starts
+let csrfFetchPromise: Promise<string | null> | null = null;
+async function fetchCsrfToken(): Promise<string | null> {
+    if (csrfFetchPromise) return csrfFetchPromise;
+    csrfFetchPromise = (async () => {
+        try {
+            const res = await fetch(`${BASE}/auth/csrf`, { credentials: 'include' });
+            const token = res.headers.get('x-csrf-token');
+            if (token) {
+                memoryCsrfToken = token;
+            }
+            return memoryCsrfToken;
+        } catch {
+            return null;
+        } finally {
+            csrfFetchPromise = null;
+        }
+    })();
+    return csrfFetchPromise;
 }
 
 // Bug #7 FIX: Mutex to prevent multiple concurrent refresh attempts.
@@ -55,6 +89,15 @@ function forceLogout(): never {
 
 export async function request<T>(path: string, init?: RequestInit): Promise<T> {
     const fullUrl = `${BASE}${path}`;
+    
+    // Intercept non-GET requests to ensure we have a CSRF token
+    const method = init?.method || 'GET';
+    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method.toUpperCase())) {
+        if (!getCookie('csrf-token') && !memoryCsrfToken) {
+            await fetchCsrfToken();
+        }
+    }
+
     try {
         const res = await fetch(fullUrl, {
             ...init,
@@ -65,6 +108,12 @@ export async function request<T>(path: string, init?: RequestInit): Promise<T> {
                 ...(init?.headers as Record<string, string>),
             },
         });
+
+        // Always check if the response attached a fresh CSRF token
+        const resCsrfToken = res.headers.get('x-csrf-token');
+        if (resCsrfToken) {
+            memoryCsrfToken = resCsrfToken;
+        }
 
         // Bug #7 FIX: On 401, attempt a single mutex-guarded refresh then retry once.
         if (res.status === 401 && !path.includes('/auth/login') && !path.includes('/auth/refresh')) {

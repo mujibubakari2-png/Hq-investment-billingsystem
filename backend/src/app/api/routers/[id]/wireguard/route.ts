@@ -5,12 +5,13 @@ import { requirePermission } from "@/lib/rbac";
 import { canAccessTenant } from "@/lib/tenant";
 import { getMikroTikService, sanitizeMikroTikName } from "@/lib/mikrotik";
 import { wireguardManager } from "@/lib/wireguard";
+import { encryptRouterFields, decryptRouterFields } from "@/lib/encryption";
 import { exec } from "child_process";
 import { promisify } from "util";
 const execAsync = promisify(exec);
 
 async function getRouterWgFields(db: ReturnType<typeof getTenantClient>, routerId: string) {
-    return await db.router.findFirst({
+    const router = await db.router.findFirst({
         where: { id: routerId },
         select: {
             wgPrivateKey: true,
@@ -32,6 +33,7 @@ async function getRouterWgFields(db: ReturnType<typeof getTenantClient>, routerI
             username: true,
         },
     });
+    return router ? decryptRouterFields(router) : null;
 }
 
 async function updateRouterWgFields(db: ReturnType<typeof getTenantClient>, routerId: string, data: Record<string, any>) {
@@ -39,9 +41,10 @@ async function updateRouterWgFields(db: ReturnType<typeof getTenantClient>, rout
         Object.entries(data).filter(([, value]) => value !== undefined)
     );
     if (Object.keys(sanitizedData).length === 0) return;
+    const encryptedData = encryptRouterFields(sanitizedData);
     await db.router.update({
         where: { id: routerId },
-        data: sanitizedData,
+        data: encryptedData,
     });
 }
 

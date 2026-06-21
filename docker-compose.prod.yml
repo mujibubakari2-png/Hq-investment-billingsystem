@@ -103,7 +103,8 @@ services:
       CORS_ORIGIN: ${CORS_ORIGIN}
       # SMS / Payment gateway keys (injected at runtime, not baked into image)
       SMS_API_KEY: ${SMS_API_KEY:-}
-      HARAKAPAY_SECRET: ${HARAKAPAY_SECRET:-}
+      HARAKAPAY_API_KEY: ${HARAKAPAY_API_KEY:-}
+      HARAKAPAY_API_SECRET: ${HARAKAPAY_API_SECRET:-}
       HARAKAPAY_API_URL: ${HARAKAPAY_API_URL:-}
       # FIELD_ENCRYPTION_KEY (not ENCRYPTION_KEY) — backend throws FATAL if missing
       FIELD_ENCRYPTION_KEY: ${FIELD_ENCRYPTION_KEY}
@@ -122,7 +123,7 @@ services:
         reservations:
           memory: 256M
     healthcheck:
-      test: [ "CMD-SHELL", "wget -qO- http://localhost:3000/api/health || exit 1" ]
+      test: [ "CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/health || exit 1" ]
       interval: 30s
       timeout: 10s
       retries: 3

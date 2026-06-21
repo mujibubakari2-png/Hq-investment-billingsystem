@@ -86,11 +86,11 @@ export function isEncrypted(value: string | null | undefined): boolean {
 /**
  * Encrypt a Router record's sensitive fields before saving to DB.
  */
-export function encryptRouterFields(data: {
+export function encryptRouterFields<T extends {
   password?: string | null;
   wgPrivateKey?: string | null;
   wgPresharedKey?: string | null;
-}) {
+}>(data: T): T {
   return {
     ...data,
     ...(data.password      !== undefined && { password:      encrypt(data.password)      }),
@@ -118,11 +118,11 @@ export function decryptRouterFields<T extends {
 /**
  * Encrypt a PaymentChannel record's sensitive fields before saving.
  */
-export function encryptPaymentChannelFields(data: {
+export function encryptPaymentChannelFields<T extends {
   apiKey?: string | null;
   apiSecret?: string | null;
   webhookSecret?: string | null;
-}) {
+}>(data: T): T {
   return {
     ...data,
     ...(data.apiKey       !== undefined && { apiKey:       encrypt(data.apiKey)       }),
@@ -155,9 +155,9 @@ export function decryptPaymentChannelFields<T extends {
 /**
  * Encrypt a VpnUser record's sensitive fields before saving to DB.
  */
-export function encryptVpnUserFields(data: {
+export function encryptVpnUserFields<T extends {
   password?: string | null;
-}) {
+}>(data: T): T {
   return {
     ...data,
     ...(data.password !== undefined && { password: encrypt(data.password) }),

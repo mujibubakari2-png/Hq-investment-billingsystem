@@ -41,9 +41,10 @@ export function proxy(request: NextRequest) {
             headers: {
                 "Access-Control-Allow-Origin": origin,
                 "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
-                "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With, Accept",
+                "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With, Accept, X-CSRF-Token",
                 "Access-Control-Max-Age": "86400",
                 "Access-Control-Allow-Credentials": "true",
+                "Access-Control-Expose-Headers": "X-CSRF-Token",
             },
         });
     }
@@ -58,8 +59,9 @@ export function proxy(request: NextRequest) {
     if (isAllowedOrigin && origin) {
         response.headers.set("Access-Control-Allow-Origin", origin);
         response.headers.set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH");
-        response.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Accept");
+        response.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Accept, X-CSRF-Token");
         response.headers.set("Access-Control-Allow-Credentials", "true");
+        response.headers.set("Access-Control-Expose-Headers", "X-CSRF-Token");
     }
 
     return response;

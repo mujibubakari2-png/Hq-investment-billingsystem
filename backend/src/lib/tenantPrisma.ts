@@ -76,6 +76,8 @@ const TENANT_MODELS = new Set([
     'vpnUser',
     'webhookLog',
     'user',
+    'radUserGroup',
+    'radPostAuth',
 ]);
 
 // ── Soft-delete models (also have deletedAt column) ───────────────────────────

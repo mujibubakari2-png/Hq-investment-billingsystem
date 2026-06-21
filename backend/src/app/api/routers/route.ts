@@ -3,6 +3,7 @@ import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { requirePermission } from "@/lib/rbac";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import { toISOSafe } from "@/lib/dateUtils";
+import { encryptRouterFields } from "@/lib/encryption";
 
 // GET /api/routers
 export async function GET(req: NextRequest) {
@@ -158,9 +159,11 @@ export async function POST(req: NextRequest) {
         if (body.wgServerEndpoint !== undefined) routerData.wgServerEndpoint = body.wgServerEndpoint;
         if (body.wgListenPort) routerData.wgListenPort = parseInt(body.wgListenPort.toString());
 
+        const encryptedData = encryptRouterFields(routerData);
+
         const router = existing
-            ? await db.router.update({ where: { id: existing.id }, data: routerData })
-            : await db.router.create({ data: routerData });
+            ? await db.router.update({ where: { id: existing.id }, data: encryptedData })
+            : await db.router.create({ data: encryptedData });
 
         // Synchronize with RADIUS NAS table to manage RADIUS via VPN
         const nasIp = router.wgTunnelIp || router.host;
@@ -168,12 +171,16 @@ export async function POST(req: NextRequest) {
             where: { tenantId: tenantIdValue, nasName: nasIp }
         });
 
-        // Do not persist router management passwords/shared secrets in plaintext.
-        // We will create/update NAS entries without storing the secret.
+        // RADIUS NAS secret MUST be stored in plaintext because the FreeRADIUS daemon
+        // reads the database directly and does not support application-level AES-256-GCM.
+        // However, the API automatically masks this field for non-admins to prevent leaks.
         if (existingNas) {
             await db.radiusNas.update({
                 where: { id: existingNas.id },
-                data: { shortName: router.name }
+                data: { 
+                    shortName: router.name,
+                    secret: password || process.env.RADIUS_NAS_SECRET || "hqsecret"
+                }
             });
         } else {
             // Also clean up old NAS entry if the IP changed
@@ -186,10 +193,10 @@ export async function POST(req: NextRequest) {
                 data: {
                     nasName: nasIp,
                     shortName: router.name,
-                    secret: "REDACTED",
+                    secret: password || process.env.RADIUS_NAS_SECRET || "hqsecret",
                     type: "other",
                     tenantId: tenantIdValue,
-                    description: "Auto-synced from Router (credentials redacted)"
+                    description: "Auto-synced from Router"
                 }
             });
         }
