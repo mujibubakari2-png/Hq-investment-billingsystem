@@ -225,10 +225,13 @@ jobs:
 
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1
+        env:
+          SUDO_PASSWORD: ${{ secrets.DROPLET_PASSWORD }}
         with:
           host: ${{ secrets.DROPLET_HOST }}
           username: ${{ secrets.DROPLET_USER }}
           key: ${{ secrets.DROPLET_SSH_KEY }}
+          envs: SUDO_PASSWORD
           script: |
             set -e
             cd /var/www/Hq-investment-billingsystem
@@ -274,13 +277,13 @@ jobs:
             pnpm --filter landing-page build
 
             # Copy fresh frontend dist to nginx web root
-            sudo rm -rf /var/www/html/billing/*
-            sudo cp -r frontend/dist/* /var/www/html/billing/
+            echo "$SUDO_PASSWORD" | sudo -S rm -rf /var/www/html/billing/*
+            echo "$SUDO_PASSWORD" | sudo -S cp -r frontend/dist/* /var/www/html/billing/
 
             # Restart backend + landing page with PM2
             pm2 restart ecosystem.config.js --update-env
 
             # Reload nginx
-            sudo nginx -t && sudo nginx -s reload
+            echo "$SUDO_PASSWORD" | sudo -S nginx -t && echo "$SUDO_PASSWORD" | sudo -S nginx -s reload
 
             echo "✅ Deployment complete"
