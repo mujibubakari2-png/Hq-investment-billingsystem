@@ -115,21 +115,21 @@ export default function Login() {
     const navigate = useNavigate();
 
     // Credentials step
-    const [username, setUsername]   = useState('');
-    const [password, setPassword]   = useState('');
-    const [showPass, setShowPass]   = useState(false);
-    const [remember, setRemember]   = useState(false);
+    const [username, setUsername] = useState('');
+    const [password, setPassword] = useState('');
+    const [showPass, setShowPass] = useState(false);
+    const [remember, setRemember] = useState(false);
 
     // MFA step
-    const [step, setStep]           = useState<LoginStep>('credentials');
+    const [step, setStep] = useState<LoginStep>('credentials');
     const [tempToken, setTempToken] = useState('');
-    const [mfaCode, setMfaCode]     = useState('');
+    const [mfaCode, setMfaCode] = useState('');
     const [useBackup, setUseBackup] = useState(false);
     const [backupCode, setBackupCode] = useState('');
 
     // Shared
     const [loading, setLoading] = useState(false);
-    const [error, setError]     = useState('');
+    const [error, setError] = useState('');
 
     // Auto-submit when 6 digits entered
     useEffect(() => {
@@ -431,7 +431,7 @@ export default function Login() {
                                     onMouseOver={e => !loading && (e.currentTarget.style.backgroundColor = '#008ee6')}
                                     onMouseOut={e => !loading && (e.currentTarget.style.backgroundColor = '#00a3ff')}
                                 >
-                                    {loading ? 'Signing in...' : 'Sign In to Dashboard →'}
+                                    {loading ? 'Signing in...' : '➡️ Sign In'}
                                 </button>
                             </form>
                         </>
