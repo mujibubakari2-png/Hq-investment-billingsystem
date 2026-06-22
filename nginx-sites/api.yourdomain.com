@@ -19,7 +19,7 @@ server {
     }
 
     location / {
-        return 301 https://$host$request_uri;
+        return 308 https://$host$request_uri;
     }
 }
 
@@ -56,17 +56,6 @@ server {
 
     if ($http_next_action) {
         return 444;
-    }
-
-    if ($request_method = 'OPTIONS') {
-        add_header Access-Control-Allow-Origin      "https://app.yourdomain.com" always;
-        add_header Access-Control-Allow-Methods     "GET, POST, PUT, DELETE, PATCH, OPTIONS" always;
-        add_header Access-Control-Allow-Headers     "Authorization, Content-Type, X-Requested-With" always;
-        add_header Access-Control-Allow-Credentials "true" always;
-        add_header Access-Control-Max-Age           "86400" always;
-        add_header Content-Length 0;
-        add_header Content-Type text/plain;
-        return 204;
     }
 
     proxy_intercept_errors on;

@@ -283,6 +283,12 @@ jobs:
             # Restart backend + landing page with PM2
             pm2 restart ecosystem.config.js --update-env
 
+            # Sync Nginx configuration files from repository to the server
+            echo "Syncing Nginx configurations..."
+            echo "$SUDO_PASSWORD" | sudo -S cp nginx-sites/api.yourdomain.com /etc/nginx/sites-available/api.yourdomain.com
+            echo "$SUDO_PASSWORD" | sudo -S cp nginx-sites/app.yourdomain.com /etc/nginx/sites-available/app.yourdomain.com
+            echo "$SUDO_PASSWORD" | sudo -S cp nginx-sites/yourdomain.com /etc/nginx/sites-available/yourdomain.com
+
             # Reload nginx
             echo "$SUDO_PASSWORD" | sudo -S nginx -t && echo "$SUDO_PASSWORD" | sudo -S nginx -s reload
 

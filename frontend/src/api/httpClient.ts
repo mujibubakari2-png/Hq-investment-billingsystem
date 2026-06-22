@@ -54,6 +54,7 @@ async function doRefresh(): Promise<boolean> {
         const refreshRes = await fetch(`${BASE}/auth/refresh`, {
             method: 'POST',
             credentials: 'include',
+            headers: authHeaders(),
         });
         if (refreshRes.ok) {
             const data = await refreshRes.json();

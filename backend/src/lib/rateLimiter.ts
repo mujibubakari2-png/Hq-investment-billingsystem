@@ -72,14 +72,18 @@ const defaultLimit: UserRateLimitConfig = {
 /**
  * Get rate limit key (IP + User ID)
  */
-function getRateLimitKey(request: NextRequest, userId?: string): string {
+function getRateLimitKey(request: NextRequest, body: any, userId?: string): string {
     // x-forwarded-proto is a scheme (http/https), NOT an IP address.
     // Removed from fallback chain to prevent all scheme-less requests sharing one key.
     // Also split x-forwarded-for on commas — format is "client, proxy1, proxy2".
     const ip = request.headers.get('x-forwarded-for')?.split(',')[0].trim() ||
         request.headers.get('x-real-ip') ||
         'unknown';
-    return userId ? `${ip}:${userId}` : ip;
+    
+    const tenantId = body?.tenantId || 'global';
+    const identifier = userId || body?.username || body?.email || 'anonymous';
+    
+    return `${tenantId}:${identifier}:${ip}`;
 }
 
 /**
@@ -122,8 +126,15 @@ function getRateLimitConfig(path: string, role: 'admin' | 'user' | 'anonymous'):
 /**
  * Check if request should be rate limited
  */
-export function isRateLimited(request: NextRequest, userId?: string): { limited: boolean; message: string; retryAfter?: number } {
-    const key = getRateLimitKey(request, userId || getUserFromRequest(request)?.userId);
+export async function isRateLimited(request: NextRequest, userId?: string): Promise<{ limited: boolean; message: string; retryAfter?: number }> {
+    let body: any = null;
+    if (request.method === 'POST' || request.method === 'PUT') {
+        try {
+            body = await request.clone().json();
+        } catch { }
+    }
+    
+    const key = getRateLimitKey(request, body, userId || getUserFromRequest(request)?.userId);
     const role = getUserRole(request);
     const path = new URL(request.url).pathname;
     const config = getRateLimitConfig(path, role);
@@ -157,8 +168,8 @@ export function isRateLimited(request: NextRequest, userId?: string): { limited:
  * FIX: Do not trust client-supplied user headers for rate-limit identity.
  * Role and userId are derived from authenticated JWT payload only.
  */
-export function rateLimitMiddleware(request: NextRequest): NextResponse | null {
-    const result = isRateLimited(request);
+export async function rateLimitMiddleware(request: NextRequest): Promise<NextResponse | null> {
+    const result = await isRateLimited(request);
 
     if (result.limited) {
         return NextResponse.json(
@@ -201,7 +212,7 @@ export function resetRateLimit(identifier: string): void {
  * Check request rate limit and return a NextResponse when limited.
  */
 export async function checkRateLimit(request: NextRequest) {
-    return rateLimitMiddleware(request);
+    return await rateLimitMiddleware(request);
 }
 
 /**

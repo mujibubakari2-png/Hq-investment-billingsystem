@@ -19,7 +19,7 @@ server {
     }
 
     location / {
-        return 301 https://$host$request_uri;
+        return 308 https://$host$request_uri;
     }
 }
 
