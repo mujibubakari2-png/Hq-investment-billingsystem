@@ -20,7 +20,6 @@ import {
   useQuery,
   useMutation,
   useQueryClient,
-  UseQueryOptions,
 } from '@tanstack/react-query';
 import { get, post, put, del } from './httpClient';
 
@@ -29,52 +28,59 @@ import { get, post, put, del } from './httpClient';
 
 export const queryKeys = {
   // Dashboard
-  dashboardStats:   () => ['dashboard', 'stats'] as const,
-  dashboardRecent:  () => ['dashboard', 'recent'] as const,
+  dashboardStats: () => ['dashboard', 'stats'] as const,
+  dashboardRecent: () => ['dashboard', 'recent'] as const,
 
   // Clients
-  clients:          (params?: object) => ['clients', params] as const,
-  client:           (id: string)      => ['clients', id] as const,
+  clients: (params?: object) => ['clients', params] as const,
+  client: (id: string) => ['clients', id] as const,
 
   // Packages
-  packages:         (params?: object) => ['packages', params] as const,
-  package:          (id: string)      => ['packages', id] as const,
+  packages: (params?: object) => ['packages', params] as const,
+  package: (id: string) => ['packages', id] as const,
 
   // Subscriptions
-  subscriptions:    (params?: object) => ['subscriptions', params] as const,
-  subscription:     (id: string)      => ['subscriptions', id] as const,
+  subscriptions: (params?: object) => ['subscriptions', params] as const,
+  subscription: (id: string) => ['subscriptions', id] as const,
 
   // Routers
-  routers:          (params?: object) => ['routers', params] as const,
-  router:           (id: string)      => ['routers', id] as const,
-  routerSessions:   (id: string)      => ['routers', id, 'sessions'] as const,
-  routerLogs:       (id: string)      => ['routers', id, 'logs'] as const,
+  routers: (params?: object) => ['routers', params] as const,
+  router: (id: string) => ['routers', id] as const,
+  routerSessions: (id: string) => ['routers', id, 'sessions'] as const,
+  routerLogs: (id: string) => ['routers', id, 'logs'] as const,
 
   // Payments / Transactions
-  transactions:     (params?: object) => ['transactions', params] as const,
-  invoices:         (params?: object) => ['invoices', params] as const,
+  transactions: (params?: object) => ['transactions', params] as const,
+  invoices: (params?: object) => ['invoices', params] as const,
 
   // Users (system users / staff)
-  systemUsers:      (params?: object) => ['system-users', params] as const,
+  systemUsers: (params?: object) => ['system-users', params] as const,
 
   // Expired subs
-  expiredSubs:      (params?: object) => ['expired-subscribers', params] as const,
+  expiredSubs: (params?: object) => ['expired-subscribers', params] as const,
 };
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 
-export function useDashboardStats() {
+export function useDashboardStats(params?: { tenantId?: string; routerId?: string }) {
+  const qs = params
+    ? new URLSearchParams(
+      Object.entries(params).filter(([, v]) => v !== undefined && v !== 'All').map(([k, v]) => [k, v as string])
+    ).toString()
+    : '';
   return useQuery({
     queryKey: queryKeys.dashboardStats(),
-    queryFn:  () => get<Record<string, unknown>>('/dashboard/stats'),
+    queryFn: () => get<Record<string, unknown>>(`/dashboard${qs ? `?${qs}` : ''}`),
     staleTime: 60_000, // Dashboard stats: 60s (slightly longer — heavy aggregation)
   });
 }
 
+// NOTE: /api/dashboard returns all stats in a single call.
+// useDashboardRecent is kept for API compatibility but queries the same endpoint.
 export function useDashboardRecent() {
   return useQuery({
     queryKey: queryKeys.dashboardRecent(),
-    queryFn:  () => get<Record<string, unknown>>('/dashboard/recent'),
+    queryFn: () => get<Record<string, unknown>>('/dashboard'),
     staleTime: 30_000,
   });
 }
@@ -82,10 +88,10 @@ export function useDashboardRecent() {
 // ── Clients ───────────────────────────────────────────────────────────────────
 
 export interface ClientListParams {
-  page?:        number;
-  limit?:       number;
-  search?:      string;
-  status?:      string;
+  page?: number;
+  limit?: number;
+  search?: string;
+  status?: string;
   serviceType?: string;
 }
 
@@ -95,15 +101,15 @@ export function useClients(params: ClientListParams = {}) {
   ).toString();
   return useQuery({
     queryKey: queryKeys.clients(params),
-    queryFn:  () => get<{ data: unknown[]; total: number; page: number; limit: number }>(`/clients${qs ? `?${qs}` : ''}`),
+    queryFn: () => get<{ data: unknown[]; total: number; page: number; limit: number }>(`/clients${qs ? `?${qs}` : ''}`),
   });
 }
 
 export function useClient(id: string) {
   return useQuery({
     queryKey: queryKeys.client(id),
-    queryFn:  () => get<Record<string, unknown>>(`/clients/${id}`),
-    enabled:  !!id,
+    queryFn: () => get<Record<string, unknown>>(`/clients/${id}`),
+    enabled: !!id,
   });
 }
 
@@ -111,7 +117,7 @@ export function useCreateClient() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (data: Record<string, unknown>) => post('/clients', data),
-    onSuccess:  () => qc.invalidateQueries({ queryKey: ['clients'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['clients'] }),
   });
 }
 
@@ -119,7 +125,7 @@ export function useUpdateClient(id: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (data: Record<string, unknown>) => put(`/clients/${id}`, data),
-    onSuccess:  () => {
+    onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['clients'] });
       qc.invalidateQueries({ queryKey: queryKeys.client(id) });
     },
@@ -130,15 +136,15 @@ export function useDeleteClient(id: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: () => del(`/clients/${id}`),
-    onSuccess:  () => qc.invalidateQueries({ queryKey: ['clients'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['clients'] }),
   });
 }
 
 // ── Packages ──────────────────────────────────────────────────────────────────
 
 export interface PackageListParams {
-  type?:     string;
-  status?:   string;
+  type?: string;
+  status?: string;
   routerId?: string;
 }
 
@@ -148,7 +154,7 @@ export function usePackages(params: PackageListParams = {}) {
   ).toString();
   return useQuery({
     queryKey: queryKeys.packages(params),
-    queryFn:  () => get<unknown[]>(`/packages${qs ? `?${qs}` : ''}`),
+    queryFn: () => get<unknown[]>(`/packages${qs ? `?${qs}` : ''}`),
     staleTime: 60_000, // Packages rarely change
   });
 }
@@ -157,7 +163,7 @@ export function useCreatePackage() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (data: Record<string, unknown>) => post('/packages', data),
-    onSuccess:  () => qc.invalidateQueries({ queryKey: ['packages'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['packages'] }),
   });
 }
 
@@ -165,7 +171,7 @@ export function useUpdatePackage(id: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (data: Record<string, unknown>) => put(`/packages/${id}`, data),
-    onSuccess:  () => qc.invalidateQueries({ queryKey: ['packages'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['packages'] }),
   });
 }
 
@@ -173,7 +179,7 @@ export function useDeletePackage(id: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: () => del(`/packages/${id}`),
-    onSuccess:  () => qc.invalidateQueries({ queryKey: ['packages'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['packages'] }),
   });
 }
 
@@ -185,7 +191,7 @@ export function useSubscriptions(params: Record<string, string | number | undefi
   ).toString();
   return useQuery({
     queryKey: queryKeys.subscriptions(params),
-    queryFn:  () => get<unknown[]>(`/subscriptions${qs ? `?${qs}` : ''}`),
+    queryFn: () => get<unknown[]>(`/subscriptions${qs ? `?${qs}` : ''}`),
   });
 }
 
@@ -197,7 +203,7 @@ export function useRouters(params: Record<string, string | undefined> = {}) {
   ).toString();
   return useQuery({
     queryKey: queryKeys.routers(params),
-    queryFn:  () => get<unknown[]>(`/routers${qs ? `?${qs}` : ''}`),
+    queryFn: () => get<unknown[]>(`/routers${qs ? `?${qs}` : ''}`),
     staleTime: 30_000,
   });
 }
@@ -205,8 +211,8 @@ export function useRouters(params: Record<string, string | undefined> = {}) {
 export function useRouterSessions(routerId: string) {
   return useQuery({
     queryKey: queryKeys.routerSessions(routerId),
-    queryFn:  () => get<unknown[]>(`/routers/${routerId}/active-sessions`),
-    enabled:  !!routerId,
+    queryFn: () => get<unknown[]>(`/routers/${routerId}/active-sessions`),
+    enabled: !!routerId,
     staleTime: 15_000, // Active sessions: shorter stale time
     refetchInterval: 30_000, // Auto-refresh every 30s
   });
@@ -220,7 +226,7 @@ export function useTransactions(params: Record<string, string | number | undefin
   ).toString();
   return useQuery({
     queryKey: queryKeys.transactions(params),
-    queryFn:  () => get<unknown[]>(`/transactions${qs ? `?${qs}` : ''}`),
+    queryFn: () => get<unknown[]>(`/transactions${qs ? `?${qs}` : ''}`),
   });
 }
 
@@ -230,7 +236,7 @@ export function useInvoices(params: Record<string, string | number | undefined> 
   ).toString();
   return useQuery({
     queryKey: queryKeys.invoices(params),
-    queryFn:  () => get<unknown[]>(`/invoices${qs ? `?${qs}` : ''}`),
+    queryFn: () => get<unknown[]>(`/invoices${qs ? `?${qs}` : ''}`),
   });
 }
 
@@ -242,6 +248,6 @@ export function useExpiredSubscribers(params: Record<string, string | number | u
   ).toString();
   return useQuery({
     queryKey: queryKeys.expiredSubs(params),
-    queryFn:  () => get<unknown[]>(`/expired-subscribers${qs ? `?${qs}` : ''}`),
+    queryFn: () => get<unknown[]>(`/expired-subscribers${qs ? `?${qs}` : ''}`),
   });
 }

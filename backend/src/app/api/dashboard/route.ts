@@ -6,6 +6,7 @@ import { requirePermission } from "@/lib/rbac";
 import { isPlatformSuperAdmin } from "@/lib/tenant";
 import { toISOSafe, toTimestampSafe, getStartOfTodayTZ, getStartOfMonthTZ } from "@/lib/dateUtils";
 import { Redis } from 'ioredis';
+import logger from "@/lib/logger";
 
 let redis: Redis | null = null;
 try {
@@ -31,10 +32,15 @@ const RADIUS_SYNC_INTERVAL_MS = 60_000;
 
 // GET /api/dashboard - aggregate stats
 export async function GET(req: NextRequest) {
+    // Capture context early so it's available in catch block
+    let _userId: string | undefined;
+    let _tenantId: string | null | undefined;
     try {
         const guard = requirePermission(req, "dashboard:read");
         if (guard.error) return guard.error;
         const userPayload = guard.user;
+        _userId = userPayload.userId;
+        _tenantId = userPayload.tenantId;
         const db = getTenantClient(userPayload);
         const globalDb = getTenantClient(null);
 
@@ -99,7 +105,13 @@ export async function GET(req: NextRequest) {
                     }
                 }
             } catch (e) {
-                console.error("[DASHBOARD SYNC ERROR]: Failed to map RADIUS sessions to tenants", e);
+                logger.error("[DASHBOARD SYNC ERROR]: Failed to map RADIUS sessions to tenants", {
+                    endpoint: "GET /api/dashboard",
+                    userId: _userId,
+                    tenantId: _tenantId,
+                    error: e instanceof Error ? e.message : String(e),
+                    stack: e instanceof Error ? e.stack : undefined,
+                });
             }
         }
 
@@ -154,7 +166,13 @@ export async function GET(req: NextRequest) {
                     });
                 }
             } catch (e) {
-                console.error("[DASHBOARD RADIUS SYNC ERROR]: Failed to sync online status from RADIUS", e);
+                logger.error("[DASHBOARD RADIUS SYNC ERROR]: Failed to sync online status from RADIUS", {
+                    endpoint: "GET /api/dashboard",
+                    userId: _userId,
+                    tenantId: _tenantId,
+                    error: e instanceof Error ? e.message : String(e),
+                    stack: e instanceof Error ? e.stack : undefined,
+                });
             }
         }
 
@@ -295,7 +313,7 @@ export async function GET(req: NextRequest) {
                                                 SELECT TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY-MM-DD') as name, SUM(amount) as value
                                                 FROM transactions
                                                 WHERE status = 'COMPLETED' AND timezone('Africa/Dar_es_Salaam', "createdAt") >= timezone('Africa/Dar_es_Salaam', NOW()) - INTERVAL '30 days'
-                                                    AND "tenantId" = ${tenantFilter.tenantId}
+                                                    AND "tenantId" = ${tenantFilter.tenantId ?? null}
                                                 GROUP BY TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY-MM-DD')
                                                 ORDER BY name ASC`;
 
@@ -311,7 +329,7 @@ export async function GET(req: NextRequest) {
                                                 SELECT TO_CHAR(DATE_TRUNC('week', timezone('Africa/Dar_es_Salaam', "createdAt")), 'YYYY-MM-DD') as name, SUM(amount) as value
                                                 FROM transactions
                                                 WHERE status = 'COMPLETED' AND timezone('Africa/Dar_es_Salaam', "createdAt") >= timezone('Africa/Dar_es_Salaam', NOW()) - INTERVAL '12 weeks'
-                                                    AND "tenantId" = ${tenantFilter.tenantId}
+                                                    AND "tenantId" = ${tenantFilter.tenantId ?? null}
                                                 GROUP BY DATE_TRUNC('week', timezone('Africa/Dar_es_Salaam', "createdAt"))
                                                 ORDER BY DATE_TRUNC('week', timezone('Africa/Dar_es_Salaam', "createdAt")) ASC`;
 
@@ -327,7 +345,7 @@ export async function GET(req: NextRequest) {
                                                 SELECT TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY-MM') as name, SUM(amount) as value
                                                 FROM transactions
                                                 WHERE status = 'COMPLETED' AND timezone('Africa/Dar_es_Salaam', "createdAt") >= timezone('Africa/Dar_es_Salaam', NOW()) - INTERVAL '12 months'
-                                                    AND "tenantId" = ${tenantFilter.tenantId}
+                                                    AND "tenantId" = ${tenantFilter.tenantId ?? null}
                                                 GROUP BY TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY-MM')
                                                 ORDER BY name ASC`;
 
@@ -343,7 +361,7 @@ export async function GET(req: NextRequest) {
                                                 SELECT TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY') as name, SUM(amount) as value
                                                 FROM transactions
                                                 WHERE status = 'COMPLETED'
-                                                    AND "tenantId" = ${tenantFilter.tenantId}
+                                                    AND "tenantId" = ${tenantFilter.tenantId ?? null}
                                                 GROUP BY TO_CHAR(timezone('Africa/Dar_es_Salaam', "createdAt"), 'YYYY')
                                                 ORDER BY name ASC`;
 
@@ -355,7 +373,14 @@ export async function GET(req: NextRequest) {
                 // Keep revenueChartData for backward compatibility (defaults to daily)
                 revenueChartData = revenueAnalytics.daily;
             } catch (e) {
-                console.error("Dashboard Raw SQL error (Revenue Analytics):", e);
+                logger.error("Dashboard Raw SQL error (Revenue Analytics)", {
+                    endpoint: "GET /api/dashboard",
+                    userId: _userId,
+                    tenantId: _tenantId,
+                    error: e instanceof Error ? e.message : String(e),
+                    stack: e instanceof Error ? e.stack : undefined,
+                    query: "revenue_analytics",
+                });
             }
         }
 
@@ -372,11 +397,18 @@ export async function GET(req: NextRequest) {
                     SELECT TO_CHAR("createdAt", 'Mon') as month, COUNT(*) as clients
                     FROM clients
                     WHERE "createdAt" >= NOW() - INTERVAL '6 months'
-                      AND "tenantId" = ${tenantFilter.tenantId}
+                      AND "tenantId" = ${tenantFilter.tenantId ?? null}
                     GROUP BY TO_CHAR("createdAt", 'Mon')`;
             subscriberGrowthData = rawGrowth.map(d => ({ month: d.month, clients: Number(d.clients) || 0 }));
         } catch (e) {
-            console.error("Dashboard Raw SQL error (Growth):", e);
+            logger.error("Dashboard Raw SQL error (Subscriber Growth)", {
+                endpoint: "GET /api/dashboard",
+                userId: _userId,
+                tenantId: _tenantId,
+                error: e instanceof Error ? e.message : String(e),
+                stack: e instanceof Error ? e.stack : undefined,
+                query: "subscriber_growth",
+            });
         }
 
         // Build system activities from tenant logins within last 5 days
@@ -442,7 +474,7 @@ export async function GET(req: NextRequest) {
             paid: mobileTransactionsStats.find(s => s.status === "COMPLETED")?._count._all || 0,
             unpaid: mobileTransactionsStats.find(s => s.status === "PENDING")?._count._all || 0,
             failed: mobileTransactionsStats.find(s => s.status === "FAILED")?._count._all || 0,
-            canceled: mobileTransactionsStats.find(s => s.status === "CANCELED")?._count._all || 0,
+            canceled: 0, // Note: TransactionStatus enum has no CANCELED variant; use FAILED for failed payments
         };
 
         const response = {
@@ -512,7 +544,19 @@ export async function GET(req: NextRequest) {
 
         return jsonResponse(response);
     } catch (e) {
-        console.error(e);
-        return errorResponse("Internal server error", 500);
+        const err = e instanceof Error ? e : new Error(String(e));
+        logger.error('Dashboard route failed', {
+            endpoint: 'GET /api/dashboard',
+            userId: _userId,
+            tenantId: _tenantId,
+            error: err.message,
+            stack: err.stack,
+        });
+        return errorResponse(
+            `Internal server error`,
+            500,
+            "DASHBOARD_INTERNAL_ERROR",
+            err.message
+        );
     }
 }

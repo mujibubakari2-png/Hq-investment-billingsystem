@@ -1,6 +1,8 @@
 // ── Shared HTTP client ────────────────────────────────────────────────────────
 // All API modules import from here. Never import directly in page components.
 
+import authStore from '../stores/authStore';
+
 const API_URL = (import.meta.env.VITE_API_URL as string) ?? '';
 export const CLEAN_API_URL = API_URL.endsWith('/') ? API_URL.slice(0, -1) : API_URL;
 const BASE = `${CLEAN_API_URL}/api`;
@@ -14,8 +16,14 @@ function getCookie(name: string): string | null {
 
 function authHeaders(): Record<string, string> {
     const headers: Record<string, string> = {};
-    // Auth token is stored in HttpOnly cookies — no manual header needed.
-    // However, CSRF requires a manual header read from the non-HttpOnly cookie or memory
+    // 1. Authorization header from stored token (cross-port dev + mobile clients)
+    //    The backend checks cookies first, then falls back to this header.
+    //    This ensures 401s don't happen when SameSite cookie policy blocks cross-port delivery.
+    const token = authStore.getToken();
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
+    // 2. CSRF token from non-HttpOnly cookie (must be sent as a header)
     const csrfToken = getCookie('csrf-token') || memoryCsrfToken;
     if (csrfToken) {
         headers['x-csrf-token'] = csrfToken;
@@ -81,7 +89,7 @@ async function refreshToken(): Promise<boolean> {
 
 function forceLogout(): never {
     if (typeof window !== 'undefined') {
-        try { localStorage.removeItem('user'); } catch { /* ignore */ }
+        try { authStore.logout(); } catch { /* ignore */ }
         // E18 FIX: Use the correct basename
         window.location.href = '/billing/login';
     }

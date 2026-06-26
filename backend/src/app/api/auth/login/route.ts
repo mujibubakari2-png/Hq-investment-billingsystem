@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
         try {
             body = await req.json();
         } catch {
-            return errorResponse("Invalid JSON in request body", 400);
+            return errorResponse("Invalid JSON in request body", 400, "INVALID_JSON");
         }
 
         const username = body.username || body.email;
@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
         logger.info("Login attempt", { username });
 
         if (!username || !password) {
-            return errorResponse("Username and password are required");
+            return errorResponse("Username and password are required", 400, "MISSING_CREDENTIALS", "Both 'username' and 'password' fields must be provided.");
         }
 
         const db = getTenantClient(null);
@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
         if (!user) {
             // CRIT-007: Constant-time delay to prevent username enumeration via timing
             await comparePassword(password, "$2b$12$invalidhashplaceholderXXXXXXXXXXXX");
-            return errorResponse("Invalid credentials", 401);
+            return errorResponse("Invalid credentials", 401, "INVALID_CREDENTIALS", "Username or password is incorrect.");
         }
 
         // Account lockout check (defense-in-depth)
@@ -89,13 +89,13 @@ export async function POST(req: NextRequest) {
         const lockoutKey = `lockout:${user.email}`;
         try {
             const locked = await cacheGet<boolean>(lockoutKey);
-            if (locked) return errorResponse("Account temporarily locked due to multiple failed login attempts", 403);
+            if (locked) return errorResponse("Account temporarily locked due to multiple failed login attempts", 403, "ACCOUNT_LOCKED", "Too many failed attempts. Try again in 15 minutes.");
         } catch (err) {
             // cache errors are non-fatal
         }
 
         if (user.status !== "ACTIVE") {
-            return errorResponse("Account is disabled", 403);
+            return errorResponse("Account is disabled", 403, "ACCOUNT_DISABLED", "This account has been deactivated. Contact your administrator.");
         }
 
         const valid = await comparePassword(password, user.password);
@@ -112,7 +112,7 @@ export async function POST(req: NextRequest) {
             } catch (err) {
                 // ignore cache errors
             }
-            return errorResponse("Invalid credentials", 401);
+            return errorResponse("Invalid credentials", 401, "INVALID_CREDENTIALS", "Username or password is incorrect.");
         }
 
         // ── CRIT-002 FIX: MFA challenge ───────────────────────────────────────
@@ -178,8 +178,12 @@ export async function POST(req: NextRequest) {
 
         return response;
     } catch (e: unknown) {
-        const message = e instanceof Error ? e.message : String(e);
-        logger.error("Login error", { error: message });
-        return errorResponse("Internal server error", 500);
+        const err = e instanceof Error ? e : new Error(String(e));
+        logger.error("Login route failed", {
+            endpoint: "POST /api/auth/login",
+            error: err.message,
+            stack: err.stack,
+        });
+        return errorResponse("Internal server error", 500, "LOGIN_INTERNAL_ERROR", err.message);
     }
 }

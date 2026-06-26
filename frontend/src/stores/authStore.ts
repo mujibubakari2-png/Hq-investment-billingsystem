@@ -52,11 +52,12 @@ function safeRemoveItem(key: string): void {
 }
 
 // Bug #6 FIX: Read initial state from localStorage with safe accessors.
-// The token is stored in HttpOnly cookies (server-side verification).
-// localStorage only stores the user profile for UI display.
+// The token is stored in both HttpOnly cookies (server-side verification)
+// AND localStorage (for Authorization header fallback on cross-port dev requests).
 // If someone injects a fake user, the first API call returns 401 → logout.
 function loadState(): AuthState {
     const userJson = safeGetItem('user');
+    const token    = safeGetItem('token'); // Authorization header fallback
     let user: AuthUser | null = null;
 
     if (userJson) {
@@ -68,7 +69,7 @@ function loadState(): AuthState {
     }
 
     return {
-        token: null, // Token handled via cookies
+        token,
         user,
         isAuthenticated: !!user,
     };
@@ -94,13 +95,15 @@ function getState(): AuthState {
 }
 
 function login(token: string, user: AuthUser) {
-    safeSetItem('user', JSON.stringify(user));
+    safeSetItem('user',  JSON.stringify(user));
+    safeSetItem('token', token); // persist for Authorization header fallback
     state = { token, user, isAuthenticated: true };
     notify();
 }
 
 function logout() {
     safeRemoveItem('user');
+    safeRemoveItem('token');
     state = { token: null, user: null, isAuthenticated: false };
     notify();
 }
@@ -121,6 +124,7 @@ export function useAuth(): AuthState {
 
 export const authStore = {
     getState,
+    getToken: () => state.token ?? safeGetItem('token'), // Authorization header source
     subscribe,
     login,
     logout,

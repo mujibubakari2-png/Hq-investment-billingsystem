@@ -38,7 +38,11 @@ const nextConfig = {
 
     // Build optimizations for production deployment
     compiler: {
-        removeConsole: process.env.NODE_ENV === "production",
+        // Only strip debug-noise consoles in production.
+        // NEVER strip 'error' or 'warn' — crash details must survive to PM2 logs.
+        removeConsole: process.env.NODE_ENV === "production"
+            ? { exclude: ["error", "warn"] }
+            : false,
     },
     // Optimize images
     images: {

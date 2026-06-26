@@ -223,13 +223,21 @@ export function jsonResponse(data: any, status = 200) {
     );
 }
 
-export function errorResponse(message: string, status = 400) {
+export function errorResponse(
+    message: string,
+    status = 400,
+    code?: string,
+    details?: string
+) {
     if (status >= 400) {
-        console.warn(`[API ERROR] Status ${status}: ${message}`);
+        console.warn(`[API ERROR] Status ${status} (${code ?? 'NO_CODE'}): ${message}`);
     }
     return jsonResponse({
+        success: false,
         error: message,
         message: message, // Alias for tests that expect 'message'
-        status: "error"
+        status: "error",
+        ...(code    ? { code }    : {}),
+        ...(details ? { details } : {}),
     }, status);
 }
