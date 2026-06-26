@@ -426,26 +426,30 @@ export function RevenueAnalyticsCard({ data, period, onPeriodChange }: RevenueAn
                     {periodBtn('daily', 'Day')}{periodBtn('weekly', 'Week')}{periodBtn('monthly', 'Month')}{periodBtn('yearly', 'Year')}
                 </div>
             </div>
-            <div className="dash-card-body" style={{ height: 300 }}>
-                <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1} debounce={50}>
-                    <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                        <defs>
-                            <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="#2196f3" stopOpacity={0.25} />
-                                <stop offset="95%" stopColor="#2196f3" stopOpacity={0.02} />
-                            </linearGradient>
-                        </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
-                        <XAxis dataKey="date" stroke="var(--text-muted)" fontSize={11} tickLine={false} axisLine={{ stroke: 'var(--border-light)' }} />
-                        <YAxis stroke="var(--text-muted)" fontSize={11} tickLine={false} axisLine={{ stroke: 'var(--border-light)' }} tickFormatter={(v: number) => v.toLocaleString()} />
-                        <Tooltip
-                            contentStyle={{ background: '#1a1d2e', border: 'none', borderRadius: 8, color: '#fff', fontSize: 12, padding: '8px 14px' }}
-                            labelStyle={{ color: '#90caf9', fontWeight: 600, marginBottom: 4 }}
-                            formatter={(value: unknown) => [`Revenue: ${((value as number) ?? 0).toLocaleString()}.00`, '']}
-                        />
-                        <Area type="monotone" dataKey="revenue" stroke="#2196f3" strokeWidth={2.5} fill="url(#revenueGradient)" dot={{ r: 3, fill: '#2196f3', strokeWidth: 0 }} activeDot={{ r: 5, fill: '#2196f3', stroke: '#fff', strokeWidth: 2 }} />
-                    </AreaChart>
-                </ResponsiveContainer>
+            <div className="dash-card-body" style={{ padding: '20px 20px 12px' }}>
+                {/* Fixed pixel height wrapper prevents Recharts "width/height = -1" error
+                    that occurs when ResponsiveContainer uses height="100%" on a flex/grid parent */}
+                <div style={{ position: 'relative', width: '100%', height: 260, minWidth: 1, minHeight: 1 }}>
+                    <ResponsiveContainer width="100%" height={260} minWidth={1} minHeight={1} debounce={50}>
+                        <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                            <defs>
+                                <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="#2196f3" stopOpacity={0.25} />
+                                    <stop offset="95%" stopColor="#2196f3" stopOpacity={0.02} />
+                                </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" />
+                            <XAxis dataKey="date" stroke="var(--text-muted)" fontSize={11} tickLine={false} axisLine={{ stroke: 'var(--border-light)' }} />
+                            <YAxis stroke="var(--text-muted)" fontSize={11} tickLine={false} axisLine={{ stroke: 'var(--border-light)' }} tickFormatter={(v: number) => v.toLocaleString()} />
+                            <Tooltip
+                                contentStyle={{ background: '#1a1d2e', border: 'none', borderRadius: 8, color: '#fff', fontSize: 12, padding: '8px 14px' }}
+                                labelStyle={{ color: '#90caf9', fontWeight: 600, marginBottom: 4 }}
+                                formatter={(value: unknown) => [`Revenue: ${((value as number) ?? 0).toLocaleString()}.00`, '']}
+                            />
+                            <Area type="monotone" dataKey="revenue" stroke="#2196f3" strokeWidth={2.5} fill="url(#revenueGradient)" dot={{ r: 3, fill: '#2196f3', strokeWidth: 0 }} activeDot={{ r: 5, fill: '#2196f3', stroke: '#fff', strokeWidth: 2 }} />
+                        </AreaChart>
+                    </ResponsiveContainer>
+                </div>
             </div>
         </div>
     );

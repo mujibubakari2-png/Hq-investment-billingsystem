@@ -8,7 +8,11 @@ import { toISOSafe, toTimestampSafe, getStartOfTodayTZ, getStartOfMonthTZ } from
 import { Redis } from 'ioredis';
 import logger from "@/lib/logger";
 
+// Connection-related error codes that should be suppressed (Redis not available)
+const REDIS_CONN_ERRORS = new Set(['ECONNREFUSED', 'ENOENT', 'ENOTFOUND', 'ETIMEDOUT', 'ECONNRESET', 'EPIPE']);
+
 let redis: Redis | null = null;
+let _redisFailures = 0;
 try {
     redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
         lazyConnect: true,
@@ -16,12 +20,27 @@ try {
         maxRetriesPerRequest: 1,
         connectTimeout: 2000,
         commandTimeout: 2000,
+        // Stop retrying after 3 consecutive failures to avoid spamming logs
+        retryStrategy: (times: number) => {
+            if (times > 3) {
+                // Give up – set redis to null so the app runs without it
+                redis = null;
+                return null; // null = stop retrying
+            }
+            return Math.min(times * 500, 2000); // backoff in ms
+        },
     });
-    redis.on('error', (err) => {
-        // Suppress noisy ECONNREFUSED logs in dev when Redis is not running
-        if (!err.message.includes('ECONNREFUSED')) {
-            console.error('[Redis Error in dashboard route]:', err.message);
+    redis.on('error', (err: NodeJS.ErrnoException) => {
+        _redisFailures++;
+        const code = err.code || '';
+        const message = err.message || String(err);
+        // Suppress well-known connection errors – they are not actionable
+        if (!REDIS_CONN_ERRORS.has(code) && !message.includes('ECONNREFUSED')) {
+            console.error('[Redis Error in dashboard route]:', message);
         }
+    });
+    redis.on('ready', () => {
+        _redisFailures = 0; // reset on successful connection
     });
 } catch {
     redis = null;
