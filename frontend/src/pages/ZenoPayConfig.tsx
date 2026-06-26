@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { settingsApi } from '../api';
+import { getPublicApiBase } from '../utils/config';
 import SaveIcon from '@mui/icons-material/Save';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import VisibilityIcon from '@mui/icons-material/Visibility';
@@ -40,6 +41,9 @@ export default function ZenoPayConfig() {
             setSaving(false);
         }
     };
+
+    const configuredWebhookUrl = (import.meta.env.VITE_ZENOPAY_WEBHOOK_URL as string | undefined)?.trim();
+    const webhookUrl = configuredWebhookUrl || `${getPublicApiBase()}/api/webhooks/zenopay`;
 
     return (
         <div>
@@ -106,7 +110,7 @@ export default function ZenoPayConfig() {
                             type="text"
                             className="form-input"
                             readOnly
-                            value={`${window.location.origin}/api/webhooks/zenopay`}
+                            value={webhookUrl}
                             style={{ paddingLeft: 34, background: '#f8f9fa', color: '#6b7280', cursor: 'text' }}
                         />
                     </div>

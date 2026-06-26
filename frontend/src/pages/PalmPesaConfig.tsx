@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { settingsApi } from '../api';
+import { getPublicApiBase } from '../utils/config';
 import SaveIcon from '@mui/icons-material/Save';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import VisibilityIcon from '@mui/icons-material/Visibility';
@@ -24,7 +25,7 @@ export default function PalmPesaConfig() {
                     if (parsed.apiKey) setApiKey(parsed.apiKey);
                     if (parsed.apiToken) setApiToken(parsed.apiToken);
                     if (parsed.secretKey) setSecretKey(parsed.secretKey);
-                } catch (e) {}
+                } catch (e) { }
             }
         }).catch(console.error);
     }, []);
@@ -44,6 +45,9 @@ export default function PalmPesaConfig() {
             setSaving(false);
         }
     };
+
+    const configuredWebhookUrl = (import.meta.env.VITE_PALMPESA_WEBHOOK_URL as string | undefined)?.trim();
+    const webhookUrl = configuredWebhookUrl || `${getPublicApiBase()}/api/webhooks/palmpesa`;
 
     return (
         <div>
@@ -113,11 +117,11 @@ export default function PalmPesaConfig() {
 
                 <div className="form-group" style={{ marginBottom: 4 }}>
                     <label className="form-label" style={{ fontWeight: 600 }}>🔗 Webhook / Callback URL</label>
-                    <input 
-                        type="text" 
-                        className="form-input" 
+                    <input
+                        type="text"
+                        className="form-input"
                         readOnly
-                        value={`${window.location.origin}/api/webhooks/palmpesa`} 
+                        value={webhookUrl}
                         style={{ background: '#f8f9fa', color: '#6b7280', cursor: 'text' }}
                     />
                 </div>

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { settingsApi } from '../api';
+import { getPublicApiBase } from '../utils/config';
 import SaveIcon from '@mui/icons-material/Save';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import VisibilityIcon from '@mui/icons-material/Visibility';
@@ -22,7 +23,7 @@ export default function HarakaPayConfig() {
                 try {
                     const parsed = JSON.parse(data.payment_config_harakapay);
                     if (parsed.apiKey) setApiKey(parsed.apiKey);
-                } catch (e) {}
+                } catch (e) { }
             }
         }).catch(console.error);
     }, []);
@@ -50,6 +51,9 @@ export default function HarakaPayConfig() {
             setTestResult('Verification successful!');
         }, 2000);
     };
+
+    const configuredWebhookUrl = (import.meta.env.VITE_HARAKAPAY_WEBHOOK_URL as string | undefined)?.trim();
+    const webhookUrl = configuredWebhookUrl || `${getPublicApiBase()}/api/webhooks/harakapay`;
 
     return (
         <div>
@@ -104,7 +108,7 @@ export default function HarakaPayConfig() {
                         type="text"
                         className="form-input"
                         readOnly
-                        value={`${window.location.origin}/api/webhooks/harakapay`}
+                        value={webhookUrl}
                         style={{ background: '#f8f9fa', color: '#6b7280', cursor: 'text' }}
                     />
                 </div>
@@ -242,8 +246,8 @@ export default function HarakaPayConfig() {
 
                 {testResult && (
                     <div style={{
-                        marginTop: 16, padding: '12px 16px', background: '#f0f9ff', 
-                        border: '1px solid #bae6fd', color: '#0369a1', borderRadius: 'var(--radius-sm)', 
+                        marginTop: 16, padding: '12px 16px', background: '#f0f9ff',
+                        border: '1px solid #bae6fd', color: '#0369a1', borderRadius: 'var(--radius-sm)',
                         fontSize: '0.85rem', fontWeight: 500
                     }}>
                         {testResult}
