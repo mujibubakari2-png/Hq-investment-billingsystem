@@ -85,6 +85,22 @@ export function getOrCreateCsrfToken(sessionId: string): string {
 }
 
 /**
+ * Public auth paths that are exempt from CSRF enforcement.
+ * CSRF attacks require an authenticated session — these endpoints are called
+ * before authentication exists, so CSRF protection adds no security benefit
+ * and creates a chicken-and-egg problem (need login to get CSRF, need CSRF to login).
+ */
+const CSRF_EXEMPT_PATHS = [
+    '/api/auth/login',
+    '/api/auth/register',
+    '/api/auth/forgot-password',
+    '/api/auth/google',
+    '/api/auth/csrf',
+    '/api/auth/mfa',
+    '/api/contact',
+];
+
+/**
  * CSRF middleware for Next.js
  */
 export function csrfMiddleware(request: NextRequest): NextResponse | null {
@@ -92,6 +108,12 @@ export function csrfMiddleware(request: NextRequest): NextResponse | null {
 
     // GET, HEAD, OPTIONS requests don't need CSRF protection
     if (['GET', 'HEAD', 'OPTIONS'].includes(method)) {
+        return null;
+    }
+
+    // Exempt public auth endpoints (no authenticated session exists yet)
+    const pathname = request.nextUrl.pathname;
+    if (CSRF_EXEMPT_PATHS.some((p) => pathname.startsWith(p))) {
         return null;
     }
 

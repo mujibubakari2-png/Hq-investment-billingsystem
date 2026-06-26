@@ -7,12 +7,24 @@ import { isPlatformSuperAdmin } from "@/lib/tenant";
 import { toISOSafe, toTimestampSafe, getStartOfTodayTZ, getStartOfMonthTZ } from "@/lib/dateUtils";
 import { Redis } from 'ioredis';
 
-const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
-    lazyConnect: true,
-});
-redis.on('error', (err) => {
-    console.error('[Redis Error in dashboard route]:', err.message);
-});
+let redis: Redis | null = null;
+try {
+    redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
+        lazyConnect: true,
+        enableReadyCheck: false,
+        maxRetriesPerRequest: 1,
+        connectTimeout: 2000,
+        commandTimeout: 2000,
+    });
+    redis.on('error', (err) => {
+        // Suppress noisy ECONNREFUSED logs in dev when Redis is not running
+        if (!err.message.includes('ECONNREFUSED')) {
+            console.error('[Redis Error in dashboard route]:', err.message);
+        }
+    });
+} catch {
+    redis = null;
+}
 
 // Bug #5 FIX: Throttle RADIUS sync to at most once per 60 seconds across all PM2 instances
 const RADIUS_SYNC_INTERVAL_MS = 60_000;
@@ -54,8 +66,16 @@ export async function GET(req: NextRequest) {
         // Bug #5 FIX: Throttle sync operations to run at most once per 60 seconds
         // using a Redis mutex to prevent simultaneous syncs across PM2 processes.
         const syncLockKey = `dashboard:radius:sync_lock:${userPayload.tenantId || 'global'}`;
-        const lockAcquired = await redis.set(syncLockKey, "1", "PX", RADIUS_SYNC_INTERVAL_MS, "NX");
-        const shouldSync = lockAcquired === "OK";
+        let shouldSync = true; // Default to true when Redis is unavailable
+        if (redis) {
+            try {
+                const lockAcquired = await redis.set(syncLockKey, "1", "PX", RADIUS_SYNC_INTERVAL_MS, "NX");
+                shouldSync = lockAcquired === "OK";
+            } catch {
+                // Redis unavailable — allow sync to proceed (no throttle)
+                shouldSync = true;
+            }
+        }
 
         if (shouldSync && isPlatformAdmin) {
 
