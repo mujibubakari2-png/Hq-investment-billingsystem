@@ -38,10 +38,12 @@ export interface DashboardResponse {
     newCustomersThisMonth: number;
     todayVoucherRev: number;
     vouchersUsedToday: number;
-    vouchersGeneratedToday: number;
+    vouchersGeneratedToday?: number;
     monthlyVoucherRev: number;
     vouchersUsedMonth: number;
-    vouchersGeneratedMonth: number;
+    vouchersGeneratedMonth?: number;
+    monthlyRevenueTrend?: number;
+    monthlyVoucherRevTrend?: number;
     onlineRouters: number;
     totalRouters: number;
     hotspotOnlineUsers: number;

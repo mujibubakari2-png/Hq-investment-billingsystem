@@ -95,14 +95,14 @@ export default function Dashboard() {
 
     const revenueCards = [
         { label: "Today's Revenue",   value: fmt(stats?.todayRevenue ?? 0),           subtitle: `${stats?.todayRechargesMobile || 0} payments received today`, change: null, color: '#e53935', icon: '💰', accent: 'accent-red' },
-        { label: 'Monthly Revenue',    value: fmt(stats?.monthlyRevenue ?? 0),         subtitle: `${stats?.monthlyRechargesMobile || 0} payments this month`,    change: null, color: '#00bcd4', icon: '📊', accent: 'accent-blue' },
+        { label: 'Monthly Revenue',    value: fmt(stats?.monthlyRevenue ?? 0),         subtitle: `${stats?.monthlyRechargesMobile || 0} payments this month`,    change: stats?.monthlyRevenueTrend != null ? Math.round(stats.monthlyRevenueTrend) : null, color: '#00bcd4', icon: '📊', accent: 'accent-blue' },
         { label: 'Active Subscribers', value: String(stats?.activeSubscribers ?? 0),  subtitle: `⚡ ${stats?.onlineUsers ?? 0} currently online`,               change: null, color: '#4caf50', icon: '👥', accent: 'accent-green' },
         { label: 'Total Customers',    value: String(stats?.totalClients ?? 0),        subtitle: `${stats?.newCustomersThisMonth || 0} new this month`,           change: null, color: '#9c27b0', icon: '🔋', accent: 'accent-purple' },
     ];
 
     const voucherCards = [
-        { label: 'Today Voucher Rev',   value: fmt(stats?.todayVoucherRev ?? 0),   subtitle: `${stats?.vouchersUsedToday || 0}/${stats?.vouchersGeneratedToday || 0} generated / used`,   change: null, color: '#2196f3', accent: 'accent-blue' },
-        { label: 'Monthly Voucher Rev', value: fmt(stats?.monthlyVoucherRev ?? 0), subtitle: `${stats?.vouchersUsedMonth || 0}/${stats?.vouchersGeneratedMonth || 0} generated / used`,   change: null, color: '#e91e63', accent: 'accent-red' },
+        { label: 'Today Voucher Rev',   value: fmt(stats?.todayVoucherRev ?? 0),   subtitle: `${stats?.vouchersUsedToday || 0} active vouchers`,   change: null, color: '#2196f3', accent: 'accent-blue' },
+        { label: 'Monthly Voucher Rev', value: fmt(stats?.monthlyVoucherRev ?? 0), subtitle: `${stats?.vouchersUsedMonth || 0} active vouchers`,   change: stats?.monthlyVoucherRevTrend != null ? Math.round(stats.monthlyVoucherRevTrend) : null, color: '#e91e63', accent: 'accent-red' },
     ];
 
     const recentTransactions = (stats?.recentTransactions ?? []).map(t => ({

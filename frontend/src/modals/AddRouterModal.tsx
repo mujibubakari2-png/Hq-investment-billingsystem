@@ -11,6 +11,9 @@ import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import EditIcon from '@mui/icons-material/Edit';
 import PowerSettingsNewIcon from '@mui/icons-material/PowerSettingsNew';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import RouterIcon from '@mui/icons-material/Router';
+import LanIcon from '@mui/icons-material/Lan';
+import PersonIcon from '@mui/icons-material/Person';
 import type { Router } from '../types';
 
 interface AddRouterModalProps {
@@ -19,303 +22,310 @@ interface AddRouterModalProps {
     initialData?: Partial<Router>;
 }
 
+const VPN_OPTIONS = [
+    {
+        value: 'hybrid',
+        label: 'Hybrid',
+        badge: 'Recommended',
+        icon: <AddTaskIcon style={{ fontSize: 20, color: '#16a34a' }} />,
+        color: '#16a34a',
+        bg: '#f0fdf4',
+        border: '#bbf7d0',
+        description: 'WireGuard + OpenVPN — best performance with easy management access.',
+    },
+    {
+        value: 'wireguard',
+        label: 'WireGuard',
+        icon: <VpnLockIcon style={{ fontSize: 20, color: '#2563eb' }} />,
+        color: '#2563eb',
+        bg: '#eff6ff',
+        border: '#bfdbfe',
+        description: 'Fast & modern. Lightweight, low latency VPN tunnel.',
+    },
+    {
+        value: 'openvpn',
+        label: 'OpenVPN',
+        icon: <ShieldIcon style={{ fontSize: 20, color: '#7c3aed' }} />,
+        color: '#7c3aed',
+        bg: '#f5f3ff',
+        border: '#ddd6fe',
+        description: 'Traditional VPN with wide compatibility and port forwarding.',
+    },
+] as const;
+
+type VpnMode = 'hybrid' | 'wireguard' | 'openvpn';
+
 export default function AddRouterModal({ onClose, onSave, initialData }: AddRouterModalProps) {
     const [routerName, setRouterName] = useState(initialData?.name || '');
     const [accessCode, setAccessCode] = useState(initialData?.password || '');
     const [showAccessCode, setShowAccessCode] = useState(false);
-    const [vpnMode, setVpnMode] = useState<'hybrid' | 'wireguard' | 'openvpn'>(
-        (initialData?.vpnMode as 'hybrid' | 'wireguard' | 'openvpn') || 'hybrid'
-    );
-    const [description, setDescription] = useState(initialData?.description || '');
+    const [vpnMode, setVpnMode] = useState<VpnMode>((initialData?.vpnMode as VpnMode) || 'hybrid');
+    const [description, setDescription] = useState((initialData as any)?.description || '');
     const [status, setStatus] = useState<'Online' | 'Offline'>(initialData?.status === 'Online' ? 'Online' : 'Offline');
     const [showAdvanced, setShowAdvanced] = useState(false);
-    const [host, setHost] = useState(initialData?.host || "0.0.0.0");
-    const [username, setUsername] = useState(initialData?.username || "admin");
+    const [host, setHost] = useState(initialData?.host || '0.0.0.0');
+    const [username, setUsername] = useState(initialData?.username || 'admin');
     const [port, setPort] = useState<number | undefined>(initialData?.port || undefined);
-    const [apiPort, setApiPort] = useState<number | undefined>(initialData?.apiPort || undefined);
+    const [apiPort, setApiPort] = useState<number | undefined>((initialData as any)?.apiPort || undefined);
+
+    const isEdit = !!initialData?.id;
 
     const handleSave = () => {
-        if (!routerName || (!accessCode && !initialData?.id)) {
+        if (!routerName || (!accessCode && !isEdit)) {
             alert('Router name and access code are required');
             return;
         }
-        if (onSave) onSave({
-            name: routerName,
-            password: accessCode,
-            vpnMode,
-            description,
-            status,
-            host: host,
-            username: username,
-            port: port,
-            apiPort: apiPort,
-        });
+        if (onSave) onSave({ name: routerName, password: accessCode, vpnMode, description, status, host, username, port, apiPort });
     };
+
+    const selectedVpn = VPN_OPTIONS.find(v => v.value === vpnMode)!;
 
     return (
         <div className="modal-overlay" onClick={onClose}>
-            <div className="modal" style={{ maxWidth: 600 }} onClick={e => e.stopPropagation()}>
-
-                {/* Header */}
-                <div className="modal-header">
-                    <h2 style={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, letterSpacing: '-0.02em' }}>Add Router</h2>
-                    <button onClick={onClose} className="modal-close">
+            {/* Responsive overrides for mobile */}
+            <style>{`
+                .add-router-body { padding: 24px 28px; }
+                .add-router-footer { padding: 14px 28px; }
+                .add-router-vpn-grid { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+                .add-router-footer-inner { flex-direction: row; align-items: center; }
+                .add-router-warn { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+                @media (max-width: 560px) {
+                    .add-router-body { padding: 16px 14px; }
+                    .add-router-footer { padding: 12px 14px; }
+                    .add-router-vpn-grid { grid-template-columns: 1fr !important; }
+                    .add-router-footer-inner { flex-direction: column !important; align-items: stretch !important; }
+                    .add-router-footer-inner .add-router-buttons { justify-content: stretch; }
+                    .add-router-footer-inner .add-router-buttons button { flex: 1; }
+                    .add-router-warn { white-space: normal; }
+                }
+            `}</style>
+            <div
+                className="modal"
+                style={{ maxWidth: 600, width: '96vw', maxHeight: '94vh', display: 'flex', flexDirection: 'column' }}
+                onClick={e => e.stopPropagation()}
+            >
+                {/* ── Header ── */}
+                <div style={{
+                    background: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)',
+                    color: '#fff',
+                    padding: '18px 24px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 12,
+                    borderRadius: 'var(--radius-lg) var(--radius-lg) 0 0',
+                    flexShrink: 0,
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+                        <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(255,255,255,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <RouterIcon style={{ fontSize: 22 }} />
+                        </div>
+                        <div>
+                            <div style={{ fontWeight: 700, fontSize: '1.05rem' }}>{isEdit ? 'Edit Router' : 'Add New Router'}</div>
+                            <div style={{ fontSize: '0.75rem', opacity: 0.65, marginTop: 2 }}>
+                                {isEdit ? `Editing: ${initialData?.name}` : 'Connect a new MikroTik router to this system'}
+                            </div>
+                        </div>
+                    </div>
+                    <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', borderRadius: 8, width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
                         <CloseIcon fontSize="small" />
                     </button>
                 </div>
 
-                <div style={{ padding: '28px' }}>
-                    {/* Access Code */}
-                    <div className="form-group" style={{ marginBottom: 24 }}>
-                        <label className="form-label" style={{ fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.9rem', marginBottom: 8 }}>
-                            <EditIcon style={{ fontSize: 18, color: 'var(--primary)' }} /> Access Code <span style={{ color: 'var(--danger)' }}>*</span>
-                        </label>
-                        <div style={{ position: 'relative' }}>
+                {/* ── Body ── */}
+                <div className="add-router-body" style={{ overflowY: 'auto', flex: 1 }}>
+
+                    {/* ── Row 1: Name + Access Code (2 columns on desktop) ── */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 20, marginBottom: 24 }}>
+
+                        {/* Router Name */}
+                        <div>
+                            <label style={labelStyle}>
+                                <SecurityIcon style={{ fontSize: 16, color: 'var(--primary)' }} />
+                                Router Name <span style={{ color: 'var(--danger)' }}>*</span>
+                            </label>
                             <input
-                                type={showAccessCode ? 'text' : 'password'}
+                                type="text"
                                 className="form-input"
-                                placeholder="Enter access code"
-                                value={accessCode}
-                                onChange={e => setAccessCode(e.target.value)}
-                                style={{
-                                    paddingRight: 50, height: 52, fontSize: '1rem',
-                                    background: 'var(--bg-input)', border: '1.5px solid var(--border)',
-                                    borderRadius: 'var(--radius-sm)', transition: 'all 0.2s'
-                                }}
+                                placeholder="e.g., Router-Moshi-01"
+                                value={routerName}
+                                onChange={e => setRouterName(e.target.value)}
+                                style={inputStyle}
                             />
-                            <button
-                                type="button"
-                                style={{
-                                    position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
-                                    border: 'none', background: 'var(--bg-hover)', borderRadius: 8,
-                                    padding: '6px 10px', cursor: 'pointer', color: 'var(--text-secondary)',
-                                    display: 'flex', alignItems: 'center', transition: 'all 0.2s'
-                                }}
-                                onClick={() => setShowAccessCode(!showAccessCode)}
-                            >
-                                {showAccessCode ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
-                            </button>
+                            <div style={hintStyle}><InfoOutlinedIcon style={{ fontSize: 13 }} /> 3–30 chars, alphanumeric with - and _</div>
                         </div>
-                        <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: 8, display: 'flex', alignItems: 'center', gap: 6, opacity: 0.8 }}>
-                            <InfoOutlinedIcon style={{ fontSize: 15 }} /> Default access code is required to add new routers
+
+                        {/* Access Code */}
+                        <div>
+                            <label style={labelStyle}>
+                                <EditIcon style={{ fontSize: 16, color: 'var(--primary)' }} />
+                                Access Code {!isEdit && <span style={{ color: 'var(--danger)' }}>*</span>}
+                            </label>
+                            <div style={{ position: 'relative' }}>
+                                <input
+                                    type={showAccessCode ? 'text' : 'password'}
+                                    className="form-input"
+                                    placeholder={isEdit ? 'Leave blank to keep current' : 'Enter router password'}
+                                    value={accessCode}
+                                    onChange={e => setAccessCode(e.target.value)}
+                                    style={{ ...inputStyle, paddingRight: 48 }}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowAccessCode(v => !v)}
+                                    style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', padding: 4 }}
+                                >
+                                    {showAccessCode ? <VisibilityOffIcon style={{ fontSize: 18 }} /> : <VisibilityIcon style={{ fontSize: 18 }} />}
+                                </button>
+                            </div>
+                            <div style={hintStyle}><InfoOutlinedIcon style={{ fontSize: 13 }} /> Default MikroTik admin password</div>
                         </div>
                     </div>
 
-                    {/* Router Name */}
-                    <div className="form-group" style={{ marginBottom: 28 }}>
-                        <label className="form-label" style={{ fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.9rem', marginBottom: 8 }}>
-                            <SecurityIcon style={{ fontSize: 18, color: 'var(--primary)' }} /> Router Name <span style={{ color: 'var(--danger)' }}>*</span>
+                    {/* ── VPN Mode (3 cards in a row on desktop) ── */}
+                    <div style={{ marginBottom: 24 }}>
+                        <label style={{ ...labelStyle, marginBottom: 12 }}>
+                            <ShieldIcon style={{ fontSize: 16, color: 'var(--primary)' }} />
+                            VPN Configuration Mode <span style={{ color: 'var(--danger)' }}>*</span>
                         </label>
-                        <input
-                            type="text"
-                            className="form-input"
-                            placeholder="e.g., Router-Branch-01"
-                            value={routerName}
-                            onChange={e => setRouterName(e.target.value)}
-                            style={{
-                                height: 52, fontSize: '1rem',
-                                background: 'var(--bg-input)', border: '1.5px solid var(--border)',
-                                borderRadius: 'var(--radius-sm)', transition: 'all 0.2s'
-                            }}
-                        />
-                        <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: 8, display: 'flex', alignItems: 'center', gap: 6, opacity: 0.8 }}>
-                            <InfoOutlinedIcon style={{ fontSize: 15 }} /> 3-30 characters, alphanumeric with - and _ only
+                        <div className="add-router-vpn-grid" style={{ display: 'grid', gap: 12 }}>
+                            {VPN_OPTIONS.map(opt => {
+                                const isSelected = vpnMode === opt.value;
+                                return (
+                                    <div
+                                        key={opt.value}
+                                        onClick={() => setVpnMode(opt.value)}
+                                        style={{
+                                            border: `2px solid ${isSelected ? opt.color : 'var(--border-light)'}`,
+                                            borderRadius: 'var(--radius-md)',
+                                            padding: '14px 16px',
+                                            cursor: 'pointer',
+                                            background: isSelected ? opt.bg : 'var(--bg-surface)',
+                                            transition: 'all 0.2s',
+                                            position: 'relative',
+                                        }}
+                                    >
+                                        {/* Selected indicator */}
+                                        <div style={{
+                                            position: 'absolute', top: 12, right: 12,
+                                            width: 18, height: 18, borderRadius: '50%',
+                                            border: `2px solid ${isSelected ? opt.color : 'var(--border)'}`,
+                                            background: isSelected ? opt.color : 'transparent',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                            transition: 'all 0.2s',
+                                        }}>
+                                            {isSelected && <CheckIcon style={{ fontSize: 12, color: '#fff' }} />}
+                                        </div>
+
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                                            {opt.icon}
+                                            <span style={{ fontWeight: 700, fontSize: '0.88rem', color: isSelected ? opt.color : 'var(--text-primary)' }}>{opt.label}</span>
+                                            {'badge' in opt && (
+                                                <span style={{ fontSize: '0.62rem', fontWeight: 800, background: opt.color, color: '#fff', padding: '2px 7px', borderRadius: 10, letterSpacing: 0.3, whiteSpace: 'nowrap' }}>
+                                                    {(opt as any).badge}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>{opt.description}</div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        {/* Info hint for selected mode */}
+                        <div style={{ marginTop: 10, padding: '10px 14px', borderRadius: 'var(--radius-sm)', background: selectedVpn.bg, border: `1px solid ${selectedVpn.border}`, fontSize: '0.78rem', color: selectedVpn.color, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                            <InfoOutlinedIcon style={{ fontSize: 15, flexShrink: 0, marginTop: 1 }} />
+                            <span>
+                                <strong>{selectedVpn.label}:</strong>{' '}
+                                {vpnMode === 'hybrid'
+                                    ? 'Uses WireGuard for customer traffic and OpenVPN for management (Winbox/WebFig). Optimal performance with convenient remote management.'
+                                    : vpnMode === 'wireguard'
+                                        ? 'Best for high-speed connectivity and lower resource usage. Modern cryptography with minimal overhead.'
+                                        : 'Best for compatibility and easy management features across any network environment.'}
+                            </span>
                         </div>
                     </div>
 
-                    {/* VPN Configuration Mode */}
-                    <div className="form-group" style={{ marginBottom: 28 }}>
-                        <label className="form-label" style={{ fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.9rem', marginBottom: 16 }}>
-                            <ShieldIcon style={{ fontSize: 18, color: 'var(--primary)' }} /> VPN Configuration Mode <span style={{ color: 'var(--danger)' }}>*</span>
-                        </label>
+                    {/* ── Row 2: Description + Status ── */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 20, marginBottom: 20 }}>
 
-                        {/* Hybrid Mode Selection */}
-                        <div
-                            onClick={() => setVpnMode('hybrid')}
-                            style={{
-                                border: vpnMode === 'hybrid' ? '2px solid var(--primary)' : '1.5px solid var(--border)',
-                                borderRadius: 'var(--radius)', padding: 20, marginBottom: 16, cursor: 'pointer',
-                                background: vpnMode === 'hybrid' ? 'var(--primary-light)' : 'var(--bg-input)', position: 'relative',
-                                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                transform: vpnMode === 'hybrid' ? 'scale(1.01)' : 'scale(1)',
-                                boxShadow: vpnMode === 'hybrid' ? 'var(--shadow-md)' : 'none'
-                            }}
-                        >
-                            <div style={{ position: 'absolute', top: 20, left: 20 }}>
-                                <div style={{
-                                    width: 20, height: 20, borderRadius: '50%',
-                                    border: vpnMode === 'hybrid' ? `6px solid var(--primary)` : '2.5px solid var(--border)',
-                                    background: '#fff', transition: 'all 0.3s'
-                                }} />
-                            </div>
-                            <div style={{ paddingLeft: 36 }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
-                                    <div style={{
-                                        width: 36, height: 36, borderRadius: 10, background: 'var(--secondary-light)',
-                                        display: 'flex', alignItems: 'center', justifyContent: 'center'
-                                    }}>
-                                        <AddTaskIcon style={{ color: 'var(--secondary)', fontSize: 20 }} />
-                                    </div>
-                                    <strong style={{ fontSize: '1.05rem', color: 'var(--text-primary)' }}>Hybrid Mode</strong>
-                                    <span style={{
-                                        background: 'var(--secondary)', color: '#fff', padding: '3px 12px',
-                                        borderRadius: 20, fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px'
-                                    }}>Recommended</span>
-                                </div>
-                                <ul style={{ margin: 0, padding: 0, listStyle: 'none', fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.7 }}>
-                                    <li style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                        <CheckIcon style={{ fontSize: 16, color: 'var(--secondary)' }} /> <span>WireGuard: Primary VPN for all customer traffic (fast & efficient)</span>
-                                    </li>
-                                    <li style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                        <CheckIcon style={{ fontSize: 16, color: 'var(--secondary)' }} /> <span>OpenVPN: Management tunnel with port forwarding (Winbox/WebFig)</span>
-                                    </li>
-                                </ul>
-                                <div style={{
-                                    marginTop: 12, display: 'inline-flex', alignItems: 'center', gap: 6,
-                                    background: 'var(--secondary-light)', color: 'var(--secondary)', padding: '4px 12px', borderRadius: 8,
-                                    fontSize: '0.75rem', fontWeight: 700, border: '1px solid var(--border-light)'
-                                }}>
-                                    ⭐ Best of both worlds
-                                </div>
-                            </div>
+                        {/* Description */}
+                        <div>
+                            <label style={labelStyle}>📝 Description <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(Optional)</span></label>
+                            <textarea
+                                className="form-input"
+                                placeholder="Location, notes, or purpose of this router"
+                                rows={3}
+                                value={description}
+                                onChange={e => setDescription(e.target.value)}
+                                style={{ padding: 12, resize: 'none', fontSize: '0.88rem', background: 'var(--bg-input)', border: '1.5px solid var(--border)', borderRadius: 'var(--radius-sm)' }}
+                            />
                         </div>
 
-                        {/* Split Options */}
-                        <div className="responsive-grid-2" style={{ gap: 16 }}>
-                            {/* WireGuard Only */}
-                            <div
-                                onClick={() => setVpnMode('wireguard')}
-                                style={{
-                                    border: vpnMode === 'wireguard' ? '2px solid var(--primary)' : '1.5px solid var(--border)',
-                                    borderRadius: 'var(--radius)', padding: 18, cursor: 'pointer',
-                                    background: vpnMode === 'wireguard' ? 'var(--primary-light)' : 'var(--bg-input)', position: 'relative',
-                                    transition: 'all 0.3s', transform: vpnMode === 'wireguard' ? 'scale(1.02)' : 'scale(1)',
-                                    boxShadow: vpnMode === 'wireguard' ? 'var(--shadow)' : 'none'
-                                }}
-                            >
-                                <div style={{ position: 'absolute', top: 18, left: 18 }}>
-                                    <div style={{
-                                        width: 18, height: 18, borderRadius: '50%',
-                                        border: vpnMode === 'wireguard' ? `5px solid var(--primary)` : '2.5px solid var(--border)',
-                                        background: '#fff'
-                                    }} />
-                                </div>
-                                <div style={{ paddingLeft: 30 }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-                                        <VpnLockIcon style={{ color: 'var(--info)', fontSize: 20 }} />
-                                        <strong style={{ fontSize: '0.95rem', color: 'var(--text-primary)' }}>WireGuard Only</strong>
-                                    </div>
-                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-                                        Fast & modern protocol<br />Lightweight VPN<br />Direct IP access
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* OpenVPN Only */}
-                            <div
-                                onClick={() => setVpnMode('openvpn')}
-                                style={{
-                                    border: vpnMode === 'openvpn' ? '2px solid var(--primary)' : '1.5px solid var(--border)',
-                                    borderRadius: 'var(--radius)', padding: 18, cursor: 'pointer',
-                                    background: vpnMode === 'openvpn' ? 'var(--primary-light)' : 'var(--bg-input)', position: 'relative',
-                                    transition: 'all 0.3s', transform: vpnMode === 'openvpn' ? 'scale(1.02)' : 'scale(1)',
-                                    boxShadow: vpnMode === 'openvpn' ? 'var(--shadow)' : 'none'
-                                }}
-                            >
-                                <div style={{ position: 'absolute', top: 18, left: 18 }}>
-                                    <div style={{
-                                        width: 18, height: 18, borderRadius: '50%',
-                                        border: vpnMode === 'openvpn' ? `5px solid var(--primary)` : '2.5px solid var(--border)',
-                                        background: '#fff'
-                                    }} />
-                                </div>
-                                <div style={{ paddingLeft: 30 }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-                                        <ShieldIcon style={{ color: 'var(--danger)', fontSize: 20 }} />
-                                        <strong style={{ fontSize: '0.95rem', color: 'var(--text-primary)' }}>OpenVPN Only</strong>
-                                    </div>
-                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-                                        Traditional VPN<br />Port forwarding<br />Wide compatibility
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Hybrid Info Banner */}
-                        <div style={{
-                            marginTop: 20, padding: 16, borderRadius: 12, background: 'var(--info-light)',
-                            border: '1px solid var(--border-light)', display: 'flex', alignItems: 'flex-start', gap: 10,
-                            animation: 'fadeIn 0.3s ease-out'
-                        }}>
-                            <InfoOutlinedIcon style={{ color: 'var(--info)', fontSize: 20, marginTop: 1 }} />
-                            <div style={{ fontSize: '0.82rem', color: 'var(--info)', lineHeight: 1.6, fontWeight: 500 }}>
-                                <strong>{vpnMode === 'hybrid' ? 'Hybrid Mode' : vpnMode === 'wireguard' ? 'WireGuard' : 'OpenVPN'}:</strong> {
-                                    vpnMode === 'hybrid'
-                                        ? 'Uses WireGuard for customer traffic and OpenVPN for management access. Optimal performance with convenient remote management.'
-                                        : vpnMode === 'wireguard'
-                                            ? 'Best for high-speed connectivity and lower resource usage. Modern and efficient.'
-                                            : 'Best for compatibility and easy management features across any network.'
-                                }
+                        {/* Initial Status */}
+                        <div>
+                            <label style={labelStyle}>
+                                <PowerSettingsNewIcon style={{ fontSize: 16, color: 'var(--primary)' }} />
+                                Initial Status
+                            </label>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 4 }}>
+                                {(['Online', 'Offline'] as const).map(s => {
+                                    const isActive = status === s;
+                                    const color = s === 'Online' ? '#16a34a' : '#dc2626';
+                                    const bg = s === 'Online' ? '#f0fdf4' : '#fef2f2';
+                                    return (
+                                        <div
+                                            key={s}
+                                            onClick={() => setStatus(s)}
+                                            style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '10px 14px', borderRadius: 'var(--radius-sm)', border: `1.5px solid ${isActive ? color : 'var(--border-light)'}`, background: isActive ? bg : 'var(--bg-surface)', transition: 'all 0.18s' }}
+                                        >
+                                            <div style={{ width: 18, height: 18, borderRadius: '50%', border: `2px solid ${isActive ? color : 'var(--border)'}`, background: isActive ? color : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                                {isActive && <CheckIcon style={{ fontSize: 11, color: '#fff' }} />}
+                                            </div>
+                                            <span style={{ fontWeight: 600, fontSize: '0.85rem', color: isActive ? color : 'var(--text-secondary)' }}>
+                                                {s === 'Online' ? '🟢 Enable (Online)' : '🔴 Disable (Offline)'}
+                                            </span>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
                     </div>
 
-                    {/* Description */}
-                    <div className="form-group" style={{ marginBottom: 28 }}>
-                        <label className="form-label" style={{ fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.9rem' }}>
-                            📝 Description (Optional)
-                        </label>
-                        <textarea
-                            className="form-input"
-                            placeholder="Brief description or location of this router"
-                            rows={3}
-                            value={description}
-                            onChange={e => setDescription(e.target.value)}
-                            style={{
-                                padding: 14, resize: 'none', background: 'var(--bg-input)',
-                                border: '1.5px solid var(--border)', borderRadius: 'var(--radius-sm)',
-                                fontSize: '0.95rem'
-                            }}
-                        />
-                    </div>
-
-                    {/* Advanced Settings Toggle */}
-                    <div style={{ marginBottom: 20 }}>
+                    {/* ── Advanced Settings ── */}
+                    <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: 16, marginBottom: 4 }}>
                         <button
                             type="button"
-                            onClick={() => setShowAdvanced(!showAdvanced)}
-                            style={{
-                                background: 'transparent', border: 'none', color: 'var(--primary)',
-                                fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer',
-                                display: 'flex', alignItems: 'center', gap: 6, padding: 0
-                            }}
+                            onClick={() => setShowAdvanced(v => !v)}
+                            style={{ background: 'transparent', border: 'none', color: 'var(--primary)', fontWeight: 600, fontSize: '0.83rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, padding: 0 }}
                         >
-                            {showAdvanced ? '− Hide Advanced Settings' : '+ Show Advanced Settings (Host, User & Port)'}
+                            <LanIcon style={{ fontSize: 16 }} />
+                            {showAdvanced ? '− Hide Advanced Settings' : '+ Show Advanced Settings (Host, API User & Ports)'}
                         </button>
 
                         {showAdvanced && (
-                            <div style={{
-                                marginTop: 16, padding: 20, background: 'var(--bg-input)',
-                                border: '1.5px solid var(--border)', borderRadius: 'var(--radius)',
-                                animation: 'fadeIn 0.3s ease-out'
-                            }}>
-                                <div className="responsive-grid-2" style={{ gap: 16, marginBottom: 16 }}>
-                                    <div className="form-group">
-                                        <label className="form-label" style={{ fontSize: '0.8rem', fontWeight: 700, marginBottom: 8, display: 'block' }}>
-                                            Router IP / Host Address
+                            <div style={{ marginTop: 16, padding: '20px 20px', background: 'var(--bg-input)', border: '1.5px solid var(--border)', borderRadius: 'var(--radius-md)', animation: 'fadeIn 0.2s ease' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(175px, 1fr))', gap: 16 }}>
+
+                                    {/* Host */}
+                                    <div>
+                                        <label style={{ ...labelStyle, fontSize: '0.78rem', marginBottom: 6 }}>
+                                            <RouterIcon style={{ fontSize: 14 }} /> Router IP / Host
                                         </label>
                                         <input
                                             type="text"
                                             className="form-input"
-                                            placeholder="e.g., 10.0.0.201 or router public IP"
+                                            placeholder="e.g. 196.216.1.10"
                                             value={host}
                                             onChange={e => setHost(e.target.value)}
-                                            style={{ height: 44, fontSize: '0.9rem' }}
+                                            style={{ height: 42, fontSize: '0.85rem' }}
                                         />
                                     </div>
-                                    <div className="form-group">
-                                        <label className="form-label" style={{ fontSize: '0.8rem', fontWeight: 700, marginBottom: 8, display: 'block' }}>
-                                            API Username
+
+                                    {/* Username */}
+                                    <div>
+                                        <label style={{ ...labelStyle, fontSize: '0.78rem', marginBottom: 6 }}>
+                                            <PersonIcon style={{ fontSize: 14 }} /> API Username
                                         </label>
                                         <input
                                             type="text"
@@ -323,115 +333,72 @@ export default function AddRouterModal({ onClose, onSave, initialData }: AddRout
                                             placeholder="admin"
                                             value={username}
                                             onChange={e => setUsername(e.target.value)}
-                                            style={{ height: 44, fontSize: '0.9rem' }}
+                                            style={{ height: 42, fontSize: '0.85rem' }}
                                         />
                                     </div>
-                                </div>
-                                <div className="responsive-grid-2" style={{ gap: 16 }}>
-                                    {/* apiPort and port are now independent fields */}
-                                    <div className="form-group">
-                                        <label className="form-label" style={{ fontSize: '0.8rem', fontWeight: 700, marginBottom: 8, display: 'block' }}>
-                                            API Port (default: 8728)
+
+                                    {/* API Port */}
+                                    <div>
+                                        <label style={{ ...labelStyle, fontSize: '0.78rem', marginBottom: 6 }}>
+                                            API Port
                                         </label>
                                         <input
                                             type="number"
                                             className="form-input"
                                             placeholder="8728"
                                             value={apiPort || ''}
-                                            onChange={e => {
-                                                const val = e.target.value ? parseInt(e.target.value) : undefined;
-                                                setApiPort(val);
-                                            }}
-                                            style={{ height: 44, fontSize: '0.9rem' }}
+                                            onChange={e => setApiPort(e.target.value ? parseInt(e.target.value) : undefined)}
+                                            style={{ height: 42, fontSize: '0.85rem' }}
                                         />
+                                        <div style={hintStyle}>RouterOS API default</div>
                                     </div>
-                                    <div className="form-group">
-                                        <label className="form-label" style={{ fontSize: '0.8rem', fontWeight: 700, marginBottom: 8, display: 'block' }}>
-                                            WinBox Port (default: 8291)
+
+                                    {/* Winbox Port */}
+                                    <div>
+                                        <label style={{ ...labelStyle, fontSize: '0.78rem', marginBottom: 6 }}>
+                                            WinBox Port
                                         </label>
                                         <input
                                             type="number"
                                             className="form-input"
                                             placeholder="8291"
                                             value={port || ''}
-                                            onChange={e => {
-                                                const val = e.target.value ? parseInt(e.target.value) : undefined;
-                                                setPort(val);
-                                            }}
-                                            style={{ height: 44, fontSize: '0.9rem' }}
+                                            onChange={e => setPort(e.target.value ? parseInt(e.target.value) : undefined)}
+                                            style={{ height: 42, fontSize: '0.85rem' }}
                                         />
+                                        <div style={hintStyle}>WinBox default port</div>
                                     </div>
                                 </div>
                             </div>
                         )}
                     </div>
-
-                    {/* Initial Status */}
-                    <div className="form-group" style={{ marginBottom: 28 }}>
-                        <label className="form-label" style={{ fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.9rem', marginBottom: 16 }}>
-                            <PowerSettingsNewIcon style={{ fontSize: 18, color: 'var(--primary)' }} /> Initial Status
-                        </label>
-                        <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
-                            <div
-                                onClick={() => setStatus('Online')}
-                                style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', transition: 'all 0.2s' }}
-                            >
-                                <div style={{
-                                    width: 20, height: 20, borderRadius: '50%',
-                                    border: status === 'Online' ? `6px solid var(--secondary)` : '2.5px solid var(--border)',
-                                    background: '#fff', transition: 'all 0.2s'
-                                }} />
-                                <span style={{ fontSize: '1rem', fontWeight: 600, color: status === 'Online' ? 'var(--text-primary)' : 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                                    <CheckIcon style={{ fontSize: 18, color: 'var(--secondary)' }} /> Enable
-                                </span>
-                            </div>
-                            <div
-                                onClick={() => setStatus('Offline')}
-                                style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', transition: 'all 0.2s' }}
-                            >
-                                <div style={{
-                                    width: 20, height: 20, borderRadius: '50%',
-                                    border: status === 'Offline' ? `6px solid var(--danger)` : '2.5px solid var(--border)',
-                                    background: '#fff', transition: 'all 0.2s'
-                                }} />
-                                <span style={{ fontSize: '1rem', fontWeight: 600, color: status === 'Offline' ? 'var(--text-primary)' : 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                                    <CloseIcon style={{ fontSize: 18, color: 'var(--danger)' }} /> Disable
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Note Box */}
-                    <div style={{
-                        background: 'var(--warning-light)', border: '1px solid var(--border-light)', borderRadius: 'var(--radius)',
-                        padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 12,
-                        boxShadow: 'inset 0 0 10px rgba(0,0,0,0.02)'
-                    }}>
-                        <WarningAmberIcon style={{ color: 'var(--warning)', fontSize: 24 }} />
-                        <div style={{ fontSize: '0.85rem', color: 'var(--warning)', fontWeight: 600, lineHeight: 1.5 }}>
-                            <strong>Note:</strong> After creation, you'll receive setup instructions and configuration files. Make sure to save all credentials securely.
-                        </div>
-                    </div>
                 </div>
 
-                {/* Footer */}
-                <div className="modal-footer">
-                    <div className="modal-footer-left" />
-                    <div className="modal-footer-right">
-                        <button
-                            className="btn btn-secondary"
-                            onClick={onClose}
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            className="btn btn-primary"
-                            onClick={handleSave}
-                            style={{ fontWeight: 800 }}
-                            disabled={!routerName || (!accessCode && !initialData?.id)}
-                        >
-                            <AddTaskIcon style={{ fontSize: 20 }} /> Create Router
-                        </button>
+                {/* ── Footer ── */}
+                <div className="add-router-footer" style={{ borderTop: '1px solid var(--border-light)', flexShrink: 0, background: 'var(--bg-surface)', borderRadius: '0 0 var(--radius-lg) var(--radius-lg)' }}>
+                    <div className="add-router-footer-inner" style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+
+                        {/* Warning note */}
+                        <div className="add-router-warn" style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.75rem', color: '#92400e', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, padding: '8px 12px', flex: 1, minWidth: 0 }}>
+                            <WarningAmberIcon style={{ fontSize: 15, flexShrink: 0, color: '#d97706' }} />
+                            <span>After creation, open <strong>⚙️ Setup Wizard</strong> to push config to the router.</span>
+                        </div>
+
+                        {/* Buttons */}
+                        <div className="add-router-buttons" style={{ display: 'flex', gap: 10, flexShrink: 0, alignItems: 'center' }}>
+                            <button className="btn btn-secondary" onClick={onClose} style={{ padding: '9px 20px' }}>
+                                Cancel
+                            </button>
+                            <button
+                                className="btn btn-primary"
+                                onClick={handleSave}
+                                disabled={!routerName || (!accessCode && !isEdit)}
+                                style={{ padding: '9px 24px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: 'linear-gradient(135deg, #16a34a, #15803d)', color: '#fff' }}
+                            >
+                                <AddTaskIcon style={{ fontSize: 18 }} />
+                                {isEdit ? 'Save Changes' : 'Create Router'}
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -439,3 +406,31 @@ export default function AddRouterModal({ onClose, onSave, initialData }: AddRout
     );
 }
 
+// ── Style constants ────────────────────────────────────────────────────────────
+
+const labelStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+    fontWeight: 700,
+    fontSize: '0.82rem',
+    color: 'var(--text-primary)',
+    marginBottom: 8,
+};
+
+const inputStyle: React.CSSProperties = {
+    height: 46,
+    fontSize: '0.92rem',
+    background: 'var(--bg-input)',
+    border: '1.5px solid var(--border)',
+    borderRadius: 'var(--radius-sm)',
+};
+
+const hintStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 4,
+    fontSize: '0.72rem',
+    color: 'var(--text-muted)',
+    marginTop: 5,
+};

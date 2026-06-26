@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -8,159 +9,432 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
         body {
             font-family: 'Inter', sans-serif;
             background: linear-gradient(175deg, BILLING_ACCENT_COLOR18 0%, #f0f4f8 40%, #ffffff 100%);
-            min-height: 100vh; padding: 0;
-            display: flex; align-items: center; justify-content: center;
+            min-height: 100vh;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
-        .page { 
-            width: 100%; max-width: 480px; background: #fff; 
-            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
-            position: relative; overflow: hidden;
+
+        .page {
+            width: 100%;
+            max-width: 480px;
+            background: #fff;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+            position: relative;
+            overflow: hidden;
         }
+
         @media (min-width: 481px) {
-            .page { border-radius: 24px; min-height: auto; margin: 20px; }
-            body { background: linear-gradient(135deg, BILLING_PRIMARY_COLOR22, BILLING_ACCENT_COLOR22); }
+            .page {
+                border-radius: 24px;
+                min-height: auto;
+                margin: 20px;
+            }
+
+            body {
+                background: linear-gradient(135deg, BILLING_PRIMARY_COLOR22, BILLING_ACCENT_COLOR22);
+            }
         }
+
         @media (max-width: 480px) {
-            .page { min-height: 100vh; border-radius: 0; }
-            body { align-items: flex-start; }
+            .page {
+                min-height: 100vh;
+                border-radius: 0;
+            }
+
+            body {
+                align-items: flex-start;
+            }
         }
 
         /* ── Header ── */
         .header {
             background: linear-gradient(135deg, BILLING_PRIMARY_COLOR, BILLING_ACCENT_COLOR);
-            padding: 14px 12px 12px; text-align: center; color: #fff;
+            padding: 14px 12px 12px;
+            text-align: center;
+            color: #fff;
             border-radius: 0 0 16px 16px;
         }
-        .header-brand { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 8px; }
-        .header-brand svg { width: 24px; height: 24px; fill: #fff; }
-        .header-brand h1 { font-size: 1.2rem; font-weight: 700; letter-spacing: 0.5px; }
-        .networks-title { font-size: 0.75rem; font-weight: 600; margin-bottom: 6px; opacity: 0.9; }
-        .networks-row { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
-        .network-badge {
-            background: rgba(255,255,255,0.2); border-radius: 8px; padding: 4px 10px;
-            font-size: 0.72rem; font-weight: 600; color: #fff;
+
+        .header-brand {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 8px;
         }
-        .steps { display: flex; justify-content: center; gap: 10px; font-size: 0.75rem; margin-bottom: 8px; }
-        .steps span { opacity: 0.85; }
-        .steps .dot { opacity: 0.5; }
+
+        .header-brand svg {
+            width: 24px;
+            height: 24px;
+            fill: #fff;
+        }
+
+        .header-brand h1 {
+            font-size: 1.2rem;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+
+        .networks-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-bottom: 6px;
+            opacity: 0.9;
+        }
+
+        .networks-row {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 10px;
+        }
+
+        .network-badge {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            padding: 4px 10px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .steps {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            font-size: 0.75rem;
+            margin-bottom: 8px;
+        }
+
+        .steps span {
+            opacity: 0.85;
+        }
+
+        .steps .dot {
+            opacity: 0.5;
+        }
+
         .support-bar {
-            background: BILLING_ACCENT_COLOR40; border-radius: 16px; padding: 6px 14px;
-            font-size: 0.75rem; display: inline-flex; align-items: center; gap: 6px;
+            background: BILLING_ACCENT_COLOR40;
+            border-radius: 16px;
+            padding: 6px 14px;
+            font-size: 0.75rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
         }
 
         /* ── Section Shared ── */
-        .section { padding: 10px 12px; }
-        .section-title {
-            font-size: 0.85rem; font-weight: 700; color: BILLING_PRIMARY_COLOR;
-            margin-bottom: 8px; display: flex; align-items: center; gap: 6px;
+        .section {
+            padding: 10px 12px;
         }
+
+        .section-title {
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: BILLING_PRIMARY_COLOR;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
         .section-card {
-            background: #f8fafb; border: 1px solid #e8ecf0; border-radius: 10px;
-            padding: 10px; margin-bottom: 8px;
+            background: #f8fafb;
+            border: 1px solid #e8ecf0;
+            border-radius: 10px;
+            padding: 10px;
+            margin-bottom: 8px;
         }
 
         /* ── Packages Grid ── */
-        .packages-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+        .packages-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+        }
+
         .pkg-card {
             background: linear-gradient(135deg, BILLING_ACCENT_COLOR08, BILLING_ACCENT_COLOR15);
-            border: 1.5px solid BILLING_ACCENT_COLOR30; border-radius: 12px;
-            padding: 12px 8px; text-align: center; cursor: pointer;
+            border: 1.5px solid BILLING_ACCENT_COLOR30;
+            border-radius: 12px;
+            padding: 12px 8px;
+            text-align: center;
+            cursor: pointer;
             transition: all 0.2s;
         }
-        .pkg-card:hover { transform: translateY(-2px); box-shadow: 0 6px 20px BILLING_ACCENT_COLOR25; border-color: BILLING_ACCENT_COLOR; }
-        .pkg-name { font-size: 0.78rem; font-weight: 700; color: BILLING_ACCENT_COLOR; margin-bottom: 4px; text-transform: uppercase; }
-        .pkg-price { font-size: 1.3rem; font-weight: 700; color: BILLING_PRIMARY_COLOR; line-height: 1; }
-        .pkg-price small { font-size: 0.7rem; font-weight: 500; color: #888; }
+
+        .pkg-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px BILLING_ACCENT_COLOR25;
+            border-color: BILLING_ACCENT_COLOR;
+        }
+
+        .pkg-name {
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: BILLING_ACCENT_COLOR;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+        }
+
+        .pkg-price {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: BILLING_PRIMARY_COLOR;
+            line-height: 1;
+        }
+
+        .pkg-price small {
+            font-size: 0.7rem;
+            font-weight: 500;
+            color: #888;
+        }
+
         .pkg-duration {
-            font-size: 0.72rem; color: #e74c3c; margin-top: 4px;
-            display: flex; align-items: center; justify-content: center; gap: 3px;
+            font-size: 0.72rem;
+            color: #e74c3c;
+            margin-top: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 3px;
         }
 
         /* ── Input fields ── */
-        .field-group { margin-bottom: 8px; }
-        .field-group label { display: block; font-size: 0.75rem; color: #666; margin-bottom: 4px; font-weight: 500; }
+        .field-group {
+            margin-bottom: 8px;
+        }
+
+        .field-group label {
+            display: block;
+            font-size: 0.75rem;
+            color: #666;
+            margin-bottom: 4px;
+            font-weight: 500;
+        }
+
         .field-input {
-            width: 100%; padding: 8px 12px; border: 1.5px solid #d1d5db; border-radius: 8px;
-            font-size: 0.85rem; font-family: 'Inter', sans-serif;
+            width: 100%;
+            padding: 8px 12px;
+            border: 1.5px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-family: 'Inter', sans-serif;
             transition: border-color 0.2s;
         }
-        .field-input:focus { outline: none; border-color: BILLING_ACCENT_COLOR; box-shadow: 0 0 0 3px BILLING_ACCENT_COLOR15; }
+
+        .field-input:focus {
+            outline: none;
+            border-color: BILLING_ACCENT_COLOR;
+            box-shadow: 0 0 0 3px BILLING_ACCENT_COLOR15;
+        }
 
         /* ── Buttons ── */
         .btn-primary {
-            width: 100%; padding: 10px; background: BILLING_ACCENT_COLOR; color: #fff;
-            border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 700;
-            cursor: pointer; font-family: 'Inter', sans-serif;
-            display: flex; align-items: center; justify-content: center; gap: 4px;
+            width: 100%;
+            padding: 10px;
+            background: BILLING_ACCENT_COLOR;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            cursor: pointer;
+            font-family: 'Inter', sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
             transition: all 0.2s;
         }
-        .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+
+        .btn-primary:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+
         .btn-accent {
-            width: 100%; padding: 10px; background: linear-gradient(135deg, #e53935, #c62828);
-            color: #fff; border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 700;
-            cursor: pointer; font-family: 'Inter', sans-serif;
-            display: flex; align-items: center; justify-content: center; gap: 4px;
+            width: 100%;
+            padding: 10px;
+            background: linear-gradient(135deg, #e53935, #c62828);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            cursor: pointer;
+            font-family: 'Inter', sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
         }
+
         .btn-connect {
-            padding: 8px 16px; background: BILLING_ACCENT_COLOR; color: #fff;
-            border: none; border-radius: 8px; font-size: 0.8rem; font-weight: 700;
-            cursor: pointer; white-space: nowrap;
+            padding: 8px 16px;
+            background: BILLING_ACCENT_COLOR;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            cursor: pointer;
+            white-space: nowrap;
         }
-        .login-row { display: flex; gap: 8px; align-items: center; }
-        .login-row .field-input { flex: 1; margin-bottom: 0; }
+
+        .login-row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .login-row .field-input {
+            flex: 1;
+            margin-bottom: 0;
+        }
 
         /* ── Remember me / MAC ── */
         .remember-row {
-            margin-top: 8px; display: flex; align-items: center; gap: 6px;
-            font-size: 0.78rem; color: #777;
+            margin-top: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.78rem;
+            color: #777;
         }
-        .remember-row input[type="checkbox"] { width: 15px; height: 15px; accent-color: BILLING_ACCENT_COLOR; }
+
+        .remember-row input[type="checkbox"] {
+            width: 15px;
+            height: 15px;
+            accent-color: BILLING_ACCENT_COLOR;
+        }
+
         .mac-bar {
-            background: BILLING_ACCENT_COLOR10; border: 1px solid BILLING_ACCENT_COLOR25;
-            border-radius: 8px; padding: 8px 14px; margin-top: 10px;
-            font-size: 0.78rem; color: BILLING_PRIMARY_COLOR; display: flex; align-items: center; gap: 6px;
+            background: BILLING_ACCENT_COLOR10;
+            border: 1px solid BILLING_ACCENT_COLOR25;
+            border-radius: 8px;
+            padding: 8px 14px;
+            margin-top: 10px;
+            font-size: 0.78rem;
+            color: BILLING_PRIMARY_COLOR;
+            display: flex;
+            align-items: center;
+            gap: 6px;
         }
 
         /* ── Footer ── */
         .footer {
-            text-align: center; padding: 16px; font-size: 0.72rem; color: #bbb;
-            border-top: 1px solid #f0f0f0; margin-top: 8px;
+            text-align: center;
+            padding: 16px;
+            font-size: 0.72rem;
+            color: #bbb;
+            border-top: 1px solid #f0f0f0;
+            margin-top: 8px;
         }
 
-        .pkg-loading { text-align: center; padding: 20px; color: #888; font-size: 0.85rem; }
+        .pkg-loading {
+            text-align: center;
+            padding: 20px;
+            color: #888;
+            font-size: 0.85rem;
+        }
+
         @media (max-width: 380px) {
-            .packages-grid { grid-template-columns: repeat(2, 1fr); }
+            .packages-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
         }
 
         /* ── Payment Overlay ── */
         .payment-overlay {
-            position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
-            display: none; align-items: center; justify-content: center; z-index: 2000; padding: 20px;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            padding: 20px;
         }
+
         .payment-box {
-            background: #fff; border-radius: 20px; width: 100%; max-width: 360px;
-            overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
+            background: #fff;
+            border-radius: 20px;
+            width: 100%;
+            max-width: 360px;
+            overflow: hidden;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
             animation: modalUp 0.3s ease-out;
         }
-        @keyframes modalUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+        @keyframes modalUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
         .payment-header {
             background: linear-gradient(135deg, BILLING_PRIMARY_COLOR, BILLING_ACCENT_COLOR);
-            padding: 20px; color: #fff; text-align: center;
+            padding: 20px;
+            color: #fff;
+            text-align: center;
         }
-        .payment-body { padding: 24px; }
+
+        .payment-body {
+            padding: 24px;
+        }
+
         .status-badge {
-            display: inline-block; padding: 4px 12px; border-radius: 20px;
-            font-size: 0.72rem; font-weight: 700; margin-bottom: 12px;
-            background: #f1f5f9; color: #64748b;
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            margin-bottom: 12px;
+            background: #f1f5f9;
+            color: #64748b;
         }
-        .status-loading { color: BILLING_ACCENT_COLOR; background: BILLING_ACCENT_COLOR15; animation: pulse 2s infinite; }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+
+        .status-loading {
+            color: BILLING_ACCENT_COLOR;
+            background: BILLING_ACCENT_COLOR15;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.6;
+            }
+        }
     </style>
 </head>
+
 <body>
 
     <!-- Payment Modal -->
@@ -180,8 +454,10 @@
                     </div>
                 </div>
                 <div style="display: flex; gap: 10px;">
-                    <button class="btn-primary" style="flex: 2;" onclick="initiatePurchase()" id="btnPay">Pay Now</button>
-                    <button class="btn-primary" style="flex: 1; background: #94a3b8;" onclick="closePayment()">Cancel</button>
+                    <button class="btn-primary" style="flex: 2;" onclick="initiatePurchase()" id="btnPay">Pay
+                        Now</button>
+                    <button class="btn-primary" style="flex: 1; background: #94a3b8;"
+                        onclick="closePayment()">Cancel</button>
                 </div>
             </div>
             <div class="payment-body" id="paymentWait" style="display: none; text-align: center; padding: 40px 24px;">
@@ -189,19 +465,31 @@
                 <div style="font-size: 0.85rem; color: #475569; margin-bottom: 20px;" id="pollMessage">
                     Please check your phone for the payment prompt and enter your PIN.
                 </div>
-                <div style="width: 40px; height: 40px; border: 3px solid BILLING_ACCENT_COLOR20; border-top-color: BILLING_ACCENT_COLOR; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto;"></div>
-                <button class="btn-primary" style="margin-top: 30px; background: #94a3b8;" onclick="closePayment()">Close</button>
+                <div
+                    style="width: 40px; height: 40px; border: 3px solid BILLING_ACCENT_COLOR20; border-top-color: BILLING_ACCENT_COLOR; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto;">
+                </div>
+                <button class="btn-primary" style="margin-top: 30px; background: #94a3b8;"
+                    onclick="closePayment()">Close</button>
             </div>
         </div>
     </div>
 
-    <style> @keyframes spin { to { transform: rotate(360deg); } } </style>
+    <style>
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
 
     <div class="page">
         <!-- Header -->
         <div class="header">
             <div class="header-brand">
-                <svg viewBox="0 0 24 24"><path d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9zm8 8l3 3 3-3a4.237 4.237 0 00-6 0zm-4-4l2 2a7.074 7.074 0 0110 0l2-2C15.14 9.14 8.87 9.14 5 13z"/></svg>
+                <svg viewBox="0 0 24 24">
+                    <path
+                        d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9zm8 8l3 3 3-3a4.237 4.237 0 00-6 0zm-4-4l2 2a7.074 7.074 0 0110 0l2-2C15.14 9.14 8.87 9.14 5 13z" />
+                </svg>
                 <h1>BILLING_COMPANY_NAME</h1>
             </div>
             <div class="networks-title">Supported Mobile Networks</div>
@@ -234,7 +522,8 @@
                 <form name="voucher_form" action="$(link-login-only)" method="post" onsubmit="return doVoucher();">
                     <input type="hidden" name="dst" value="$(link-orig)" />
                     <div class="login-row">
-                        <input type="text" class="field-input" name="username" id="voucher-code" placeholder="Voucher code" />
+                        <input type="text" class="field-input" name="username" id="voucher-code"
+                            placeholder="Voucher code" />
                         <button type="submit" class="btn-connect" style="background: #e53935;">Redeem</button>
                     </div>
                 </form>
@@ -245,9 +534,11 @@
         <div class="section">
             <div class="section-title">🔄 Reconnect</div>
             <div class="section-card">
-                <label style="font-size: 0.78rem; color: #666; margin-bottom: 6px; display: block;">Enter Transaction reference</label>
+                <label style="font-size: 0.78rem; color: #666; margin-bottom: 6px; display: block;">Enter Transaction
+                    reference</label>
                 <div class="login-row">
-                    <input type="text" class="field-input" id="zenopay-ref" placeholder="Transaction reference (HP...)" />
+                    <input type="text" class="field-input" id="zenopay-ref"
+                        placeholder="Transaction reference (HP...)" />
                 </div>
                 <button class="btn-accent" style="margin-top: 10px;" onclick="doReconnect()">
                     💳 Reconnect
@@ -260,7 +551,8 @@
             <div class="section-title">📶 Manual Login</div>
             <div class="section-card">
                 $(if error)
-                <div style="background: #fee2e2; color: #ef4444; padding: 10px; border-radius: 6px; margin-bottom: 15px; font-size: 0.85rem; text-align: center; border: 1px solid #fca5a5;">
+                <div
+                    style="background: #fee2e2; color: #ef4444; padding: 10px; border-radius: 6px; margin-bottom: 15px; font-size: 0.85rem; text-align: center; border: 1px solid #fca5a5;">
                     $(error)
                 </div>
                 $(endif)
@@ -269,7 +561,8 @@
                     <input type="hidden" name="popup" value="true" />
                     <input type="hidden" name="mac" value="$(mac)" />
                     <div class="login-row">
-                        <input type="text" class="field-input" name="username" value="$(username)" placeholder="Username" />
+                        <input type="text" class="field-input" name="username" value="$(username)"
+                            placeholder="Username" />
                         <input type="password" class="field-input" name="password" placeholder="••••" />
                         <button type="submit" class="btn-connect">Connect</button>
                     </div>
@@ -279,7 +572,10 @@
                     <label for="remember">Remember me (Auto-reconnect while subscribed)</label>
                 </div>
                 <div class="mac-bar">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="BILLING_PRIMARY_COLOR"><path d="M20 18c1.1 0 1.99-.9 1.99-2L22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z"/></svg>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="BILLING_PRIMARY_COLOR">
+                        <path
+                            d="M20 18c1.1 0 1.99-.9 1.99-2L22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z" />
+                    </svg>
                     MAC: <strong>$(mac)</strong>
                 </div>
             </div>
@@ -296,7 +592,7 @@
         var API_BASE = 'BILLING_API_URL';
         var ROUTER_ID = 'BILLING_ROUTER_ID';
         if (ROUTER_ID === 'BILLING_ROUTER_ID') ROUTER_ID = '';
-        
+
         var ACCENT = 'BILLING_ACCENT_COLOR';
         var PRIMARY = 'BILLING_PRIMARY_COLOR';
         var currentPkg = null;
@@ -305,14 +601,14 @@
         function renderPackages(packages) {
             var c = document.getElementById('packagesContainer');
             if (!packages || packages.length === 0) { c.innerHTML = '<div class="pkg-loading">No packages available</div>'; return; }
-            c.innerHTML = packages.map(function(p) {
+            c.innerHTML = packages.map(function (p) {
                 var validity = p.validity || (p.duration ? p.duration + ' ' + (p.durationUnit || '') : '');
                 return '<div class="pkg-card" onclick=\'showPayment(' + JSON.stringify(p).replace(/"/g, "&quot;").replace(/'/g, "&#39;") + ')\'>' +
                     '<div class="pkg-name">' + p.name + '</div>' +
                     '<div class="pkg-price"><small>TSH</small> ' + Number(p.price).toLocaleString() + '</div>' +
                     '<div class="pkg-duration" style="margin-bottom:6px">⏱ ' + validity + '</div>' +
                     '<button style="width:100%; border:none; padding:6px; background:' + ACCENT + '; color:#fff; border-radius:6px; font-weight:700; font-size:0.75rem; cursor:pointer;">Buy</button>' +
-                '</div>';
+                    '</div>';
             }).join('');
         }
 
@@ -333,7 +629,7 @@
         function initiatePurchase() {
             var phone = document.getElementById('phoneInput').value;
             if (!phone || phone.length < 10) { alert('Please enter a valid phone number'); return; }
-            
+
             var btn = document.getElementById('btnPay');
             btn.disabled = true;
             btn.innerText = 'Processing...';
@@ -348,42 +644,42 @@
                     routerId: ROUTER_ID
                 })
             })
-            .then(function(r) { return r.json(); })
-            .then(function(d) {
-                if (d.error) { throw new Error(d.error); }
-                document.getElementById('paymentInitial').style.display = 'none';
-                document.getElementById('paymentWait').style.display = 'block';
-                startPolling(d.reference);
-            })
-            .catch(function(err) {
-                alert(err.message || 'Failed to initiate purchase');
-                btn.disabled = false;
-                btn.innerText = 'Pay Now';
-            });
+                .then(function (r) { return r.json(); })
+                .then(function (d) {
+                    if (d.error) { throw new Error(d.error); }
+                    document.getElementById('paymentInitial').style.display = 'none';
+                    document.getElementById('paymentWait').style.display = 'block';
+                    startPolling(d.reference);
+                })
+                .catch(function (err) {
+                    alert(err.message || 'Failed to initiate purchase');
+                    btn.disabled = false;
+                    btn.innerText = 'Pay Now';
+                });
         }
 
         function startPolling(ref) {
             if (pollInterval) clearInterval(pollInterval);
-            pollInterval = setInterval(function() {
+            pollInterval = setInterval(function () {
                 fetch(API_BASE + '/api/hotspot/status?reference=' + ref)
-                .then(function(r) { return r.json(); })
-                .then(function(d) {
-                    if (d.status === 'COMPLETED') {
-                        clearInterval(pollInterval);
-                        document.getElementById('pollStatus').innerText = 'PAID! Connecting...';
-                        document.getElementById('pollStatus').style.background = '#22c55e';
-                        document.getElementById('pollStatus').style.color = '#fff';
-                        document.getElementById('pollMessage').innerText = 'Your payment was successful. Getting you online now!';
-                        
-                        setTimeout(function() {
-                            connectUser(d.username, d.password);
-                        }, 2000);
-                    } else if (d.status === 'FAILED') {
-                        clearInterval(pollInterval);
-                        alert('Payment failed or cancelled. Please try again.');
-                        closePayment();
-                    }
-                });
+                    .then(function (r) { return r.json(); })
+                    .then(function (d) {
+                        if (d.status === 'COMPLETED') {
+                            clearInterval(pollInterval);
+                            document.getElementById('pollStatus').innerText = 'Successfully activated. Successfuly connected';
+                            document.getElementById('pollStatus').style.background = '#22c55e';
+                            document.getElementById('pollStatus').style.color = '#fff';
+                            document.getElementById('pollMessage').innerText = 'Your payment was successful and you are now connected.';
+
+                            setTimeout(function () {
+                                connectUser(d.username, d.password);
+                            }, 2000);
+                        } else if (d.status === 'FAILED') {
+                            clearInterval(pollInterval);
+                            alert('Failed to connect: ' + (d.message || d.error || 'Payment failed or cancelled. Please try again.'));
+                            closePayment();
+                        }
+                    });
             }, 3000);
         }
 
@@ -402,10 +698,10 @@
                 sendForm.method = 'post';
                 sendForm.action = '$(link-login-only)';
                 sendForm.innerHTML = '<input type="hidden" name="username" value="' + f.username.value + '" />' +
-                                     '<input type="hidden" name="password" value="' + newpass + '" />' +
-                                     '<input type="hidden" name="dst" value="' + f.dst.value + '" />' +
-                                     '<input type="hidden" name="popup" value="true" />' +
-                                     '<input type="hidden" name="mac" value="' + (f.mac ? f.mac.value : '$(mac)') + '" />';
+                    '<input type="hidden" name="password" value="' + newpass + '" />' +
+                    '<input type="hidden" name="dst" value="' + f.dst.value + '" />' +
+                    '<input type="hidden" name="popup" value="true" />' +
+                    '<input type="hidden" name="mac" value="' + (f.mac ? f.mac.value : '$(mac)') + '" />';
                 document.body.appendChild(sendForm);
                 sendForm.submit();
                 return false;
@@ -417,7 +713,7 @@
         function doVoucher() {
             var code = document.getElementById('voucher-code').value;
             if (!code) { alert('Please enter a voucher code'); return false; }
-            
+
             var btn = document.forms['voucher_form'].querySelector('button');
             btn.disabled = true;
             btn.innerText = 'Checking...';
@@ -431,17 +727,17 @@
                     routerId: ROUTER_ID
                 })
             })
-            .then(function(r) { return r.json(); })
-            .then(function(d) {
-                if (d.error) { throw new Error(d.error); }
-                alert('Voucher valid! Connecting...');
-                connectUser(d.username, d.password || '');
-            })
-            .catch(function(err) {
-                alert(err.message || 'Failed to redeem voucher');
-                btn.disabled = false;
-                btn.innerText = 'Redeem';
-            });
+                .then(function (r) { return r.json(); })
+                .then(function (d) {
+                    if (d.error) { throw new Error(d.error); }
+                    alert('Successfully activated.Success Connected!');
+                    connectUser(d.username, d.password || '');
+                })
+                .catch(function (err) {
+                    alert('Failed to connect: ' + (err.message || 'Unknown error occurred. Please try again.'));
+                    btn.disabled = false;
+                    btn.innerText = 'Redeem';
+                });
 
             return false;
         }
@@ -453,16 +749,35 @@
         }
 
         // Init
-        (function() {
+        (function () {
             if (!API_BASE || API_BASE === 'BILLING_API_URL') return;
+
+            // Auto-reconnect if package is still active
+            var userMac = '$(mac)';
+            // Check if userMac is resolved by Mikrotik (not the raw variable string)
+            if (userMac && userMac !== '' && userMac !== '$' + '(mac)') {
+                fetch(API_BASE + '/api/hotspot/check-mac?mac=' + encodeURIComponent(userMac) + '&routerId=' + ROUTER_ID)
+                    .then(function (r) { return r.json(); })
+                    .then(function (d) {
+                        if (d.active && d.username) {
+                            alert('Your package is still active. Reconnecting you directly...');
+                            connectUser(d.username, d.password || '');
+                        }
+                    })
+                    .catch(function (err) {
+                        console.log('MAC check failed:', err);
+                    });
+            }
+
             fetch(API_BASE + '/api/hotspot/packages?routerId=' + ROUTER_ID)
-                .then(function(r) { return r.json(); })
-                .then(function(d) {
+                .then(function (r) { return r.json(); })
+                .then(function (d) {
                     var pkgs = Array.isArray(d) ? d : (d.data || []);
                     renderPackages(pkgs);
                 })
-                .catch(function(err) { console.log('Package fetch failed:', err); });
+                .catch(function (err) { console.log('Package fetch failed:', err); });
         })();
     </script>
 </body>
+
 </html>

@@ -180,6 +180,10 @@ export async function GET(req: NextRequest) {
         const todayStart = new Date(getStartOfTodayTZ());
         const monthStart = new Date(getStartOfMonthTZ());
 
+        const lastMonthStart = new Date(monthStart);
+        lastMonthStart.setMonth(lastMonthStart.getMonth() - 1);
+        const lastMonthEnd = new Date(monthStart);
+
         const lastYear = new Date();
         lastYear.setFullYear(lastYear.getFullYear() - 1);
 
@@ -189,6 +193,7 @@ export async function GET(req: NextRequest) {
             expiredSubscribers,
             totalRevenue,
             monthlyRevenue,
+            lastMonthRevenue,
             onlineUsers,
             totalRouters,
             onlineRouters,
@@ -199,9 +204,8 @@ export async function GET(req: NextRequest) {
             // Voucher stats
             todayVoucherRev,
             monthlyVoucherRev,
-            vouchersGeneratedToday,
+            lastMonthVoucherRev,
             vouchersUsedToday,
-            vouchersGeneratedMonth,
             vouchersUsedMonth,
             todayRechargesVoucher,
             todayRechargesMobile,
@@ -222,6 +226,14 @@ export async function GET(req: NextRequest) {
                 where: {
                     status: "COMPLETED",
                     createdAt: { gte: monthStart },
+                    ...tenantFilter,
+                },
+                _sum: { amount: true },
+            }) : Promise.resolve({ _sum: { amount: 0 } }),
+            isAdmin ? db.transaction.aggregate({
+                where: {
+                    status: "COMPLETED",
+                    createdAt: { gte: lastMonthStart, lt: lastMonthEnd },
                     ...tenantFilter,
                 },
                 _sum: { amount: true },
@@ -282,9 +294,11 @@ export async function GET(req: NextRequest) {
                 where: { status: "COMPLETED", type: "VOUCHER", createdAt: { gte: monthStart }, ...tenantFilter },
                 _sum: { amount: true }
             }) : Promise.resolve({ _sum: { amount: 0 } }),
-            db.voucher.count({ where: { createdAt: { gte: todayStart }, ...tenantFilter, ...routerFilter } }),
+            isAdmin ? db.transaction.aggregate({
+                where: { status: "COMPLETED", type: "VOUCHER", createdAt: { gte: lastMonthStart, lt: lastMonthEnd }, ...tenantFilter },
+                _sum: { amount: true }
+            }) : Promise.resolve({ _sum: { amount: 0 } }),
             db.voucher.count({ where: { status: "USED", usedAt: { gte: todayStart }, ...tenantFilter, ...routerFilter } }),
-            db.voucher.count({ where: { createdAt: { gte: monthStart }, ...tenantFilter, ...routerFilter } }),
             db.voucher.count({ where: { status: "USED", usedAt: { gte: monthStart }, ...tenantFilter, ...routerFilter } }),
             db.transaction.count({ where: { status: "COMPLETED", type: "VOUCHER", createdAt: { gte: todayStart }, ...tenantFilter } }),
             db.transaction.count({ where: { status: "COMPLETED", type: "MOBILE", createdAt: { gte: todayStart }, ...tenantFilter } }),
@@ -296,6 +310,15 @@ export async function GET(req: NextRequest) {
             // RADIUS-based PPPoE online count (acctstoptime IS NULL, framedprotocol = PPP)
             db.radAcct.count({ where: { acctstoptime: null, framedprotocol: "PPP", ...tenantFilter } }),
         ]);
+
+        // Calculate analytics trends
+        const currRev = monthlyRevenue._sum.amount || 0;
+        const prevRev = lastMonthRevenue._sum.amount || 0;
+        const monthlyRevenueTrend = prevRev === 0 ? (currRev > 0 ? 100 : 0) : ((currRev - prevRev) / prevRev) * 100;
+
+        const currVoucherRev = monthlyVoucherRev._sum.amount || 0;
+        const prevVoucherRev = lastMonthVoucherRev._sum.amount || 0;
+        const monthlyVoucherRevTrend = prevVoucherRev === 0 ? (currVoucherRev > 0 ? 100 : 0) : ((currVoucherRev - prevVoucherRev) / prevVoucherRev) * 100;
 
         let revenueChartData: any[] = [];
         let revenueAnalytics = { daily: [], weekly: [], monthly: [], yearly: [] } as any;
@@ -486,13 +509,14 @@ export async function GET(req: NextRequest) {
             revenue: totalRevenue._sum.amount || 0,
             todayRevenue: todayRevenue._sum.amount || 0,
             monthlyRevenue: monthlyRevenue._sum.amount || 0,
+            monthlyRevenueTrend, // Added trend
 
             todayVoucherRev: todayVoucherRev._sum.amount || 0,
             monthlyVoucherRev: monthlyVoucherRev._sum.amount || 0,
-            vouchersGeneratedToday,
+            monthlyVoucherRevTrend, // Added trend
             vouchersUsedToday,
-            vouchersGeneratedMonth,
             vouchersUsedMonth,
+            // Removed vouchersGeneratedToday / vouchersGeneratedMonth as requested
             todayRechargesVoucher,
             todayRechargesMobile,
             monthlyRechargesMobile,

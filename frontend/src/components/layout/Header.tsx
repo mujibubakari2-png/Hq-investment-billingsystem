@@ -103,7 +103,7 @@ export default function Header({ onToggleSidebar, darkMode, onToggleDarkMode }: 
     };
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', width: '100%', position: 'sticky', top: 0, zIndex: 100 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', width: '100%', position: 'sticky', top: 0, zIndex: 200, backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)', background: 'var(--bg-header)' }}>
             {/* License expiry warning banner — only for non-SUPER_ADMIN nearing expiry */}
             {license &&
                 typeof license.daysRemaining === 'number' &&
@@ -140,7 +140,7 @@ export default function Header({ onToggleSidebar, darkMode, onToggleDarkMode }: 
                     </div>
                 )}
 
-            <header className="header">
+            <header className="header" style={{ position: 'relative', top: 'unset', zIndex: 'unset', backdropFilter: 'none', WebkitBackdropFilter: 'none', background: 'transparent' }}>
                 <div className="header-left">
                     <button
                         className="hamburger-btn"

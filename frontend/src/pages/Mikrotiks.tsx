@@ -71,8 +71,48 @@ export default function Mikrotiks() {
     useEffect(() => { fetchRouters(); }, [searchTerm, currentPage, pageSize]);
     useEffect(() => { setCurrentPage(1); }, [searchTerm, pageSize]);
 
+    // Background live stats sync (halisi CPU load)
+    useEffect(() => {
+        if (routers.length === 0) return;
+        
+        let isCancelled = false;
+        const syncLiveStats = async () => {
+            // Only sync routers that are currently on the page
+            await Promise.allSettled(
+                routers.map(async (r) => {
+                    try {
+                        const res = await routersApi.testConnection(r.id) as any;
+                        if (!isCancelled && res?.success && res?.info) {
+                            setRouters(prev => prev.map(router => 
+                                router.id === r.id 
+                                    ? { 
+                                        ...router, 
+                                        cpuLoad: res.info.cpuLoad, 
+                                        status: 'Online',
+                                        uptime: res.info.uptime || router.uptime
+                                      }
+                                    : router
+                            ));
+                        } else if (!isCancelled && !res?.success) {
+                            setRouters(prev => prev.map(router => router.id === r.id ? { ...router, status: 'Offline' } : router));
+                        }
+                    } catch {
+                        if (!isCancelled) {
+                            setRouters(prev => prev.map(router => router.id === r.id ? { ...router, status: 'Offline' } : router));
+                        }
+                    }
+                })
+            );
+        };
 
+        const timer = setInterval(syncLiveStats, 15000);
+        syncLiveStats(); // Run once immediately after routers are loaded
 
+        return () => {
+            isCancelled = true;
+            clearInterval(timer);
+        };
+    }, [routers.map(r => r.id).join(',')]); // Only re-run effect if the LIST of routers changes
     const handleAddRouter = async (data: any) => {
         try {
             const res = await routersApi.create({

@@ -50,7 +50,7 @@ async function upsertRadCheck(
     await prisma.$executeRaw`
         INSERT INTO radcheck (username, attribute, op, value, "tenantId")
         VALUES (${username}, ${attribute}, ${op}, ${value}, ${tid})
-        ON CONFLICT ON CONSTRAINT "username_tenantId_attribute"
+        ON CONFLICT (username, "tenantId", attribute)
         DO UPDATE SET value = EXCLUDED.value, op = EXCLUDED.op
     `;
 }
@@ -69,7 +69,7 @@ async function upsertRadReply(
     await prisma.$executeRaw`
         INSERT INTO radreply (username, attribute, op, value, "tenantId")
         VALUES (${username}, ${attribute}, ${op}, ${value}, ${tid})
-        ON CONFLICT ON CONSTRAINT "username_tenantId_attribute"
+        ON CONFLICT (username, "tenantId", attribute)
         DO UPDATE SET value = EXCLUDED.value, op = EXCLUDED.op
     `;
 }

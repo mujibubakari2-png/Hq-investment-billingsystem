@@ -113,7 +113,66 @@ export async function POST(req: NextRequest) {
             });
         }
 
-        // Update voucher status and subscription in a transaction
+        // 4. SYNC TO RADIUS
+        const upUnit = pkg.uploadUnit?.charAt(0)?.toUpperCase() || "M";
+        const downUnit = pkg.downloadUnit?.charAt(0)?.toUpperCase() || "M";
+        const rateLimit = `${pkg.uploadSpeed}${upUnit}/${pkg.downloadSpeed}${downUnit}`;
+
+        let radiusSyncSuccess = false;
+        try {
+            await syncRadiusUser({
+                username: client.username,
+                password: code,
+                tenantId: pkg.tenantId || null,
+                fullName: client.fullName || undefined,
+                expiresAt: expiresAt,
+                status: "Active",
+                rateLimit: rateLimit,
+                profileName: pkg.name
+            });
+            radiusSyncSuccess = true;
+        } catch (radErr) {
+            console.error("RADIUS sync error for voucher:", radErr);
+            // We continue anyway as local MikroTik sync might still work
+        }
+
+        // 5. Activate the user on MikroTik (as backup and for local management)
+        const rId = routerId || pkg.routerId;
+        let mikrotikSyncSuccess = false;
+        let finalSyncStatus = "PENDING";
+        
+        if (rId) {
+            try {
+                const mikrotik = await getMikroTikService(rId);
+                await mikrotik.activateService(client.username, code, pkg.name, "hotspot", expiresAt);
+                mikrotikSyncSuccess = true;
+                finalSyncStatus = "SYNCED";
+                
+                await db.routerLog.create({
+                    data: {
+                        routerId: rId,
+                        action: "HOTSPOT_VOUCHER_REDEEMED",
+                        details: `Voucher redeemed: ${code} | MAC: ${macAddress || "N/A"}`,
+                        status: "success",
+                        username: client.username,
+                        tenantId: pkg.tenantId,
+                    },
+                });
+            } catch (logErr: any) {
+                console.error("Router/MikroTik voucher redeem error:", logErr);
+                finalSyncStatus = "FAILED_SYNC";
+            }
+        } else {
+            // If there's no router assigned, we rely entirely on RADIUS.
+            mikrotikSyncSuccess = radiusSyncSuccess;
+        }
+
+        // 6. Abort if BOTH failed to connect to network. The voucher remains UNUSED.
+        if (!radiusSyncSuccess && !mikrotikSyncSuccess) {
+            return errorResponse("Failed to connect to the network router. Your voucher has NOT been used. Please try again.", 500);
+        }
+
+        // 7. Update voucher status and subscription in a transaction ONLY after successful network activation
         const [updatedVoucher, newSub, updatedClient] = await db.$transaction([
             // 1. Mark voucher as USED
             db.voucher.update({
@@ -135,7 +194,7 @@ export async function POST(req: NextRequest) {
                     activatedAt: now,
                     expiresAt,
                     onlineStatus: "ONLINE",
-                    syncStatus: "PENDING",
+                    syncStatus: finalSyncStatus,
                     tenantId: pkg.tenantId,
                 },
             }),
@@ -145,62 +204,6 @@ export async function POST(req: NextRequest) {
                 data: { status: "ACTIVE" },
             }),
         ]);
-
-        // 4. SYNC TO RADIUS (Crucial for fast connection when RADIUS is enabled on router)
-        try {
-            const upUnit = pkg.uploadUnit?.charAt(0)?.toUpperCase() || "M";
-            const downUnit = pkg.downloadUnit?.charAt(0)?.toUpperCase() || "M";
-            const rateLimit = `${pkg.uploadSpeed}${upUnit}/${pkg.downloadSpeed}${downUnit}`;
-
-            await syncRadiusUser({
-                username: client.username,
-                password: code,
-                tenantId: pkg.tenantId || null,
-                fullName: client.fullName || undefined,
-                expiresAt: expiresAt,
-                status: "Active",
-                rateLimit: rateLimit,
-                profileName: pkg.name
-            });
-        } catch (radErr) {
-            console.error("RADIUS sync error for voucher:", radErr);
-            // We continue anyway as local MikroTik sync might still work
-        }
-
-        // 5. Activate the user on MikroTik (as backup and for local management)
-        const rId = routerId || pkg.routerId;
-        let finalSyncStatus = "PENDING";
-        if (rId) {
-            try {
-                const mikrotik = await getMikroTikService(rId);
-                // We call this but don't necessarily need to block the response for too long
-                // However, for vouchers, it's safer to ensure it's done.
-                await mikrotik.activateService(client.username, code, pkg.name, "hotspot", expiresAt);
-
-                finalSyncStatus = "SYNCED";
-                await db.routerLog.create({
-                    data: {
-                        routerId: rId,
-                        action: "HOTSPOT_VOUCHER_REDEEMED",
-                        details: `Voucher redeemed: ${code} | MAC: ${macAddress || "N/A"}`,
-                        status: "success",
-                        username: client.username,
-                        tenantId: pkg.tenantId,
-                    },
-                });
-            } catch (logErr: any) {
-                console.error("Router/MikroTik voucher redeem error:", logErr);
-                finalSyncStatus = "FAILED_SYNC";
-                // ... log error
-            }
-
-            if (newSub?.id) {
-                await db.subscription.update({
-                    where: { id: newSub.id },
-                    data: { syncStatus: finalSyncStatus }
-                });
-            }
-        }
 
         return jsonResponse({
             success: true,
