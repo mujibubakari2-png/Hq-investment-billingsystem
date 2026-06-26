@@ -122,7 +122,9 @@ CREATE TABLE IF NOT EXISTS "saas_plans" (
     "id"          TEXT             NOT NULL,
     "name"        TEXT             NOT NULL,
     "price"       DOUBLE PRECISION NOT NULL,
-    "clientLimit" INTEGER          NOT NULL,
+    "pppoeLimit"  INTEGER          NOT NULL DEFAULT 100,
+    "hotspotLimit" INTEGER,
+    "maxRouters"  INTEGER          NOT NULL DEFAULT 1,
     "createdAt"   TIMESTAMP(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt"   TIMESTAMP(3)     NOT NULL,
 
@@ -135,6 +137,9 @@ CREATE TABLE IF NOT EXISTS "tenants" (
     "name"             TEXT           NOT NULL,
     "email"            TEXT           NOT NULL,
     "phone"            TEXT,
+    "slug"             TEXT           NOT NULL,
+    "logoUrl"          TEXT,
+    "ownerUserId"      TEXT,
     "status"           "TenantStatus" NOT NULL DEFAULT 'ACTIVE',
     "planId"           TEXT           NOT NULL,
     "trialStart"       TIMESTAMP(3),
@@ -160,6 +165,12 @@ CREATE TABLE IF NOT EXISTS "users" (
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
     "tenantId"  TEXT,
+    "createdById" TEXT,
+    "isPlatformAdmin" BOOLEAN NOT NULL DEFAULT false,
+    "deletedAt" TIMESTAMP(3),
+    "mfaEnabled" BOOLEAN NOT NULL DEFAULT false,
+    "mfaSecret" TEXT,
+    "mfaBackupCodes" TEXT[],
 
     CONSTRAINT "users_pkey" PRIMARY KEY ("id")
 );
@@ -195,6 +206,7 @@ CREATE TABLE IF NOT EXISTS "routers" (
     "accountingEnabled" BOOLEAN       NOT NULL DEFAULT true,
     "createdAt"        TIMESTAMP(3)   NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt"        TIMESTAMP(3)   NOT NULL,
+    "deletedAt"        TIMESTAMP(3),
     "tenantId"         TEXT,
     "apiPort"          INTEGER        DEFAULT 8728,
     "restPort"         INTEGER,
@@ -227,6 +239,7 @@ CREATE TABLE IF NOT EXISTS "clients" (
     "device"      TEXT,
     "createdAt"   TIMESTAMP(3)    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt"   TIMESTAMP(3)    NOT NULL,
+    "deletedAt"   TIMESTAMP(3),
     "tenantId"    TEXT,
 
     CONSTRAINT "clients_pkey" PRIMARY KEY ("id")
@@ -252,6 +265,7 @@ CREATE TABLE IF NOT EXISTS "packages" (
     "paymentType"   "PaymentType"     NOT NULL DEFAULT 'PREPAID',
     "createdAt"     TIMESTAMP(3)      NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt"     TIMESTAMP(3)      NOT NULL,
+    "deletedAt"     TIMESTAMP(3),
     "routerId"      TEXT,
     "tenantId"      TEXT,
 
@@ -273,6 +287,7 @@ CREATE TABLE IF NOT EXISTS "subscriptions" (
     "syncStatus"   TEXT,
     "createdAt"    TIMESTAMP(3)          NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt"    TIMESTAMP(3)          NOT NULL,
+    "deletedAt"    TIMESTAMP(3),
     "tenantId"     TEXT,
 
     CONSTRAINT "subscriptions_pkey" PRIMARY KEY ("id")
@@ -311,6 +326,7 @@ CREATE TABLE IF NOT EXISTS "transactions" (
     "invoiceId" TEXT,
     "createdAt" TIMESTAMP(3)          NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3)          NOT NULL,
+    "deletedAt" TIMESTAMP(3),
     "tenantId"  TEXT,
 
     CONSTRAINT "transactions_pkey" PRIMARY KEY ("id")
@@ -415,6 +431,7 @@ CREATE TABLE IF NOT EXISTS "invoice_items" (
     "quantity"    INTEGER          NOT NULL,
     "unitPrice"   DOUBLE PRECISION NOT NULL,
     "total"       DOUBLE PRECISION NOT NULL,
+    "tenantId"    TEXT,
 
     CONSTRAINT "invoice_items_pkey" PRIMARY KEY ("id")
 );
@@ -506,9 +523,157 @@ CREATE TABLE IF NOT EXISTS "tenant_payments" (
     "status"        "PaymentStatus" NOT NULL DEFAULT 'PENDING',
     "createdAt"     TIMESTAMP(3)    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt"     TIMESTAMP(3)    NOT NULL,
+    "deletedAt"     TIMESTAMP(3),
 
     CONSTRAINT "tenant_payments_pkey" PRIMARY KEY ("id")
 );
+
+-- tenant_branding
+CREATE TABLE IF NOT EXISTS "tenant_branding" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "tenantId" TEXT NOT NULL UNIQUE,
+    "companyName" TEXT NOT NULL,
+    "companyLogo" TEXT,
+    "companyEmail" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+DO $$ BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'tenant_branding_tenantId_fkey'
+    ) THEN
+        ALTER TABLE "tenant_branding"
+        ADD CONSTRAINT "tenant_branding_tenantId_fkey"
+        FOREIGN KEY ("tenantId") REFERENCES "tenants"("id")
+        ON DELETE CASCADE ON UPDATE CASCADE;
+    END IF;
+END $$;
+
+-- tenant_settings
+CREATE TABLE IF NOT EXISTS "tenant_settings" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "tenantId" TEXT NOT NULL UNIQUE,
+    "defaultLocale" TEXT NOT NULL DEFAULT 'en',
+    "defaultTimezone" TEXT NOT NULL DEFAULT 'Africa/Dar_es_Salaam',
+    "enableSubdomain" BOOLEAN NOT NULL DEFAULT true,
+    "hotspotAutoSync" BOOLEAN NOT NULL DEFAULT true,
+    "settings" JSONB,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+DO $$ BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'tenant_settings_tenantId_fkey'
+    ) THEN
+        ALTER TABLE "tenant_settings"
+        ADD CONSTRAINT "tenant_settings_tenantId_fkey"
+        FOREIGN KEY ("tenantId") REFERENCES "tenants"("id")
+        ON DELETE CASCADE ON UPDATE CASCADE;
+    END IF;
+END $$;
+
+-- tenant_payment_gateways
+CREATE TABLE IF NOT EXISTS "tenant_payment_gateways" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "tenantId" TEXT NOT NULL,
+    "provider" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "enabled" BOOLEAN NOT NULL DEFAULT false,
+    "status" TEXT NOT NULL DEFAULT 'INACTIVE',
+    "config" JSONB,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "tenant_payment_gateways_tenantId_provider_key" UNIQUE("tenantId", "provider")
+);
+
+DO $$ BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'tenant_payment_gateways_tenantId_fkey'
+    ) THEN
+        ALTER TABLE "tenant_payment_gateways"
+        ADD CONSTRAINT "tenant_payment_gateways_tenantId_fkey"
+        FOREIGN KEY ("tenantId") REFERENCES "tenants"("id")
+        ON DELETE CASCADE ON UPDATE CASCADE;
+    END IF;
+END $$;
+
+-- tenant_licenses
+CREATE TABLE IF NOT EXISTS "tenant_licenses" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "tenantId" TEXT NOT NULL,
+    "planId" TEXT NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'PENDING',
+    "startsAt" TIMESTAMP(3),
+    "expiresAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS "tenant_licenses_tenantId_status_idx" ON "tenant_licenses"("tenantId", "status");
+
+DO $$ BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'tenant_licenses_tenantId_fkey'
+    ) THEN
+        ALTER TABLE "tenant_licenses"
+        ADD CONSTRAINT "tenant_licenses_tenantId_fkey"
+        FOREIGN KEY ("tenantId") REFERENCES "tenants"("id")
+        ON DELETE CASCADE ON UPDATE CASCADE;
+    END IF;
+END $$;
+
+DO $$ BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'tenant_licenses_planId_fkey'
+    ) THEN
+        ALTER TABLE "tenant_licenses"
+        ADD CONSTRAINT "tenant_licenses_planId_fkey"
+        FOREIGN KEY ("planId") REFERENCES "saas_plans"("id")
+        ON DELETE RESTRICT ON UPDATE CASCADE;
+    END IF;
+END $$;
+
+-- audit_logs
+CREATE TABLE IF NOT EXISTS "audit_logs" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "tenantId" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "action" TEXT NOT NULL,
+    "resource" TEXT NOT NULL,
+    "resourceId" TEXT,
+    "details" JSONB,
+    "ipAddress" TEXT,
+    "userAgent" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS "audit_logs_tenantId_createdAt_idx" ON "audit_logs"("tenantId", "createdAt" DESC);
+CREATE INDEX IF NOT EXISTS "audit_logs_userId_idx" ON "audit_logs"("userId");
+CREATE INDEX IF NOT EXISTS "audit_logs_action_idx" ON "audit_logs"("action");
+
+DO $$ BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'audit_logs_tenantId_fkey'
+    ) THEN
+        ALTER TABLE "audit_logs"
+        ADD CONSTRAINT "audit_logs_tenantId_fkey"
+        FOREIGN KEY ("tenantId") REFERENCES "tenants"("id")
+        ON DELETE CASCADE ON UPDATE CASCADE;
+    END IF;
+END $$;
+
+DO $$ BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'audit_logs_userId_fkey'
+    ) THEN
+        ALTER TABLE "audit_logs"
+        ADD CONSTRAINT "audit_logs_userId_fkey"
+        FOREIGN KEY ("userId") REFERENCES "users"("id")
+        ON DELETE CASCADE ON UPDATE CASCADE;
+    END IF;
+END $$;
 
 -- vpn_users
 CREATE TABLE IF NOT EXISTS "vpn_users" (
@@ -645,7 +810,8 @@ CREATE TABLE IF NOT EXISTS radgroupcheck (
     groupname VARCHAR(64)  NOT NULL DEFAULT '',
     attribute VARCHAR(64)  NOT NULL,
     op        VARCHAR(2)   NOT NULL DEFAULT ':=',
-    value     VARCHAR(253) NOT NULL
+    value     VARCHAR(253) NOT NULL,
+    "tenantId" TEXT
 );
 
 -- radgroupreply
@@ -654,7 +820,8 @@ CREATE TABLE IF NOT EXISTS radgroupreply (
     groupname VARCHAR(64)  NOT NULL DEFAULT '',
     attribute VARCHAR(64)  NOT NULL,
     op        VARCHAR(2)   NOT NULL DEFAULT '=',
-    value     VARCHAR(253) NOT NULL
+    value     VARCHAR(253) NOT NULL,
+    "tenantId" TEXT
 );
 
 -- radusergroup
@@ -662,7 +829,8 @@ CREATE TABLE IF NOT EXISTS radusergroup (
     id        SERIAL      PRIMARY KEY,
     username  VARCHAR(64) NOT NULL DEFAULT '',
     groupname VARCHAR(64) NOT NULL DEFAULT '',
-    priority  INT         NOT NULL DEFAULT 1
+    priority  INT         NOT NULL DEFAULT 1,
+    "tenantId" TEXT
 );
 
 -- rate_limits
@@ -706,8 +874,10 @@ CREATE TABLE IF NOT EXISTS "webhook_logs" (
 CREATE UNIQUE INDEX IF NOT EXISTS "users_username_key"  ON "users"("username");
 CREATE UNIQUE INDEX IF NOT EXISTS "users_email_key"     ON "users"("email");
 CREATE INDEX        IF NOT EXISTS "users_tenantId_idx"  ON "users"("tenantId");
+CREATE INDEX        IF NOT EXISTS "users_createdById_idx" ON "users"("createdById");
 CREATE INDEX        IF NOT EXISTS "users_role_idx"      ON "users"("role");
 CREATE INDEX        IF NOT EXISTS "users_status_idx"    ON "users"("status");
+CREATE INDEX        IF NOT EXISTS "users_deletedAt_idx" ON "users"("deletedAt");
 
 -- clients
 CREATE UNIQUE INDEX IF NOT EXISTS "clients_username_key"      ON "clients"("username");
@@ -771,8 +941,12 @@ END $$;
 -- system_settings
 CREATE UNIQUE INDEX IF NOT EXISTS "system_settings_key_tenantId_key" ON "system_settings"("key", "tenantId");
 
+CREATE INDEX IF NOT EXISTS "invoice_items_tenantId_idx" ON "invoice_items"("tenantId");
+
 -- tenants
 CREATE UNIQUE INDEX IF NOT EXISTS "tenants_email_key" ON "tenants"("email");
+CREATE UNIQUE INDEX IF NOT EXISTS "tenants_slug_key" ON "tenants"("slug");
+CREATE INDEX        IF NOT EXISTS "tenants_ownerUserId_idx" ON "tenants"("ownerUserId");
 
 -- tenant_invoices
 CREATE UNIQUE INDEX IF NOT EXISTS "tenant_invoices_invoiceNumber_key" ON "tenant_invoices"("invoiceNumber");
@@ -822,8 +996,19 @@ CREATE UNIQUE INDEX IF NOT EXISTS "radreply_username_tenantId_attribute" ON radr
 
 -- radgroupcheck / radgroupreply / radusergroup
 CREATE INDEX IF NOT EXISTS "idx_radgroupcheck_groupname"  ON radgroupcheck(groupname);
+CREATE INDEX IF NOT EXISTS "idx_radgroupcheck_tenantId_idx"   ON radgroupcheck("tenantId");
+CREATE INDEX IF NOT EXISTS "idx_radgroupcheck_tenantId_groupname_idx" ON radgroupcheck("tenantId", groupname);
+CREATE UNIQUE INDEX IF NOT EXISTS "radgroupcheck_groupname_tenant_attribute" ON radgroupcheck(groupname, "tenantId", attribute);
+
 CREATE INDEX IF NOT EXISTS "idx_radgroupreply_groupname"  ON radgroupreply(groupname);
+CREATE INDEX IF NOT EXISTS "idx_radgroupreply_tenantId_idx"   ON radgroupreply("tenantId");
+CREATE INDEX IF NOT EXISTS "idx_radgroupreply_tenantId_groupname_idx" ON radgroupreply("tenantId", groupname);
+CREATE UNIQUE INDEX IF NOT EXISTS "radgroupreply_groupname_tenant_attribute_reply" ON radgroupreply(groupname, "tenantId", attribute);
+
 CREATE INDEX IF NOT EXISTS "idx_radusergroup_username"    ON radusergroup(username);
+CREATE INDEX IF NOT EXISTS "idx_radusergroup_tenantId_idx" ON radusergroup("tenantId");
+CREATE INDEX IF NOT EXISTS "idx_radusergroup_tenantId_username_idx" ON radusergroup("tenantId", username);
+CREATE UNIQUE INDEX IF NOT EXISTS "radusergroup_username_tenant_group" ON radusergroup(username, "tenantId", groupname);
 
 -- rate_limits
 CREATE INDEX        IF NOT EXISTS "rate_limits_resetAt_idx" ON "rate_limits"("resetAt");
@@ -843,7 +1028,11 @@ CREATE INDEX IF NOT EXISTS "webhook_logs_createdAt_idx"      ON "webhook_logs"("
 
 DO $$ BEGIN ALTER TABLE "tenants" ADD CONSTRAINT "tenants_planId_fkey" FOREIGN KEY ("planId") REFERENCES "saas_plans"("id") ON DELETE RESTRICT ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
+DO $$ BEGIN ALTER TABLE "tenants" ADD CONSTRAINT "tenants_ownerUserId_fkey" FOREIGN KEY ("ownerUserId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
 DO $$ BEGIN ALTER TABLE "users" ADD CONSTRAINT "users_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE CASCADE ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN ALTER TABLE "users" ADD CONSTRAINT "users_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN ALTER TABLE "user_otps" ADD CONSTRAINT "user_otps_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE CASCADE ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 

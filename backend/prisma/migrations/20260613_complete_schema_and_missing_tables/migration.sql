@@ -1,10 +1,8 @@
--- ============================================================================
+-- =============================================================================
 -- MIGRATION: 20260613_complete_schema_and_missing_tables
 -- Phase 2 Audit Completion — HQ Investment ISP Platform
----- NOTE: This file is preserved for reference only.
---       The real Prisma migration directory is:
---       backend/prisma/migrations/20260613_complete_schema_and_missing_tables/
----- Purpose: Complete the database schema by adding missing tables identified
+--
+-- Purpose: Complete the database schema by adding missing tables identified
 -- during the comprehensive audit, including:
 --   • tenant_branding, tenant_settings, tenant_payment_gateways, tenant_licenses
 --   • audit_logs (critical for compliance and debugging)
@@ -15,7 +13,7 @@
 -- Apply on existing database:
 --   psql $DATABASE_URL -f this-file.sql
 --
--- ============================================================================
+-- =============================================================================
 
 BEGIN;
 
