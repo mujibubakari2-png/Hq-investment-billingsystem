@@ -71,7 +71,7 @@ server {
     }
 
     location /billing/assets/ {
-        alias /var/www/Hq-investment-billingsystem/frontend/dist/assets/;
+        root /var/www/html;
         expires 1y;
         add_header Cache-Control "public, immutable";
         add_header X-Content-Type-Options "nosniff" always;
@@ -79,7 +79,7 @@ server {
     }
 
     location /billing/ {
-        alias /var/www/Hq-investment-billingsystem/frontend/dist/;
+        root /var/www/html;
         try_files $uri $uri/ /billing/index.html;
         add_header Cache-Control "no-cache, no-store, must-revalidate";
         add_header Pragma "no-cache";
