@@ -218,6 +218,8 @@ jobs:
 
       - name: Build landing page
         run: pnpm --filter landing-page build
+        env:
+          NEXT_PUBLIC_BILLING_SYSTEM_URL: ${{ secrets.NEXT_PUBLIC_BILLING_SYSTEM_URL }}
 
       - name: Upload landing page build artifact
         uses: actions/upload-artifact@v4
