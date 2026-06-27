@@ -4,6 +4,7 @@ const config: Config = {
     preset: 'ts-jest',
     testEnvironment: 'node',
     setupFiles: ['<rootDir>/jest.setup.ts'],
+    setupFilesAfterEnv: ['<rootDir>/jest.setupAfterEnv.ts'],
     roots: ['<rootDir>/src/__tests__'],
     testMatch: ['**/*.test.ts'],
     transform: {
