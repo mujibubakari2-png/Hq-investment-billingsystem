@@ -71,7 +71,7 @@ export default function RenewLicense() {
     const activePlan = allPlans.find(p => p.id === selectedPlanId) || license?.plan;
     const basePrice = activePlan?.price || 0;
     const hasPendingInvoice = license?.pendingInvoices && license.pendingInvoices.length > 0;
-    const pendingAmount = hasPendingInvoice ? license.pendingInvoices![0].amount : (location.state?.amount || 0);
+    const pendingAmount = location.state?.amount || (hasPendingInvoice ? license.pendingInvoices![0].amount : 0);
 
     const packages = [
         { months: 1, title: '1 Month License', subtitle: 'Standard 30-day license', price: basePrice, save: 0 },
@@ -386,7 +386,7 @@ export default function RenewLicense() {
                                 }}
                             >
                                 <div>
-                                    <div style={{ fontWeight: 600 }}>Pay Generated Invoice</div>
+                                    <div style={{ fontWeight: 600 }}>Pay Outstanding Balance</div>
                                     <div style={{ fontSize: '0.8rem', opacity: 0.9 }}>{license.pendingInvoices![0].invoiceNumber}</div>
                                 </div>
                                 <div style={{ textAlign: 'right' }}>
