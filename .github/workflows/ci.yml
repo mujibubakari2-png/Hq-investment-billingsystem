@@ -306,11 +306,6 @@ jobs:
             pnpm prisma generate
             cd ..
             
-            # Copy frontend to nginx root
-            echo "Deploying frontend static files..."
-            echo "$SUDO_PASSWORD" | sudo -S rm -rf /var/www/html/billing/*
-            echo "$SUDO_PASSWORD" | sudo -S cp -r frontend/dist/* /var/www/html/billing/
-            
             # Restart backend + landing page with PM2
             echo "Restarting application servers..."
             pm2 restart ecosystem.config.js --update-env
