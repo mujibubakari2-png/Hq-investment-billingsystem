@@ -247,6 +247,7 @@ jobs:
             find . -maxdepth 5 -name "*.test.tsx"  -not -path "./node_modules/*" -delete
             find . -maxdepth 5 -name "*.spec.ts"   -not -path "./node_modules/*" -delete
             find . -maxdepth 5 -name "jest.setup.ts"  -not -path "./node_modules/*" -delete
+            find . -maxdepth 5 -name "jest.setupAfterEnv.ts" -not -path "./node_modules/*" -delete
             find . -maxdepth 5 -name "jest.config.ts" -not -path "./node_modules/*" -delete
             find . -maxdepth 5 -name "vitest.config.ts" -not -path "./node_modules/*" -delete
             rm -rf backend/src/__tests__
