@@ -50,22 +50,10 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 
 cd "$PROJECT_DIR" || fail "Cannot cd to $PROJECT_DIR"
 
-# ── 0. PM2 processes will be gracefully reloaded after build ──────────────────
-# ── 1. Pull latest code ───────────────────────────────────────────────────────
-if [ "$BACKEND_ONLY" = false ] && [ "$FRONTEND_ONLY" = false ]; then
-    step "Pulling latest code from origin/$GIT_BRANCH"
-    git fetch origin
-    git reset --hard "origin/$GIT_BRANCH"
-    ok "Code updated to $(git rev-parse --short HEAD)"
-fi
-
-# ── 2. Install dependencies ───────────────────────────────────────────────────
-step "Installing dependencies"
-pnpm install --no-frozen-lockfile
+# ── 1. Install dependencies ───────────────────────────────────────────────────
+step "Installing production dependencies"
+pnpm install --frozen-lockfile --prod
 ok "Dependencies installed"
-
-# Prevent Out-Of-Memory (OOM) errors during Next.js and Vite builds on smaller VPS instances
-export NODE_OPTIONS="--max-old-space-size=1024"
 
 # ── 2.5. Environment Check ────────────────────────────────────────────────────
 step "Checking for environment variables"
@@ -121,30 +109,9 @@ if [ "$FRONTEND_ONLY" = false ]; then
     ok "Pre-deployment setup complete"
 fi
 
-# ── 4. Build backend ─────────────────────────────────────────────────────────
-if [ "$FRONTEND_ONLY" = false ]; then
-    step "Building backend"
-    BUILD_DIR=.next-temp pnpm --filter backend build 2>&1 | tee -a "$LOG_FILE" || fail "Backend build failed"
-    rm -rf backend/.next
-    mv backend/.next-temp backend/.next
-    ok "Backend built"
-fi
-
-# ── 5. Build landing page ─────────────────────────────────────────────────────
-if [ "$BACKEND_ONLY" = false ]; then
-    step "Building landing page"
-    BUILD_DIR=.next-temp pnpm --filter landing-page build 2>&1 | tee -a "$LOG_FILE" || fail "Landing page build failed"
-    rm -rf landing-page/.next
-    mv landing-page/.next-temp landing-page/.next
-    ok "Landing page built"
-fi
-
-# ── 6. Build frontend (Vite SPA) ──────────────────────────────────────────────
-if [ "$BACKEND_ONLY" = false ]; then
-    step "Building frontend (Vite SPA)"
-    pnpm --filter frontend build 2>&1 | tee -a "$LOG_FILE" || fail "Frontend build failed"
-    ok "Frontend built → frontend/dist/"
-fi
+# ── 4. Build steps removed (Artifact Only Deployment) ───────────────────────────
+# The CI/CD pipeline builds the artifacts and pushes them to the server.
+# This script is now strictly for reloading services and applying migrations.
 
 # ── 6. Start/Reload backend with PM2 ──────────────────────────────────────────
 if [ "$FRONTEND_ONLY" = false ]; then

@@ -146,6 +146,13 @@ jobs:
       - name: Build backend
         run: pnpm --filter backend build
 
+      - name: Upload backend build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-next
+          path: backend/.next
+          retention-days: 1
+
   # ── Frontend Build ─────────────────────────────────────────────────────────
   build-frontend:
     name: Build Frontend
@@ -211,6 +218,13 @@ jobs:
       - name: Build landing page
         run: pnpm --filter landing-page build
 
+      - name: Upload landing page build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: landing-next
+          path: landing-page/.next
+          retention-days: 1
+
   # ── Deploy to Production (main branch only) ────────────────────────────────
   deploy:
     name: Deploy to Production
@@ -222,6 +236,42 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Download frontend artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
+
+      - name: Download backend artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-next
+          path: backend/.next
+
+      - name: Download landing page artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: landing-next
+          path: landing-page/.next
+
+      - name: Create release artifact
+        run: |
+          tar -czf release.tar.gz \
+            --exclude='backend/src' --exclude='frontend/src' --exclude='landing-page/app' \
+            --exclude='*.test.ts' --exclude='__tests__' \
+            package.json pnpm-workspace.yaml pnpm-lock.yaml ecosystem.config.js nginx-sites deploy.sh \
+            backend/package.json backend/.next backend/public backend/prisma backend/next.config.mjs backend/scripts \
+            frontend/package.json frontend/dist \
+            landing-page/package.json landing-page/.next landing-page/public landing-page/next.config.mjs || true
+
+      - name: Copy artifact to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DROPLET_HOST }}
+          username: ${{ secrets.DROPLET_USER }}
+          key: ${{ secrets.DROPLET_SSH_KEY }}
+          source: "release.tar.gz"
+          target: "/tmp"
 
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1
@@ -234,56 +284,35 @@ jobs:
           envs: SUDO_PASSWORD
           script: |
             set -e
-            cd /var/www/Hq-investment-billingsystem
-
-            # Pull latest code
-            git pull origin master
-
-            # ── Remove test/dev files from the VPS deployment ─────────────────
-            # Tests live in the repo for CI/CD but must NOT be present on the
-            # production server. This cleanup runs after every pull.
-            echo "Cleaning test and dev artifacts from production server..."
-            find . -maxdepth 5 -name "*.test.ts"   -not -path "./node_modules/*" -delete
-            find . -maxdepth 5 -name "*.test.tsx"  -not -path "./node_modules/*" -delete
-            find . -maxdepth 5 -name "*.spec.ts"   -not -path "./node_modules/*" -delete
-            find . -maxdepth 5 -name "jest.setup.ts"  -not -path "./node_modules/*" -delete
-            find . -maxdepth 5 -name "jest.setupAfterEnv.ts" -not -path "./node_modules/*" -delete
-            find . -maxdepth 5 -name "jest.config.ts" -not -path "./node_modules/*" -delete
-            find . -maxdepth 5 -name "vitest.config.ts" -not -path "./node_modules/*" -delete
-            rm -rf backend/src/__tests__
-            rm -rf backend/scratch
-            rm -f  backend/tenantIsolation.log
-            rm -f  backend/test-prisma.ts
-            rm -f  backend/dry_run.js
-            rm -f  backend/extract-error.js
-            rm -f  backend/tmp_tenant_model_audit.py
-            rm -f  payments.service.mock.test.ts
-            rm -f  frontend/src/pages/webhooks.tenant.route.test.ts
-            rm -f  frontend/src/pages/payments.service.mock.test.ts
-            echo "Test artifact cleanup complete."
-
-            # Install dependencies
-            pnpm install --frozen-lockfile
-
-            # Run DB migrations
-            cd backend && pnpm prisma migrate deploy && cd ..
-
-            # Rebuild backend (prisma generate + next build)
-            pnpm --filter backend build
-
-            # Build frontend on server
-            pnpm --filter frontend build
-
-            # Build landing page on server
-            pnpm --filter landing-page build
-
-            # Copy fresh frontend dist to nginx web root
+            DEPLOY_DIR="/var/www/Hq-investment-billingsystem"
+            
+            # Extract new release over existing files
+            echo "Extracting artifacts..."
+            tar -xzf /tmp/release.tar.gz -C $DEPLOY_DIR
+            rm /tmp/release.tar.gz
+            
+            cd $DEPLOY_DIR
+            
+            # Install production dependencies only (no devDependencies, no build)
+            echo "Installing production dependencies..."
+            pnpm install --frozen-lockfile --prod
+            
+            # Run DB migrations & generate client
+            echo "Applying database migrations..."
+            cd backend
+            pnpm prisma migrate deploy
+            pnpm prisma generate
+            cd ..
+            
+            # Copy frontend to nginx root
+            echo "Deploying frontend static files..."
             echo "$SUDO_PASSWORD" | sudo -S rm -rf /var/www/html/billing/*
             echo "$SUDO_PASSWORD" | sudo -S cp -r frontend/dist/* /var/www/html/billing/
-
+            
             # Restart backend + landing page with PM2
+            echo "Restarting application servers..."
             pm2 restart ecosystem.config.js --update-env
-
+            
             # Sync Nginx configuration files from repository to the server
             echo "Syncing Nginx configurations..."
             echo "$SUDO_PASSWORD" | sudo -S cp nginx-sites/api.yourdomain.com /etc/nginx/sites-available/api.yourdomain.com
