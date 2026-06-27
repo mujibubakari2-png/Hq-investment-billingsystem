@@ -14,6 +14,7 @@ out/
 src/__tests__/
 jest.config.ts
 jest.setup.ts
+jest.setupAfterEnv.ts
 coverage/
 *.test.ts
 *.test.tsx
