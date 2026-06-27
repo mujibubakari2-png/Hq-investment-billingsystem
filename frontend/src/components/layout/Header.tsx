@@ -133,7 +133,7 @@ export default function Header({ onToggleSidebar, darkMode, onToggleDarkMode }: 
                         </span>
                         <span
                             style={{ textDecoration: 'underline', cursor: 'pointer' }}
-                            onClick={() => navigate('/license-management')}
+                            onClick={() => navigate('/renew')}
                         >
                             Renew now
                         </span>

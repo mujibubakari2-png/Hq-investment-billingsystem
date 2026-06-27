@@ -81,7 +81,7 @@ export default function Restricted() {
                             <PaymentIcon fontSize="small" /> Pay Outstanding Invoices
                         </button>
                     )}
-                    <button className="btn btn-secondary" onClick={() => navigate('/license-management')} style={{ width: '100%', border: '1px solid var(--border-light)' }}>
+                    <button className="btn btn-secondary" onClick={() => navigate('/renew')} style={{ width: '100%', border: '1px solid var(--border-light)' }}>
                         <ConfirmationNumberIcon fontSize="small" /> Renew License
                     </button>
                 </div>

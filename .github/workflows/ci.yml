@@ -152,6 +152,7 @@ jobs:
           name: backend-next
           path: backend/.next
           retention-days: 1
+          include-hidden-files: true
 
   # ── Frontend Build ─────────────────────────────────────────────────────────
   build-frontend:
@@ -224,6 +225,7 @@ jobs:
           name: landing-next
           path: landing-page/.next
           retention-days: 1
+          include-hidden-files: true
 
   # ── Deploy to Production (main branch only) ────────────────────────────────
   deploy:
