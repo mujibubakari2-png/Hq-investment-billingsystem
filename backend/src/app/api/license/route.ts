@@ -82,8 +82,8 @@ export async function GET(req: NextRequest) {
             currentStatus = "SUSPENDED";
         }
 
-        // Auto-create pending invoice if within 7 days of expiry and none exists
-        if (daysRemaining > 0 && daysRemaining <= 7 && expiresAt) {
+        // Auto-create pending invoice if within 5 days of expiry and none exists
+        if (daysRemaining > 0 && daysRemaining <= 5 && expiresAt) {
             const hasPending = tenant.tenantInvoices.some(i => i.status === "PENDING");
             if (!hasPending) {
                 const invoiceNumber = `INV-${new Date().getFullYear()}-${crypto.randomUUID().replace(/-/g, "").slice(0, 8).toUpperCase()}`;
@@ -140,14 +140,6 @@ export async function GET(req: NextRequest) {
                 invoiceDate: toISOSafe(i.createdAt),
                 paymentDate: toISOSafe(i.payments.find(p => p.status === "COMPLETED")?.createdAt ?? null),
                 licensePackage: i.plan.name,
-                amount: i.amount,
-                dueDate: toISOSafe(i.dueDate),
-                status: i.status
-            })),
-            pendingInvoices: tenant.tenantInvoices.filter(i => i.status === "PENDING").map(i => ({
-                id: i.id,
-                invoiceNumber: i.invoiceNumber,
-                invoiceDate: toISOSafe(i.createdAt),
                 amount: i.amount,
                 dueDate: toISOSafe(i.dueDate),
                 status: i.status
