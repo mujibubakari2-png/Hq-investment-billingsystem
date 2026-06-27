@@ -76,11 +76,9 @@ export default function Restricted() {
                 )}
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    {license?.hasOutstanding && (
-                        <button className="btn btn-primary" onClick={() => navigate('/renew', { state: { amount: outstandingTotal } })} style={{ width: '100%', background: '#1a1a2e', color: 'white' }}>
-                            <PaymentIcon fontSize="small" /> Pay Outstanding Invoices
-                        </button>
-                    )}
+                    <button className="btn btn-primary" onClick={() => navigate('/renew', { state: { amount: outstandingTotal } })} style={{ width: '100%', background: '#1a1a2e', color: 'white' }}>
+                        <PaymentIcon fontSize="small" /> Pay Outstanding Invoices
+                    </button>
                     <button className="btn btn-secondary" onClick={() => navigate('/license-management')} style={{ width: '100%', border: '1px solid var(--border-light)' }}>
                         <ConfirmationNumberIcon fontSize="small" /> Renew License
                     </button>
