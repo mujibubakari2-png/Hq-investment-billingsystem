@@ -177,7 +177,7 @@ jobs:
       - name: Build frontend
         run: pnpm --filter frontend build
         env:
-          VITE_API_URL: https://placeholder.example.com
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
 
       - name: Upload frontend build artifact
         uses: actions/upload-artifact@v4
