@@ -3,37 +3,65 @@ import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 import { requireRole } from "@/lib/rbac";
 import { toISOSafe } from "@/lib/dateUtils";
+import { isPlatformSuperAdmin } from "@/lib/tenant";
 
 
-// GET /api/admin/saas-invoices - list all SaaS (Tenant) invoices (Super Admin only)
+// GET /api/admin/saas-invoices - list all SaaS licenses as invoices (Paid, Unpaid, Overdue)
 export async function GET(req: NextRequest) {
     try {
         const guard = requireRole(req, "SUPER_ADMIN");
         if (guard.error) return guard.error;
         const user = guard.user;
+        if (!isPlatformSuperAdmin(user)) return errorResponse("Forbidden: Platform Super Admin Only", 403);
         const db = getTenantClient(null);
 
-        const invoices = await db.tenantInvoice.findMany({
+        // Fetch all tenants to show the current license status for EVERY tenant
+        const tenants = await db.tenant.findMany({
             include: {
-                tenant: { select: { name: true, email: true } },
                 plan: { select: { name: true, price: true } },
-                payments: true
+                tenantInvoices: {
+                    include: { payments: true },
+                    orderBy: { createdAt: "desc" },
+                    take: 1
+                }
             },
             orderBy: { createdAt: "desc" }
         });
 
-        const mapped = invoices.map(inv => ({
-            id: inv.id,
-            invoiceNumber: inv.invoiceNumber,
-            tenantName: inv.tenant.name,
-            tenantEmail: inv.tenant.email,
-            planName: inv.plan.name,
-            amount: inv.amount,
-            status: inv.status,
-            dueDate: toISOSafe(inv.dueDate),
-            paidAmount: inv.payments.filter(p => p.status === "COMPLETED").reduce((sum, p) => sum + p.amount, 0),
-            createdAt: toISOSafe(inv.createdAt)
-        }));
+        const mapped = tenants.map(t => {
+            const latestInvoice = t.tenantInvoices[0];
+            const now = new Date();
+            const expires = t.licenseExpiresAt || t.trialEnd;
+            
+            let status = "PENDING";
+            
+            if (latestInvoice) {
+                status = latestInvoice.status;
+                if (status === "PENDING" && latestInvoice.dueDate && latestInvoice.dueDate < now) {
+                    status = "OVERDUE";
+                }
+            } else {
+                // If the license is active and hasn't expired, it is PAID
+                if (expires && expires > now) {
+                    status = "PAID";
+                } else {
+                    status = "OVERDUE";
+                }
+            }
+
+            return {
+                id: latestInvoice ? latestInvoice.id : t.id,
+                invoiceNumber: latestInvoice ? latestInvoice.invoiceNumber : `LIC-${t.id.slice(0,8).toUpperCase()}`,
+                tenantName: t.name,
+                tenantEmail: t.email,
+                planName: t.plan ? t.plan.name : "Unknown Plan",
+                amount: latestInvoice ? latestInvoice.amount : (t.plan ? t.plan.price : 0),
+                status: status,
+                dueDate: latestInvoice?.dueDate ? toISOSafe(latestInvoice.dueDate) : (expires ? toISOSafe(expires) : toISOSafe(now)),
+                paidAmount: status === "PAID" ? (latestInvoice ? latestInvoice.amount : (t.plan ? t.plan.price : 0)) : 0,
+                createdAt: latestInvoice ? toISOSafe(latestInvoice.createdAt) : toISOSafe(t.createdAt)
+            };
+        });
 
         return jsonResponse(mapped);
     } catch (e) {
@@ -48,6 +76,7 @@ export async function POST(req: NextRequest) {
         const guard = requireRole(req, "SUPER_ADMIN");
         if (guard.error) return guard.error;
         const user = guard.user;
+        if (!isPlatformSuperAdmin(user)) return errorResponse("Forbidden: Platform Super Admin Only", 403);
         const db = getTenantClient(null);
 
         const body = await req.json();

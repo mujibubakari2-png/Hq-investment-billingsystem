@@ -3,7 +3,7 @@ import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 import { requirePermission } from "@/lib/rbac";
 import { decrypt } from "@/lib/encryption";
-import { canAccessTenant } from "@/lib/tenant";
+import { canAccessTenant, isPlatformSuperAdmin } from "@/lib/tenant";
 
 // DELETE /api/vpn/[id]
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -11,6 +11,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
         const guard = requirePermission(req, "vpn:write");
         if (guard.error) return guard.error;
         const userPayload = guard.user;
+        if (!isPlatformSuperAdmin(userPayload)) return errorResponse("Forbidden: Platform Super Admin Only", 403);
         const db = getTenantClient(userPayload);
 
         const { id } = await params;

@@ -51,11 +51,21 @@ export async function GET(req: NextRequest) {
         let expiresAt: Date | null = tenant.licenseExpiresAt || tenant.trialEnd || null;
         const hasAnyExpiry = !!(tenant.licenseExpiresAt || tenant.trialEnd);
 
-        if (tenant.licenseExpiresAt && tenant.licenseExpiresAt > now) {
-            daysRemaining = Math.max(0, Math.ceil((tenant.licenseExpiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+        const isNotExpired = (date: Date) => {
+            const endOfDay = new Date(date);
+            endOfDay.setHours(23, 59, 59, 999);
+            return endOfDay >= now;
+        };
+
+        if (tenant.licenseExpiresAt && isNotExpired(tenant.licenseExpiresAt)) {
+            const endOfDay = new Date(tenant.licenseExpiresAt);
+            endOfDay.setHours(23, 59, 59, 999);
+            daysRemaining = Math.max(1, Math.ceil((endOfDay.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
             expiresAt = tenant.licenseExpiresAt;
-        } else if (tenant.trialEnd && tenant.trialEnd > now) {
-            daysRemaining = Math.max(0, Math.ceil((tenant.trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+        } else if (tenant.trialEnd && isNotExpired(tenant.trialEnd)) {
+            const endOfDay = new Date(tenant.trialEnd);
+            endOfDay.setHours(23, 59, 59, 999);
+            daysRemaining = Math.max(1, Math.ceil((endOfDay.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
             expiresAt = tenant.trialEnd;
         } else {
             if (tenant.licenseExpiresAt) expiresAt = tenant.licenseExpiresAt;
@@ -70,6 +80,27 @@ export async function GET(req: NextRequest) {
         if (hasAnyExpiry && daysRemaining <= 0 && canAutoSuspend) {
             await db.tenant.update({ where: { id: tenant.id }, data: { status: "SUSPENDED" } });
             currentStatus = "SUSPENDED";
+        }
+
+        // Auto-create pending invoice if within 7 days of expiry and none exists
+        if (daysRemaining > 0 && daysRemaining <= 7 && expiresAt) {
+            const hasPending = tenant.tenantInvoices.some(i => i.status === "PENDING");
+            if (!hasPending) {
+                const invoiceNumber = `INV-${new Date().getFullYear()}-${crypto.randomUUID().replace(/-/g, "").slice(0, 8).toUpperCase()}`;
+                const newInvoice = await db.tenantInvoice.create({
+                    data: {
+                        invoiceNumber,
+                        tenantId: tenant.id,
+                        planId: tenant.planId,
+                        packageMonths: 1,
+                        amount: tenant.plan.price,
+                        status: "PENDING",
+                        dueDate: expiresAt,
+                    },
+                    include: { plan: true, payments: true }
+                });
+                tenant.tenantInvoices.unshift(newInvoice);
+            }
         }
 
         // Calculate Paid This Month
@@ -109,6 +140,14 @@ export async function GET(req: NextRequest) {
                 invoiceDate: toISOSafe(i.createdAt),
                 paymentDate: toISOSafe(i.payments.find(p => p.status === "COMPLETED")?.createdAt ?? null),
                 licensePackage: i.plan.name,
+                amount: i.amount,
+                dueDate: toISOSafe(i.dueDate),
+                status: i.status
+            })),
+            pendingInvoices: tenant.tenantInvoices.filter(i => i.status === "PENDING").map(i => ({
+                id: i.id,
+                invoiceNumber: i.invoiceNumber,
+                invoiceDate: toISOSafe(i.createdAt),
                 amount: i.amount,
                 dueDate: toISOSafe(i.dueDate),
                 status: i.status

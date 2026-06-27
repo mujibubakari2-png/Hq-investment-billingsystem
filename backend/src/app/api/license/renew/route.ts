@@ -43,12 +43,23 @@ export async function POST(req: NextRequest) {
             });
             if (!invoice) return errorResponse("Invoice not found", 404);
             if (invoice.tenantId !== tenant.id) return errorResponse("Forbidden", 403);
+            
+            // If the plan changed or the amount changed, update the invoice
+            if (invoice.amount !== Number(amount) || invoice.planId !== tenant.planId || (packageMonths && Number(packageMonths) !== invoice.packageMonths)) {
+                invoice = await db.tenantInvoice.update({
+                    where: { id: invoice.id },
+                    data: {
+                        amount: Number(amount),
+                        planId: tenant.planId,
+                        packageMonths: packageMonths ? Number(packageMonths) : invoice.packageMonths
+                    }
+                });
+            }
         } else {
             await db.tenantInvoice.deleteMany({
                 where: {
                     tenantId: tenant.id,
                     status: "PENDING",
-                    planId: tenant.planId,
                 },
             });
 
@@ -65,7 +76,7 @@ export async function POST(req: NextRequest) {
                     packageMonths: Number(packageMonths),
                     amount: Number(amount),
                     status: "PENDING",
-                    dueDate: new Date(),
+                    dueDate: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours from now
                 },
             });
         }
@@ -94,7 +105,7 @@ export async function POST(req: NextRequest) {
 
         try {
             const cleanPhone = formatPhoneTZ(phoneNumber);
-            const provider = getPaymentProvider(providerName);
+            const provider = getPaymentProvider(providerName, systemChannel);
 
             const result = await provider.initiatePayment({
                 amount: invoice.amount,

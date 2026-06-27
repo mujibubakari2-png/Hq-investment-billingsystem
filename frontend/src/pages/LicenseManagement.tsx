@@ -281,15 +281,17 @@ export default function LicenseManagement() {
             </div>
 
             {/* Quick Actions */}
-            <div style={{ display: 'flex', gap: 12, marginBottom: 24, flexWrap: 'wrap' }}>
-                <button
-                    className="btn btn-primary"
-                    style={{ display: 'flex', alignItems: 'center', gap: 6 }}
-                    onClick={() => navigate('/renew')}
-                >
-                    <PaymentIcon style={{ fontSize: 16 }} /> Pay Invoice / Renew
-                </button>
-            </div>
+            {(daysRemaining! <= 7 || hasOutstanding) && (
+                <div style={{ display: 'flex', gap: 12, marginBottom: 24, flexWrap: 'wrap' }}>
+                    <button
+                        className="btn btn-primary"
+                        style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+                        onClick={() => navigate('/renew')}
+                    >
+                        <PaymentIcon style={{ fontSize: 16 }} /> Pay Invoice / Renew
+                    </button>
+                </div>
+            )}
 
             {/* Invoice Status */}
             <div className="card" style={{ padding: '60px 20px', textAlign: 'center' }}>
@@ -300,8 +302,19 @@ export default function LicenseManagement() {
                         <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: 16 }}>
                             You have unpaid invoices pending. Please settle them to avoid suspension.
                         </p>
-                        <button className="btn btn-primary" onClick={() => navigate('/renew')}>
-                            <PaymentIcon style={{ fontSize: 16, marginRight: 6 }} /> Pay Now
+                        <button className="btn btn-primary" style={{ background: '#ef4444', borderColor: '#ef4444' }} onClick={() => navigate('/renew')}>
+                            <PaymentIcon style={{ fontSize: 16, marginRight: 6 }} /> Pay Overdue Invoice
+                        </button>
+                    </>
+                ) : license?.pendingInvoices && license.pendingInvoices.length > 0 ? (
+                    <>
+                        <WarningIcon style={{ fontSize: 48, color: '#f59e0b', marginBottom: 12 }} />
+                        <h3 style={{ fontWeight: 700, fontSize: '1.1rem', marginBottom: 4 }}>Pending SaaS Invoice</h3>
+                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: 16 }}>
+                            Invoice <strong>{license.pendingInvoices[0].invoiceNumber}</strong> has been generated for your upcoming renewal.
+                        </p>
+                        <button className="btn btn-primary" style={{ background: '#f59e0b', borderColor: '#f59e0b' }} onClick={() => navigate('/renew')}>
+                            <PaymentIcon style={{ fontSize: 16, marginRight: 6 }} /> Pay Pending Invoice
                         </button>
                     </>
                 ) : (

@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
-import { getTenantFilter } from "@/lib/tenant";
+import { getTenantFilter, isPlatformSuperAdmin } from "@/lib/tenant";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { requirePermission } from "@/lib/rbac";
 import { encrypt, decrypt } from "@/lib/encryption";
@@ -12,6 +12,7 @@ export async function GET(req: NextRequest) {
         const guard = requirePermission(req, "vpn:read");
         if (guard.error) return guard.error;
         const userPayload = guard.user;
+        if (!isPlatformSuperAdmin(userPayload)) return errorResponse("Forbidden: Platform Super Admin Only", 403);
         const db = getTenantClient(userPayload);
         const { filter: tenantFilter } = getTenantFilter(userPayload);
 
@@ -54,6 +55,7 @@ export async function POST(req: NextRequest) {
         const guard = requirePermission(req, "vpn:write");
         if (guard.error) return guard.error;
         const userPayload = guard.user;
+        if (!isPlatformSuperAdmin(userPayload)) return errorResponse("Forbidden: Platform Super Admin Only", 403);
         const db = getTenantClient(userPayload);
 
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";

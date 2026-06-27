@@ -133,12 +133,25 @@ export default function Header({ onToggleSidebar, darkMode, onToggleDarkMode }: 
                         </span>
                         <span
                             style={{ textDecoration: 'underline', cursor: 'pointer' }}
-                            onClick={() => navigate('/renew')}
+                            onClick={() => navigate('/license-management')}
                         >
                             Renew now
                         </span>
                     </div>
                 )}
+
+            {/* Outstanding Invoice Warning */}
+            {license?.hasOutstanding && license.outstandingInvoices && license.outstandingInvoices.length > 0 && (
+                <div style={{ background: '#fee2e2', color: '#991b1b', padding: '9px 20px', textAlign: 'center', fontWeight: 600, borderBottom: '1px solid #fca5a5', fontSize: '0.82rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <span>🚨</span>
+                    <span>
+                        You have an overdue payment for invoice <strong>{license.outstandingInvoices[0].invoiceNumber}</strong>. Please pay to avoid suspension.
+                    </span>
+                    <span style={{ textDecoration: 'underline', cursor: 'pointer' }} onClick={() => navigate('/renew', { state: { amount: license.outstandingInvoices![0].amount } })}>
+                        Pay now
+                    </span>
+                </div>
+            )}
 
             <header className="header" style={{ position: 'relative', top: 'unset', zIndex: 'unset', backdropFilter: 'none', WebkitBackdropFilter: 'none', background: 'transparent' }}>
                 <div className="header-left">

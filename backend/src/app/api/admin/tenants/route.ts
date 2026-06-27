@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 import { requireRole } from "@/lib/rbac";
+import { isPlatformSuperAdmin } from "@/lib/tenant";
 
 
 // GET /api/admin/tenants - list all tenants (Super Admin only)
@@ -9,6 +10,8 @@ export async function GET(req: NextRequest) {
     try {
         const guard = requireRole(req, "SUPER_ADMIN");
         if (guard.error) return guard.error;
+        const user = guard.user;
+        if (!isPlatformSuperAdmin(user)) return errorResponse("Forbidden: Platform Super Admin Only", 403);
         const db = getTenantClient(null);
 
         const tenants = await db.tenant.findMany({
@@ -51,8 +54,9 @@ export async function POST(req: NextRequest) {
     try {
         const guard = requireRole(req, "SUPER_ADMIN");
         if (guard.error) return guard.error;
-        const db = getTenantClient(null);
         const user = guard.user;
+        if (!isPlatformSuperAdmin(user)) return errorResponse("Forbidden: Platform Super Admin Only", 403);
+        const db = getTenantClient(null);
 
         const body = await req.json();
         const { action, tenantId, ...data } = body;

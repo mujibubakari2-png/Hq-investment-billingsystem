@@ -48,6 +48,7 @@ export interface LicenseResponse {
     hasOutstanding?: boolean; message?: string;
     plan?: { id: string; name: string; price: number };
     outstandingInvoices?: { id: string; invoiceNumber: string; amount: number; dueDate: string; status: string }[];
+    pendingInvoices?: { id: string; invoiceNumber: string; amount: number; dueDate: string; status: string }[];
 }
 
 export const licenseApi = {

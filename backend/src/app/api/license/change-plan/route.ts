@@ -33,6 +33,22 @@ export async function POST(req: NextRequest) {
             include: { plan: true },
         });
 
+        // Update any PENDING invoices to match the new plan's price
+        const pendingInvoices = await db.tenantInvoice.findMany({
+            where: { tenantId: tenantId, status: "PENDING" }
+        });
+        
+        for (const inv of pendingInvoices) {
+            const months = inv.packageMonths || 1;
+            await db.tenantInvoice.update({
+                where: { id: inv.id },
+                data: {
+                    planId: newPlan.id,
+                    amount: newPlan.price * months
+                }
+            });
+        }
+
         return jsonResponse({
             message: `Plan changed to "${newPlan.name}" successfully.`,
             plan: {

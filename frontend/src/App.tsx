@@ -104,11 +104,15 @@ export default function App() {
                   <Route path="/" element={<Navigate to="/dashboard" replace />} />
                   <Route path="/dashboard" element={<Dashboard />} />
 
-                  {/* PLATFORM SUPER ADMIN — tenantless operator accounts */}
+                  {/* PLATFORM SUPER ADMIN — tenantless operator accounts only */}
                   <Route element={<SuperAdminGuard />}>
-                    <Route path="/invoices"       element={<Invoices />} />
-                    <Route path="/system-tenants" element={<SystemTenants />} />
+                    <Route path="/invoices"          element={<Invoices />} />
+                    <Route path="/system-tenants"    element={<SystemTenants />} />
+                    <Route path="/vpn-management"    element={<VpnManagement />} />
                   </Route>
+
+                  {/* TENANT LICENSE MANAGEMENT */}
+                  <Route path="/license-management" element={<LicenseManagement />} />
 
                   {/* CLIENT MANAGEMENT — all roles */}
                   <Route path="/clients"             element={<Clients />} />
@@ -125,13 +129,6 @@ export default function App() {
                   <Route path="/mobile-transactions" element={<MobileTransactions />} />
                   <Route path="/expense-tracking"    element={<ExpenseTracking />} />
 
-                  {/* NETWORK MANAGEMENT */}
-                  <Route path="/mikrotiks"  element={<Mikrotiks />} />
-                  <Route path="/equipments" element={<Equipments />} />
-                  <Route element={<RoleGuard roles={['SUPER_ADMIN', 'ADMIN']} />}>
-                    <Route path="/vpn-management" element={<VpnManagement />} />
-                  </Route>
-
                   {/* COMMUNICATIONS */}
                   <Route path="/sms-messages"      element={<SmsMessages />} />
                   <Route path="/message-templates" element={<MessageTemplates />} />
@@ -145,10 +142,8 @@ export default function App() {
                     <Route path="/system-settings"    element={<SystemSettings />} />
                     <Route path="/payment-channels"   element={<PaymentChannels />} />
                     <Route path="/system-users"       element={<SystemUsers />} />
-                    <Route path="/license-management" element={<LicenseManagement />} />
                     <Route path="/hotspot-customizer" element={<HotspotLoginCustomizer />} />
                     <Route path="/audit-logs"         element={<AuditLogs />} />
-                    <Route path="/invoices"           element={<Invoices />} />
                     {/* Payment provider config pages */}
                     <Route path="/bank-payment-config"  element={<BankPaymentConfig />} />
                     <Route path="/harakapay-config"     element={<HarakaPayConfig />} />
@@ -158,6 +153,11 @@ export default function App() {
                     {/* Router setup requires admin privileges */}
                     <Route path="/router-setup/:id"     element={<RouterSetupWizard />} />
                   </Route>
+
+                  {/* NETWORK MANAGEMENT — Mikrotiks & Equipments available to all */}
+                  <Route path="/mikrotiks"  element={<Mikrotiks />} />
+                  <Route path="/equipments" element={<Equipments />} />
+                  {/* VPN Management is restricted to Platform Super Admin (see SuperAdminGuard above) */}
 
                   {/* ── SUPER_ADMIN + ADMIN ROUTES ────────────────────────────── */}
                   <Route element={<RoleGuard roles={['SUPER_ADMIN', 'ADMIN']} />}>

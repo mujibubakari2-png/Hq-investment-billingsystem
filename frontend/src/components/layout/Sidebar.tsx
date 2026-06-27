@@ -35,12 +35,23 @@ interface NavItem {
     path: string;
     /** If set, only these roles can see this item */
     roles?: AppRole[];
+    /**
+     * If true, this item is ONLY shown to the Platform Super Admin
+     * (isPlatformAdmin === true, no tenantId). It is completely hidden
+     * from ALL tenant users — including tenant SUPER_ADMINs.
+     */
+    platformOnly?: boolean;
 }
 
 interface NavSection {
     title: string;
     /** If set, the entire section is hidden for roles not in this list */
     roles?: AppRole[];
+    /**
+     * If true, this entire section is ONLY shown to the Platform Super Admin.
+     * Hidden from ALL tenant users including tenant SUPER_ADMINs.
+     */
+    platformOnly?: boolean;
     items: NavItem[];
 }
 
@@ -74,8 +85,8 @@ const navSections: NavSection[] = [
             { label: 'Payments Records',    icon: 'receipt', path: '/all-transactions' },
             { label: 'Mobile Transactions', icon: 'mobile',  path: '/mobile-transactions' },
             { label: 'Expense Tracking',    icon: 'wallet',  path: '/expense-tracking' },
-            // Spec § 2: Invoices visible to SUPER_ADMIN only
-            { label: 'Invoices', icon: 'invoice', path: '/invoices', roles: ['SUPER_ADMIN'] },
+            // Invoices: Platform Super Admin ONLY — completely hidden from all tenant users
+            { label: 'Invoices', icon: 'invoice', path: '/invoices', platformOnly: true },
         ],
     },
     {
@@ -83,8 +94,8 @@ const navSections: NavSection[] = [
         items: [
             { label: 'Mikrotiks',   icon: 'router',   path: '/mikrotiks' },
             { label: 'Equipments',  icon: 'devices',  path: '/equipments' },
-            { label: 'VPN Management', icon: 'vpn',   path: '/vpn-management',
-              roles: ['SUPER_ADMIN', 'ADMIN'] },
+            // VPN Management: Platform Super Admin ONLY — completely hidden from all tenant users
+            { label: 'VPN Management', icon: 'vpn', path: '/vpn-management', platformOnly: true },
         ],
     },
     {
@@ -95,15 +106,15 @@ const navSections: NavSection[] = [
         ],
     },
     {
-        // Spec § 2, 3, 5: Administration is SUPER_ADMIN only
+        // Administration: tenant SUPER_ADMIN sees most items; platformOnly items filtered separately
         title: 'ADMINISTRATION',
         roles: ['SUPER_ADMIN'],
         items: [
             { label: 'System Settings',    icon: 'settings', path: '/system-settings' },
             { label: 'Payment Channels',   icon: 'payment',  path: '/payment-channels' },
             { label: 'System Users',       icon: 'admin',    path: '/system-users' },
-            // Spec § 3: License Management — SUPER_ADMIN only
-            { label: 'License Management', icon: 'license',  path: '/license-management' },
+            // License Management: Platform Super Admin ONLY — completely hidden from tenant SUPER_ADMINs
+            { label: 'License Management', icon: 'license',  path: '/license-management', platformOnly: true },
             { label: 'Hotspot Customizer', icon: 'router',   path: '/hotspot-customizer' },
             { label: 'Audit Logs',         icon: 'audit',    path: '/audit-logs' },
         ],
@@ -150,8 +161,24 @@ interface SidebarProps {
     onClose: () => void;
 }
 
-/** Returns true if the userRole passes a role gate (undefined gate = all roles) */
-function allowed(userRole: string, roles?: AppRole[]): boolean {
+/**
+ * Returns true if the user is permitted to see a nav item/section.
+ *
+ * Two independent gates:
+ *  1. platformOnly — must have isPlatformAdmin===true (no tenantId).
+ *     This ALWAYS overrides the roles gate. A tenant SUPER_ADMIN with
+ *     platformOnly===true will NEVER see the item.
+ *  2. roles — a simple role-membership check (skipped when gate is empty).
+ */
+function allowed(
+    userRole: string,
+    isPlatformAdmin: boolean,
+    roles?: AppRole[],
+    platformOnly?: boolean,
+): boolean {
+    // Gate 1 — platform-admin-only items are invisible to ALL tenant users
+    if (platformOnly) return isPlatformAdmin;
+    // Gate 2 — role-based visibility (no gate = any role allowed)
     if (!roles || roles.length === 0) return true;
     return roles.includes(userRole as AppRole);
 }
@@ -171,6 +198,9 @@ export default function Sidebar({ isOpen, collapsed = false, onClose }: SidebarP
     const { user } = authStore.useAuth();
 
     const userRole = user?.role ?? 'VIEWER';
+    // Platform Super Admin: isPlatformAdmin flag set by backend at login,
+    // OR no tenantId with SUPER_ADMIN role (fallback for legacy tokens).
+    const isPlatformAdmin = user?.isPlatformAdmin === true || (userRole === 'SUPER_ADMIN' && !user?.tenantId);
     const { main, sub } = parseBrand(user?.companyName);
 
     return (
@@ -197,11 +227,13 @@ export default function Sidebar({ isOpen, collapsed = false, onClose }: SidebarP
 
                 <nav className="sidebar-nav">
                     {navSections.map((section) => {
-                        // Section-level role gate
-                        if (!allowed(userRole, section.roles)) return null;
+                        // Section-level gates (platformOnly takes precedence over roles)
+                        if (!allowed(userRole, isPlatformAdmin, section.roles, section.platformOnly)) return null;
 
-                        // Item-level role gate
-                        const items = section.items.filter(item => allowed(userRole, item.roles));
+                        // Item-level gates (platformOnly takes precedence over roles)
+                        const items = section.items.filter(item =>
+                            allowed(userRole, isPlatformAdmin, item.roles, item.platformOnly)
+                        );
                         if (items.length === 0) return null;
 
                         return (

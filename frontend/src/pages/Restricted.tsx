@@ -66,7 +66,7 @@ export default function Restricted() {
                         {license.outstandingInvoices?.map(inv => (
                             <div key={inv.id} style={{ background: 'var(--bg-body)', padding: '0.75rem', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
                                 <div>
-                                    <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>{inv.id}</div>
+                                    <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>{inv.invoiceNumber || inv.id.substring(0, 8).toUpperCase()}</div>
                                     <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Due: {formatDate(inv.dueDate)}</div>
                                 </div>
                                 <div style={{ fontSize: '0.9rem', color: '#d32f2f', fontWeight: 600 }}>{inv.amount.toLocaleString()}/=</div>
@@ -81,7 +81,7 @@ export default function Restricted() {
                             <PaymentIcon fontSize="small" /> Pay Outstanding Invoices
                         </button>
                     )}
-                    <button className="btn btn-secondary" onClick={() => navigate('/renew')} style={{ width: '100%', border: '1px solid var(--border-light)' }}>
+                    <button className="btn btn-secondary" onClick={() => navigate('/license-management')} style={{ width: '100%', border: '1px solid var(--border-light)' }}>
                         <ConfirmationNumberIcon fontSize="small" /> Renew License
                     </button>
                 </div>

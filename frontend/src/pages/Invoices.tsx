@@ -1,31 +1,54 @@
 import { useState, useEffect } from 'react';
 import ReceiptIcon from '@mui/icons-material/Receipt';
-import AddIcon from '@mui/icons-material/Add';
 import SearchIcon from '@mui/icons-material/Search';
-import VisibilityIcon from '@mui/icons-material/Visibility';
 import PrintIcon from '@mui/icons-material/Print';
-import DeleteIcon from '@mui/icons-material/Delete';
-import { invoicesApi } from '../api';
-import type { Invoice } from '../types';
-import CreateInvoiceModal from '../modals/CreateInvoiceModal';
-import ViewInvoiceModal from '../modals/ViewInvoiceModal';
-import ConfirmDeleteModal from '../modals/ConfirmDeleteModal';
+import { adminInvoicesApi } from '../api';
 import { formatDate } from '../utils/formatters';
 
+interface SaasInvoice {
+    id: string;
+    invoiceNumber: string;
+    tenantName: string;
+    tenantEmail: string;
+    planName: string;
+    amount: number;
+    paidAmount: number;
+    status: string; // 'PENDING' | 'PAID'
+    dueDate: string;
+    createdAt: string;
+    displayStatus: 'Paid' | 'Unpaid' | 'Overdue';
+}
+
 export default function Invoices() {
-    const [invoices, setInvoices] = useState<Invoice[]>([]);
+    const [invoices, setInvoices] = useState<SaasInvoice[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('All');
     const [loading, setLoading] = useState(true);
-    const [showCreateModal, setShowCreateModal] = useState(false);
-    const [viewInvoice, setViewInvoice] = useState<Invoice | null>(null);
-    const [deleteInvoice, setDeleteInvoice] = useState<Invoice | null>(null);
 
     const fetchInvoices = async () => {
         setLoading(true);
         try {
-            const res = await invoicesApi.list();
-            setInvoices((res.data || []) as unknown as Invoice[]);
+            const res = await adminInvoicesApi.list();
+
+            const mapped = res.map((inv: any) => {
+                let displayStatus: 'Paid' | 'Unpaid' | 'Overdue' = 'Unpaid';
+                if (inv.status === 'PAID') {
+                    displayStatus = 'Paid';
+                } else if (inv.status === 'PENDING') {
+                    if (new Date(inv.dueDate) < new Date()) {
+                        displayStatus = 'Overdue';
+                    } else {
+                        displayStatus = 'Unpaid';
+                    }
+                }
+
+                return {
+                    ...inv,
+                    displayStatus
+                };
+            });
+
+            setInvoices(mapped);
         } catch (err) {
             console.error(err);
         } finally {
@@ -37,33 +60,9 @@ export default function Invoices() {
         fetchInvoices();
     }, []);
 
-    const handleDelete = async (id: string) => {
-        try {
-            await invoicesApi.delete(id);
-            setDeleteInvoice(null);
-            fetchInvoices();
-        } catch (err) {
-            console.error('Failed to delete invoice:', err);
-        }
-    };
-
-    const handleCreateInvoice = async (data: Record<string, unknown>) => {
-        try {
-            await invoicesApi.create(data);
-            setShowCreateModal(false);
-            fetchInvoices();
-        } catch (err) {
-            console.error('Failed to create invoice:', err);
-            alert('Failed to create invoice.');
-        }
-    };
-
-    const handlePrintInvoice = (inv: Invoice) => {
-        const itemsHtml = (inv.items || []).map(item =>
-            '<tr><td>' + item.description + '</td><td>' + item.quantity + '</td><td>' + item.unitPrice.toLocaleString() + ' TZS</td><td>' + item.total.toLocaleString() + ' TZS</td></tr>'
-        ).join('');
+    const handlePrintInvoice = (inv: SaasInvoice) => {
         const printContent = `
-            <html><head><title>Invoice ${inv.invoiceNumber}</title>
+            <html><head><title>SaaS Invoice ${inv.invoiceNumber}</title>
             <style>
                 body { font-family: 'Segoe UI', sans-serif; padding: 40px; color: #333; }
                 h1 { font-size: 1.8rem; margin-bottom: 4px; }
@@ -73,11 +72,16 @@ export default function Invoices() {
                 .total { font-weight: 700; font-size: 1.1rem; text-align: right; margin-top: 16px; }
             </style></head><body>
             <h1>Invoice ${inv.invoiceNumber}</h1>
-            <p>Client: <strong>${inv.client}</strong> | Status: ${inv.status}</p>
-            <p>Issued: ${formatDate(inv.issuedDate)} | Due: ${formatDate(inv.dueDate)}</p>
+            <p>Tenant: <strong>${inv.tenantName}</strong> (${inv.tenantEmail}) | Status: ${inv.displayStatus}</p>
+            <p>Issued: ${formatDate(inv.createdAt)} | Due: ${formatDate(inv.dueDate)}</p>
             <table>
-                <thead><tr><th>Description</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr></thead>
-                <tbody>${itemsHtml}</tbody>
+                <thead><tr><th>Description</th><th>Total</th></tr></thead>
+                <tbody>
+                    <tr>
+                        <td>SaaS License - ${inv.planName}</td>
+                        <td>${inv.amount.toLocaleString()} TZS</td>
+                    </tr>
+                </tbody>
             </table>
             <div class="total">Total: ${inv.amount.toLocaleString()} TZS</div>
             </body></html>
@@ -87,52 +91,27 @@ export default function Invoices() {
     };
 
     const filtered = invoices.filter(inv => {
-        const matchSearch = inv.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase()) || inv.client.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchStatus = statusFilter === 'All' || inv.status === statusFilter;
+        const matchSearch = inv.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            inv.tenantName.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchStatus = statusFilter === 'All' || inv.displayStatus === statusFilter;
         return matchSearch && matchStatus;
     });
 
-    const totalPaid = invoices.filter(i => i.status === 'Paid').reduce((s, i) => s + i.amount, 0);
-    const totalUnpaid = invoices.filter(i => i.status === 'Unpaid').reduce((s, i) => s + i.amount, 0);
-    const totalOverdue = invoices.filter(i => i.status === 'Overdue').reduce((s, i) => s + i.amount, 0);
+    const totalPaid = invoices.filter(i => i.displayStatus === 'Paid').reduce((s, i) => s + i.amount, 0);
+    const totalUnpaid = invoices.filter(i => i.displayStatus === 'Unpaid').reduce((s, i) => s + i.amount, 0);
+    const totalOverdue = invoices.filter(i => i.displayStatus === 'Overdue').reduce((s, i) => s + i.amount, 0);
 
     return (
         <div>
-            {showCreateModal && (
-                <CreateInvoiceModal
-                    onClose={() => setShowCreateModal(false)}
-                    onSave={handleCreateInvoice}
-                />
-            )}
-            {viewInvoice && (
-                <ViewInvoiceModal
-                    invoice={viewInvoice}
-                    onClose={() => setViewInvoice(null)}
-                />
-            )}
-            {deleteInvoice && (
-                <ConfirmDeleteModal
-                    title="Delete Invoice"
-                    message={`Are you sure you want to delete invoice ${deleteInvoice.invoiceNumber}? This action cannot be undone.`}
-                    onClose={() => setDeleteInvoice(null)}
-                    onConfirm={() => handleDelete(deleteInvoice.id)}
-                />
-            )}
-
             <div className="page-header">
                 <div className="page-header-left">
                     <div className="page-header-icon" style={{ background: 'var(--info-light)', color: 'var(--info)' }}>
                         <ReceiptIcon />
                     </div>
                     <div>
-                        <h1 className="page-title">Invoices</h1>
-                        <p className="page-subtitle">Manage and track client invoices</p>
+                        <h1 className="page-title">SaaS Invoices</h1>
+                        <p className="page-subtitle">Manage and track tenant license invoices</p>
                     </div>
-                </div>
-                <div className="page-header-right">
-                    <button className="btn btn-primary" onClick={() => setShowCreateModal(true)}>
-                        <AddIcon fontSize="small" /> Create Invoice
-                    </button>
                 </div>
             </div>
 
@@ -141,17 +120,17 @@ export default function Invoices() {
                 <div className="card card-body" style={{ borderLeft: '4px solid var(--secondary)' }}>
                     <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Total Paid</div>
                     <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--secondary)', marginTop: 4 }}>{totalPaid.toLocaleString()} TZS</div>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{invoices.filter(i => i.status === 'Paid').length} invoices</div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{invoices.filter(i => i.displayStatus === 'Paid').length} invoices</div>
                 </div>
                 <div className="card card-body" style={{ borderLeft: '4px solid var(--warning)' }}>
                     <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Unpaid</div>
                     <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--warning)', marginTop: 4 }}>{totalUnpaid.toLocaleString()} TZS</div>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{invoices.filter(i => i.status === 'Unpaid').length} invoices</div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{invoices.filter(i => i.displayStatus === 'Unpaid').length} invoices</div>
                 </div>
                 <div className="card card-body" style={{ borderLeft: '4px solid var(--danger)' }}>
                     <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Overdue</div>
                     <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--danger)', marginTop: 4 }}>{totalOverdue.toLocaleString()} TZS</div>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{invoices.filter(i => i.status === 'Overdue').length} invoices</div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{invoices.filter(i => i.displayStatus === 'Overdue').length} invoices</div>
                 </div>
             </div>
 
@@ -160,16 +139,15 @@ export default function Invoices() {
                     <div className="table-toolbar-left">
                         <select className="select-field" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
                             <option value="All">All Status</option>
-                            <option>Paid</option>
-                            <option>Unpaid</option>
-                            <option>Overdue</option>
-                            <option>Draft</option>
+                            <option value="Paid">Paid</option>
+                            <option value="Unpaid">Unpaid</option>
+                            <option value="Overdue">Overdue</option>
                         </select>
                     </div>
                     <div className="table-toolbar-right">
                         <div className="search-input">
                             <SearchIcon className="search-icon" />
-                            <input placeholder="Search invoices..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+                            <input placeholder="Search tenant or invoice..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
                         </div>
                     </div>
                 </div>
@@ -179,7 +157,8 @@ export default function Invoices() {
                         <thead>
                             <tr>
                                 <th>Invoice #</th>
-                                <th>Client</th>
+                                <th>Tenant Name</th>
+                                <th>Plan</th>
                                 <th>Amount</th>
                                 <th>Status</th>
                                 <th>Issued Date</th>
@@ -204,22 +183,19 @@ export default function Invoices() {
                                 filtered.map(inv => (
                                     <tr key={inv.id}>
                                         <td><span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{inv.invoiceNumber}</span></td>
-                                        <td style={{ fontWeight: 500 }}>{inv.client}</td>
+                                        <td style={{ fontWeight: 500 }}>{inv.tenantName}</td>
+                                        <td>{inv.planName}</td>
                                         <td style={{ fontWeight: 600 }}>{inv.amount.toLocaleString()} TZS</td>
                                         <td>
-                                            <span className={`badge ${inv.status === 'Paid' ? 'active' : inv.status === 'Overdue' ? 'expired' : 'inactive'}`}>
-                                                {inv.status}
+                                            <span className={`badge ${inv.displayStatus === 'Paid' ? 'active' : inv.displayStatus === 'Overdue' ? 'expired' : 'inactive'}`}>
+                                                {inv.displayStatus}
                                             </span>
                                         </td>
-                                        <td>{formatDate(inv.issuedDate)}</td>
-                                        <td style={{ color: inv.status === 'Overdue' ? 'var(--danger)' : 'inherit' }}>{formatDate(inv.dueDate)}</td>
+                                        <td>{formatDate(inv.createdAt)}</td>
+                                        <td style={{ color: inv.displayStatus === 'Overdue' ? 'var(--danger)' : 'inherit' }}>{formatDate(inv.dueDate)}</td>
                                         <td>
                                             <div className="table-actions">
-                                                <button className="btn-icon view" title="View" onClick={() => setViewInvoice(inv)}><VisibilityIcon style={{ fontSize: 16 }} /></button>
                                                 <button className="btn-icon sync" title="Print" onClick={() => handlePrintInvoice(inv)}><PrintIcon style={{ fontSize: 16 }} /></button>
-                                                <button className="btn-icon delete" title="Delete" onClick={() => setDeleteInvoice(inv)}>
-                                                    <DeleteIcon style={{ fontSize: 16 }} />
-                                                </button>
                                             </div>
                                         </td>
                                     </tr>

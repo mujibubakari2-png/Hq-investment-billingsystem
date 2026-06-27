@@ -3,7 +3,7 @@ import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { licenseApi } from '../api';
 import authStore from '../stores/authStore';
 
-const BYPASS_PATHS = ['/restricted', '/renew', '/pending-approval'];
+const BYPASS_PATHS = ['/restricted', '/renew', '/pending-approval', '/license-management'];
 
 export default function LicenseGuard() {
     const { user } = authStore.useAuth();
@@ -108,7 +108,7 @@ export default function LicenseGuard() {
         return <Navigate to="/restricted" replace />;
     }
 
-    if (status === 'active' && BYPASS_PATHS.includes(location.pathname)) {
+    if (status === 'active' && ['/restricted', '/pending-approval'].includes(location.pathname)) {
         return <Navigate to="/dashboard" replace />;
     }
 

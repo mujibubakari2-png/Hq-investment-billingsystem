@@ -29,8 +29,6 @@ export default function RenewLicense() {
 
     // Check if we came from "Pay Outstanding"
     const isPayingBalance = location.state?.amount !== undefined;
-    const balanceAmount = location.state?.amount || 0;
-
     const [selectedPackage, setSelectedPackage] = useState<number>(isPayingBalance ? 0 : 1);
 
     useEffect(() => {
@@ -38,6 +36,9 @@ export default function RenewLicense() {
             setLicense(data);
             if (data?.plan?.id) {
                 setSelectedPlanId(data.plan.id);
+            }
+            if (data?.pendingInvoices && data.pendingInvoices.length > 0) {
+                setSelectedPackage(0);
             }
         }).catch(console.error);
 
@@ -56,6 +57,9 @@ export default function RenewLicense() {
             const updated = await licenseApi.getLicense();
             setLicense(updated);
             setSelectedPlanId(planId);
+            if (updated?.pendingInvoices && updated.pendingInvoices.length > 0) {
+                setSelectedPackage(0);
+            }
             setTimeout(() => { setShowChangePlan(false); setChangePlanMsg(''); }, 2000);
         } catch (err: any) {
             setChangePlanMsg(err.message || 'Failed to change plan.');
@@ -66,6 +70,8 @@ export default function RenewLicense() {
 
     const activePlan = allPlans.find(p => p.id === selectedPlanId) || license?.plan;
     const basePrice = activePlan?.price || 0;
+    const hasPendingInvoice = license?.pendingInvoices && license.pendingInvoices.length > 0;
+    const pendingAmount = hasPendingInvoice ? license.pendingInvoices![0].amount : (location.state?.amount || 0);
 
     const packages = [
         { months: 1, title: '1 Month License', subtitle: 'Standard 30-day license', price: basePrice, save: 0 },
@@ -86,7 +92,7 @@ export default function RenewLicense() {
         }
         setSubmitting(true);
         try {
-            let amount = balanceAmount;
+            let amount = pendingAmount;
             let months = 0;
 
             if (selectedPackage > 0) {
@@ -106,7 +112,7 @@ export default function RenewLicense() {
                 packageMonths: months,
                 phoneNumber: phone,
                 amount: amount,
-                invoiceId: selectedPackage === 0 ? license?.outstandingInvoices?.[0]?.id : undefined
+                invoiceId: selectedPackage === 0 && hasPendingInvoice ? license?.pendingInvoices?.[0]?.id : undefined
             });
 
             if (res.success) {
@@ -123,7 +129,7 @@ export default function RenewLicense() {
     };
 
     const getAmountToPay = () => {
-        if (selectedPackage === 0) return balanceAmount;
+        if (selectedPackage === 0) return pendingAmount;
         return packages.find(p => p.months === selectedPackage)?.price || 0;
     };
 
@@ -131,9 +137,9 @@ export default function RenewLicense() {
         const issueDate = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
         const periodFrom = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
         const periodTo = new Date(Date.now() + (selectedPackage || 1) * 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-        const dueDate = license?.outstandingInvoices?.[0]?.dueDate || 'Immediately';
-        const invoiceRef = license?.outstandingInvoices?.[0]?.invoiceNumber || 'INV-RENEWAL';
-        const description = selectedPackage === 0 ? 'Outstanding Invoice Balance' : `${currentPlanName} — License Fee (${selectedPackage} Month${selectedPackage > 1 ? 's' : ''})`;
+        const dueDate = license?.pendingInvoices?.[0]?.dueDate || 'Immediately';
+        const invoiceRef = license?.pendingInvoices?.[0]?.invoiceNumber || 'INV-RENEWAL';
+        const description = selectedPackage === 0 ? 'Invoice Balance' : `${currentPlanName} — License Fee (${selectedPackage} Month${selectedPackage > 1 ? 's' : ''})`;
         const amount = getAmountToPay().toLocaleString(undefined, { maximumFractionDigits: 0 });
 
         const printContent = `
@@ -364,7 +370,7 @@ export default function RenewLicense() {
                             </div>
                         ))}
 
-                        {isPayingBalance && balanceAmount > 0 && (
+                        {hasPendingInvoice && pendingAmount > 0 && (
                             <div
                                 onClick={() => setSelectedPackage(0)}
                                 style={{
@@ -380,11 +386,11 @@ export default function RenewLicense() {
                                 }}
                             >
                                 <div>
-                                    <div style={{ fontWeight: 600 }}>Pay Invoice Balance</div>
-                                    <div style={{ fontSize: '0.8rem', opacity: 0.9 }}>Current amount due</div>
+                                    <div style={{ fontWeight: 600 }}>Pay Generated Invoice</div>
+                                    <div style={{ fontSize: '0.8rem', opacity: 0.9 }}>{license.pendingInvoices![0].invoiceNumber}</div>
                                 </div>
                                 <div style={{ textAlign: 'right' }}>
-                                    <div style={{ fontWeight: 700 }}>TZS {balanceAmount.toLocaleString()}</div>
+                                    <div style={{ fontWeight: 700 }}>TZS {pendingAmount.toLocaleString()}</div>
                                     <div style={{ fontSize: '0.8rem', opacity: 0.9 }}>Balance due</div>
                                 </div>
                             </div>
@@ -443,7 +449,7 @@ export default function RenewLicense() {
                         <div style={{ textAlign: 'right' }}>
                             <h1 style={{ fontSize: '1.5rem', fontWeight: 300, color: 'var(--text-secondary)', letterSpacing: 2, margin: '0 0 0.5rem 0' }}>INVOICE</h1>
                             <div style={{ fontWeight: 600 }}>
-                                {license?.outstandingInvoices?.[0]?.invoiceNumber || 'INV-RENEWAL'}
+                                {license?.pendingInvoices?.[0]?.invoiceNumber || 'INV-RENEWAL'}
                             </div>
                         </div>
                     </div>
@@ -470,7 +476,7 @@ export default function RenewLicense() {
                         <div style={{ textAlign: 'right' }}>
                             <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>DUE DATE</div>
                             <div style={{ fontWeight: 500, color: '#d32f2f' }}>
-                                {license?.outstandingInvoices?.[0]?.dueDate ? formatDate(license.outstandingInvoices[0].dueDate) : 'Immediately'}
+                                {license?.pendingInvoices?.[0]?.dueDate ? formatDate(license.pendingInvoices[0].dueDate) : 'Immediately'}
                             </div>
                         </div>
                     </div>
