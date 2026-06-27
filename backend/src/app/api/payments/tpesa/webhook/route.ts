@@ -25,13 +25,22 @@ export async function POST(req: NextRequest) {
         if (rateLimited) {
             return rateLimited;
         }
-        const webhookSecret = env.TPESA_WEBHOOK_SECRET || env.PAYMENT_WEBHOOK_SECRET;
-        if (!webhookSecret) {
+
+        // ── Webhook signature verification ──────────────────────────────────
+        // T-Pesa webhook secret: prefer the DB-stored tenant channel secret (if available
+        // after we find the transaction/tenant), but do a first-pass check with env secret.
+        // Full per-tenant verification happens after we identify the tenant below.
+        const envWebhookSecret = env.TPESA_WEBHOOK_SECRET || env.PAYMENT_WEBHOOK_SECRET;
+        if (!envWebhookSecret) {
             return errorResponse("Webhook secret is not configured", 500);
         }
-        const providedSecret = (req.headers.get("x-webhook-secret") || req.headers.get("x-tpesa-signature") || "").toString();
+        const providedSecret = (
+            req.headers.get("x-webhook-secret") ||
+            req.headers.get("x-tpesa-signature") ||
+            ""
+        ).toString();
         const providedDigest = crypto.createHash("sha256").update(providedSecret).digest();
-        const secretDigest = crypto.createHash("sha256").update(webhookSecret).digest();
+        const secretDigest   = crypto.createHash("sha256").update(envWebhookSecret).digest();
         try {
             if (!crypto.timingSafeEqual(providedDigest, secretDigest)) {
                 return errorResponse("Unauthorized webhook", 401);
@@ -103,7 +112,48 @@ export async function POST(req: NextRequest) {
             return jsonResponse({ message: "Already processed" });
         }
 
+        // ── Re-verify signature using the per-tenant DB channel secret ───────
+        // MOD-13 FIX: If the tenant has configured their own webhook secret in the
+        // PaymentChannel table, use that for verification. The global env secret is
+        // only a fallback for tenants without a DB-configured channel.
         const tenantDb = getTenantClient(transaction.tenantId);
+        const { decrypt } = await import("@/lib/encryption");
+        const tenantChannel = await tenantDb.paymentChannel.findFirst({
+            where: { provider: "TPESA", status: "ACTIVE", tenantId: transaction.tenantId },
+        });
+        if (tenantChannel?.webhookSecret) {
+            const decryptedSecret = decrypt(tenantChannel.webhookSecret);
+            if (decryptedSecret) {
+                const tenantProvidedDigest = crypto.createHash("sha256").update(providedSecret).digest();
+                const tenantSecretDigest   = crypto.createHash("sha256").update(decryptedSecret).digest();
+                try {
+                    if (!crypto.timingSafeEqual(tenantProvidedDigest, tenantSecretDigest)) {
+                        console.error(`[TPESA] Tenant channel secret mismatch for tenant ${transaction.tenantId}`);
+                        return errorResponse("Unauthorized webhook", 401);
+                    }
+                } catch {
+                    return errorResponse("Unauthorized webhook", 401);
+                }
+            }
+        }
+
+        // ── Partial payment check (CRITICAL-3 FIX) ───────────────────────────
+        // Validate the amount from the callback matches what we stored on the Transaction.
+        // Without this check, a successful callback with a lower amount would still activate
+        // the hotspot user (free or discounted service attack).
+        const callbackAmount = Number(Amount);
+        if (!isNaN(callbackAmount) && callbackAmount > 0 && callbackAmount < transaction.amount) {
+            console.error(`[TPESA] Partial payment detected: paid=${callbackAmount}, expected=${transaction.amount}, ref=${AccountReference}`);
+            // Record the partial payment attempt but do not activate the service
+            await tenantDb.transaction.update({
+                where: { id: transaction.id, tenantId: transaction.tenantId },
+                data: { status: "FAILED" },
+            });
+            return errorResponse(
+                `Partial payment rejected: received ${callbackAmount}, expected ${transaction.amount}`,
+                400
+            );
+        }
         const pkg = transaction.packageId
             ? await tenantDb.package.findFirst({
                 where: {

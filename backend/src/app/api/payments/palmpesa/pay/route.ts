@@ -1,91 +1,34 @@
-import { NextRequest } from "next/server";
-import { getTenantClient } from "@/lib/tenantPrisma";
-import { errorResponse, jsonResponse } from "@/lib/auth";
-import { requirePermission } from "@/lib/rbac";
-import { canAccessTenant } from "@/lib/tenant";
+import { NextRequest, NextResponse } from "next/server";
 
-// Environment variables or settings for PalmPesa API
-const PALMPESA_BASE_URL = process.env.PALMPESA_API_URL;
-const PALMPESA_API_URL = PALMPESA_BASE_URL
-    ? (PALMPESA_BASE_URL.endsWith("/payments/stk-push")
-        ? PALMPESA_BASE_URL
-        : `${PALMPESA_BASE_URL}/payments/stk-push`)
-    : undefined;
-const PALMPESA_API_KEY = process.env.PALMPESA_API_KEY;
-
-export async function POST(req: NextRequest) {
-    try {
-        const guard = requirePermission(req, "transactions:write");
-        if (guard.error) return guard.error;
-        const userPayload = guard.user;
-        const db = getTenantClient(userPayload);
-
-        const body = await req.json();
-        const { tenantInvoiceId, phone } = body;
-
-        if (!tenantInvoiceId || !phone) {
-            return errorResponse("Missing tenantInvoiceId or phone", 400);
-        }
-
-        const invoice = await db.tenantInvoice.findUnique({
-            where: { id: tenantInvoiceId },
-            include: { tenant: true }
-        });
-
-        if (!invoice) {
-            return errorResponse("Invoice not found", 404);
-        }
-        if (!canAccessTenant(userPayload, invoice.tenantId)) {
-            return errorResponse("Forbidden", 403);
-        }
-
-        if (invoice.status === "PAID") {
-            return errorResponse("Invoice is already paid", 400);
-        }
-
-        // Mock PalmPesa API STK push request
-        const appUrl = process.env.APP_URL;
-        if (!appUrl) {
-            return errorResponse("Server payment callback URL is not configured", 500);
-        }
-
-        const stkPayload = {
-            PhoneNumber: phone,
-            Amount: invoice.amount,
-            AccountReference: invoice.invoiceNumber,
-            TransactionDesc: `Payment for SaaS Plan ${invoice.planId}`,
-            CallbackUrl: `${appUrl}/api/payments/palmpesa/webhook`,
-        };
-
-        if (!PALMPESA_API_URL) {
-            return errorResponse("PalmPesa API URL is not configured", 500);
-        }
-        if (!PALMPESA_API_KEY) {
-            return errorResponse("PalmPesa API key is not configured", 500);
-        }
-        const response = await fetch(PALMPESA_API_URL, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${PALMPESA_API_KEY}`
-            },
-            body: JSON.stringify(stkPayload)
-        });
-        const result = await response.json();
-
-        if (result.ResponseCode === "0") {
-            return jsonResponse({
-                message: "STK Push initiated successfully",
-                checkoutRequestId: result.CheckoutRequestID,
-                status: "processing"
-            });
-        } else {
-            return errorResponse("Failed to initiate STK Push", 500);
-        }
-
-    } catch (e) {
-        console.error("PALMPESA PAY ERROR:", e);
-        return errorResponse("Internal server error", 500);
-    }
+/**
+ * [DEPRECATED — CRITICAL-2 FIX]
+ *
+ * This route previously used the global platform environment variable PALMPESA_API_KEY
+ * to initiate payments against tenant-scoped invoices (tenantInvoiceId).
+ *
+ * This is a payment credential isolation violation:
+ *   - Platform credentials (tenantId=null) MUST only be used for License payments.
+ *   - Tenant credentials (tenantId=<value>) MUST only be used for Hotspot/PPPoE payments.
+ *
+ * All payment flows are now handled through the correct, isolated endpoints:
+ *   - License / SaaS Renewal : POST /api/license/renew      (uses platform paymentChannel)
+ *   - Hotspot / PPPoE        : POST /api/payments/initiate  (uses tenant paymentChannel)
+ *
+ * This endpoint is permanently removed. Any integration pointing here must be updated.
+ */
+export async function POST(_req: NextRequest) {
+    console.error(
+        "[DEPRECATED] POST /api/payments/palmpesa/pay was called. " +
+        "This endpoint is permanently removed due to a payment credential isolation violation. " +
+        "Use /api/license/renew for SaaS license payments or /api/payments/initiate for customer payments."
+    );
+    return NextResponse.json(
+        {
+            error: "Endpoint permanently removed.",
+            reason: "Payment credential isolation violation — platform credentials cannot be used for tenant payments.",
+            license_payments: "POST /api/license/renew",
+            customer_payments: "POST /api/payments/initiate",
+        },
+        { status: 410 }
+    );
 }
-

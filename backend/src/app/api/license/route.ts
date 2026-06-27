@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { randomUUID } from "node:crypto";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 import { requirePermission } from "@/lib/rbac";
@@ -86,7 +87,7 @@ export async function GET(req: NextRequest) {
         if (daysRemaining > 0 && daysRemaining <= 5 && expiresAt) {
             const hasPending = tenant.tenantInvoices.some(i => i.status === "PENDING");
             if (!hasPending) {
-                const invoiceNumber = `INV-${new Date().getFullYear()}-${crypto.randomUUID().replace(/-/g, "").slice(0, 8).toUpperCase()}`;
+                const invoiceNumber = `INV-${new Date().getFullYear()}-${randomUUID().replace(/-/g, "").slice(0, 8).toUpperCase()}`;
                 const newInvoice = await db.tenantInvoice.create({
                     data: {
                         invoiceNumber,
@@ -108,9 +109,15 @@ export async function GET(req: NextRequest) {
             .filter(i => i.status === "PAID" && i.createdAt.getTime() >= startOfMonth)
             .reduce((acc, curr) => acc + (curr.amount || 0), 0);
 
-        // Only flag invoices as "outstanding" if their due date has actually passed
+        // outstandingInvoices: PENDING invoices whose due date has already passed
         const outstandingInvoices = tenant.tenantInvoices.filter(
             i => i.status === "PENDING" && i.dueDate && i.dueDate <= now
+        );
+
+        // pendingInvoices: ALL PENDING invoices (including future-dated auto-generated ones)
+        // The frontend RenewLicense page uses this to show the "Pay Generated Invoice" flow.
+        const pendingInvoices = tenant.tenantInvoices.filter(
+            i => i.status === "PENDING"
         );
 
         const globalSettings = await db.systemSetting.findMany({ where: { tenantId: null } });
@@ -152,6 +159,18 @@ export async function GET(req: NextRequest) {
                 dueDate: toISOSafe(i.dueDate),
                 status: i.status
             })),
+            // pendingInvoices: all PENDING invoices (past-due AND future-dated).
+            // Used by the frontend RenewLicense page to show the "Pay Generated Invoice" option.
+            pendingInvoices: pendingInvoices.map(i => ({
+                id: i.id,
+                invoiceNumber: i.invoiceNumber,
+                invoiceDate: toISOSafe(i.createdAt),
+                paymentDate: toISOSafe(i.payments.find(p => p.status === "COMPLETED")?.createdAt ?? null),
+                licensePackage: i.plan.name,
+                amount: i.amount,
+                dueDate: toISOSafe(i.dueDate),
+                status: i.status
+            })),
             billingHistory: tenant.tenantInvoices.map(i => ({
                 id: i.id,
                 invoiceNumber: i.invoiceNumber,
@@ -159,9 +178,11 @@ export async function GET(req: NextRequest) {
                 paymentDate: toISOSafe(i.payments.find(p => p.status === "COMPLETED")?.createdAt ?? null),
                 licensePackage: i.plan.name,
                 amount: i.amount,
+                dueDate: toISOSafe(i.dueDate),
                 status: i.status,
             })),
-            hasOutstanding: outstandingInvoices.length > 0
+            hasOutstanding: outstandingInvoices.length > 0,
+            hasPending: pendingInvoices.length > 0
         };
 
         return jsonResponse(payload);

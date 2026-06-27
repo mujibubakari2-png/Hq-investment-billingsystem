@@ -24,8 +24,15 @@ export async function POST(req: NextRequest) {
         const body = await req.json();
         const { packageMonths, phoneNumber, invoiceId } = body;
 
-        if (packageMonths === undefined || isNaN(Number(packageMonths)) || Number(packageMonths) < 1) {
+        // packageMonths must be a non-negative integer.
+        // When invoiceId is provided, packageMonths=0 means "use the invoice's existing months".
+        // When creating a new invoice, packageMonths must be >= 1.
+        const requestedMonths = Number(packageMonths);
+        if (packageMonths === undefined || isNaN(requestedMonths) || requestedMonths < 0) {
             return errorResponse("Missing or invalid package months", 400);
+        }
+        if (!invoiceId && requestedMonths < 1) {
+            return errorResponse("packageMonths must be at least 1 when creating a new invoice", 400);
         }
 
         const tenant = await db.tenant.findUnique({
@@ -36,7 +43,6 @@ export async function POST(req: NextRequest) {
         if (!tenant) return errorResponse("Tenant not found", 404);
 
         let invoice;
-        const requestedMonths = Number(packageMonths);
 
         if (invoiceId) {
             invoice = await db.tenantInvoice.findUnique({
@@ -44,17 +50,19 @@ export async function POST(req: NextRequest) {
             });
             if (!invoice) return errorResponse("Invoice not found", 404);
             if (invoice.tenantId !== tenant.id) return errorResponse("Forbidden", 403);
-            
-            const expectedAmount = tenant.plan ? tenant.plan.price * requestedMonths : invoice.amount;
+
+            // Use invoice's existing packageMonths when caller passes 0
+            const effectiveMonths = requestedMonths > 0 ? requestedMonths : (invoice.packageMonths ?? 1);
+            const expectedAmount = tenant.plan ? tenant.plan.price * effectiveMonths : invoice.amount;
 
             // If the plan changed or the amount changed, update the invoice
-            if (invoice.amount !== expectedAmount || invoice.planId !== tenant.planId || requestedMonths !== invoice.packageMonths) {
+            if (invoice.amount !== expectedAmount || invoice.planId !== tenant.planId || effectiveMonths !== invoice.packageMonths) {
                 invoice = await db.tenantInvoice.update({
                     where: { id: invoice.id },
                     data: {
                         amount: expectedAmount,
                         planId: tenant.planId,
-                        packageMonths: requestedMonths
+                        packageMonths: effectiveMonths
                     }
                 });
             }

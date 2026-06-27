@@ -41,17 +41,46 @@ export const paymentChannelsApi = {
     delete: (id: string)                                => del<{ message: string }>(`/payment-channels/${id}`),
 };
 
+export interface LicenseInvoiceEntry {
+    id: string;
+    invoiceNumber: string;
+    invoiceDate?: string;
+    paymentDate?: string;
+    licensePackage?: string;
+    amount: number;
+    dueDate?: string;
+    status: string;
+}
+
 export interface LicenseResponse {
     isSuperAdmin: boolean;
     platformName?: string;
     platformPhone?: string;
-    companyName?: string; companyLogo?: string;
-    status?: string; daysRemaining?: number; expiresAt?: string;
-    customersCount?: number; pppoeLimit?: number; hotspotLimit?: number | null; maxRouters?: number; paidThisMonth?: number;
-    hasOutstanding?: boolean; message?: string;
+    companyName?: string;
+    companyLogo?: string;
+    tenantSlug?: string;
+    licenseKey?: string;
+    status?: string;
+    daysRemaining?: number;
+    expiresAt?: string;
+    customersCount?: number;
+    pppoeLimit?: number;
+    hotspotLimit?: number | null;
+    maxRouters?: number;
+    subUsersCount?: number;
+    subUsersLimit?: number;
+    paidThisMonth?: number;
+    hasOutstanding?: boolean;
+    /** hasPending: true if any PENDING invoice exists (past-due or future-dated). */
+    hasPending?: boolean;
+    message?: string;
     plan?: { id: string; name: string; price: number };
-    outstandingInvoices?: { id: string; invoiceNumber: string; amount: number; dueDate: string; status: string }[];
-    pendingInvoices?: { id: string; invoiceNumber: string; amount: number; dueDate: string; status: string }[];
+    /** outstandingInvoices: PENDING invoices whose due date has passed. */
+    outstandingInvoices?: LicenseInvoiceEntry[];
+    /** pendingInvoices: ALL PENDING invoices (past-due AND future-dated auto-generated). */
+    pendingInvoices?: LicenseInvoiceEntry[];
+    /** billingHistory: all invoices (PAID, PENDING, OVERDUE, EXPIRED). */
+    billingHistory?: LicenseInvoiceEntry[];
 }
 
 export const licenseApi = {

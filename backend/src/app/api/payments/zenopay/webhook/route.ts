@@ -98,8 +98,15 @@ export async function POST(req: NextRequest) {
         const tenantDb = getTenantClient(invoice.tenantId);
         try {
             await tenantDb.$transaction(async (tx: any) => {
+                // CRITICAL-3 FIX: Handle null amount from provider.
+                // If the provider sends amount=null on a COMPLETED callback, we cannot verify
+                // the amount paid and must reject the callback to prevent a free-activation attack.
+                if (amount === null || amount === undefined) {
+                    throw new Error('MISSING_AMOUNT');
+                }
+
                 // Prevent Partial Payment Attacks
-                const paidAmount = amount || 0; // If amount is null, treat as 0
+                const paidAmount = Number(amount);
                 if (paidAmount < invoice.amount) {
                     await tx.tenantPayment.create({
                         data: {
@@ -155,6 +162,12 @@ export async function POST(req: NextRequest) {
             }
             if (err?.message === 'ALREADY_PROCESSED') {
                 return jsonResponse({ message: 'Already paid' });
+            }
+            if (err?.message === 'MISSING_AMOUNT') {
+                return errorResponse(
+                    'Payment callback rejected: provider did not include the payment amount. Cannot verify payment.',
+                    400
+                );
             }
             throw err;
         }

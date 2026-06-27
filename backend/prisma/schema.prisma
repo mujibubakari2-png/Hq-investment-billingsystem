@@ -1026,6 +1026,7 @@ enum TenantStatus {
 enum TenantInvoiceStatus {
   PENDING
   PAID
+  OVERDUE
   EXPIRED
 }
 

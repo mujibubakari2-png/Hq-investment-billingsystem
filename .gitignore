@@ -13,10 +13,10 @@ coverage/
 test-results/
 
 # Root-level stray test files (should never be at the repo root)
-*.test.ts
-*.test.tsx
-*.spec.ts
-*.spec.tsx
+/*.test.ts
+/*.test.tsx
+/*.spec.ts
+/*.spec.tsx
 
 # Production
 dist/

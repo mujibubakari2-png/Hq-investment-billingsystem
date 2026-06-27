@@ -33,19 +33,31 @@ export async function GET(req: NextRequest) {
             const now = new Date();
             const expires = t.licenseExpiresAt || t.trialEnd;
             
-            let status = "PENDING";
+            let status: string = "PENDING";
             
             if (latestInvoice) {
                 status = latestInvoice.status;
+                // MOD-4 FIX: 'OVERDUE' is now a proper TenantInvoiceStatus enum value.
+                // Mark PENDING invoices as OVERDUE when their due date has passed.
                 if (status === "PENDING" && latestInvoice.dueDate && latestInvoice.dueDate < now) {
                     status = "OVERDUE";
                 }
             } else {
-                // If the license is active and hasn't expired, it is PAID
-                if (expires && expires > now) {
-                    status = "PAID";
-                } else {
+                // No invoice exists. Determine status from the tenant's actual state.
+                // MOD-7 FIX: Don't show 'PAID' when there is no payment record —
+                // the tenant may be on a trial or have had their license extended manually.
+                if (t.status === "TRIALLING") {
+                    status = "TRIALLING";
+                } else if (t.status === "SUSPENDED" || t.status === "CANCELLED") {
+                    status = t.status;
+                } else if (expires && expires > now) {
+                    // Active license, extended manually or on trial — no invoice on file
+                    status = "ACTIVE";
+                } else if (expires && expires <= now) {
                     status = "OVERDUE";
+                } else {
+                    // No expiry date at all — brand new tenant
+                    status = "PENDING";
                 }
             }
 

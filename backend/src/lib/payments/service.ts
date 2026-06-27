@@ -24,6 +24,28 @@ import { syncRadiusUser } from "@/lib/radius";
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
+/**
+ * PAYMENT ARCHITECTURE — CREDENTIAL ISOLATION CONTRACT
+ * =====================================================
+ * This system operates two completely separate payment contexts:
+ *
+ * LICENSE context  (paymentContext = "LICENSE"):
+ *   - Used for: License Purchase, License Renewal, SaaS Subscription Payments.
+ *   - Credentials: Platform Super Admin's PaymentChannel (tenantId = null).
+ *   - Money flows to: Platform Owner only.
+ *   - Route: POST /api/license/renew → this service with tenantId = null.
+ *
+ * TENANT context   (paymentContext = "TENANT"):
+ *   - Used for: Hotspot customer payments, PPPoE customer payments.
+ *   - Credentials: Tenant Super Admin's PaymentChannel (tenantId = <value>).
+ *   - Money flows to: That specific tenant only.
+ *   - Route: POST /api/payments/initiate → this service with tenantId = <value>.
+ *
+ * ENFORCEMENT: getChannel() enforces this contract and throws if there is a
+ * context mismatch. This prevents any cross-contamination of credentials.
+ */
+export type PaymentContext = "LICENSE" | "TENANT";
+
 export interface InitiatePaymentOptions {
   tenantId: string | null;
   amount: number;
@@ -48,11 +70,44 @@ export interface InitiatePaymentOptions {
 export class PaymentService {
   /**
    * Load the active PaymentChannel record for a tenant + provider from DB.
+   *
+   * @param tenantId        null = platform (LICENSE payments), string = tenant (TENANT payments)
+   * @param providerName    Provider identifier e.g. "PALMPESA"
+   * @param paymentContext  "LICENSE" or "TENANT" — enforces credential isolation.
+   *                        Defaults to auto-detecting from tenantId for backwards compatibility.
+   *
+   * ISOLATION CONTRACT:
+   *   LICENSE context → tenantId MUST be null (platform channel)
+   *   TENANT context  → tenantId MUST be a non-empty string (tenant channel)
    */
-  async getChannel(tenantId: string | null, providerName: string) {
+  async getChannel(
+    tenantId: string | null,
+    providerName: string,
+    paymentContext?: PaymentContext
+  ) {
+    // Auto-detect context from tenantId if not explicitly provided
+    const ctx = paymentContext ?? (tenantId === null ? "LICENSE" : "TENANT");
+
+    // CRITICAL-1 FIX: Hard isolation enforcement.
+    // If the context and tenantId don't match, reject immediately.
+    // This prevents platform credentials from being used for tenant payments
+    // and prevents tenant credentials from being used for license payments.
+    if (ctx === "LICENSE" && tenantId !== null) {
+      throw new Error(
+        `[PAYMENT ISOLATION VIOLATION] LICENSE context requires tenantId=null (platform channel), ` +
+        `but got tenantId="${tenantId}". ` +
+        `Platform credentials must never be used for Hotspot or PPPoE payments.`
+      );
+    }
+    if (ctx === "TENANT" && !tenantId) {
+      throw new Error(
+        `[PAYMENT ISOLATION VIOLATION] TENANT context requires a non-null tenantId, ` +
+        `but got tenantId=null. ` +
+        `Tenant credentials must never be used for License payments.`
+      );
+    }
+
     // MT-003 FIX: Explicitly match tenantId=null for global channels when tenantId is null.
-    // The previous `...(tenantId ? { tenantId } : {})` pattern omitted the tenantId filter
-    // entirely when tenantId was null/falsy, allowing any tenant's channel to be returned.
     const db = getTenantClient(tenantId);
     return db.paymentChannel.findFirst({
       where: {
