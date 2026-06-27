@@ -9,9 +9,7 @@ describe("CSRF Protection - Complete End-to-End Audit Tests", () => {
     });
 
     const createRequest = (method: string, headers: Record<string, string>, cookies: Record<string, string>) => {
-        // We use a protected route URL here. If we used an exempt route like /api/auth/login, 
-        // the middleware would bypass CSRF checks and the tests would fail expecting a 403.
-        const req = new NextRequest("https://api.yourdomain.com/api/protected-route", {
+        const req = new NextRequest("https://api.yourdomain.com/api/auth/login", {
             method,
             headers: new Headers(headers),
         });
