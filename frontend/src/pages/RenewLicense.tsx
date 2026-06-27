@@ -168,10 +168,10 @@ export default function RenewLicense() {
             
             <div class="header-flex">
                 <div>
-                    <h2>${license?.companyName || 'Our Company'}</h2>
+                    <h2>${license?.platformName || 'Our Company'}</h2>
                     <div style="font-size: 0.85rem; color: #666; line-height: 1.5">
-                        support@${license?.companyName ? license.companyName.toLowerCase().replace(/\s+/g, '') : 'company'}.com<br/>
-                        +255787109988
+                        support@${license?.platformName ? license.platformName.toLowerCase().replace(/\s+/g, '') : 'company'}.com<br/>
+                        ${license?.platformPhone || '+255621085215 . +255780823988'}
                     </div>
                 </div>
                 <div style="text-align: right;">
@@ -183,7 +183,7 @@ export default function RenewLicense() {
             <div class="info-grid">
                 <div>
                     <div class="info-label">BILL TO</div>
-                    <div class="info-value">${name.toUpperCase()}</div>
+                    <div class="info-value">${license?.companyName?.toUpperCase() || name.toUpperCase()}</div>
                     <div style="font-size: 0.85rem; color: #666; line-height: 1.5">
                         ${email ? email + '<br/>' : ''}
                         ${phone}
@@ -241,7 +241,7 @@ export default function RenewLicense() {
             </div>
 
             <div class="footer">
-                Thank you for your business! Questions? Contact support@${license?.companyName ? license.companyName.toLowerCase().replace(/\s+/g, '') : 'company'}.com
+                Thank you for your business! Questions? Contact support@${license?.platformName ? license.platformName.toLowerCase().replace(/\s+/g, '') : 'company'}.com
             </div>
 
             </body></html>
@@ -440,10 +440,10 @@ export default function RenewLicense() {
 
                     <div style={{ borderTop: '4px solid #d32f2f', paddingTop: '1.5rem', display: 'flex', justifyContent: 'space-between', marginBottom: '2rem' }}>
                         <div>
-                            <h2 style={{ fontSize: '1.2rem', fontWeight: 700, margin: '0 0 0.5rem 0' }}>{license?.companyName || 'Our Company'}</h2>
+                            <h2 style={{ fontSize: '1.2rem', fontWeight: 700, margin: '0 0 0.5rem 0' }}>{license?.platformName || 'Our Company'}</h2>
                             <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                                support@{license?.companyName ? license.companyName.toLowerCase().replace(/\s+/g, '') : 'company'}.com<br />
-                                +255621085215
+                                support@{license?.platformName ? license.platformName.toLowerCase().replace(/\s+/g, '') : 'company'}.com<br />
+                                {license?.platformPhone || '+255787109988'}
                             </div>
                         </div>
                         <div style={{ textAlign: 'right' }}>
@@ -457,7 +457,7 @@ export default function RenewLicense() {
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2rem', justifyContent: 'space-between', marginBottom: '2rem' }}>
                         <div>
                             <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>BILL TO</div>
-                            <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>{name.toUpperCase()}</div>
+                            <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>{license?.companyName?.toUpperCase() || name.toUpperCase()}</div>
                             <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
                                 {email}<br />
                                 {phone}
@@ -528,7 +528,7 @@ export default function RenewLicense() {
                     </div>
 
                     <div style={{ background: '#f8f9fa', padding: '1rem', textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-secondary)', borderRadius: '4px', borderTop: '1px solid var(--border-light)', marginTop: '2rem' }}>
-                        Thank you for your business! Questions? Contact support@{license?.companyName ? license.companyName.toLowerCase().replace(/\s+/g, '') : 'company'}.com
+                        Thank you for your business! Questions? Contact support@{license?.platformName ? license.platformName.toLowerCase().replace(/\s+/g, '') : 'company'}.com
                     </div>
                 </div>
 

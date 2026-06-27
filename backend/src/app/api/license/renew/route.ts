@@ -22,10 +22,10 @@ export async function POST(req: NextRequest) {
         if (!tenantId) return errorResponse("Tenant ID missing", 400);
 
         const body = await req.json();
-        const { packageMonths, phoneNumber, amount, invoiceId } = body;
+        const { packageMonths, phoneNumber, invoiceId } = body;
 
-        if (packageMonths === undefined || !amount) {
-            return errorResponse("Missing package details", 400);
+        if (packageMonths === undefined || isNaN(Number(packageMonths)) || Number(packageMonths) < 1) {
+            return errorResponse("Missing or invalid package months", 400);
         }
 
         const tenant = await db.tenant.findUnique({
@@ -36,6 +36,7 @@ export async function POST(req: NextRequest) {
         if (!tenant) return errorResponse("Tenant not found", 404);
 
         let invoice;
+        const requestedMonths = Number(packageMonths);
 
         if (invoiceId) {
             invoice = await db.tenantInvoice.findUnique({
@@ -44,14 +45,16 @@ export async function POST(req: NextRequest) {
             if (!invoice) return errorResponse("Invoice not found", 404);
             if (invoice.tenantId !== tenant.id) return errorResponse("Forbidden", 403);
             
+            const expectedAmount = tenant.plan ? tenant.plan.price * requestedMonths : invoice.amount;
+
             // If the plan changed or the amount changed, update the invoice
-            if (invoice.amount !== Number(amount) || invoice.planId !== tenant.planId || (packageMonths && Number(packageMonths) !== invoice.packageMonths)) {
+            if (invoice.amount !== expectedAmount || invoice.planId !== tenant.planId || requestedMonths !== invoice.packageMonths) {
                 invoice = await db.tenantInvoice.update({
                     where: { id: invoice.id },
                     data: {
-                        amount: Number(amount),
+                        amount: expectedAmount,
                         planId: tenant.planId,
-                        packageMonths: packageMonths ? Number(packageMonths) : invoice.packageMonths
+                        packageMonths: requestedMonths
                     }
                 });
             }
@@ -63,6 +66,8 @@ export async function POST(req: NextRequest) {
                 },
             });
 
+            const expectedAmount = tenant.plan ? tenant.plan.price * requestedMonths : 0;
+
             const invoiceNumber = `INV-${new Date().getFullYear()}-${randomUUID()
                 .replace(/-/g, "")
                 .slice(0, 8)
@@ -73,8 +78,8 @@ export async function POST(req: NextRequest) {
                     invoiceNumber,
                     tenantId: tenant.id,
                     planId: tenant.planId,
-                    packageMonths: Number(packageMonths),
-                    amount: Number(amount),
+                    packageMonths: requestedMonths,
+                    amount: expectedAmount,
                     status: "PENDING",
                     dueDate: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours from now
                 },
@@ -87,7 +92,8 @@ export async function POST(req: NextRequest) {
         }
 
         let providerName = "PALMPESA";
-        const systemChannel = await db.paymentChannel.findFirst({
+        const unscopedDb = getTenantClient(null);
+        const systemChannel = await unscopedDb.paymentChannel.findFirst({
             where: { status: "ACTIVE", tenantId: null },
         });
 

@@ -42,7 +42,10 @@ export const paymentChannelsApi = {
 };
 
 export interface LicenseResponse {
-    isSuperAdmin: boolean; companyName?: string; licenseKey?: string;
+    isSuperAdmin: boolean;
+    platformName?: string;
+    platformPhone?: string;
+    companyName?: string; companyLogo?: string;
     status?: string; daysRemaining?: number; expiresAt?: string;
     customersCount?: number; pppoeLimit?: number; hotspotLimit?: number | null; maxRouters?: number; paidThisMonth?: number;
     hasOutstanding?: boolean; message?: string;

@@ -113,8 +113,16 @@ export async function GET(req: NextRequest) {
             i => i.status === "PENDING" && i.dueDate && i.dueDate <= now
         );
 
+        const globalSettings = await db.systemSetting.findMany({ where: { tenantId: null } });
+        const appNameSetting = globalSettings.find(s => s.key === "companyName" || s.key === "appName");
+        const supportPhoneSetting = globalSettings.find(s => s.key === "supportPhone" || s.key === "phone");
+        const platformName = appNameSetting?.value || process.env.APP_NAME || "HQ INVESTMENT";
+        const platformPhone = supportPhoneSetting?.value || "+255787109988";
+
         const payload = {
             isSuperAdmin: false,
+            platformName,
+            platformPhone,
             companyName: tenant.name,
             companyLogo: tenant.logoUrl,
             tenantSlug: tenant.slug,

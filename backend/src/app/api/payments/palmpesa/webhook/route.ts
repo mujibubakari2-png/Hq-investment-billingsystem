@@ -14,7 +14,22 @@ export async function POST(req: NextRequest) {
             return rateLimited;
         }
 
-        const webhookSecret = env.PALMPESA_WEBHOOK_SECRET || env.PAYMENT_WEBHOOK_SECRET;
+        const globalDb = getTenantClient(null);
+        let webhookSecret = env.PALMPESA_WEBHOOK_SECRET || env.PAYMENT_WEBHOOK_SECRET;
+
+        // Use DB-configured Global Channel secret if available
+        const systemChannel = await globalDb.paymentChannel.findFirst({
+            where: { provider: "PALMPESA", status: "ACTIVE", tenantId: null },
+        });
+
+        if (systemChannel && systemChannel.webhookSecret) {
+            const { decrypt } = await import("@/lib/encryption");
+            const dbSecret = decrypt(systemChannel.webhookSecret);
+            if (dbSecret) {
+                webhookSecret = dbSecret;
+            }
+        }
+
         if (!webhookSecret) {
             console.error("[PALMPESA WEBHOOK] Webhook secret is not configured");
             return errorResponse("Webhook secret is not configured", 500);
@@ -45,7 +60,6 @@ export async function POST(req: NextRequest) {
         }
 
         // Find the invoice
-        const globalDb = getTenantClient(null);
         const invoice = await globalDb.tenantInvoice.findUnique({
             where: { invoiceNumber: AccountReference },
             include: { tenant: true }
@@ -73,6 +87,22 @@ export async function POST(req: NextRequest) {
         // Use conditional update to make webhook processing idempotent under retries.
         try {
             await tenantDb.$transaction(async (tx) => {
+                // Prevent Partial Payment Attacks
+                const paidAmount = Number(Amount);
+                if (paidAmount < invoice.amount) {
+                    await tx.tenantPayment.create({
+                        data: {
+                            invoiceId: invoice.id,
+                            tenantId: invoice.tenantId,
+                            amount: paidAmount,
+                            transactionId: TransactionId,
+                            status: 'FAILED',
+                            paymentMethod: 'PALMPESA',
+                        },
+                    });
+                    throw new Error('PARTIAL_PAYMENT');
+                }
+
                 const res = await tx.tenantInvoice.updateMany({
                     where: { id: invoice.id, status: { not: 'PAID' } },
                     data: { status: 'PAID' },
@@ -87,7 +117,7 @@ export async function POST(req: NextRequest) {
                     data: {
                         invoiceId: invoice.id,
                         tenantId: invoice.tenantId,
-                        amount: Number(Amount),
+                        amount: paidAmount,
                         transactionId: TransactionId,
                         status: 'COMPLETED',
                         paymentMethod: 'PALMPESA',
@@ -109,6 +139,9 @@ export async function POST(req: NextRequest) {
                 });
             });
         } catch (err: any) {
+            if (err?.message === 'PARTIAL_PAYMENT') {
+                return errorResponse('Payment amount is less than invoice amount', 400);
+            }
             if (err?.message === 'ALREADY_PROCESSED') {
                 return jsonResponse({ message: 'Already paid' });
             }
