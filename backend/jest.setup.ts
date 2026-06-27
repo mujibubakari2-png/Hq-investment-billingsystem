@@ -23,15 +23,3 @@ process.env.FIELD_ENCRYPTION_KEY ||= 'cafecafecafecafecafecafecafecafecafecafeca
 
 // Cron — test-only secret
 process.env.CRON_SECRET ||= 'ci_test_cron_secret_32chars_ok!!';
-
-// Suppress console.error and console.warn in tests to keep CI logs clean.
-// Many tests intentionally trigger error paths (e.g. simulating network timeouts)
-// which print scary red errors to the console even though the test PASSES.
-beforeAll(() => {
-  jest.spyOn(console, 'error').mockImplementation(() => {});
-  jest.spyOn(console, 'warn').mockImplementation(() => {});
-});
-
-afterAll(() => {
-  jest.restoreAllMocks();
-});
