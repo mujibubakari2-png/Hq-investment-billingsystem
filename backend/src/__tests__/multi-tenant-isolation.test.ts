@@ -18,17 +18,17 @@ import { PaymentService } from '@/lib/payments/service';
 jest.mock('@/lib/prisma', () => {
   function mkModel(overrides: Record<string, jest.Mock> = {}) {
     return {
-      findFirst:         jest.fn().mockResolvedValue(null),
-      findMany:          jest.fn().mockResolvedValue([]),
-      findUnique:        jest.fn().mockResolvedValue(null),
-      findFirstOrThrow:  jest.fn().mockResolvedValue(null),
-      updateMany:        jest.fn().mockResolvedValue({ count: 0 }),
-      update:            jest.fn().mockResolvedValue({ id: 'mock-id' }),
-      create:            jest.fn().mockResolvedValue({ id: 'mock-id' }),
-      createMany:        jest.fn().mockResolvedValue({ count: 0 }),
-      delete:            jest.fn().mockResolvedValue({}),
-      deleteMany:        jest.fn().mockResolvedValue({ count: 0 }),
-      count:             jest.fn().mockResolvedValue(0),
+      findFirst: jest.fn().mockResolvedValue(null),
+      findMany: jest.fn().mockResolvedValue([]),
+      findUnique: jest.fn().mockResolvedValue(null),
+      findFirstOrThrow: jest.fn().mockResolvedValue(null),
+      updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      update: jest.fn().mockResolvedValue({ id: 'mock-id' }),
+      create: jest.fn().mockResolvedValue({ id: 'mock-id' }),
+      createMany: jest.fn().mockResolvedValue({ count: 0 }),
+      delete: jest.fn().mockResolvedValue({}),
+      deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+      count: jest.fn().mockResolvedValue(0),
       ...overrides,
     };
   }
@@ -36,25 +36,25 @@ jest.mock('@/lib/prisma', () => {
     __esModule: true,
     default: {
       paymentChannel: mkModel(),
-      transaction:    mkModel(),
-      tenantInvoice:  mkModel(),
-      tenantPayment:  mkModel(),
-      invoice:        mkModel(),
-      webhookLog:     mkModel({ create: jest.fn().mockResolvedValue({ id: 'wl-001' }) }),
-      tenant:         mkModel(),
-      subscription:   mkModel(),
-      client:         mkModel(),
-      package:        mkModel(),
-      routerLog:      mkModel(),
+      transaction: mkModel(),
+      tenantInvoice: mkModel(),
+      tenantPayment: mkModel(),
+      invoice: mkModel(),
+      webhookLog: mkModel({ create: jest.fn().mockResolvedValue({ id: 'wl-001' }) }),
+      tenant: mkModel(),
+      subscription: mkModel(),
+      client: mkModel(),
+      package: mkModel(),
+      routerLog: mkModel(),
       $transaction: jest.fn(async (fn: any) =>
         fn({
-          transaction:  { findFirst: jest.fn().mockResolvedValue(null), update: jest.fn().mockResolvedValue({}), updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+          transaction: { findFirst: jest.fn().mockResolvedValue(null), update: jest.fn().mockResolvedValue({}), updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
           tenantInvoice: { findFirst: jest.fn().mockResolvedValue(null), update: jest.fn().mockResolvedValue({}) },
           tenantPayment: { findFirst: jest.fn().mockResolvedValue(null), update: jest.fn().mockResolvedValue({}) },
           subscription: { findFirst: jest.fn().mockResolvedValue(null), create: jest.fn().mockResolvedValue({ id: 'sub-001' }), update: jest.fn().mockResolvedValue({}) },
-          client:       { update: jest.fn().mockResolvedValue({}) },
-          invoice:      { update: jest.fn().mockResolvedValue({}) },
-          tenant:       { update: jest.fn().mockResolvedValue({}) },
+          client: { update: jest.fn().mockResolvedValue({}) },
+          invoice: { update: jest.fn().mockResolvedValue({}) },
+          tenant: { update: jest.fn().mockResolvedValue({}) },
         })
       ),
     },
@@ -63,7 +63,7 @@ jest.mock('@/lib/prisma', () => {
 
 jest.mock('@/lib/payments/registry', () => ({
   isSupportedProvider: jest.fn(() => true),
-  getPaymentProvider:  jest.fn(),
+  getPaymentProvider: jest.fn(),
 }));
 
 // ─── Helper: build a fake JwtPayload ───────────────────────────────────────
@@ -194,7 +194,7 @@ describe('Multi-Tenant Isolation — Webhook cannot activate cross-tenant invoic
     const prisma = require('@/lib/prisma').default;
     const { getPaymentProvider } = require('@/lib/payments/registry');
     (getPaymentProvider as jest.Mock).mockReturnValue({
-      verifyWebhook:       jest.fn().mockResolvedValue({ verified: true }),
+      verifyWebhook: jest.fn().mockResolvedValue({ verified: true }),
       parseWebhookPayload: jest.fn().mockReturnValue({
         transactionRef: 'HP-AABBCCDD',
         resultCode: '0',
