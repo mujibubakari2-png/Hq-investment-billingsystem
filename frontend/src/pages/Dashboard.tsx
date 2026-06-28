@@ -62,14 +62,14 @@ export default function Dashboard() {
     const tenantIdParam = searchParams.get('tenantId');
 
     // ── State ──────────────────────────────────────────────────────────────
-    const [hiddenCards, setHiddenCards]     = useState<Set<number>>(new Set());
-    const [stats, setStats]                 = useState<DashboardResponse | null>(null);
-    const [routers, setRouters]             = useState<Router[]>([]);
-    const [loading, setLoading]             = useState(true);
-    const [error, setError]                 = useState<string | null>(null);
+    const [hiddenCards, setHiddenCards] = useState<Set<number>>(new Set());
+    const [stats, setStats] = useState<DashboardResponse | null>(null);
+    const [routers, setRouters] = useState<Router[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const [selectedRouter, setSelectedRouter] = useState('All');
     const [analyticsPeriod, setAnalyticsPeriod] = useState<AnalyticsPeriod>('daily');
-    const [now, setNow]                     = useState(new Date());
+    const [now, setNow] = useState(new Date());
 
     // Live clock
     useEffect(() => {
@@ -106,8 +106,8 @@ export default function Dashboard() {
 
     // ── Derived values ─────────────────────────────────────────────────────
     const greetName = user?.username || 'User';
-    const hour      = now.getHours();
-    const greeting  = tenantIdParam
+    const hour = now.getHours();
+    const greeting = tenantIdParam
         ? `Viewing dashboard for tenant: ${tenantIdParam}`
         : hour < 12 ? '☀️ Good morning!' : hour < 18 ? '🌤️ Good afternoon!' : '🌙 Good night!';
 
@@ -118,14 +118,14 @@ export default function Dashboard() {
     const monthlyVoucherTrend = getTrendMeta(stats?.monthlyVoucherRev, stats?.monthlyVoucherRevTrend);
 
     const revenueCards = [
-        { label: "Today's Revenue",   value: fmt(stats?.todayRevenue ?? 0),           subtitle: `${stats?.todayRechargesMobile || 0} payments received today`, change: null, color: '#e53935', icon: '💰', accent: 'accent-red' },
-        { label: 'Monthly Revenue',    value: fmt(stats?.monthlyRevenue ?? 0),         subtitle: monthlyRevenueTrend.subtitle ?? `${stats?.monthlyRechargesMobile || 0} payments this month`, change: monthlyRevenueTrend.change, color: '#00bcd4', icon: '📊', accent: 'accent-blue' },
-        { label: 'Active Subscribers', value: String(stats?.activeSubscribers ?? 0),  subtitle: `⚡ ${stats?.onlineUsers ?? 0} currently online`,               change: null, color: '#4caf50', icon: '👥', accent: 'accent-green' },
-        { label: 'Total Customers',    value: String(stats?.totalClients ?? 0),        subtitle: `${stats?.newCustomersThisMonth || 0} new this month`,           change: null, color: '#9c27b0', icon: '🔋', accent: 'accent-purple' },
+        { label: "Today's Revenue", value: fmt(stats?.todayRevenue ?? 0), subtitle: `${stats?.todayRechargesMobile || 0} payments received today`, change: null, color: '#e53935', icon: '💰', accent: 'accent-red' },
+        { label: 'Monthly Revenue', value: fmt(stats?.monthlyRevenue ?? 0), subtitle: monthlyRevenueTrend.subtitle ?? `${stats?.monthlyRechargesMobile || 0} payments this month`, change: monthlyRevenueTrend.change, color: '#00bcd4', icon: '📊', accent: 'accent-blue' },
+        { label: 'Active Subscribers', value: String(stats?.activeSubscribers ?? 0), subtitle: `⚡ ${stats?.onlineUsers ?? 0} currently online`, change: null, color: '#4caf50', icon: '👥', accent: 'accent-green' },
+        { label: 'Total Customers', value: String(stats?.totalClients ?? 0), subtitle: `${stats?.newCustomersThisMonth || 0} new this month`, change: null, color: '#9c27b0', icon: '🔋', accent: 'accent-purple' },
     ];
 
     const voucherCards = [
-        { label: 'Today Voucher Rev',   value: fmt(stats?.todayVoucherRev ?? 0),   subtitle: `${stats?.vouchersUsedToday || 0} active vouchers`,   change: null, color: '#2196f3', accent: 'accent-blue' },
+        { label: 'Today Voucher Rev', value: fmt(stats?.todayVoucherRev ?? 0), subtitle: `${stats?.vouchersUsedToday || 0} active vouchers`, change: null, color: '#2196f3', accent: 'accent-blue' },
         { label: 'Monthly Voucher Rev', value: fmt(stats?.monthlyVoucherRev ?? 0), subtitle: monthlyVoucherTrend.subtitle ?? `${stats?.vouchersUsedMonth || 0} active vouchers`, change: monthlyVoucherTrend.change, color: '#e91e63', accent: 'accent-red' },
     ];
 

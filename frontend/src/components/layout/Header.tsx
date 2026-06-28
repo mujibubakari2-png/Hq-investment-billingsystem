@@ -11,39 +11,39 @@ import './Header.css';
 
 // Map paths to friendly page titles
 const pageTitles: Record<string, string> = {
-    '/dashboard':           'Dashboard',
-    '/clients':             'Clients',
-    '/active-subscribers':  'Active Subscribers',
+    '/dashboard': 'Dashboard',
+    '/clients': 'Clients',
+    '/active-subscribers': 'Active Subscribers',
     '/expired-subscribers': 'Expired Subscribers',
-    '/packages':            'Packages',
-    '/voucher-codes':       'Voucher Codes',
-    '/all-transactions':    'Payment Records',
+    '/packages': 'Packages',
+    '/voucher-codes': 'Voucher Codes',
+    '/all-transactions': 'Payment Records',
     '/mobile-transactions': 'Mobile Transactions',
-    '/expense-tracking':    'Expense Tracking',
-    '/invoices':            'Invoices',
-    '/mikrotiks':           'Mikrotiks',
-    '/equipments':          'Equipments',
-    '/sms-messages':        'SMS Messages',
-    '/message-templates':   'Message Templates',
-    '/system-settings':     'System Settings',
-    '/payment-channels':    'Payment Channels',
-    '/system-users':        'System Users',
-    '/license-management':  'License Management',
-    '/reports':             'Reports & Analytics',
-    '/tutorial-videos':     'Tutorial Videos',
-    '/technical-support':   'Technical Support',
-    '/profile':             'My Profile',
-    '/system-tenants':      'System Tenants',
-    '/hotspot-customizer':  'Hotspot Customizer',
-    '/vpn-management':      'VPN Management',
+    '/expense-tracking': 'Expense Tracking',
+    '/invoices': 'Invoices',
+    '/mikrotiks': 'Mikrotiks',
+    '/equipments': 'Equipments',
+    '/sms-messages': 'SMS Messages',
+    '/message-templates': 'Message Templates',
+    '/system-settings': 'System Settings',
+    '/payment-channels': 'Payment Channels',
+    '/system-users': 'System Users',
+    '/license-management': 'License Management',
+    '/reports': 'Reports & Analytics',
+    '/tutorial-videos': 'Tutorial Videos',
+    '/technical-support': 'Technical Support',
+    '/profile': 'My Profile',
+    '/system-tenants': 'System Tenants',
+    '/hotspot-customizer': 'Hotspot Customizer',
+    '/vpn-management': 'VPN Management',
 };
 
 // Human-readable role label shown in the header dropdown
 function roleLabel(role: string): string {
     switch (role) {
         case 'SUPER_ADMIN': return 'Super Admin';
-        case 'ADMIN':  return 'Admin';
-        case 'AGENT':  return 'Agent';
+        case 'ADMIN': return 'Admin';
+        case 'AGENT': return 'Agent';
         case 'VIEWER': return 'Viewer';
         default: return role;
     }
