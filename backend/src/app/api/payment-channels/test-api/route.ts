@@ -3,28 +3,57 @@ import { jsonResponse, errorResponse } from "@/lib/auth";
 import { requirePermission } from "@/lib/rbac";
 
 // Supported providers and their default base URLs (from env or fallback)
-const PROVIDER_DEFAULTS: Record<string, { envKey: string; defaultUrl: string; testPath: string }> = {
+const PROVIDER_DEFAULTS: Record<string, { envKey: string; defaultUrl: string; testPath: string; allow404AsReachable: boolean }> = {
     ZENOPAY: {
         envKey: "ZENOPAY_API_URL",
         defaultUrl: "",
         testPath: "/payments/status/test-ping",
+        allow404AsReachable: true,
     },
     PALMPESA: {
         envKey: "PALMPESA_API_URL",
         defaultUrl: "",
-        testPath: "/payments/status/test-ping",
+        testPath: "/order-status?order_id=test-ping",
+        allow404AsReachable: true,
     },
     HARAKAPAY: {
         envKey: "HARAKAPAY_API_URL",
         defaultUrl: "",
         testPath: "/payments/status/test-ping",
+        allow404AsReachable: true,
     },
     MONGIKE: {
         envKey: "MONGIKE_API_URL",
         defaultUrl: "",
         testPath: "/payments/status/test-ping",
+        allow404AsReachable: true,
     },
 };
+
+export function normalizeUrl(baseUrl: string, path: string): string {
+    const cleanedBase = baseUrl.replace(/\/+$/, "");
+    let cleanedPath = path.replace(/^\/+/, "");
+
+    if (cleanedBase.toLowerCase().endsWith("/api") && cleanedPath.toLowerCase().startsWith("api/")) {
+        cleanedPath = cleanedPath.replace(/^api\//i, "");
+    }
+
+    return `${cleanedBase}/${cleanedPath}`;
+}
+
+export function getTestUrls(baseUrl: string, path: string): string[] {
+    const cleanedBase = baseUrl.replace(/\/+$/, "");
+    const primaryUrl = normalizeUrl(cleanedBase, path);
+    const urls = [primaryUrl];
+    const pathHasApiPrefix = path.toLowerCase().startsWith("/api/");
+    const baseEndsWithApi = cleanedBase.toLowerCase().endsWith("/api");
+
+    if (!baseEndsWithApi && !pathHasApiPrefix) {
+        urls.push(normalizeUrl(`${cleanedBase}/api`, path));
+    }
+
+    return [...new Set(urls)];
+}
 
 /**
  * POST /api/payment-channels/test-api
@@ -84,69 +113,103 @@ export async function POST(req: NextRequest) {
                 break;
         }
 
-        // Attempt a lightweight GET to the base URL to check reachability
-        // We use a status endpoint — a 401/403 means the server IS reachable (just wrong key),
-        // a 200 or 4xx from the server means the URL is valid.
-        // Network errors (ECONNREFUSED, DNS failure) mean the URL is wrong.
-        const testUrl = `${baseUrl}${meta.testPath}`;
+        // Attempt lightweight GETs to verify the gateway endpoint.
+        // We test both the configured base URL and an /api-prefixed fallback.
+        const candidateUrls = getTestUrls(baseUrl, meta.testPath);
 
         let reachable = false;
         let statusCode = 0;
         let responseMessage = "";
+        let lastSuccessMessage = "";
 
-        try {
-            const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 8000);
-
-            const res = await fetch(testUrl, {
-                method: "GET",
-                headers,
-                signal: controller.signal,
-            });
-
-            clearTimeout(timeout);
-            statusCode = res.status;
-
-            // 200-299 = valid key, 400-403 = server reachable (key may be wrong),
-            // 404 = server reachable but path not found (still OK for URL check),
-            // 5xx = server error but reachable
-            reachable = statusCode < 600;
-
-            const text = await res.text().catch(() => "");
+        for (const testUrl of candidateUrls) {
+            let timeout: ReturnType<typeof setTimeout> | undefined;
             try {
-                const json = JSON.parse(text);
-                responseMessage = (json?.message ?? json?.error ?? json?.detail ?? "").toString();
-            } catch {
-                responseMessage = text.slice(0, 200);
+                const controller = new AbortController();
+                timeout = setTimeout(() => controller.abort(), 8000);
+
+                const res = await fetch(testUrl, {
+                    method: "GET",
+                    headers,
+                    signal: controller.signal,
+                });
+
+                clearTimeout(timeout);
+                statusCode = res.status;
+                reachable = statusCode < 600;
+
+                const text = await res.text().catch(() => "");
+                try {
+                    const json = JSON.parse(text);
+                    responseMessage = (json?.message ?? json?.error ?? json?.detail ?? "").toString();
+                } catch {
+                    responseMessage = text.slice(0, 200);
+                }
+
+                const apiValid = (statusCode >= 200 && statusCode < 300) || statusCode === 401 || statusCode === 403;
+                const notFound = statusCode === 404;
+
+                if (apiValid) {
+                    lastSuccessMessage = `✅ ${providerUpper} API is reachable at ${testUrl} (HTTP ${statusCode}). Credentials appear valid.`;
+                    return jsonResponse({
+                        success: true,
+                        reachable,
+                        statusCode,
+                        provider: providerUpper,
+                        baseUrl,
+                        testedUrl: testUrl,
+                        message: lastSuccessMessage,
+                    });
+                }
+
+                if (notFound && meta.allow404AsReachable) {
+                    lastSuccessMessage = `✅ ${providerUpper} API is reachable at ${testUrl}, but the specific test resource returned HTTP 404. This usually means the provider returned "not found" for a dummy transaction reference, which is expected for connectivity checks.`;
+                    return jsonResponse({
+                        success: true,
+                        reachable,
+                        statusCode,
+                        provider: providerUpper,
+                        baseUrl,
+                        testedUrl: testUrl,
+                        message: lastSuccessMessage,
+                    });
+                }
+
+                // Keep the last 404 or other reachable response and continue trying fallback URLs.
+                if (statusCode === 404) {
+                    lastSuccessMessage = `⚠️ ${providerUpper} endpoint not found at ${testUrl} (HTTP 404). Trying alternative URL.`;
+                    continue;
+                }
+
+                return jsonResponse({
+                    success: false,
+                    reachable,
+                    statusCode,
+                    provider: providerUpper,
+                    baseUrl,
+                    testedUrl: testUrl,
+                    message: `⚠️ ${providerUpper} server responded with HTTP ${statusCode}. ${responseMessage || "Please check your API key or URL."}`,
+                });
+
+            } catch (fetchErr: any) {
+                if (timeout) clearTimeout(timeout);
+                const isTimeout = fetchErr?.name === "AbortError";
+                lastSuccessMessage = isTimeout
+                    ? `⏱️ Request timed out (8s) while checking ${testUrl}. Verify that ${baseUrl} is reachable from this server.`
+                    : `❌ Cannot reach ${testUrl}. Error: ${fetchErr?.message || "Network error"}. Please verify the Base URL.`;
+                continue;
             }
-
-            // Consider 200-299 or 401/403 (auth error = server is real) as "API key recognized"
-            const apiValid = (statusCode >= 200 && statusCode < 300) || statusCode === 401 || statusCode === 403;
-
-            return jsonResponse({
-                success: apiValid,
-                reachable,
-                statusCode,
-                provider: providerUpper,
-                baseUrl,
-                message: apiValid
-                    ? `✅ ${providerUpper} API is reachable (HTTP ${statusCode}). Credentials look valid.`
-                    : `⚠️ ${providerUpper} server responded with HTTP ${statusCode}. ${responseMessage || "Please check your API key."}`,
-            });
-
-        } catch (fetchErr: any) {
-            const isTimeout = fetchErr?.name === "AbortError";
-            return jsonResponse({
-                success: false,
-                reachable: false,
-                statusCode: 0,
-                provider: providerUpper,
-                baseUrl,
-                message: isTimeout
-                    ? `⏱️ Request timed out (8s). Check that ${baseUrl} is accessible from this server.`
-                    : `❌ Cannot reach ${baseUrl}. Error: ${fetchErr?.message || "Network error"}. Please verify the Base URL.`,
-            });
         }
+
+        return jsonResponse({
+            success: false,
+            reachable,
+            statusCode,
+            provider: providerUpper,
+            baseUrl,
+            testedUrl: candidateUrls.join(', '),
+            message: lastSuccessMessage || `❌ ${providerUpper} API check failed for ${baseUrl}. Please verify the URL and credentials.`,
+        });
 
     } catch (e: any) {
         console.error("test-api endpoint error:", e);
