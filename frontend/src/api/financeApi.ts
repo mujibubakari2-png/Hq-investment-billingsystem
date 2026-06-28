@@ -88,7 +88,7 @@ export interface LicenseResponse {
 export const licenseApi = {
     getLicense:  ()                                                                         => get<LicenseResponse>(`/license?_t=${Date.now()}`),
     renewLicense:(data: { packageMonths: number; phoneNumber: string; amount: number; invoiceId?: string }) =>
-        post<{ success: boolean; message: string; expiresAt: string }>('/license/renew', data),
+        post<{ success: boolean; message: string; status: string; reference: string; provider?: string; providerRef?: string | null; paymentId?: string; expiresAt?: string }>('/license/renew', data),
     changePlan:  (planId: string) =>
         post<{ message: string; plan: { id: string; name: string; price: number; pppoeLimit: number; hotspotLimit: number | null; maxRouters: number } }>('/license/change-plan', { planId }),
 };

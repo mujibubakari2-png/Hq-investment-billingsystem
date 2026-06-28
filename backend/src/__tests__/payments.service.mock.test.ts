@@ -22,7 +22,7 @@ jest.mock('@/lib/mikrotik', () => ({
 
 // `export {}` gives this file its own ES module scope, preventing
 // "Cannot redeclare block-scoped variable" TS errors across test files.
-export {};
+export { };
 
 const { getTenantClient } = require('@/lib/tenantPrisma');
 const { getPaymentProvider } = require('@/lib/payments/registry');

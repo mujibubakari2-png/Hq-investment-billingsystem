@@ -120,6 +120,7 @@ export async function POST(req: NextRequest) {
         // All provider webhooks are handled at /api/webhooks/{provider}.
         const callbackUrl = buildCallbackUrl(providerName, req, appUrl);
 
+        let paymentRecord: any = null;
         try {
             const cleanPhone = formatPhoneTZ(phoneNumber);
 
@@ -136,15 +137,61 @@ export async function POST(req: NextRequest) {
                 paymentContext: 'LICENSE',
             });
 
+            // Create a tenantPayment record so webhooks can later mark it COMPLETED/FAILED
+            try {
+                paymentRecord = await unscopedDb.tenantPayment.create({
+                    data: {
+                        invoiceId: invoice.id,
+                        tenantId: invoice.tenantId,
+                        amount: invoice.amount,
+                        paymentMethod: providerName,
+                        status: 'PENDING',
+                    },
+                });
+            } catch (createErr) {
+                console.warn('Failed to create tenantPayment record (best-effort):', createErr);
+            }
+
             if (result.success) {
+                // For PalmPesa require a providerRef (order id / checkout id) to ensure STK push was created.
+                if (providerName.toUpperCase() === 'PALMPESA' && !result.providerRef) {
+                    console.error('[LICENSE/RENEW] PalmPesa accepted request but did not return providerRef', {
+                        request: { amount: invoice.amount, phone: cleanPhone, reference: invoice.invoiceNumber, callbackUrl },
+                        providerResponse: result,
+                    });
+                    // Mark tenantPayment as FAILED if created
+                    if (paymentRecord && paymentRecord.id) {
+                        await unscopedDb.tenantPayment.update({ where: { id: paymentRecord.id }, data: { status: 'FAILED' } }).catch(() => {});
+                    }
+                    return errorResponse('PalmPesa did not create a transaction (missing provider reference)', 502, 'PALMPESA_INVALID_RESPONSE');
+                }
+                // Persist provider reference (transaction id / checkout id) when available
+                if (result.providerRef && paymentRecord && paymentRecord.id) {
+                    await unscopedDb.tenantPayment.update({
+                        where: { id: paymentRecord.id },
+                        data: { transactionId: result.providerRef, status: 'PENDING' },
+                    }).catch(() => { /* best-effort */ });
+                }
+
                 return jsonResponse(
                     {
                         success: true,
-                        message: "Please enter your mobile money PIN to complete the transaction.",
-                        status: "processing",
+                        message: "Sending STK Push...",
+                        status: "PENDING",
+                        reference: invoice.invoiceNumber,
+                        providerRef: result.providerRef ?? null,
+                        paymentId: paymentRecord?.id ?? null,
                     },
                     200
                 );
+            }
+
+            // Mark tenantPayment as FAILED when initiation failed
+            if (paymentRecord && paymentRecord.id) {
+                await unscopedDb.tenantPayment.update({
+                    where: { id: paymentRecord.id },
+                    data: { status: 'FAILED' },
+                }).catch(() => { /* ignore */ });
             }
 
             const isGatewayIssue =
@@ -162,6 +209,12 @@ export async function POST(req: NextRequest) {
             );
         } catch (paymentErr: any) {
             console.error("STK push error during license renewal:", paymentErr);
+            // Attempt to record failure if we created a payment record earlier
+            try {
+                if (paymentRecord && paymentRecord.id) {
+                    await unscopedDb.tenantPayment.update({ where: { id: paymentRecord.id }, data: { status: 'FAILED' } });
+                }
+            } catch { /* ignore */ }
             return errorResponse(paymentErr.message || "Payment provider error", 502, "PALMPESA_GATEWAY", "Provider request failed");
         }
     } catch (error) {

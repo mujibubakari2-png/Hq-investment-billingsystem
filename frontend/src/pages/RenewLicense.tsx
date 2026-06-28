@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import PaymentIcon from '@mui/icons-material/Payment';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import PrintIcon from '@mui/icons-material/Print';
 import DescriptionIcon from '@mui/icons-material/Description';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import { licenseApi, saasPlansApi, type LicenseResponse, type SaasPlan } from '../api';
 import authStore from '../stores/authStore';
@@ -21,8 +21,14 @@ export default function RenewLicense() {
     const [name, setName] = useState(user?.fullName || user?.username || '');
     const [email, setEmail] = useState(user?.email || '');
     const [submitting, setSubmitting] = useState(false);
-    const [paymentSent, setPaymentSent] = useState(false);
-    const [paymentMessage, setPaymentMessage] = useState('');
+    // payment flow state
+    const [paymentState, setPaymentState] = useState<{
+        status: 'IDLE' | 'SENDING' | 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED' | 'CANCELLED' | 'EXPIRED' | 'TIMEOUT' | 'UNKNOWN',
+        message?: string,
+        reference?: string,
+        providerRef?: string | null,
+        paymentId?: string | null,
+    }>({ status: 'IDLE' });
     const [showChangePlan, setShowChangePlan] = useState(false);
     const [changingPlan, setChangingPlan] = useState(false);
     const [changePlanMsg, setChangePlanMsg] = useState('');
@@ -67,6 +73,84 @@ export default function RenewLicense() {
             setChangingPlan(false);
         }
     };
+
+    // Poll payment status when in PENDING state
+    useEffect(() => {
+        let intervalId: any = null;
+        let timeoutId: any = null;
+
+        const startPolling = async () => {
+            if (!paymentState.reference) return;
+            const reference = paymentState.reference;
+            const provider = 'PALMPESA';
+            const providerRef = paymentState.providerRef;
+
+            const poll = async () => {
+                try {
+                    const q = new URLSearchParams();
+                    q.set('provider', provider);
+                    if (providerRef) q.set('providerRef', String(providerRef));
+                    const res = await fetch(`/api/payments/status/${encodeURIComponent(reference)}?${q.toString()}`);
+                    if (!res.ok) return;
+                    const data = await res.json();
+                    const live = (data.liveStatus || data.status || '').toString().toUpperCase();
+                    const status = (data.status || data.liveStatus || '').toString().toUpperCase();
+                    // Map status
+                    if (status === 'COMPLETED' || live === 'COMPLETED') {
+                        // If DB still pending but provider says completed, show PROCESSING briefly
+                        if (data.status && data.status !== 'COMPLETED' && live === 'COMPLETED') {
+                            setPaymentState(s => ({ ...s, status: 'PROCESSING', message: data.message || 'Provider confirmed payment — finalizing.' }));
+                            return;
+                        }
+                        setPaymentState({ status: 'COMPLETED', message: data.message || 'Payment completed', reference, providerRef: providerRef ?? null, paymentId: paymentState.paymentId ?? null });
+                        clearInterval(intervalId);
+                        clearTimeout(timeoutId);
+                        return;
+                    }
+                    if (status === 'FAILED' || live === 'FAILED') {
+                        setPaymentState({ status: 'FAILED', message: data.message || (data.liveStatusMessage || 'Payment failed'), reference, providerRef: providerRef ?? null, paymentId: paymentState.paymentId ?? null });
+                        clearInterval(intervalId);
+                        clearTimeout(timeoutId);
+                        return;
+                    }
+                    if (status === 'CANCELLED' || live === 'CANCELLED') {
+                        setPaymentState({ status: 'CANCELLED', message: data.message || 'Payment cancelled', reference, providerRef: providerRef ?? null, paymentId: paymentState.paymentId ?? null });
+                        clearInterval(intervalId);
+                        clearTimeout(timeoutId);
+                        return;
+                    }
+                    if (status === 'EXPIRED' || live === 'EXPIRED') {
+                        setPaymentState({ status: 'EXPIRED', message: data.message || 'Payment request expired', reference, providerRef: providerRef ?? null, paymentId: paymentState.paymentId ?? null });
+                        clearInterval(intervalId);
+                        clearTimeout(timeoutId);
+                        return;
+                    }
+                    // otherwise remain pending
+                } catch (e) {
+                    console.warn('Payment status poll error', e);
+                }
+            };
+
+            // Start interval immediately
+            await poll();
+            intervalId = setInterval(poll, 3000);
+
+            // Timeout after 2.5 minutes
+            timeoutId = setTimeout(() => {
+                clearInterval(intervalId);
+                setPaymentState({ status: 'TIMEOUT', message: 'Payment request timed out. No confirmation received.' });
+            }, 150000);
+        };
+
+        if (paymentState.status === 'PENDING') {
+            startPolling();
+        }
+
+        return () => {
+            if (intervalId) clearInterval(intervalId);
+            if (timeoutId) clearTimeout(timeoutId);
+        };
+    }, [paymentState.status, paymentState.reference]);
 
     const activePlan = allPlans.find(p => p.id === selectedPlanId) || license?.plan;
     const basePrice = activePlan?.price || 0;
@@ -120,13 +204,19 @@ export default function RenewLicense() {
             });
 
             if (res.success) {
-                setPaymentMessage(res.message || 'STK push sent! Please enter your mobile money PIN to complete the payment.');
-                setPaymentSent(true);
+                // STK Push was accepted by our server/provider as PENDING
+                setPaymentState({
+                    status: res.status === 'PENDING' ? 'PENDING' : (res.status as any) || 'UNKNOWN',
+                    message: res.message || 'STK push requested. Waiting for provider confirmation.',
+                    reference: res.reference,
+                    providerRef: (res as any).providerRef ?? null,
+                    paymentId: (res as any).paymentId ?? null,
+                });
             } else {
-                alert("Payment failed. Please try again.");
+                setPaymentState({ status: 'FAILED', message: res.message || 'Failed to initiate payment' });
             }
         } catch (err: any) {
-            alert(err.message || 'Payment initiation failed');
+            setPaymentState({ status: 'FAILED', message: err.message || 'Payment initiation failed' });
         } finally {
             setSubmitting(false);
         }
@@ -258,31 +348,66 @@ export default function RenewLicense() {
         }
     };
 
-    // ── Payment Success Screen ────────────────────────────────────────────────
-    if (paymentSent) {
+    // Payment status screens
+
+    // If payment is COMPLETED show final success
+    if (paymentState.status === 'COMPLETED') {
         return (
             <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: 'var(--bg-lighter)', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-family)', padding: '2rem' }}>
                 <div className="card" style={{ maxWidth: 480, width: '100%', padding: '2.5rem 2rem', textAlign: 'center', boxShadow: 'var(--shadow-md)', borderTop: '4px solid #2e7d32' }}>
                     <div style={{ margin: '0 auto 1.5rem', width: 72, height: 72, borderRadius: '50%', background: '#e8f5e9', color: '#2e7d32', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <CheckCircleIcon style={{ fontSize: 40 }} />
                     </div>
-                    <h1 style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.75rem' }}>Payment Initiated</h1>
+                    <h1 style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.75rem' }}>Payment Confirmed</h1>
                     <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem', fontSize: '0.95rem', lineHeight: 1.6 }}>
-                        {paymentMessage}
+                        {paymentState.message || 'Payment completed successfully.'}
                     </p>
-                    <div style={{ background: '#f5f5f5', borderRadius: '8px', padding: '1rem', marginBottom: '1.5rem', fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                        After entering your PIN, your account will be reviewed and activated shortly.
-                        If you experience any issues, please contact support.
-                    </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                         <button className="btn btn-primary" style={{ background: '#1a1a2e', color: 'white', width: '100%' }} onClick={() => navigate('/dashboard')}>
                             Go to Dashboard
                         </button>
-                        <button className="btn btn-secondary" style={{ width: '100%', border: '1px solid var(--border-light)' }} onClick={() => setPaymentSent(false)}>
+                        <button className="btn btn-secondary" style={{ width: '100%', border: '1px solid var(--border-light)' }} onClick={() => setPaymentState({ status: 'IDLE' })}>
                             Back to Renewal
                         </button>
                     </div>
                 </div>
+            </div>
+        );
+    }
+
+    // Terminal failure/cancel/timeout screen
+    if (['FAILED','CANCELLED','EXPIRED','TIMEOUT','UNKNOWN'].includes(paymentState.status)) {
+        return (
+            <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: 'var(--bg-lighter)', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-family)', padding: '2rem' }}>
+                <div className="card" style={{ maxWidth: 560, width: '100%', padding: '2.5rem 2rem', textAlign: 'center', boxShadow: 'var(--shadow-md)', borderTop: '4px solid #b91c1c' }}>
+                    <h1 style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.75rem' }}>{paymentState.status === 'CANCELLED' ? 'Payment Cancelled' : 'Payment Failed'}</h1>
+                    <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem', fontSize: '0.95rem', lineHeight: 1.6 }}>
+                        {paymentState.message || 'The payment could not be completed. Please try again or contact support.'}
+                    </p>
+                    <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
+                        <button className="btn btn-primary" style={{ background: '#1a1a2e', color: 'white' }} onClick={() => setPaymentState({ status: 'IDLE' })}>Try Again</button>
+                        <button className="btn btn-secondary" style={{ border: '1px solid var(--border-light)' }} onClick={() => navigate('/support')}>Contact Support</button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // Pending / Processing UI
+    if (paymentState.status === 'PENDING' || paymentState.status === 'PROCESSING' || paymentState.status === 'SENDING') {
+        return (
+            <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: 'var(--bg-lighter)', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-family)', padding: '2rem' }}>
+                <div className="card" style={{ maxWidth: 560, width: '100%', padding: '2rem', textAlign: 'center', boxShadow: 'var(--shadow-md)', borderTop: '4px solid #1976d2' }}>
+                    <div style={{ margin: '0 auto 1rem', width: 56, height: 56, borderRadius: '50%', background: '#e8f0ff', color: '#1e3a8a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <div className="spinner" style={{ width: 20, height: 20, border: '3px solid #fff', borderTop: '3px solid rgba(0,0,0,0.12)', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+                    </div>
+                    <h2 style={{ margin: '0 0 0.5rem', fontWeight: 700 }}>{paymentState.status === 'PENDING' ? 'Waiting for payment confirmation...' : 'Processing payment...'}</h2>
+                    <p style={{ color: 'var(--text-secondary)', marginBottom: '1rem' }}>{paymentState.message || 'Please complete the STK prompt on your phone.'}</p>
+                    <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
+                        <button className="btn btn-secondary" style={{ border: '1px solid var(--border-light)' }} onClick={() => setPaymentState({ status: 'IDLE' })}>Cancel</button>
+                    </div>
+                </div>
+                <style>{`@keyframes spin { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }`}</style>
             </div>
         );
     }

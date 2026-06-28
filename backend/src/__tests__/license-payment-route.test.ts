@@ -66,6 +66,10 @@ describe('License renewal payment route', () => {
             paymentChannel: {
                 findFirst: jest.fn().mockResolvedValue(null),
             },
+            tenantPayment: {
+                create: jest.fn().mockResolvedValue({ id: 'pay-1' }),
+                update: jest.fn().mockResolvedValue({}),
+            },
         };
 
         mockGetTenantClient.mockImplementation((tenantId: string | null) =>
@@ -118,6 +122,10 @@ describe('License renewal payment route', () => {
             paymentChannel: {
                 findFirst: jest.fn().mockResolvedValue(null),
             },
+            tenantPayment: {
+                create: jest.fn().mockResolvedValue({ id: 'pay-1' }),
+                update: jest.fn().mockResolvedValue({}),
+            },
         };
 
         mockGetTenantClient.mockImplementation((tenantId: string | null) =>
@@ -161,6 +169,10 @@ describe('License renewal payment route', () => {
         const globalDb = {
             paymentChannel: {
                 findFirst: jest.fn().mockResolvedValue(null),
+            },
+            tenantPayment: {
+                create: jest.fn().mockResolvedValue({ id: 'pay-1' }),
+                update: jest.fn().mockResolvedValue({}),
             },
         };
 
