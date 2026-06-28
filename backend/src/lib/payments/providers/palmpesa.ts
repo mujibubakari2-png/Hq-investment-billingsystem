@@ -27,6 +27,7 @@ import {
   httpPost,
   httpGet,
   retryWithBackoff,
+  safeJsonParse,
 } from "@/lib/payments/utils";
 
 export class PalmPesaProvider implements PaymentProvider {
@@ -86,8 +87,19 @@ export class PalmPesaProvider implements PaymentProvider {
         2
       );
 
-      const data = result.data as Record<string, unknown>;
-      const responseCode = String(data?.ResponseCode ?? data?.responseCode ?? "")
+      const rawData = result.data;
+      const data =
+        typeof rawData === "string"
+          ? safeJsonParse<Record<string, unknown>>(rawData, {})
+          : (rawData as Record<string, unknown>);
+      const responseCode = String(
+        data?.ResponseCode ??
+        data?.responseCode ??
+        data?.ResultCode ??
+        data?.resultCode ??
+        data?.status ??
+        ""
+      )
         .trim()
         .toUpperCase();
       const isSuccess =
@@ -136,7 +148,11 @@ export class PalmPesaProvider implements PaymentProvider {
         this.headers
       );
 
-      const data = result.data as Record<string, unknown>;
+      const rawData = result.data;
+      const data =
+        typeof rawData === "string"
+          ? safeJsonParse<Record<string, unknown>>(rawData, {})
+          : (rawData as Record<string, unknown>);
       const rawStatus = String(
         data?.ResultCode ??
         data?.result_code ??
@@ -211,7 +227,10 @@ export class PalmPesaProvider implements PaymentProvider {
   // ── Parse Webhook Payload ─────────────────────────────────────────────────
 
   parseWebhookPayload(body: unknown): ParsedWebhookPayload {
-    const b = body as Record<string, unknown>;
+    const b =
+      typeof body === "string"
+        ? safeJsonParse<Record<string, unknown>>(body, {})
+        : (body as Record<string, unknown>);
 
     // PalmPesa sends ResultCode "0" for success
     const resultCode = String(
