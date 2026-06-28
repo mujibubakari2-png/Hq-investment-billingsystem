@@ -88,24 +88,48 @@ export class PalmPesaProvider implements PaymentProvider {
       );
 
       const rawData = result.data;
-      const data =
+      const parsedData =
         typeof rawData === "string"
           ? safeJsonParse<Record<string, unknown>>(rawData, {})
           : (rawData as Record<string, unknown>);
+
+      const data =
+        parsedData &&
+        typeof parsedData === "object" &&
+        parsedData.data &&
+        typeof parsedData.data === "object"
+          ? (parsedData.data as Record<string, unknown>)
+          : parsedData;
+
       const responseCode = String(
         data?.ResponseCode ??
         data?.responseCode ??
+        data?.response_code ??
         data?.ResultCode ??
         data?.resultCode ??
+        data?.result_code ??
         data?.status ??
         ""
       )
         .trim()
         .toUpperCase();
+
+      const responseMessage =
+        (data?.ResponseDescription as string) ??
+        (data?.response_description as string) ??
+        (data?.ResponseDesc as string) ??
+        (data?.responseDesc as string) ??
+        (data?.ResultDesc as string) ??
+        (data?.result_desc as string) ??
+        (data?.message as string) ??
+        (typeof rawData === "string" ? rawData.trim() : undefined);
+
       const isSuccess =
         result.ok &&
         (data?.success === true ||
           data?.success === "true" ||
+          data?.success === "1" ||
+          data?.success === 1 ||
           responseCode === "0" ||
           responseCode === "00" ||
           responseCode === "SUCCESS" ||
@@ -117,9 +141,11 @@ export class PalmPesaProvider implements PaymentProvider {
           providerRef:
             (data?.CheckoutRequestID as string) ??
             (data?.checkout_request_id as string) ??
+            (data?.checkoutRequestID as string) ??
             (data?.transaction_id as string) ??
+            (data?.transactionId as string) ??
             undefined,
-          message: (data?.ResponseDescription as string) ?? "Payment initiated",
+          message: responseMessage ?? "Payment initiated",
           rawResponse: data,
         };
       }
@@ -127,9 +153,7 @@ export class PalmPesaProvider implements PaymentProvider {
       return {
         success: false,
         message:
-          (data?.ResponseDescription as string) ??
-          (data?.message as string) ??
-          `PalmPesa error (HTTP ${result.status})`,
+          responseMessage ?? `PalmPesa error (HTTP ${result.status})`,
         rawResponse: data,
       };
     } catch (err: unknown) {
