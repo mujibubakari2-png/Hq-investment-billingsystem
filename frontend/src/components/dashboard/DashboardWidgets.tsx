@@ -166,7 +166,7 @@ export function StatCards({ cards, hiddenCards, idOffset = 0, onToggle }: StatCa
                         {card.change !== null && card.change !== undefined && (
                             <div className={`dash-stat-change ${card.change >= 0 ? 'up' : 'down'}`}>
                                 {card.change >= 0 ? <TrendingUpIcon style={{ fontSize: 14 }} /> : <TrendingDownIcon style={{ fontSize: 14 }} />}
-                                {card.change >= 0 ? '+' : ''}{card.change}%
+                                {card.change >= 0 ? '▲' : '▼'} {card.change >= 0 ? '+' : '-'}{Math.abs(card.change).toFixed(1)}%
                             </div>
                         )}
                     </div>

@@ -53,9 +53,21 @@ interface HeaderProps {
     onToggleSidebar: () => void;
     darkMode: boolean;
     onToggleDarkMode: () => void;
+    primaryColor: string;
+    accentColor: string;
+    onPrimaryColorChange: (value: string) => void;
+    onAccentColorChange: (value: string) => void;
 }
 
-export default function Header({ onToggleSidebar, darkMode, onToggleDarkMode }: HeaderProps) {
+export default function Header({
+    onToggleSidebar,
+    darkMode,
+    onToggleDarkMode,
+    primaryColor,
+    accentColor,
+    onPrimaryColorChange,
+    onAccentColorChange,
+}: HeaderProps) {
     const { user } = authStore.useAuth();
     const navigate = useNavigate();
     const location = useLocation();
@@ -187,13 +199,33 @@ export default function Header({ onToggleSidebar, darkMode, onToggleDarkMode }: 
                         <span>{companyName}</span>
                     </span>
 
-                    <button
-                        className="header-icon-btn"
-                        onClick={onToggleDarkMode}
-                        aria-label="Toggle dark mode"
-                    >
-                        {darkMode ? <LightModeIcon fontSize="small" /> : <DarkModeIcon fontSize="small" />}
-                    </button>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <label title="Primary color" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: '50%', overflow: 'hidden', border: '1px solid var(--border)', background: 'var(--bg-card)' }}>
+                            <input
+                                type="color"
+                                value={primaryColor}
+                                onChange={(e) => onPrimaryColorChange(e.target.value)}
+                                aria-label="Set primary color"
+                                style={{ width: 24, height: 24, border: 'none', padding: 0, background: 'transparent', cursor: 'pointer' }}
+                            />
+                        </label>
+                        <label title="Accent color" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: '50%', overflow: 'hidden', border: '1px solid var(--border)', background: 'var(--bg-card)' }}>
+                            <input
+                                type="color"
+                                value={accentColor}
+                                onChange={(e) => onAccentColorChange(e.target.value)}
+                                aria-label="Set accent color"
+                                style={{ width: 24, height: 24, border: 'none', padding: 0, background: 'transparent', cursor: 'pointer' }}
+                            />
+                        </label>
+                        <button
+                            className="header-icon-btn"
+                            onClick={onToggleDarkMode}
+                            aria-label="Toggle dark mode"
+                        >
+                            {darkMode ? <LightModeIcon fontSize="small" /> : <DarkModeIcon fontSize="small" />}
+                        </button>
+                    </div>
 
                     <div className="header-user" ref={menuRef}>
                         <div

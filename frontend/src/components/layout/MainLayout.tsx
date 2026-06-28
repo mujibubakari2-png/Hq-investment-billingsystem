@@ -1,15 +1,35 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Header from './Header';
 import Footer from './Footer';
+import authStore from '../../stores/authStore';
+
+function readTenantTheme(tenantKey: string) {
+    try {
+        const raw = localStorage.getItem(`tenant-theme:${tenantKey}`);
+        return raw ? JSON.parse(raw) : null;
+    } catch {
+        return null;
+    }
+}
+
+function writeTenantTheme(tenantKey: string, value: { darkMode: boolean; primaryColor: string; accentColor: string }) {
+    try {
+        localStorage.setItem(`tenant-theme:${tenantKey}`, JSON.stringify(value));
+    } catch {
+        // Ignore storage issues
+    }
+}
 
 export default function MainLayout() {
+    const location = useLocation();
+    const { user } = authStore.useAuth();
     const [sidebarOpen, setSidebarOpen] = useState(false);   // mobile drawer
     const [sidebarVisible, setSidebarVisible] = useState(true); // desktop toggle
-    const [darkMode, setDarkMode] = useState(() => {
-        return localStorage.getItem('theme') === 'dark';
-    });
+    const [darkMode, setDarkMode] = useState(false);
+    const [primaryColor, setPrimaryColor] = useState('#4f46e5');
+    const [accentColor, setAccentColor] = useState('#0f766e');
     const [isMobile, setIsMobile] = useState(() => {
         return typeof window !== 'undefined' ? window.innerWidth <= 768 : false;
     });
@@ -26,10 +46,33 @@ export default function MainLayout() {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
+    const tenantKey = (() => {
+        const params = new URLSearchParams(location.search);
+        return params.get('tenantId') || user?.tenantId || user?.id || 'default';
+    })();
+
+    useEffect(() => {
+        const storedTheme = readTenantTheme(tenantKey);
+        if (storedTheme) {
+            setDarkMode(Boolean(storedTheme.darkMode));
+            setPrimaryColor(storedTheme.primaryColor || '#4f46e5');
+            setAccentColor(storedTheme.accentColor || '#0f766e');
+        } else {
+            setDarkMode(false);
+            setPrimaryColor('#4f46e5');
+            setAccentColor('#0f766e');
+        }
+    }, [tenantKey]);
+
     useEffect(() => {
         document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light');
-        localStorage.setItem('theme', darkMode ? 'dark' : 'light');
-    }, [darkMode]);
+        document.documentElement.style.setProperty('--primary', primaryColor);
+        document.documentElement.style.setProperty('--primary-hover', primaryColor);
+        document.documentElement.style.setProperty('--primary-light', `${primaryColor}15`);
+        document.documentElement.style.setProperty('--secondary', accentColor);
+        document.documentElement.style.setProperty('--secondary-light', `${accentColor}15`);
+        writeTenantTheme(tenantKey, { darkMode, primaryColor, accentColor });
+    }, [darkMode, primaryColor, accentColor, tenantKey]);
 
     // Close mobile sidebar when clicking overlay
     const handleCloseMobile = useCallback(() => {
@@ -65,6 +108,10 @@ export default function MainLayout() {
                     onToggleSidebar={handleToggleSidebar}
                     darkMode={darkMode}
                     onToggleDarkMode={() => setDarkMode(d => !d)}
+                    primaryColor={primaryColor}
+                    accentColor={accentColor}
+                    onPrimaryColorChange={setPrimaryColor}
+                    onAccentColorChange={setAccentColor}
                 />
                 <div className="page-content" style={{ flex: 1 }}>
                     <Outlet />
