@@ -85,19 +85,29 @@ export function buildCallbackUrl(provider: string, req?: Request, baseUrl?: stri
     );
   }
 
-  const base =
-    baseUrl ??
-    env.APP_URL ??
-    (() => {
-      if (req) {
-        const host = req.headers.get("host") || "localhost:3000";
-        const proto = req.headers.get("x-forwarded-proto") || "http";
-        return `${proto}://${host}`;
-      }
-      return "http://localhost:3000";
-    })();
+  const requestBase = req
+    ? (() => {
+        const forwardedProto = req.headers.get("x-forwarded-proto") ?? req.headers.get("x-forwarded-protocol") ?? "http";
+        const forwardedHost = req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? "";
+        const host = forwardedHost.split(",")[0]?.trim();
+        const proto = forwardedProto.split(",")[0]?.trim() || "http";
 
-  return `${base}/api/webhooks/${provider.toLowerCase()}`;
+        if (!host) return undefined;
+        const hostIsLocal = /^(localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/i.test(host);
+        return hostIsLocal ? undefined : `${proto}://${host}`;
+      })()
+    : undefined;
+
+  const base = requestBase ?? baseUrl ?? env.APP_URL ?? (() => {
+    if (req) {
+      const host = req.headers.get("host") || "localhost:3000";
+      const proto = req.headers.get("x-forwarded-proto") || "http";
+      return `${proto}://${host}`;
+    }
+    return "http://localhost:3000";
+  })();
+
+  return `${String(base).replace(/\/$/, "")}/api/webhooks/${provider.toLowerCase()}`;
 }
 
 // ─── HMAC Signature ──────────────────────────────────────────────────────────

@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 import { requirePermission } from "@/lib/rbac";
-import { formatPhoneTZ } from "@/lib/payments/utils";
+import { buildCallbackUrl, formatPhoneTZ } from "@/lib/payments/utils";
 import { paymentService } from "@/lib/payments/service";
 import { getJwtTenantId, isPlatformSuperAdmin } from "@/lib/tenant";
 
@@ -118,7 +118,7 @@ export async function POST(req: NextRequest) {
         // FIX: Correct callback URL path.
         // Previously pointed to /api/payments/{provider}/webhook (deprecated/removed endpoint).
         // All provider webhooks are handled at /api/webhooks/{provider}.
-        const callbackUrl = `${appUrl}/api/webhooks/${providerName.toLowerCase()}`;
+        const callbackUrl = buildCallbackUrl(providerName, req, appUrl);
 
         try {
             const cleanPhone = formatPhoneTZ(phoneNumber);

@@ -1,3 +1,6 @@
+/// <reference types="jest" />
+
+import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { PalmPesaProvider } from "../lib/payments/providers/palmpesa";
 import * as utils from "../lib/payments/utils";
 
@@ -133,12 +136,14 @@ describe("PalmPesaProvider", () => {
     });
 
     it("falls back to raw text when a successful HTTP 200 response is not valid JSON", async () => {
-        jest.spyOn(global, "fetch").mockResolvedValue({
+        jest.spyOn(globalThis, "fetch").mockResolvedValue({
             ok: true,
             status: 200,
             headers: new Headers({ "content-type": "application/json" }),
-            json: jest.fn().mockRejectedValue(new SyntaxError("Unexpected token")),
-            text: jest.fn().mockResolvedValue("Payment initiated"),
+            text: async () => "Payment initiated",
+            json: async () => {
+                throw new SyntaxError("Unexpected token");
+            },
         } as unknown as Response);
 
         const result = await utils.httpPost("https://example.test/api/process-payment", { test: true }, { "Content-Type": "application/json" });
@@ -146,6 +151,19 @@ describe("PalmPesaProvider", () => {
         expect(result.ok).toBe(true);
         expect(result.status).toBe(200);
         expect(result.data).toBe("Payment initiated");
+    });
+
+    it("uses the request host for callback URLs when APP_URL is localhost", () => {
+        const req = new Request("https://example.test/api/license/renew", {
+            headers: {
+                host: "example.test",
+                "x-forwarded-proto": "https",
+            },
+        });
+
+        const callbackUrl = utils.buildCallbackUrl("PALMPESA", req as unknown as Request, "http://localhost:3000");
+
+        expect(callbackUrl).toBe("https://example.test/api/webhooks/palmpesa");
     });
 
     it("parses stringified webhook payload bodies", () => {

@@ -157,9 +157,24 @@ export class PalmPesaProvider implements PaymentProvider {
     };
 
     try {
+      const requestUrl = `${this.apiUrl}/process-payment`;
+      const maskedHeaders = {
+        ...this.headers,
+        Authorization: this.headers.Authorization ? "Bearer [REDACTED]" : "",
+      };
+
+      if (process.env.PALMPESA_DEBUG === "1") {
+        console.log("===== PALMPESA REQUEST =====", {
+          method: "POST",
+          url: requestUrl,
+          headers: maskedHeaders,
+          payload,
+        });
+      }
+
       const result = await retryWithBackoff(
         () =>
-          httpPost(`${this.apiUrl}/process-payment`, payload, this.headers),
+          httpPost(requestUrl, payload, this.headers),
         2
       );
 
@@ -172,16 +187,14 @@ export class PalmPesaProvider implements PaymentProvider {
       const isSuccess = this.evaluateResponseSuccess(result, data, rawText, responseCode, providerRef, message);
 
       if (process.env.PALMPESA_DEBUG === "1") {
-        console.log("===== PALMPESA DEBUG =====", {
-          requestUrl: `${this.apiUrl}/process-payment`,
-          requestBody: payload,
+        console.log("===== PALMPESA RESPONSE =====", {
           httpStatus: result.status,
-          headers: this.headers,
           rawBody: rawData,
           parsedBody: data,
           responseCode,
           successEvaluation: isSuccess,
-          returnedResult: { success: isSuccess, providerRef, message, rawResponse: data, status: responseCode || undefined, code: responseCode || undefined },
+          providerRef,
+          message,
         });
       }
 
