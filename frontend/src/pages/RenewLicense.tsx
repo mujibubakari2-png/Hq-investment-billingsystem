@@ -376,7 +376,7 @@ export default function RenewLicense() {
     }
 
     // Terminal failure/cancel/timeout screen
-    if (['FAILED','CANCELLED','EXPIRED','TIMEOUT','UNKNOWN'].includes(paymentState.status)) {
+    if (['FAILED', 'CANCELLED', 'EXPIRED', 'TIMEOUT', 'UNKNOWN'].includes(paymentState.status)) {
         return (
             <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: 'var(--bg-lighter)', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-family)', padding: '2rem' }}>
                 <div className="card" style={{ maxWidth: 560, width: '100%', padding: '2.5rem 2rem', textAlign: 'center', boxShadow: 'var(--shadow-md)', borderTop: '4px solid #b91c1c' }}>

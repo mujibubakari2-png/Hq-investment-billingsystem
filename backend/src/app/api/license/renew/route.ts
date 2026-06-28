@@ -161,7 +161,7 @@ export async function POST(req: NextRequest) {
                     });
                     // Mark tenantPayment as FAILED if created
                     if (paymentRecord && paymentRecord.id) {
-                        await unscopedDb.tenantPayment.update({ where: { id: paymentRecord.id }, data: { status: 'FAILED' } }).catch(() => {});
+                        await unscopedDb.tenantPayment.update({ where: { id: paymentRecord.id }, data: { status: 'FAILED' } }).catch(() => { });
                     }
                     return errorResponse('PalmPesa did not create a transaction (missing provider reference)', 502, 'PALMPESA_INVALID_RESPONSE');
                 }
