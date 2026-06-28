@@ -5,7 +5,7 @@
  * into a single wallet. Contact: Support@palmpesa.co.tz
  *
  * Auth: Bearer token (API Key)
- * Base URL: https://palmpesa.drmlelwa.co.tz/api
+ * Base URL: https://palmpesa.drmlelwa.co.tz
  *
  * Confirmed endpoints (from official docs):
  *   STK Push  : POST /api/process-payment
