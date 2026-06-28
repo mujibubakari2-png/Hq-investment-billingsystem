@@ -653,7 +653,7 @@ describe('§7 – MikroTik Name Sanitisation', () => {
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  §8 – Webhook Log Lifecycle
-//  NOTE: webhookLog.CREATE goes to globalDb; .UPDATE goes to tenantDb (when tid≠null)
+//  NOTE: webhookLog.CREATE and .UPDATE both go to globalDb
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('§8 – Webhook Log Lifecycle', () => {
@@ -665,36 +665,36 @@ describe('§8 – Webhook Log Lifecycle', () => {
         expect(globalDb.webhookLog.create).toHaveBeenCalledTimes(1);
     });
 
-    it('8.2 – final webhookLog.update on tenantDb: status=COMPLETED + processedAt', async () => {
-        const { tenantDb } = await runWebhook();
+    it('8.2 – final webhookLog.update on globalDb: status=COMPLETED + processedAt', async () => {
+        const { globalDb } = await runWebhook();
 
-        const calls = (tenantDb.webhookLog.update as jest.Mock).mock.calls;
+        const calls = (globalDb.webhookLog.update as jest.Mock).mock.calls;
         const completedCall = calls.find(([a]: any[]) => a?.data?.status === 'COMPLETED');
         expect(completedCall).toBeDefined();
         expect(completedCall[0].data.processedAt).toBeInstanceOf(Date);
     });
 
-    it('8.3 – invalid signature: tenantDb.webhookLog.update gets status=FAILED', async () => {
-        const { tenantDb } = await runWebhook({ provider: makeProvider({ verified: false, reason: 'Mismatch' }) });
+    it('8.3 – invalid signature: globalDb.webhookLog.update gets status=FAILED', async () => {
+        const { globalDb } = await runWebhook({ provider: makeProvider({ verified: false, reason: 'Mismatch' }) });
 
-        const failedCall = (tenantDb.webhookLog.update as jest.Mock).mock.calls
+        const failedCall = (globalDb.webhookLog.update as jest.Mock).mock.calls
             .find(([a]: any[]) => a?.data?.status === 'FAILED');
         expect(failedCall).toBeDefined();
     });
 
     it('8.4 – webhookLog.update records transactionRef from parsed payload', async () => {
-        const { tenantDb } = await runWebhook();
+        const { globalDb } = await runWebhook();
 
-        const refCall = (tenantDb.webhookLog.update as jest.Mock).mock.calls
+        const refCall = (globalDb.webhookLog.update as jest.Mock).mock.calls
             .find(([a]: any[]) => a?.data?.transactionRef);
         expect(refCall).toBeDefined();
         expect(refCall[0].data.transactionRef).toBe(TX_REF);
     });
 
-    it('8.5 – concurrent duplicate (count=0): tenantDb.webhookLog marked DUPLICATE', async () => {
-        const { tenantDb } = await runWebhook({ txUpdateCount: 0 });
+    it('8.5 – concurrent duplicate (count=0): globalDb.webhookLog marked DUPLICATE', async () => {
+        const { globalDb } = await runWebhook({ txUpdateCount: 0 });
 
-        const dupCall = (tenantDb.webhookLog.update as jest.Mock).mock.calls
+        const dupCall = (globalDb.webhookLog.update as jest.Mock).mock.calls
             .find(([a]: any[]) => a?.data?.status === 'DUPLICATE');
         expect(dupCall).toBeDefined();
     });
