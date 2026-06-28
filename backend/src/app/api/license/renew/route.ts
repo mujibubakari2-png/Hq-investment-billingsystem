@@ -115,7 +115,10 @@ export async function POST(req: NextRequest) {
             providerName = "MONGIKE";
         }
 
-        const callbackUrl = `${appUrl}/api/payments/${providerName.toLowerCase()}/webhook`;
+        // FIX: Correct callback URL path.
+        // Previously pointed to /api/payments/{provider}/webhook (deprecated/removed endpoint).
+        // All provider webhooks are handled at /api/webhooks/{provider}.
+        const callbackUrl = `${appUrl}/api/webhooks/${providerName.toLowerCase()}`;
 
         try {
             const cleanPhone = formatPhoneTZ(phoneNumber);
@@ -135,7 +138,7 @@ export async function POST(req: NextRequest) {
                 return jsonResponse(
                     {
                         success: true,
-                        message: " Please enter your mobile money PIN to complete the transaction.",
+                        message: "Please enter your mobile money PIN to complete the transaction.",
                         status: "processing",
                     },
                     200

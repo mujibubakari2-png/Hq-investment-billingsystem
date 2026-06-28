@@ -144,7 +144,8 @@ async function runTests() {
             }
         });
 
-        // 2a. Test Webhook Simulation
+        // Simulate webhook — all license webhooks go to /api/payments/{provider}/webhook
+        // (these are the provider-specific legacy routes that handle tenantInvoice activation)
         const webhookSecret = 'test-webhook-secret-123';
         
         let webhookPayload: any;
@@ -167,8 +168,11 @@ async function runTests() {
             webhookHeaders['x-mongike-signature'] = hmac;
         }
 
-        console.log(`Simulating webhook for License Invoice ${invoiceNumber}...`);
+        // FIX: License webhooks use /api/payments/{provider}/webhook (provider-specific routes
+        // that process tenantInvoice activation). These are distinct from the tenant customer
+        // payment webhooks at /api/webhooks/tenant/{tenantId}/{provider}.
         const webhookUrl = `${API_BASE}/api/payments/${provider.toLowerCase()}/webhook`;
+        console.log(`Simulating license webhook → ${webhookUrl}`);
         try {
             const webhookRes = await fetch(webhookUrl, { method: 'POST', headers: webhookHeaders, body: JSON.stringify(webhookPayload) });
             const webhookJson = await webhookRes.json();
@@ -228,7 +232,7 @@ async function runTests() {
             }
         });
 
-        // 3b. Test Webhook Simulation
+        // Customer payment webhooks go to /api/webhooks/tenant/{tenantId}/{provider}
         const webhookSecret = 'test-webhook-secret-123';
         
         let webhookPayload: any;
@@ -251,8 +255,10 @@ async function runTests() {
             webhookHeaders['x-mongike-signature'] = hmac;
         }
 
-        console.log(`Simulating webhook for Customer Transaction ${refNumber}...`);
-        const webhookUrl = `${API_BASE}/api/webhooks/tenant/${tenant.id}/${provider}`;
+        // FIX: Customer webhooks use /api/webhooks/tenant/{tenantId}/{provider}
+        // NOT /api/webhooks/{provider} (which is the platform-global route)
+        const webhookUrl = `${API_BASE}/api/webhooks/tenant/${tenant.id}/${provider.toLowerCase()}`;
+        console.log(`Simulating customer webhook → ${webhookUrl}`);
         try {
             const webhookRes = await fetch(webhookUrl, { method: 'POST', headers: webhookHeaders, body: JSON.stringify(webhookPayload) });
             const webhookJson = await webhookRes.json();

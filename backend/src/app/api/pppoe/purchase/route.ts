@@ -153,7 +153,21 @@ export async function POST(req: NextRequest) {
             ...(pkg.tenantId ? { tenantId: pkg.tenantId } : {}),
           },
         });
-        provider = channel?.provider?.toUpperCase() ?? "ZENOPAY";
+        if (channel?.provider) {
+          provider = channel.provider.toUpperCase();
+        } else {
+          // PAY-001 FIX (PPPoE): No provider configured — return error instead of
+          // silently defaulting to ZENOPAY. Defaulting causes payments to be routed
+          // to a provider the tenant hasn't configured, leading to silent failures.
+          await db.transaction.update({
+            where: { id: transaction.id },
+            data: { status: "FAILED" },
+          });
+          return errorResponse(
+            "No payment provider is configured for this tenant. Please contact support.",
+            503
+          );
+        }
       }
     }
 

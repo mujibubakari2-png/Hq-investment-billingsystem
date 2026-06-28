@@ -13,8 +13,13 @@ export async function POST(req: NextRequest) {
 
   try {
     const rawBody = await req.text();
+
+    // FIX: Normalize headers to lowercase for consistent provider signature verification.
+    // ZenoPay sends "x-zeno-signature" or "x-api-key" — must be lowercased to match
+    // the checks in zenopay.ts verifyWebhook(). Previously missing this caused all
+    // ZenoPay webhooks to fail signature verification and be rejected.
     const headers: Record<string, string> = {};
-    req.headers.forEach((value, key) => { headers[key] = value; });
+    req.headers.forEach((value, key) => { headers[key.toLowerCase()] = value; });
 
     const result = await paymentService.processWebhook("ZENOPAY", headers, rawBody);
 

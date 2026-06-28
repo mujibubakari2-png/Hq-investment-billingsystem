@@ -4,10 +4,7 @@
  * Mongike aggregates TZ mobile money (M-Pesa, Airtel Money, Halo Pesa, Tigo Pesa).
  * Register at: https://mongike.com/
  *
- * ⚠️  Update the endpoint URLs below once you receive your developer credentials.
- *     These follow the common TZ payment gateway pattern.
- *
- * Auth: API Key in header (x-api-key)  +  optional HMAC webhook signature
+ * Auth: API Key in header (x-api-key) + optional HMAC webhook signature
  */
 
 import {
@@ -46,9 +43,9 @@ export class MongikeProvider implements PaymentProvider {
     if (!url) {
       throw new Error("Mongike: API URL is not configured. Set MONGIKE_API_URL in environment variables or channel config.");
     }
-    this.apiUrl = url;
+    this.apiUrl = url.replace(/\/$/, ""); // strip trailing slash
     this.webhookSecret = config.webhookSecret ?? "";
-    this.environment = process.env.NODE_ENV === 'production' ? "live" : (config.environment ?? "sandbox");
+    this.environment = process.env.NODE_ENV === "production" ? "live" : (config.environment ?? "sandbox");
   }
 
   private get headers(): Record<string, string> {
@@ -80,12 +77,7 @@ export class MongikeProvider implements PaymentProvider {
 
     try {
       const result = await retryWithBackoff(
-        () =>
-          httpPost(
-            `${this.apiUrl}/payments/initiate`,
-            payload,
-            this.headers
-          ),
+        () => httpPost(`${this.apiUrl}/payments/initiate`, payload, this.headers),
         2
       );
 
@@ -167,13 +159,10 @@ export class MongikeProvider implements PaymentProvider {
     rawBody: string
   ): Promise<WebhookVerification> {
     if (!this.webhookSecret) {
-      // PAY-003/PAY-004 FIX: Reject webhooks when no secret is configured.
-      // Previously this returned verified:true which allowed anyone to forge payment confirmations.
       console.error("[MONGIKE] Webhook secret not configured — rejecting webhook. Set webhookSecret on the PaymentChannel record.");
       return { verified: false, reason: "Webhook secret not configured" };
     }
 
-    // Try HMAC-SHA256 signature first
     const hmacSig =
       (headers["x-mongike-signature"] as string) ??
       (headers["x-webhook-signature"] as string);
@@ -184,7 +173,6 @@ export class MongikeProvider implements PaymentProvider {
       return { verified: valid, reason: valid ? undefined : "HMAC signature mismatch" };
     }
 
-    // Fallback: shared secret in header
     const secretHeader =
       (headers["x-webhook-secret"] as string) ??
       (headers["x-mongike-secret"] as string);
@@ -206,9 +194,7 @@ export class MongikeProvider implements PaymentProvider {
     ).toUpperCase();
 
     const resultCode =
-      ["COMPLETED", "SUCCESS", "PAID", "SUCCESSFUL"].includes(rawStatus)
-        ? "0"
-        : "1";
+      ["COMPLETED", "SUCCESS", "PAID", "SUCCESSFUL"].includes(rawStatus) ? "0" : "1";
 
     return {
       transactionRef:

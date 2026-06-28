@@ -45,9 +45,9 @@ export class ZenoPayProvider implements PaymentProvider {
     if (!url) {
       throw new Error("ZenoPay: API URL is not configured. Set ZENOPAY_API_URL in environment variables or channel config.");
     }
-    this.apiUrl = url;
+    this.apiUrl = url.replace(/\/$/, ""); // strip trailing slash
     this.webhookSecret = config.webhookSecret ?? "";
-    this.environment = process.env.NODE_ENV === 'production' ? "live" : (config.environment ?? "sandbox");
+    this.environment = process.env.NODE_ENV === "production" ? "live" : (config.environment ?? "sandbox");
   }
 
   private get headers(): Record<string, string> {
@@ -73,25 +73,18 @@ export class ZenoPayProvider implements PaymentProvider {
       webhook_url: request.callbackUrl,
     };
 
-    // Include account_id if provided
     if (this.accountId) {
       payload.account_id = this.accountId;
     }
 
     try {
       const result = await retryWithBackoff(
-        () =>
-          httpPost(
-            `${this.apiUrl}/payments/mobile_money_tanzania`,
-            payload,
-            this.headers
-          ),
+        () => httpPost(`${this.apiUrl}/payments/mobile_money_tanzania`, payload, this.headers),
         2
       );
 
       const data = result.data as Record<string, unknown>;
 
-      // ZenoPay returns { status: "success", order_id, message }
       if (result.ok && (data?.status === "success" || data?.success === true)) {
         return {
           success: true,
@@ -159,13 +152,10 @@ export class ZenoPayProvider implements PaymentProvider {
     rawBody: string
   ): Promise<WebhookVerification> {
     if (!this.webhookSecret) {
-      // PAY-003/PAY-004 FIX: Reject webhooks when no secret is configured.
-      // Previously this returned verified:true which allowed anyone to forge payment confirmations.
       console.error("[ZENOPAY] Webhook secret not configured — rejecting webhook. Set webhookSecret on the PaymentChannel record.");
       return { verified: false, reason: "Webhook secret not configured" };
     }
 
-    // ZenoPay may send x-zeno-signature (HMAC-SHA256) or x-api-key
     const hmacHeader = headers["x-zeno-signature"] as string | undefined;
     const apiKeyHeader = headers["x-api-key"] as string | undefined;
 
@@ -189,7 +179,6 @@ export class ZenoPayProvider implements PaymentProvider {
     const b = body as Record<string, unknown>;
 
     const rawStatus = ((b?.status ?? b?.payment_status ?? "") as string).toUpperCase();
-    // Map to result code: "0" = success, "1" = failure
     const resultCode =
       rawStatus === "COMPLETED" || rawStatus === "SUCCESS" || rawStatus === "PAID"
         ? "0"

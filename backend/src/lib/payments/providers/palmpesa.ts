@@ -6,6 +6,10 @@
  *
  * Auth: Bearer token (API Key)
  * Base URL: https://palmpesa.drmlelwa.co.tz/api
+ *
+ * Confirmed endpoints (from official docs):
+ *   STK Push  : POST /api/process-payment
+ *   Status    : GET  /api/order-status  (body: { order_id })
  */
 
 import {
@@ -38,11 +42,16 @@ export class PalmPesaProvider implements PaymentProvider {
     this.apiKey = config.apiKey;
     const url = config.apiUrl ?? process.env.PALMPESA_API_URL;
     if (!url) {
-      throw new Error("PalmPesa: API URL is not configured. Set PALMPESA_API_URL in environment variables or channel config.");
+      throw new Error(
+        "PalmPesa: API URL is not configured. Set PALMPESA_API_URL in environment variables or channel config."
+      );
     }
-    this.apiUrl = url;
+    this.apiUrl = url.replace(/\/$/, ""); // strip trailing slash
     this.webhookSecret = config.webhookSecret ?? "";
-    this.environment = process.env.NODE_ENV === 'production' ? "live" : (config.environment ?? "sandbox");
+    this.environment =
+      process.env.NODE_ENV === "production"
+        ? "live"
+        : (config.environment ?? "sandbox");
   }
 
   private get headers(): Record<string, string> {
@@ -54,6 +63,8 @@ export class PalmPesaProvider implements PaymentProvider {
   }
 
   // ── Initiate Payment (STK Push) ───────────────────────────────────────────
+  // Confirmed endpoint: POST /api/process-payment
+  // Docs: https://palmpesa-docs.netlify.app
 
   async initiatePayment(request: PaymentRequest): Promise<PaymentResponse> {
     const phone = formatPhoneTZ(request.phone);
@@ -70,7 +81,8 @@ export class PalmPesaProvider implements PaymentProvider {
 
     try {
       const result = await retryWithBackoff(
-        () => httpPost(`${this.apiUrl}/payments/stk-push`, payload, this.headers),
+        () =>
+          httpPost(`${this.apiUrl}/process-payment`, payload, this.headers),
         2
       );
 
@@ -90,7 +102,10 @@ export class PalmPesaProvider implements PaymentProvider {
 
       return {
         success: false,
-        message: (data?.ResponseDescription as string) ?? (data?.message as string) ?? "Failed to initiate payment",
+        message:
+          (data?.ResponseDescription as string) ??
+          (data?.message as string) ??
+          `PalmPesa error (HTTP ${result.status})`,
         rawResponse: data,
       };
     } catch (err: unknown) {
@@ -100,21 +115,36 @@ export class PalmPesaProvider implements PaymentProvider {
   }
 
   // ── Check Transaction Status ──────────────────────────────────────────────
+  // Confirmed endpoint: GET /api/order-status?order_id={providerRef}
 
   async checkStatus(providerRef: string): Promise<TransactionStatus> {
     try {
       const result = await httpGet(
-        `${this.apiUrl}/payments/status/${providerRef}`,
+        `${this.apiUrl}/order-status?order_id=${encodeURIComponent(providerRef)}`,
         this.headers
       );
 
       const data = result.data as Record<string, unknown>;
-      const rawStatus = (data?.ResultCode ?? data?.status ?? "") as string;
+      const rawStatus = (
+        data?.ResultCode ??
+        data?.status ??
+        data?.order_status ??
+        ""
+      ) as string;
 
       let status: TransactionStatus["status"] = "PENDING";
-      if (rawStatus === "0" || rawStatus === "SUCCESS" || rawStatus === "COMPLETED") {
+      if (
+        rawStatus === "0" ||
+        rawStatus === "SUCCESS" ||
+        rawStatus === "COMPLETED" ||
+        rawStatus === "PAID"
+      ) {
         status = "COMPLETED";
-      } else if (rawStatus === "FAILED" || rawStatus === "CANCELLED") {
+      } else if (
+        rawStatus === "FAILED" ||
+        rawStatus === "CANCELLED" ||
+        rawStatus === "REJECTED"
+      ) {
         status = "FAILED";
       } else if (rawStatus === "EXPIRED") {
         status = "EXPIRED";
@@ -140,7 +170,10 @@ export class PalmPesaProvider implements PaymentProvider {
     _rawBody: string
   ): Promise<WebhookVerification> {
     if (!this.webhookSecret) {
-      console.error("[PALMPESA] Webhook secret not configured — rejecting webhook. Set webhookSecret on the PaymentChannel record.");
+      console.error(
+        "[PALMPESA] Webhook secret not configured — rejecting webhook. " +
+          "Set webhookSecret on the PaymentChannel record."
+      );
       return { verified: false, reason: "Webhook secret not configured" };
     }
 

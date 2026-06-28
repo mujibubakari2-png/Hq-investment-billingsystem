@@ -4,8 +4,6 @@
  * HarakaPay payment gateway for East Africa mobile money collections.
  * Portal: https://harakapayment.com  |  https://harakapay.net
  *
- * ⚠️  Update endpoint URLs below once you receive credentials from HarakaPay portal.
- *
  * Auth: API Key + Secret in headers
  */
 
@@ -45,9 +43,9 @@ export class HarakaPayProvider implements PaymentProvider {
     if (!url) {
       throw new Error("HarakaPay: API URL is not configured. Set HARAKAPAY_API_URL in environment variables or channel config.");
     }
-    this.apiUrl = url;
+    this.apiUrl = url.replace(/\/$/, ""); // strip trailing slash
     this.webhookSecret = config.webhookSecret ?? "";
-    this.environment = process.env.NODE_ENV === 'production' ? "live" : (config.environment ?? "sandbox");
+    this.environment = process.env.NODE_ENV === "production" ? "live" : (config.environment ?? "sandbox");
   }
 
   private get headers(): Record<string, string> {
@@ -79,12 +77,7 @@ export class HarakaPayProvider implements PaymentProvider {
 
     try {
       const result = await retryWithBackoff(
-        () =>
-          httpPost(
-            `${this.apiUrl}/payments/collect`,
-            payload,
-            this.headers
-          ),
+        () => httpPost(`${this.apiUrl}/payments/collect`, payload, this.headers),
         2
       );
 
@@ -167,13 +160,10 @@ export class HarakaPayProvider implements PaymentProvider {
     rawBody: string
   ): Promise<WebhookVerification> {
     if (!this.webhookSecret) {
-      // PAY-003/PAY-004 FIX: Reject webhooks when no secret is configured.
-      // Previously this returned verified:true which allowed anyone to forge payment confirmations.
       console.error("[HARAKAPAY] Webhook secret not configured — rejecting webhook. Set webhookSecret on the PaymentChannel record.");
       return { verified: false, reason: "Webhook secret not configured" };
     }
 
-    // Try HMAC-SHA256 first
     const hmacSig =
       (headers["x-haraka-signature"] as string) ??
       (headers["x-webhook-signature"] as string);
@@ -184,7 +174,6 @@ export class HarakaPayProvider implements PaymentProvider {
       return { verified: valid, reason: valid ? undefined : "HMAC mismatch" };
     }
 
-    // Fallback: shared secret header
     const secretHeader =
       (headers["x-webhook-secret"] as string) ??
       (headers["x-haraka-secret"] as string);
@@ -206,9 +195,7 @@ export class HarakaPayProvider implements PaymentProvider {
     ).toUpperCase();
 
     const resultCode =
-      ["COMPLETED", "SUCCESS", "PAID", "SUCCESSFUL", "0"].includes(rawStatus)
-        ? "0"
-        : "1";
+      ["COMPLETED", "SUCCESS", "PAID", "SUCCESSFUL", "0"].includes(rawStatus) ? "0" : "1";
 
     return {
       transactionRef:
