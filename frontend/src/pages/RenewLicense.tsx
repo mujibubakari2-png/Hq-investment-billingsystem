@@ -21,7 +21,17 @@ export default function RenewLicense() {
     const [name, setName] = useState(user?.fullName || user?.username || '');
     const [email, setEmail] = useState(user?.email || '');
     const [submitting, setSubmitting] = useState(false);
-    // payment flow state
+
+    // Payment flow state machine
+    // IDLE       → user on the payment form
+    // SENDING    → API call in flight (button clicked, waiting for /renew response)
+    // PENDING    → STK Push confirmed by provider, polling for confirmation
+    // PROCESSING → Provider confirmed but webhook not yet processed
+    // COMPLETED  → tenantPayment.status === COMPLETED (webhook received)
+    // FAILED     → provider rejected or webhook marked FAILED
+    // CANCELLED  → user cancelled on phone
+    // EXPIRED    → provider request expired
+    // TIMEOUT    → 60s elapsed with no terminal state
     const [paymentState, setPaymentState] = useState<{
         status: 'IDLE' | 'SENDING' | 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED' | 'CANCELLED' | 'EXPIRED' | 'TIMEOUT' | 'UNKNOWN',
         message?: string,
@@ -29,6 +39,7 @@ export default function RenewLicense() {
         providerRef?: string | null,
         paymentId?: string | null,
     }>({ status: 'IDLE' });
+
     const [showChangePlan, setShowChangePlan] = useState(false);
     const [changingPlan, setChangingPlan] = useState(false);
     const [changePlanMsg, setChangePlanMsg] = useState('');
@@ -59,7 +70,6 @@ export default function RenewLicense() {
         try {
             const res = await licenseApi.changePlan(planId);
             setChangePlanMsg(res.message || 'Plan changed successfully!');
-            // Reload license to reflect new plan
             const updated = await licenseApi.getLicense();
             setLicense(updated);
             setSelectedPlanId(planId);
@@ -74,124 +84,130 @@ export default function RenewLicense() {
         }
     };
 
-    // Poll payment status when in PENDING state
+    // ── Polling: runs whenever status enters PENDING or PROCESSING ───────────
     useEffect(() => {
-        let intervalId: any = null;
-        let timeoutId: any = null;
+        if (paymentState.status !== 'PENDING' && paymentState.status !== 'PROCESSING') return;
+        if (!paymentState.reference) return;
 
-        const startPolling = async () => {
-            if (!paymentState.reference) return;
-            const reference = paymentState.reference;
-            const provider = 'PALMPESA';
-            const providerRef = paymentState.providerRef;
+        let intervalId: ReturnType<typeof setInterval>;
+        let timeoutId: ReturnType<typeof setTimeout>;
+        let stopped = false;
 
-            const poll = async () => {
-                try {
-                    const q = new URLSearchParams();
-                    q.set('provider', provider);
-                    if (providerRef) q.set('providerRef', String(providerRef));
-                    const res = await fetch(`/api/payments/status/${encodeURIComponent(reference)}?${q.toString()}`);
-                    if (!res.ok) return;
-                    const data = await res.json();
-                    const live = (data.liveStatus || data.status || '').toString().toUpperCase();
-                    const status = (data.status || data.liveStatus || '').toString().toUpperCase();
-                    // Map status
-                    if (status === 'COMPLETED' || live === 'COMPLETED') {
-                        // If DB still pending but provider says completed, show PROCESSING briefly
-                        if (data.status && data.status !== 'COMPLETED' && live === 'COMPLETED') {
-                            setPaymentState(s => ({ ...s, status: 'PROCESSING', message: data.message || 'Provider confirmed payment — finalizing.' }));
-                            return;
-                        }
-                        setPaymentState({ status: 'COMPLETED', message: data.message || 'Payment completed', reference, providerRef: providerRef ?? null, paymentId: paymentState.paymentId ?? null });
-                        clearInterval(intervalId);
-                        clearTimeout(timeoutId);
-                        return;
-                    }
-                    if (status === 'FAILED' || live === 'FAILED') {
-                        setPaymentState({ status: 'FAILED', message: data.message || (data.liveStatusMessage || 'Payment failed'), reference, providerRef: providerRef ?? null, paymentId: paymentState.paymentId ?? null });
-                        clearInterval(intervalId);
-                        clearTimeout(timeoutId);
-                        return;
-                    }
-                    if (status === 'CANCELLED' || live === 'CANCELLED') {
-                        setPaymentState({ status: 'CANCELLED', message: data.message || 'Payment cancelled', reference, providerRef: providerRef ?? null, paymentId: paymentState.paymentId ?? null });
-                        clearInterval(intervalId);
-                        clearTimeout(timeoutId);
-                        return;
-                    }
-                    if (status === 'EXPIRED' || live === 'EXPIRED') {
-                        setPaymentState({ status: 'EXPIRED', message: data.message || 'Payment request expired', reference, providerRef: providerRef ?? null, paymentId: paymentState.paymentId ?? null });
-                        clearInterval(intervalId);
-                        clearTimeout(timeoutId);
-                        return;
-                    }
-                    // otherwise remain pending
-                } catch (e) {
-                    console.warn('Payment status poll error', e);
+        const stop = () => { stopped = true; clearInterval(intervalId); clearTimeout(timeoutId); };
+
+        const poll = async () => {
+            if (stopped) return;
+            try {
+                const q = new URLSearchParams();
+                q.set('provider', 'PALMPESA');
+                if (paymentState.providerRef) q.set('providerRef', String(paymentState.providerRef));
+                if (paymentState.paymentId) q.set('paymentId', String(paymentState.paymentId));
+
+                // ✅ FIXED: use the dedicated license status endpoint, NOT /api/payments/status
+                // /api/payments/status queries the `transaction` table (hotspot/PPPoE only).
+                // License payments live in `tenantPayment` — a completely different table.
+                const res = await fetch(
+                    `/api/license/payment-status/${encodeURIComponent(paymentState.reference!)}?${q.toString()}`
+                );
+
+                if (!res.ok) {
+                    console.warn('[RenewLicense] poll: non-OK response', res.status);
+                    return; // keep polling — could be transient
                 }
-            };
 
-            // Start interval immediately
-            await poll();
-            intervalId = setInterval(poll, 3000);
+                const data = await res.json();
+                const status = (data.status ?? '').toString().toUpperCase();
 
-            // Timeout after 2.5 minutes
-            timeoutId = setTimeout(() => {
-                clearInterval(intervalId);
-                setPaymentState({ status: 'TIMEOUT', message: 'Payment request timed out. No confirmation received.' });
-            }, 150000);
+                switch (status) {
+                    case 'PAID':
+                    case 'COMPLETED':
+                        stop();
+                        setPaymentState(s => ({ ...s, status: 'COMPLETED', message: data.message || 'Payment confirmed! Your license has been renewed.' }));
+                        break;
+                    case 'FAILED':
+                        stop();
+                        setPaymentState(s => ({ ...s, status: 'FAILED', message: data.message || 'Payment failed. Please try again.' }));
+                        break;
+                    case 'CANCELLED':
+                        stop();
+                        setPaymentState(s => ({ ...s, status: 'CANCELLED', message: data.message || 'Payment cancelled.' }));
+                        break;
+                    case 'EXPIRED':
+                        stop();
+                        setPaymentState(s => ({ ...s, status: 'EXPIRED', message: data.message || 'Payment request expired.' }));
+                        break;
+                    case 'PROCESSING':
+                        // Provider confirmed but webhook not landed yet — stay in this visual state
+                        setPaymentState(s => ({ ...s, status: 'PROCESSING', message: data.message || 'Provider confirmed — finalizing your license...' }));
+                        break;
+                    case 'PENDING':
+                    default:
+                        // Still waiting — keep polling, no state change
+                        break;
+                }
+            } catch (e) {
+                console.warn('[RenewLicense] poll error:', e);
+            }
         };
 
-        if (paymentState.status === 'PENDING') {
-            startPolling();
-        }
+        // First poll immediately, then every 3 seconds
+        poll();
+        intervalId = setInterval(poll, 3000);
 
-        return () => {
-            if (intervalId) clearInterval(intervalId);
-            if (timeoutId) clearTimeout(timeoutId);
-        };
+        // Hard timeout: 60 seconds (provider STK push expires in ~60s on most TZ networks)
+        timeoutId = setTimeout(() => {
+            if (stopped) return;
+            stop();
+            setPaymentState({ status: 'TIMEOUT', message: 'No payment confirmation received within 60 seconds. Please check your phone or try again.' });
+        }, 60_000);
+
+        return stop;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [paymentState.status, paymentState.reference]);
 
     const activePlan = allPlans.find(p => p.id === selectedPlanId) || license?.plan;
     const basePrice = activePlan?.price || 0;
-    // Use ALL pending invoices (hasPending covers both past-due and future-dated ones)
     const hasPendingInvoice = !!(license?.hasPending || license?.hasOutstanding) && (license?.pendingInvoices?.length ?? 0) > 0;
-    // Total pending amount = sum of all pending invoices (not just first one)
     const pendingAmount = hasPendingInvoice
         ? (license?.totalOutstanding ?? (license?.pendingInvoices || []).reduce((s, i) => s + i.amount, 0))
         : (location.state?.amount || 0);
 
     const packages = [
-        { months: 1, title: '1 Month License', subtitle: 'Standard 30-day license', price: basePrice, save: 0 },
-        { months: 3, title: '3 Months License', subtitle: `Save TZS ${(basePrice * 3 * 0.167).toLocaleString()} (16.7% off)`, price: basePrice * 3 - (basePrice * 3 * 0.167), save: basePrice * 3 * 0.167 },
-        { months: 6, title: '6 Months License', subtitle: 'Best value for half year', price: basePrice * 6 - (basePrice * 6 * 0.20), save: basePrice * 6 * 0.20 },
-        { months: 12, title: '12 Months License', subtitle: `Save TZS ${(basePrice * 12 * 0.167).toLocaleString()} (16.7% off)`, price: basePrice * 12 - (basePrice * 12 * 0.167), save: basePrice * 12 * 0.167 },
+        { months: 1,  title: '1 Month License',  subtitle: 'Standard 30-day license',                                                                   price: basePrice,                                  save: 0 },
+        { months: 3,  title: '3 Months License',  subtitle: `Save TZS ${(basePrice * 3 * 0.167).toLocaleString()} (16.7% off)`,                          price: basePrice * 3  - (basePrice * 3  * 0.167),  save: basePrice * 3  * 0.167 },
+        { months: 6,  title: '6 Months License',  subtitle: 'Best value for half year',                                                                   price: basePrice * 6  - (basePrice * 6  * 0.20),   save: basePrice * 6  * 0.20 },
+        { months: 12, title: '12 Months License', subtitle: `Save TZS ${(basePrice * 12 * 0.167).toLocaleString()} (16.7% off)`,                         price: basePrice * 12 - (basePrice * 12 * 0.167),  save: basePrice * 12 * 0.167 },
     ];
+
+    const getAmountToPay = () => {
+        if (selectedPackage === 0) return pendingAmount;
+        return packages.find(p => p.months === selectedPackage)?.price || 0;
+    };
 
     const handlePayment = async () => {
         if (!phone) {
-            alert("Please enter a valid phone number");
+            alert('Please enter a valid phone number');
             return;
         }
         const amountToPay = getAmountToPay();
         if (!amountToPay || amountToPay <= 0) {
-            alert("Please select a valid payment package");
+            alert('Please select a valid payment package');
             return;
         }
+
+        // Show spinner immediately so user knows click was registered
+        setPaymentState({ status: 'SENDING', message: 'Sending STK Push...' });
         setSubmitting(true);
+
         try {
             let amount = pendingAmount;
             let months = 0;
-
             if (selectedPackage > 0) {
                 const pkg = packages.find(p => p.months === selectedPackage);
-                if (pkg) {
-                    amount = pkg.price;
-                    months = pkg.months;
-                }
+                if (pkg) { amount = pkg.price; months = pkg.months; }
             }
 
-            // Dynamically change plan if selectedPlanId differs from current license plan
+            // Change plan first if needed
             if (selectedPlanId && license?.plan?.id && selectedPlanId !== license.plan.id) {
                 await licenseApi.changePlan(selectedPlanId);
             }
@@ -199,42 +215,38 @@ export default function RenewLicense() {
             const res = await licenseApi.renewLicense({
                 packageMonths: months,
                 phoneNumber: phone,
-                amount: amount,
-                invoiceId: selectedPackage === 0 && hasPendingInvoice ? license?.pendingInvoices?.[0]?.id : undefined
+                amount,
+                invoiceId: selectedPackage === 0 && hasPendingInvoice ? license?.pendingInvoices?.[0]?.id : undefined,
             });
 
             if (res.success) {
-                // STK Push was accepted by our server/provider as PENDING
+                // Backend confirmed the provider accepted the STK push.
+                // Transition to PENDING so polling starts.
                 setPaymentState({
-                    status: res.status === 'PENDING' ? 'PENDING' : (res.status as any) || 'UNKNOWN',
-                    message: res.message || 'STK push requested. Waiting for provider confirmation.',
-                    reference: res.reference,
+                    status: (res as any).status === 'PENDING' ? 'PENDING' : ((res as any).status ?? 'PENDING'),
+                    message: res.message || 'STK Push sent. Please enter your mobile money PIN.',
+                    reference: (res as any).reference,
                     providerRef: (res as any).providerRef ?? null,
                     paymentId: (res as any).paymentId ?? null,
                 });
             } else {
-                setPaymentState({ status: 'FAILED', message: res.message || 'Failed to initiate payment' });
+                setPaymentState({ status: 'FAILED', message: res.message || 'Failed to initiate payment.' });
             }
         } catch (err: any) {
-            setPaymentState({ status: 'FAILED', message: err.message || 'Payment initiation failed' });
+            setPaymentState({ status: 'FAILED', message: err.message || 'Payment initiation failed.' });
         } finally {
             setSubmitting(false);
         }
     };
 
-    const getAmountToPay = () => {
-        if (selectedPackage === 0) return pendingAmount;
-        return packages.find(p => p.months === selectedPackage)?.price || 0;
-    };
-
     const handlePrintInvoice = () => {
-        const issueDate = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        const issueDate  = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
         const periodFrom = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-        const periodTo = new Date(Date.now() + (selectedPackage || 1) * 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-        const dueDate = license?.pendingInvoices?.[0]?.dueDate || 'Immediately';
+        const periodTo   = new Date(Date.now() + (selectedPackage || 1) * 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        const dueDate    = license?.pendingInvoices?.[0]?.dueDate || 'Immediately';
         const invoiceRef = license?.pendingInvoices?.[0]?.invoiceNumber || 'INV-RENEWAL';
         const description = selectedPackage === 0 ? 'Invoice Balance' : `${currentPlanName} — License Fee (${selectedPackage} Month${selectedPackage > 1 ? 's' : ''})`;
-        const amount = getAmountToPay().toLocaleString(undefined, { maximumFractionDigits: 0 });
+        const amount     = getAmountToPay().toLocaleString(undefined, { maximumFractionDigits: 0 });
 
         const printContent = `
             <html><head><title>Invoice ${invoiceRef}</title>
@@ -259,7 +271,6 @@ export default function RenewLicense() {
                 .notes { font-size: 0.85rem; color: #666; line-height: 1.5; margin-bottom: 32px; }
                 .footer { background: #f8f9fa; padding: 16px; text-align: center; font-size: 0.85rem; color: #666; border-radius: 4px; border-top: 1px solid #eee; }
             </style></head><body>
-            
             <div class="header-flex">
                 <div>
                     <h2>${license?.platformName || 'Our Company'}</h2>
@@ -273,14 +284,12 @@ export default function RenewLicense() {
                     <div style="font-weight: 600">${invoiceRef}</div>
                 </div>
             </div>
-
             <div class="info-grid">
                 <div>
                     <div class="info-label">BILL TO</div>
                     <div class="info-value">${license?.companyName?.toUpperCase() || name.toUpperCase()}</div>
                     <div style="font-size: 0.85rem; color: #666; line-height: 1.5">
-                        ${email ? email + '<br/>' : ''}
-                        ${phone}
+                        ${email ? email + '<br/>' : ''}${phone}
                     </div>
                 </div>
                 <div>
@@ -294,14 +303,10 @@ export default function RenewLicense() {
                     <div style="font-weight: 500; color: #d32f2f;">${dueDate}</div>
                 </div>
             </div>
-
             <table>
                 <thead>
                     <tr>
-                        <th>DESCRIPTION</th>
-                        <th class="right">QTY</th>
-                        <th class="right">PRICE</th>
-                        <th class="right">TOTAL</th>
+                        <th>DESCRIPTION</th><th class="right">QTY</th><th class="right">PRICE</th><th class="right">TOTAL</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -313,44 +318,74 @@ export default function RenewLicense() {
                     </tr>
                 </tbody>
             </table>
-
             <div class="totals">
                 <div class="totals-box">
-                    <div class="total-row">
-                        <span style="color: #666;">Subtotal</span>
-                        <span>TZS ${amount}</span>
-                    </div>
-                    <div class="balance-due">
-                        <span>Balance Due</span>
-                        <span>TZS ${amount}</span>
-                    </div>
+                    <div class="total-row"><span style="color:#666;">Subtotal</span><span>TZS ${amount}</span></div>
+                    <div class="balance-due"><span>Balance Due</span><span>TZS ${amount}</span></div>
                 </div>
             </div>
-
             <div>
-                <div style="color: #666; font-size: 0.85rem; margin-bottom: 8px;"><strong>Notes</strong></div>
-                <div class="notes">
-                    Auto-generated: License renewal - Cycle from ${periodFrom} to ${periodTo} - TSH ${amount}
-                </div>
+                <div style="color:#666;font-size:0.85rem;margin-bottom:8px;"><strong>Notes</strong></div>
+                <div class="notes">Auto-generated: License renewal - Cycle from ${periodFrom} to ${periodTo} - TSH ${amount}</div>
             </div>
-
             <div class="footer">
                 Thank you for your business! Questions? Contact support@${license?.platformName ? license.platformName.toLowerCase().replace(/\s+/g, '') : 'company'}.com
             </div>
-
             </body></html>
         `;
         const w = window.open('', '_blank');
-        if (w) {
-            w.document.write(printContent);
-            w.document.close();
-            setTimeout(() => { w.print(); }, 250);
-        }
+        if (w) { w.document.write(printContent); w.document.close(); setTimeout(() => { w.print(); }, 250); }
     };
 
-    // Payment status screens
+    // ── Payment status screens ────────────────────────────────────────────────
 
-    // If payment is COMPLETED show final success
+    if (paymentState.status === 'SENDING') {
+        return (
+            <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: 'var(--bg-lighter)', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-family)', padding: '2rem' }}>
+                <div className="card" style={{ maxWidth: 480, width: '100%', padding: '2.5rem 2rem', textAlign: 'center', boxShadow: 'var(--shadow-md)', borderTop: '4px solid #1976d2' }}>
+                    <div style={{ margin: '0 auto 1.5rem', width: 64, height: 64, borderRadius: '50%', background: '#e8f0ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <div style={{ width: 28, height: 28, border: '3px solid #1976d2', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                    </div>
+                    <h2 style={{ margin: '0 0 0.5rem', fontWeight: 700 }}>Sending STK Push...</h2>
+                    <p style={{ color: 'var(--text-secondary)', margin: 0 }}>Contacting the payment provider. Please wait.</p>
+                </div>
+                <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+            </div>
+        );
+    }
+
+    if (paymentState.status === 'PENDING' || paymentState.status === 'PROCESSING') {
+        const isPending = paymentState.status === 'PENDING';
+        return (
+            <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: 'var(--bg-lighter)', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-family)', padding: '2rem' }}>
+                <div className="card" style={{ maxWidth: 560, width: '100%', padding: '2.5rem 2rem', textAlign: 'center', boxShadow: 'var(--shadow-md)', borderTop: `4px solid ${isPending ? '#1976d2' : '#f59e0b'}` }}>
+                    <div style={{ margin: '0 auto 1.5rem', width: 64, height: 64, borderRadius: '50%', background: isPending ? '#e8f0ff' : '#fef3c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <div style={{ width: 28, height: 28, border: `3px solid ${isPending ? '#1976d2' : '#f59e0b'}`, borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                    </div>
+                    <h2 style={{ margin: '0 0 0.75rem', fontWeight: 700 }}>
+                        {isPending ? 'Waiting for payment confirmation...' : 'Finalizing your license...'}
+                    </h2>
+                    <p style={{ color: 'var(--text-secondary)', marginBottom: '0.5rem', lineHeight: 1.6 }}>
+                        {paymentState.message || (isPending ? 'Please enter your mobile money PIN when prompted on your phone.' : 'Provider confirmed — updating your license now.')}
+                    </p>
+                    {isPending && (
+                        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1.5rem' }}>
+                            This will time out automatically in 60 seconds if no response is received.
+                        </p>
+                    )}
+                    <button
+                        className="btn btn-secondary"
+                        style={{ border: '1px solid var(--border-light)', marginTop: '0.5rem' }}
+                        onClick={() => setPaymentState({ status: 'IDLE' })}
+                    >
+                        Cancel
+                    </button>
+                </div>
+                <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+            </div>
+        );
+    }
+
     if (paymentState.status === 'COMPLETED') {
         return (
             <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: 'var(--bg-lighter)', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-family)', padding: '2rem' }}>
@@ -360,7 +395,7 @@ export default function RenewLicense() {
                     </div>
                     <h1 style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.75rem' }}>Payment Confirmed</h1>
                     <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem', fontSize: '0.95rem', lineHeight: 1.6 }}>
-                        {paymentState.message || 'Payment completed successfully.'}
+                        {paymentState.message || 'Your license has been renewed successfully.'}
                     </p>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                         <button className="btn btn-primary" style={{ background: '#1a1a2e', color: 'white', width: '100%' }} onClick={() => navigate('/dashboard')}>
@@ -375,43 +410,32 @@ export default function RenewLicense() {
         );
     }
 
-    // Terminal failure/cancel/timeout screen
     if (['FAILED', 'CANCELLED', 'EXPIRED', 'TIMEOUT', 'UNKNOWN'].includes(paymentState.status)) {
+        const isCancelled = paymentState.status === 'CANCELLED';
+        const isTimeout   = paymentState.status === 'TIMEOUT';
         return (
             <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: 'var(--bg-lighter)', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-family)', padding: '2rem' }}>
                 <div className="card" style={{ maxWidth: 560, width: '100%', padding: '2.5rem 2rem', textAlign: 'center', boxShadow: 'var(--shadow-md)', borderTop: '4px solid #b91c1c' }}>
-                    <h1 style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.75rem' }}>{paymentState.status === 'CANCELLED' ? 'Payment Cancelled' : 'Payment Failed'}</h1>
+                    <h1 style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.75rem' }}>
+                        {isCancelled ? 'Payment Cancelled' : isTimeout ? 'Payment Request Timed Out' : 'Payment Failed'}
+                    </h1>
                     <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem', fontSize: '0.95rem', lineHeight: 1.6 }}>
                         {paymentState.message || 'The payment could not be completed. Please try again or contact support.'}
                     </p>
                     <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
-                        <button className="btn btn-primary" style={{ background: '#1a1a2e', color: 'white' }} onClick={() => setPaymentState({ status: 'IDLE' })}>Try Again</button>
-                        <button className="btn btn-secondary" style={{ border: '1px solid var(--border-light)' }} onClick={() => navigate('/support')}>Contact Support</button>
+                        <button className="btn btn-primary" style={{ background: '#1a1a2e', color: 'white' }} onClick={() => setPaymentState({ status: 'IDLE' })}>
+                            Try Again
+                        </button>
+                        <button className="btn btn-secondary" style={{ border: '1px solid var(--border-light)' }} onClick={() => navigate('/support')}>
+                            Contact Support
+                        </button>
                     </div>
                 </div>
             </div>
         );
     }
 
-    // Pending / Processing UI
-    if (paymentState.status === 'PENDING' || paymentState.status === 'PROCESSING' || paymentState.status === 'SENDING') {
-        return (
-            <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: 'var(--bg-lighter)', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-family)', padding: '2rem' }}>
-                <div className="card" style={{ maxWidth: 560, width: '100%', padding: '2rem', textAlign: 'center', boxShadow: 'var(--shadow-md)', borderTop: '4px solid #1976d2' }}>
-                    <div style={{ margin: '0 auto 1rem', width: 56, height: 56, borderRadius: '50%', background: '#e8f0ff', color: '#1e3a8a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <div className="spinner" style={{ width: 20, height: 20, border: '3px solid #fff', borderTop: '3px solid rgba(0,0,0,0.12)', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-                    </div>
-                    <h2 style={{ margin: '0 0 0.5rem', fontWeight: 700 }}>{paymentState.status === 'PENDING' ? 'Waiting for payment confirmation...' : 'Processing payment...'}</h2>
-                    <p style={{ color: 'var(--text-secondary)', marginBottom: '1rem' }}>{paymentState.message || 'Please complete the STK prompt on your phone.'}</p>
-                    <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
-                        <button className="btn btn-secondary" style={{ border: '1px solid var(--border-light)' }} onClick={() => setPaymentState({ status: 'IDLE' })}>Cancel</button>
-                    </div>
-                </div>
-                <style>{`@keyframes spin { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }`}</style>
-            </div>
-        );
-    }
-
+    // ── Main form (IDLE state) ────────────────────────────────────────────────
     const currentPlanName = activePlan?.name || 'Current Plan';
 
     return (
@@ -474,20 +498,8 @@ export default function RenewLicense() {
                         <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Choose Renewal Duration:</div>
 
                         {packages.map(pkg => (
-                            <div
-                                key={pkg.months}
-                                onClick={() => setSelectedPackage(pkg.months)}
-                                style={{
-                                    border: `2px solid ${selectedPackage === pkg.months ? '#1a1a2e' : 'var(--border-light)'}`,
-                                    background: selectedPackage === pkg.months ? '#f8f9fa' : 'white',
-                                    padding: '1rem',
-                                    borderRadius: '8px',
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    justifyContent: 'space-between',
-                                    alignItems: 'center'
-                                }}
-                            >
+                            <div key={pkg.months} onClick={() => setSelectedPackage(pkg.months)}
+                                style={{ border: `2px solid ${selectedPackage === pkg.months ? '#1a1a2e' : 'var(--border-light)'}`, background: selectedPackage === pkg.months ? '#f8f9fa' : 'white', padding: '1rem', borderRadius: '8px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <div>
                                     <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{pkg.title}</div>
                                     <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{pkg.subtitle}</div>
@@ -500,20 +512,8 @@ export default function RenewLicense() {
                         ))}
 
                         {hasPendingInvoice && pendingAmount > 0 && (
-                            <div
-                                onClick={() => setSelectedPackage(0)}
-                                style={{
-                                    border: `2px solid ${selectedPackage === 0 ? '#1976d2' : 'var(--border-light)'}`,
-                                    background: selectedPackage === 0 ? '#1976d2' : 'white',
-                                    color: selectedPackage === 0 ? 'white' : 'var(--text-primary)',
-                                    padding: '1rem',
-                                    borderRadius: '8px',
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    justifyContent: 'space-between',
-                                    alignItems: 'center'
-                                }}
-                            >
+                            <div onClick={() => setSelectedPackage(0)}
+                                style={{ border: `2px solid ${selectedPackage === 0 ? '#1976d2' : 'var(--border-light)'}`, background: selectedPackage === 0 ? '#1976d2' : 'white', color: selectedPackage === 0 ? 'white' : 'var(--text-primary)', padding: '1rem', borderRadius: '8px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <div>
                                     <div style={{ fontWeight: 600 }}>Pay Outstanding Invoice</div>
                                     <div style={{ fontSize: '0.8rem', opacity: 0.9 }}>{license.pendingInvoices![0].invoiceNumber}</div>
@@ -530,14 +530,7 @@ export default function RenewLicense() {
                             <div style={{ fontSize: '2rem', fontWeight: 700, margin: '0.5rem 0' }}>
                                 <span style={{ fontSize: '1rem', verticalAlign: 'super' }}>TZS</span> {getAmountToPay().toLocaleString(undefined, { maximumFractionDigits: 0 })}
                             </div>
-                            <span style={{
-                                background: selectedPackage === 0 ? '#ef4444' : '#1a1a2e',
-                                color: 'white',
-                                padding: '2px 8px',
-                                borderRadius: '12px',
-                                fontSize: '0.75rem',
-                                fontWeight: 600
-                            }}>
+                            <span style={{ background: selectedPackage === 0 ? '#ef4444' : '#1a1a2e', color: 'white', padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 600 }}>
                                 {selectedPackage === 0 ? 'Outstanding Invoice Balance' : `${selectedPackage} Month${selectedPackage > 1 ? 's' : ''} Renewal`}
                             </span>
                         </div>
@@ -586,9 +579,7 @@ export default function RenewLicense() {
                         </div>
                         <div style={{ textAlign: 'right' }}>
                             <h1 style={{ fontSize: '1.5rem', fontWeight: 300, color: 'var(--text-secondary)', letterSpacing: 2, margin: '0 0 0.5rem 0' }}>INVOICE</h1>
-                            <div style={{ fontWeight: 600 }}>
-                                {license?.pendingInvoices?.[0]?.invoiceNumber || 'INV-RENEWAL'}
-                            </div>
+                            <div style={{ fontWeight: 600 }}>{license?.pendingInvoices?.[0]?.invoiceNumber || 'INV-RENEWAL'}</div>
                         </div>
                     </div>
 
@@ -596,19 +587,14 @@ export default function RenewLicense() {
                         <div>
                             <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>BILL TO</div>
                             <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>{license?.companyName?.toUpperCase() || name.toUpperCase()}</div>
-                            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                                {email}<br />
-                                {phone}
-                            </div>
+                            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>{email}<br />{phone}</div>
                         </div>
                         <div>
                             <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>ISSUED</div>
                             <div style={{ fontWeight: 500, marginBottom: '1rem' }}>{new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
-
                             <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>PERIOD</div>
                             <div style={{ fontWeight: 500 }}>
-                                {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} -
-                                {new Date(Date.now() + (selectedPackage || 1) * 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} - {new Date(Date.now() + (selectedPackage || 1) * 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                             </div>
                         </div>
                         <div style={{ textAlign: 'right' }}>
@@ -631,10 +617,7 @@ export default function RenewLicense() {
                         <tbody>
                             <tr style={{ borderBottom: '1px solid var(--border-light)' }}>
                                 <td style={{ padding: '1rem 0', fontWeight: 500, fontSize: '0.9rem' }}>
-                                    {selectedPackage === 0
-                                        ? 'Outstanding Invoice Balance'
-                                        : `${currentPlanName} — License Fee (${selectedPackage} Month${selectedPackage > 1 ? 's' : ''})`
-                                    }
+                                    {selectedPackage === 0 ? 'Outstanding Invoice Balance' : `${currentPlanName} — License Fee (${selectedPackage} Month${selectedPackage > 1 ? 's' : ''})`}
                                 </td>
                                 <td style={{ padding: '1rem 0', textAlign: 'right', color: '#1976d2' }}>1</td>
                                 <td style={{ padding: '1rem 0', textAlign: 'right' }}>TZS {getAmountToPay().toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>

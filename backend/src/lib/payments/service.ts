@@ -76,15 +76,6 @@ export interface InitiatePaymentOptions {
 export class PaymentService {
   /**
    * Load the active PaymentChannel record for a tenant + provider from DB.
-   *
-   * @param tenantId        null = platform (LICENSE payments), string = tenant (TENANT payments)
-   * @param providerName    Provider identifier e.g. "PALMPESA"
-   * @param paymentContext  "LICENSE" or "TENANT" — enforces credential isolation.
-   *                        Defaults to auto-detecting from tenantId for backwards compatibility.
-   *
-   * ISOLATION CONTRACT:
-   *   LICENSE context → tenantId MUST be null (platform channel)
-   *   TENANT context  → tenantId MUST be a non-empty string (tenant channel)
    */
   async getChannel(
     tenantId: string | null,
@@ -92,13 +83,8 @@ export class PaymentService {
     paymentContext?: PaymentContext
   ) {
     console.log("[TRACE][PaymentService.getChannel] ENTER", { tenantId, providerName, paymentContext });
-    // Auto-detect context from tenantId if not explicitly provided
     const ctx = paymentContext ?? (tenantId === null ? "LICENSE" : "TENANT");
 
-    // CRITICAL-1 FIX: Hard isolation enforcement.
-    // If the context and tenantId don't match, reject immediately.
-    // This prevents platform credentials from being used for tenant payments
-    // and prevents tenant credentials from being used for license payments.
     if (ctx === "LICENSE" && tenantId !== null) {
       console.error("[TRACE][PaymentService.getChannel] EARLY_RETURN", { reason: "LICENSE context requires tenantId=null" });
       throw new Error(
@@ -116,7 +102,6 @@ export class PaymentService {
       );
     }
 
-    // MT-003 FIX: Explicitly match tenantId=null for global channels when tenantId is null.
     const db = getTenantClient(tenantId);
     const channel = await db.paymentChannel.findFirst({
       where: {
@@ -136,34 +121,20 @@ export class PaymentService {
     console.log("[TRACE][PaymentService.initiatePayment] ENTER", { opts });
     const { tenantId, amount, phone, providerName, description, buyerName, buyerEmail, paymentContext } = opts;
 
-    // Validate
     if (!isSupportedProvider(providerName)) {
       console.error("[TRACE][PaymentService.initiatePayment] EARLY_RETURN", { reason: "unsupported provider", providerName });
-      return {
-        success: false,
-        message: `Unsupported provider: ${providerName}`,
-        reference: opts.reference ?? "",
-      };
+      return { success: false, message: `Unsupported provider: ${providerName}`, reference: opts.reference ?? "" };
     }
     if (!isValidAmount(amount)) {
       console.error("[TRACE][PaymentService.initiatePayment] EARLY_RETURN", { reason: "invalid amount", amount });
-      return {
-        success: false,
-        message: `Invalid amount: ${amount}. Must be between 100 and 10,000,000 TZS.`,
-        reference: opts.reference ?? "",
-      };
+      return { success: false, message: `Invalid amount: ${amount}. Must be between 100 and 10,000,000 TZS.`, reference: opts.reference ?? "" };
     }
 
     const reference = opts.reference ?? generateReference(providerName.slice(0, 2));
     const cleanPhone = formatPhoneTZ(phone);
-    // E19 FIX: Use caller-supplied callbackUrl (e.g. from HotspotSettings.backendUrl) if
-    // provided; otherwise fall back to the global buildCallbackUrl() which uses APP_URL.
     const callbackUrl = opts.callbackUrl ?? buildCallbackUrl(providerName);
     console.log("[TRACE][PaymentService.initiatePayment] CALLBACK", { providerName, callbackUrl, phone: cleanPhone });
 
-    // PAY-001 FIX: Idempotency check — if a transaction with this reference already
-    // exists and is PENDING or COMPLETED, return the existing state without hitting the
-    // payment gateway again. Prevents double charges on client retries or network errors.
     const globalDb = getTenantClient(null);
     let db = getTenantClient(tenantId);
     let existingTx: { status?: string } | null = null;
@@ -174,11 +145,7 @@ export class PaymentService {
     } catch (error: any) {
       const code = error?.code;
       const message = error?.message || String(error);
-      console.warn("[TRACE][PaymentService.initiatePayment] IDENTITY_CHECK_FAILED", {
-        reference,
-        code,
-        message,
-      });
+      console.warn("[TRACE][PaymentService.initiatePayment] IDENTITY_CHECK_FAILED", { reference, code, message });
       if (code === "P2021" || /table .*transactions.* does not exist/i.test(message)) {
         console.warn("[TRACE][PaymentService.initiatePayment] CONTINUING_WITHOUT_IDENTITY_CHECK", { reference });
       } else {
@@ -188,38 +155,18 @@ export class PaymentService {
     if (existingTx) {
       console.log("[TRACE][PaymentService.initiatePayment] EXISTING_TRANSACTION", { reference, status: existingTx.status });
       if (existingTx.status === "COMPLETED") {
-        return {
-          success: true,
-          message: "Payment already completed",
-          reference,
-          idempotent: true,
-        } as any;
+        return { success: true, message: "Payment already completed", reference, idempotent: true } as any;
       }
       if (existingTx.status === "PENDING") {
-        return {
-          success: true,
-          message: "Payment already initiated and is pending",
-          reference,
-          idempotent: true,
-        } as any;
+        return { success: true, message: "Payment already initiated and is pending", reference, idempotent: true } as any;
       }
-      // FAILED transactions: allow re-initiation with same reference
     }
 
-    // Load provider (DB channel config first, env fallback)
     const channel = await this.getChannel(tenantId, providerName, paymentContext);
     const provider = getPaymentProvider(providerName, channel);
     console.log("[TRACE][PaymentService.initiatePayment] PROVIDER_SELECTED", { providerName, providerClass: provider.constructor?.name, channel });
 
-    const request: PaymentRequest = {
-      amount,
-      phone: cleanPhone,
-      reference,
-      description,
-      callbackUrl,
-      buyerName,
-      buyerEmail,
-    };
+    const request: PaymentRequest = { amount, phone: cleanPhone, reference, description, callbackUrl, buyerName, buyerEmail };
 
     console.log("[TRACE][PaymentService.initiatePayment] CALLING_PROVIDER", { providerName, request });
     const response = await provider.initiatePayment(request);
@@ -270,7 +217,7 @@ export class PaymentService {
     const globalDb = getTenantClient(null);
     let db = getTenantClient(tenantId);
 
-    // 2. Log to webhook_logs regardless of verification result
+    // 2. Log to webhook_logs
     const webhookLog = await globalDb.webhookLog.create({
       data: {
         provider: providerName.toUpperCase(),
@@ -283,7 +230,7 @@ export class PaymentService {
     });
 
     if (!verification.verified) {
-      await db.webhookLog.update({
+      await globalDb.webhookLog.update({
         where: { id: webhookLog.id },
         data: { status: "FAILED", errorMessage: verification.reason },
       });
@@ -293,7 +240,7 @@ export class PaymentService {
     // 3. Parse payload
     const parsed = provider.parseWebhookPayload(body);
 
-    await db.webhookLog.update({
+    await globalDb.webhookLog.update({
       where: { id: webhookLog.id },
       data: {
         transactionRef: parsed.transactionRef || null,
@@ -302,19 +249,18 @@ export class PaymentService {
     });
 
     if (!parsed.transactionRef) {
-      await db.webhookLog.update({
+      await globalDb.webhookLog.update({
         where: { id: webhookLog.id },
         data: { status: "FAILED", errorMessage: "Missing transactionRef in payload" },
       });
       return { processed: false, message: "Missing transaction reference in payload" };
     }
 
-    // 4. Idempotency — find existing transaction
-    // NOTE: include { client, invoice } — `invoice` is a new relation pending prisma generate
-    const transaction = await (db.transaction.findFirst as any)({
+    // 4. Try to find a hotspot/PPPoE transaction first
+    let transaction = await (db.transaction.findFirst as any)({
       where: {
         reference: parsed.transactionRef,
-        ...(tenantId ? { tenantId } : {})
+        ...(tenantId ? { tenantId } : {}),
       },
       include: { client: true, invoice: true },
     }) as any;
@@ -327,10 +273,24 @@ export class PaymentService {
       });
     }
 
+    // ── LICENSE PAYMENT FALLBACK ──────────────────────────────────────────────
+    // If no hotspot/PPPoE transaction found, check if this is a LICENSE payment.
+    // License payments are tracked via tenantInvoice (invoiceNumber = transactionRef)
+    // and tenantPayment (linked to the invoice). They have no `transaction` record.
     if (!transaction) {
-      await db.webhookLog.update({
+      const licenseResult = await this.processLicenseWebhook(
+        parsed,
+        webhookLog.id,
+        providerName
+      );
+      if (licenseResult !== null) {
+        return licenseResult;
+      }
+
+      // Not a license payment either — genuine 404
+      await globalDb.webhookLog.update({
         where: { id: webhookLog.id },
-        data: { status: "FAILED", errorMessage: "Transaction not found" },
+        data: { status: "FAILED", errorMessage: "Transaction not found (hotspot, PPPoE, or license)" },
       });
       return {
         processed: false,
@@ -341,172 +301,92 @@ export class PaymentService {
 
     // Already processed — return early
     if (transaction.status === "COMPLETED") {
-      await db.webhookLog.update({
+      await globalDb.webhookLog.update({
         where: { id: webhookLog.id },
         data: { status: "DUPLICATE", processedAt: new Date() },
       });
-      return {
-        processed: true,
-        transactionRef: parsed.transactionRef,
-        status: "COMPLETED",
-        message: "Already processed",
-      };
+      return { processed: true, transactionRef: parsed.transactionRef, status: "COMPLETED", message: "Already processed" };
     }
 
     // 5. Handle FAILED payment
     if (parsed.resultCode !== "0") {
       await db.$transaction(async (tx) => {
-        await tx.transaction.update({
-          where: { id: transaction.id },
-          data: { status: "FAILED" },
-        });
+        await tx.transaction.update({ where: { id: transaction.id }, data: { status: "FAILED" } });
       });
-
-      await db.webhookLog.update({
+      await globalDb.webhookLog.update({
         where: { id: webhookLog.id },
-        data: {
-          status: "PROCESSED",
-          processedAt: new Date(),
-        },
+        data: { status: "PROCESSED", processedAt: new Date() },
       });
-
-      return {
-        processed: true,
-        transactionRef: parsed.transactionRef,
-        status: "FAILED",
-        message: parsed.resultMessage ?? "Payment failed",
-      };
+      return { processed: true, transactionRef: parsed.transactionRef, status: "FAILED", message: parsed.resultMessage ?? "Payment failed" };
     }
 
-    // 5.5. Verify Amount (Prevent Partial Payment Attack)
+    // 5.5. Verify Amount
     if (parsed.amount !== undefined && parsed.amount < transaction.amount) {
       await db.$transaction(async (tx) => {
-        await tx.transaction.update({
-          where: { id: transaction.id },
-          data: { status: "FAILED" },
-        });
+        await tx.transaction.update({ where: { id: transaction.id }, data: { status: "FAILED" } });
       });
-
-      await db.webhookLog.update({
+      await globalDb.webhookLog.update({
         where: { id: webhookLog.id },
-        data: {
-          status: "FAILED",
-          errorMessage: `Underpaid: Paid ${parsed.amount}, Expected ${transaction.amount}`,
-          processedAt: new Date(),
-        },
+        data: { status: "FAILED", errorMessage: `Underpaid: Paid ${parsed.amount}, Expected ${transaction.amount}`, processedAt: new Date() },
       });
-
-      return {
-        processed: true,
-        transactionRef: parsed.transactionRef,
-        status: "FAILED",
-        message: "Payment amount does not match transaction amount",
-      };
+      return { processed: true, transactionRef: parsed.transactionRef, status: "FAILED", message: "Payment amount does not match transaction amount" };
     }
 
-    // 6. Handle SUCCESSFUL payment
-    // E10 FIX: Look up package by packageId stored on Transaction first,
-    // fall back to planName (string) only if packageId is absent.
-    // This prevents subscription creation failure when a package is renamed.
+    // 6. Handle SUCCESSFUL hotspot/PPPoE payment
     const pkg = await db.package.findFirst({
       where: transaction.packageId
         ? { id: transaction.packageId, tenantId: transaction.tenantId }
-        : {
-          name: transaction.planName ?? "",
-          tenantId: transaction.tenantId,
-        },
+        : { name: transaction.planName ?? "", tenantId: transaction.tenantId },
     });
 
-
-
-    // DB transaction: mark paid, create/extend subscription, activate client
     let duplicateDetected = false;
     const result = await db.$transaction(async (tx) => {
       const now = new Date();
       let baseDate = now;
 
       if (pkg) {
-        // Fetch existing active sub inside the transaction to prevent race conditions (MB-002)
         const existingActiveSub = await tx.subscription.findFirst({
-          where: {
-            clientId: transaction.clientId,
-            packageId: pkg.id,
-            status: "ACTIVE",
-            expiresAt: { gt: now },
-          },
+          where: { clientId: transaction.clientId, packageId: pkg.id, status: "ACTIVE", expiresAt: { gt: now } },
           orderBy: { expiresAt: "desc" },
         });
-
-        if (existingActiveSub) {
-          baseDate = existingActiveSub.expiresAt;
-        }
+        if (existingActiveSub) { baseDate = existingActiveSub.expiresAt; }
       }
 
       const expiresAt = new Date(baseDate);
       if (pkg) {
         switch (pkg.durationUnit) {
           case "MINUTES": expiresAt.setMinutes(expiresAt.getMinutes() + pkg.duration); break;
-          case "HOURS": expiresAt.setHours(expiresAt.getHours() + pkg.duration); break;
-          case "DAYS": expiresAt.setDate(expiresAt.getDate() + pkg.duration); break;
-          case "MONTHS": expiresAt.setMonth(expiresAt.getMonth() + pkg.duration); break;
+          case "HOURS":   expiresAt.setHours(expiresAt.getHours() + pkg.duration); break;
+          case "DAYS":    expiresAt.setDate(expiresAt.getDate() + pkg.duration); break;
+          case "MONTHS":  expiresAt.setMonth(expiresAt.getMonth() + pkg.duration); break;
         }
       }
 
-      // Idempotency Lock: Use atomic updateMany to ensure we only update if it's not already COMPLETED
       const updateResult = await tx.transaction.updateMany({
-        where: {
-          id: transaction.id,
-          status: { not: "COMPLETED" }
-        },
+        where: { id: transaction.id, status: { not: "COMPLETED" } },
         data: { status: "COMPLETED", expiryDate: expiresAt },
       });
 
-      if (updateResult.count === 0) {
-        duplicateDetected = true;
-        return { updatedTx: null, sub: null };
-      }
+      if (updateResult.count === 0) { duplicateDetected = true; return { updatedTx: null, sub: null }; }
 
-      const updatedTx = await tx.transaction.findUnique({
-        where: { id: transaction.id }
-      });
+      const updatedTx = await tx.transaction.findUnique({ where: { id: transaction.id } });
 
-      // PAY-002 FIX: If this transaction was initiated from an invoice payment,
-      // mark the invoice as PAID and record the paidAt timestamp.
-      // NOTE: invoiceId, paidAt, transactionId are new schema fields — cast to any until
-      // `prisma generate` runs after the migration is applied to the database.
       if ((transaction as any).invoiceId) {
         await (tx.invoice.update as any)({
           where: { id: (transaction as any).invoiceId },
-          data: {
-            status: "PAID",
-            paidAt: now,
-            transactionId: transaction.id,
-          },
+          data: { status: "PAID", paidAt: now, transactionId: transaction.id },
         });
       }
 
       let sub = null;
       if (pkg) {
-        // PAY-005 FIX: If an active subscription already exists for this client + package,
-        // EXTEND it instead of creating a new one. Creating new subs on every renewal causes
-        // duplicate ACTIVE rows to accumulate, corrupting billing state.
         const existingSub = await tx.subscription.findFirst({
-          where: {
-            clientId: transaction.clientId,
-            packageId: pkg.id,
-            status: "ACTIVE",
-          },
+          where: { clientId: transaction.clientId, packageId: pkg.id, status: "ACTIVE" },
         });
-
         if (existingSub) {
           sub = await tx.subscription.update({
             where: { id: existingSub.id },
-            data: {
-              expiresAt,
-              updatedAt: new Date(),
-              syncStatus: "PENDING",
-              onlineStatus: "ONLINE",
-            },
+            data: { expiresAt, updatedAt: new Date(), syncStatus: "PENDING", onlineStatus: "ONLINE" },
           });
         } else {
           sub = await tx.subscription.create({
@@ -526,30 +406,21 @@ export class PaymentService {
         }
       }
 
-      await tx.client.update({
-        where: { id: transaction.clientId },
-        data: { status: "ACTIVE" },
-      });
-
+      await tx.client.update({ where: { id: transaction.clientId }, data: { status: "ACTIVE" } });
       return { updatedTx, sub };
     });
 
     if (duplicateDetected) {
-      await db.webhookLog.update({
+      await globalDb.webhookLog.update({
         where: { id: webhookLog.id },
         data: { status: "DUPLICATE", processedAt: new Date() },
       });
-      return {
-        processed: true,
-        transactionRef: parsed.transactionRef,
-        status: "COMPLETED",
-        message: "Already processed concurrently",
-      };
+      return { processed: true, transactionRef: parsed.transactionRef, status: "COMPLETED", message: "Already processed concurrently" };
     }
 
     const { sub: newSub } = result;
 
-    // 7. Sync RADIUS (E09: with compensation on failure)
+    // 7. Sync RADIUS
     if (pkg) {
       try {
         const client = transaction.client;
@@ -561,9 +432,6 @@ export class PaymentService {
         }
         await syncRadiusUser({
           username: client.username,
-          // RAD-002 FIX: Use client.phone || client.username as RADIUS password fallback.
-          // If phone is null, syncRadiusUser throws "Cannot create RadiusUser without a password".
-          // Using username as secondary fallback ensures RADIUS sync never fails due to missing phone.
           password: client.phone || client.username,
           tenantId: pkg.tenantId || null,
           fullName: client.fullName || undefined,
@@ -573,8 +441,6 @@ export class PaymentService {
           profileName: pkg.name,
         });
       } catch (radErr) {
-        // E09 FIX: RADIUS sync failed — mark subscription for retry instead of
-        // silently swallowing the error. A background job can retry PENDING_RADIUS_SYNC.
         console.error(`[PAYMENT SERVICE] RADIUS sync failed — scheduling retry:`, radErr);
         if (newSub?.id) {
           await db.subscription.update({
@@ -593,14 +459,9 @@ export class PaymentService {
         const pwd = client.phone || "123456";
         const type = client.serviceType === "HOTSPOT" ? "hotspot" : "pppoe";
         await mikrotik.activateService(client.username, pwd, pkg.name, type, (newSub as any).expiresAt);
-
         if (newSub?.id) {
-          await db.subscription.update({
-            where: { id: newSub.id },
-            data: { syncStatus: "SYNCED" },
-          });
+          await db.subscription.update({ where: { id: newSub.id }, data: { syncStatus: "SYNCED" } });
         }
-
         await db.routerLog.create({
           data: {
             routerId: pkg.routerId,
@@ -627,22 +488,162 @@ export class PaymentService {
     }
 
     // 9. Mark webhook as processed
-    await db.webhookLog.update({
+    await globalDb.webhookLog.update({
       where: { id: webhookLog.id },
-      data: {
-        status: "COMPLETED",
-        processedAt: new Date(),
-      },
+      data: { status: "COMPLETED", processedAt: new Date() },
     });
 
-    return {
-      processed: true,
-      transactionRef: parsed.transactionRef,
-      status: "COMPLETED",
-      message: "Payment processed successfully",
-    };
+    return { processed: true, transactionRef: parsed.transactionRef, status: "COMPLETED", message: "Payment processed successfully" };
+  }
+
+  // ── LICENSE Webhook Handler ───────────────────────────────────────────────
+  /**
+   * Handle a webhook where the transactionRef matches a tenantInvoice.invoiceNumber.
+   * This is the LICENSE payment path — completely separate from hotspot/PPPoE transactions.
+   *
+   * Returns:
+   *   WebhookResult  — if the ref matched a license invoice (processed or duplicate)
+   *   null           — if the ref did NOT match any license invoice (caller should handle 404)
+   */
+  private async processLicenseWebhook(
+    parsed: import("@/lib/payments/types").ParsedWebhookPayload,
+    webhookLogId: string,
+    providerName: string
+  ): Promise<WebhookResult | null> {
+    const globalDb = getTenantClient(null);
+
+    // Look up invoice by invoiceNumber (= AccountReference sent during STK push)
+    const invoice = await globalDb.tenantInvoice.findFirst({
+      where: { invoiceNumber: parsed.transactionRef },
+      include: {
+        payments: { orderBy: { createdAt: "desc" }, take: 1 },
+        tenant: { include: { plan: true } },
+      },
+    }) as any;
+
+    if (!invoice) {
+      // Not a license payment — signal caller to handle 404
+      return null;
+    }
+
+    console.log("[LICENSE WEBHOOK] Found invoice", { invoiceId: invoice.id, invoiceNumber: invoice.invoiceNumber, tenantId: invoice.tenantId });
+
+    // Idempotency: already paid
+    if (invoice.status === "PAID") {
+      await globalDb.webhookLog.update({
+        where: { id: webhookLogId },
+        data: { status: "DUPLICATE", processedAt: new Date(), tenantId: invoice.tenantId },
+      });
+      return { processed: true, transactionRef: parsed.transactionRef, status: "COMPLETED", message: "License invoice already paid" };
+    }
+
+    const tenantPayment = invoice.payments[0] ?? null;
+
+    // Handle FAILED payment
+    if (parsed.resultCode !== "0") {
+      if (tenantPayment) {
+        await globalDb.tenantPayment.update({
+          where: { id: tenantPayment.id },
+          data: { status: "FAILED" },
+        }).catch((e: any) => console.error("[LICENSE WEBHOOK] Failed to mark tenantPayment FAILED:", e));
+      }
+      await globalDb.webhookLog.update({
+        where: { id: webhookLogId },
+        data: { status: "PROCESSED", processedAt: new Date(), tenantId: invoice.tenantId },
+      });
+      return { processed: true, transactionRef: parsed.transactionRef, status: "FAILED", message: parsed.resultMessage ?? "License payment failed" };
+    }
+
+    // Amount verification
+    if (parsed.amount !== undefined && parsed.amount < invoice.amount) {
+      if (tenantPayment) {
+        await globalDb.tenantPayment.update({
+          where: { id: tenantPayment.id },
+          data: { status: "FAILED" },
+        }).catch(() => {});
+      }
+      await globalDb.webhookLog.update({
+        where: { id: webhookLogId },
+        data: {
+          status: "FAILED",
+          errorMessage: `Underpaid: Paid ${parsed.amount}, Expected ${invoice.amount}`,
+          processedAt: new Date(),
+          tenantId: invoice.tenantId,
+        },
+      });
+      return { processed: true, transactionRef: parsed.transactionRef, status: "FAILED", message: "Payment amount does not match invoice amount" };
+    }
+
+    // SUCCESS — update tenantPayment, tenantInvoice, and extend tenant license
+    try {
+      const now = new Date();
+      const packageMonths: number = invoice.packageMonths ?? 1;
+
+      // Calculate new license expiry
+      const tenant = invoice.tenant;
+      const currentExpiry = tenant?.licenseExpiresAt
+        ? new Date(tenant.licenseExpiresAt)
+        : now;
+      // Extend from today if already expired, otherwise extend from current expiry
+      const baseExpiry = currentExpiry < now ? now : currentExpiry;
+      const newExpiry = new Date(baseExpiry);
+      newExpiry.setMonth(newExpiry.getMonth() + packageMonths);
+
+      await globalDb.$transaction(async (tx: any) => {
+        // Mark invoice PAID
+        await tx.tenantInvoice.update({
+          where: { id: invoice.id },
+          data: { status: "PAID" },
+        });
+
+        // Mark tenantPayment COMPLETED
+        if (tenantPayment) {
+          await tx.tenantPayment.update({
+            where: { id: tenantPayment.id },
+            data: {
+              status: "COMPLETED",
+              transactionId: parsed.providerRef ?? tenantPayment.transactionId,
+            },
+          });
+        }
+
+        // Extend tenant license and reactivate if suspended
+        await tx.tenant.update({
+          where: { id: invoice.tenantId },
+          data: {
+            licenseExpiresAt: newExpiry,
+            status: "ACTIVE",
+          },
+        });
+      });
+
+      await globalDb.webhookLog.update({
+        where: { id: webhookLogId },
+        data: { status: "COMPLETED", processedAt: new Date(), tenantId: invoice.tenantId },
+      });
+
+      console.log("[LICENSE WEBHOOK] License renewed", {
+        tenantId: invoice.tenantId,
+        invoiceId: invoice.id,
+        packageMonths,
+        newExpiry,
+      });
+
+      return { processed: true, transactionRef: parsed.transactionRef, status: "COMPLETED", message: "License renewed successfully" };
+    } catch (err: any) {
+      console.error("[LICENSE WEBHOOK] Error processing license renewal:", err);
+      await globalDb.webhookLog.update({
+        where: { id: webhookLogId },
+        data: {
+          status: "FAILED",
+          errorMessage: err?.message ?? "License renewal processing error",
+          processedAt: new Date(),
+          tenantId: invoice.tenantId,
+        },
+      }).catch(() => {});
+      return { processed: false, transactionRef: parsed.transactionRef, message: "License webhook processing error" };
+    }
   }
 }
 
 export const paymentService = new PaymentService();
-
