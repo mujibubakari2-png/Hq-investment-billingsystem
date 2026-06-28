@@ -144,6 +144,7 @@ export class PalmPesaProvider implements PaymentProvider {
   }
 
   async initiatePayment(request: PaymentRequest): Promise<PaymentResponse> {
+    console.log("[TRACE][PalmPesaProvider.initiatePayment] ENTER", { request });
     const phone = formatPhoneTZ(request.phone);
 
     const payload = {
@@ -199,6 +200,7 @@ export class PalmPesaProvider implements PaymentProvider {
       }
 
       if (isSuccess) {
+        console.log("[TRACE][PalmPesaProvider.initiatePayment] EXIT_SUCCESS", { providerRef, message, status: responseCode || "SUCCESS" });
         return {
           success: true,
           providerRef,
@@ -210,6 +212,7 @@ export class PalmPesaProvider implements PaymentProvider {
       }
 
       if (result.ok && !rawText) {
+        console.error("[TRACE][PalmPesaProvider.initiatePayment] EXIT_FAILURE", { reason: "empty response body", status: result.status });
         return {
           success: false,
           message: "PalmPesa returned HTTP 200 but response body was empty.",
@@ -220,6 +223,7 @@ export class PalmPesaProvider implements PaymentProvider {
       }
 
       if (result.ok) {
+        console.error("[TRACE][PalmPesaProvider.initiatePayment] EXIT_FAILURE", { reason: "unknown response format", status: result.status, message });
         return {
           success: false,
           message: message || `PalmPesa returned an unknown response format. HTTP ${result.status}`,
@@ -229,6 +233,7 @@ export class PalmPesaProvider implements PaymentProvider {
         };
       }
 
+      console.error("[TRACE][PalmPesaProvider.initiatePayment] EXIT_FAILURE", { reason: "http error", status: result.status, message });
       return {
         success: false,
         message: message || `PalmPesa error (HTTP ${result.status})`,
@@ -238,6 +243,7 @@ export class PalmPesaProvider implements PaymentProvider {
       };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Network error";
+      console.error("[TRACE][PalmPesaProvider.initiatePayment] EXCEPTION", { message: msg });
       return { success: false, message: `PalmPesa error: ${msg}` };
     }
   }

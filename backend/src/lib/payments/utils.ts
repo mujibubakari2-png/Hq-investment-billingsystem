@@ -182,6 +182,20 @@ export function safeJsonParse<T>(str: string, fallback: T): T {
 
 // ─── HTTP helper ─────────────────────────────────────────────────────────────
 
+function maskHeaders(headers: Record<string, string>): Record<string, string> {
+  const masked: Record<string, string> = {};
+  for (const [key, value] of Object.entries(headers)) {
+    if (/authorization/i.test(key) && value) {
+      masked[key] = "Bearer [REDACTED]";
+    } else if (/secret|token|key/i.test(key) && value) {
+      masked[key] = "[REDACTED]";
+    } else {
+      masked[key] = value;
+    }
+  }
+  return masked;
+}
+
 /**
  * Simple fetch wrapper that throws a descriptive error on non-2xx responses.
  */
@@ -190,6 +204,8 @@ export async function httpPost(
   body: Record<string, unknown> | string,
   headers: Record<string, string>
 ): Promise<{ ok: boolean; status: number; data: unknown }> {
+  console.log("[TRACE][httpPost] ENTER", { url, method: "POST", headers: maskHeaders(headers), body });
+
   const isFormEncoded =
     headers["Content-Type"] === "application/x-www-form-urlencoded";
 
@@ -204,6 +220,7 @@ export async function httpPost(
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    console.error("[TRACE][httpPost] EXCEPTION", { url, error: message });
     throw new Error(`Network error: ${message}`);
   }
 
@@ -227,6 +244,7 @@ export async function httpPost(
     }
   }
 
+  console.log("[TRACE][httpPost] EXIT", { url, status: res.status, data });
   return { ok: res.ok, status: res.status, data };
 }
 
@@ -234,11 +252,14 @@ export async function httpGet(
   url: string,
   headers: Record<string, string>
 ): Promise<{ ok: boolean; status: number; data: unknown }> {
+  console.log("[TRACE][httpGet] ENTER", { url, method: "GET", headers: maskHeaders(headers) });
+
   let res: Response;
   try {
     res = await fetch(url, { method: "GET", headers });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    console.error("[TRACE][httpGet] EXCEPTION", { url, error: message });
     throw new Error(`Network error: ${message}`);
   }
 
@@ -262,5 +283,6 @@ export async function httpGet(
     }
   }
 
+  console.log("[TRACE][httpGet] EXIT", { url, status: res.status, data });
   return { ok: res.ok, status: res.status, data };
 }

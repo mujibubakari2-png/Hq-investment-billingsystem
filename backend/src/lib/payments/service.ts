@@ -91,6 +91,7 @@ export class PaymentService {
     providerName: string,
     paymentContext?: PaymentContext
   ) {
+    console.log("[TRACE][PaymentService.getChannel] ENTER", { tenantId, providerName, paymentContext });
     // Auto-detect context from tenantId if not explicitly provided
     const ctx = paymentContext ?? (tenantId === null ? "LICENSE" : "TENANT");
 
@@ -99,6 +100,7 @@ export class PaymentService {
     // This prevents platform credentials from being used for tenant payments
     // and prevents tenant credentials from being used for license payments.
     if (ctx === "LICENSE" && tenantId !== null) {
+      console.error("[TRACE][PaymentService.getChannel] EARLY_RETURN", { reason: "LICENSE context requires tenantId=null" });
       throw new Error(
         `[PAYMENT ISOLATION VIOLATION] LICENSE context requires tenantId=null (platform channel), ` +
         `but got tenantId="${tenantId}". ` +
@@ -106,6 +108,7 @@ export class PaymentService {
       );
     }
     if (ctx === "TENANT" && !tenantId) {
+      console.error("[TRACE][PaymentService.getChannel] EARLY_RETURN", { reason: "TENANT context requires a tenantId" });
       throw new Error(
         `[PAYMENT ISOLATION VIOLATION] TENANT context requires a non-null tenantId, ` +
         `but got tenantId=null. ` +
@@ -115,22 +118,27 @@ export class PaymentService {
 
     // MT-003 FIX: Explicitly match tenantId=null for global channels when tenantId is null.
     const db = getTenantClient(tenantId);
-    return db.paymentChannel.findFirst({
+    const channel = await db.paymentChannel.findFirst({
       where: {
         provider: providerName.toUpperCase(),
         status: "ACTIVE",
         tenantId: tenantId ?? null,
       },
     });
+
+    console.log("[TRACE][PaymentService.getChannel] EXIT", { tenantId, providerName, channel });
+    return channel;
   }
 
   // ── Initiate Payment ────────────────────────────────────────────────────
 
   async initiatePayment(opts: InitiatePaymentOptions): Promise<PaymentResponse & { reference: string }> {
+    console.log("[TRACE][PaymentService.initiatePayment] ENTER", { opts });
     const { tenantId, amount, phone, providerName, description, buyerName, buyerEmail, paymentContext } = opts;
 
     // Validate
     if (!isSupportedProvider(providerName)) {
+      console.error("[TRACE][PaymentService.initiatePayment] EARLY_RETURN", { reason: "unsupported provider", providerName });
       return {
         success: false,
         message: `Unsupported provider: ${providerName}`,
@@ -138,6 +146,7 @@ export class PaymentService {
       };
     }
     if (!isValidAmount(amount)) {
+      console.error("[TRACE][PaymentService.initiatePayment] EARLY_RETURN", { reason: "invalid amount", amount });
       return {
         success: false,
         message: `Invalid amount: ${amount}. Must be between 100 and 10,000,000 TZS.`,
@@ -150,16 +159,34 @@ export class PaymentService {
     // E19 FIX: Use caller-supplied callbackUrl (e.g. from HotspotSettings.backendUrl) if
     // provided; otherwise fall back to the global buildCallbackUrl() which uses APP_URL.
     const callbackUrl = opts.callbackUrl ?? buildCallbackUrl(providerName);
+    console.log("[TRACE][PaymentService.initiatePayment] CALLBACK", { providerName, callbackUrl, phone: cleanPhone });
 
     // PAY-001 FIX: Idempotency check — if a transaction with this reference already
     // exists and is PENDING or COMPLETED, return the existing state without hitting the
     // payment gateway again. Prevents double charges on client retries or network errors.
     const globalDb = getTenantClient(null);
     let db = getTenantClient(tenantId);
-    const existingTx = await db.transaction.findFirst({
-      where: { reference, tenantId: tenantId ?? null },
-    });
+    let existingTx: { status?: string } | null = null;
+    try {
+      existingTx = await db.transaction.findFirst({
+        where: { reference, tenantId: tenantId ?? null },
+      });
+    } catch (error: any) {
+      const code = error?.code;
+      const message = error?.message || String(error);
+      console.warn("[TRACE][PaymentService.initiatePayment] IDENTITY_CHECK_FAILED", {
+        reference,
+        code,
+        message,
+      });
+      if (code === "P2021" || /table .*transactions.* does not exist/i.test(message)) {
+        console.warn("[TRACE][PaymentService.initiatePayment] CONTINUING_WITHOUT_IDENTITY_CHECK", { reference });
+      } else {
+        throw error;
+      }
+    }
     if (existingTx) {
+      console.log("[TRACE][PaymentService.initiatePayment] EXISTING_TRANSACTION", { reference, status: existingTx.status });
       if (existingTx.status === "COMPLETED") {
         return {
           success: true,
@@ -182,6 +209,7 @@ export class PaymentService {
     // Load provider (DB channel config first, env fallback)
     const channel = await this.getChannel(tenantId, providerName, paymentContext);
     const provider = getPaymentProvider(providerName, channel);
+    console.log("[TRACE][PaymentService.initiatePayment] PROVIDER_SELECTED", { providerName, providerClass: provider.constructor?.name, channel });
 
     const request: PaymentRequest = {
       amount,
@@ -193,7 +221,9 @@ export class PaymentService {
       buyerEmail,
     };
 
+    console.log("[TRACE][PaymentService.initiatePayment] CALLING_PROVIDER", { providerName, request });
     const response = await provider.initiatePayment(request);
+    console.log("[TRACE][PaymentService.initiatePayment] EXIT", { providerName, response, reference });
     return { ...response, reference };
   }
 

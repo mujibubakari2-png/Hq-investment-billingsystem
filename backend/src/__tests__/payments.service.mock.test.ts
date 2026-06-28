@@ -1,4 +1,5 @@
 /// <reference types="jest" />
+/// <reference types="node" />
 
 jest.mock('@/lib/tenantPrisma', () => ({
     getTenantClient: jest.fn(),
@@ -101,6 +102,40 @@ describe('PaymentService (mocked DB)', () => {
         expect(result.status).toBe('COMPLETED');
         expect(webhookLogCreate).toHaveBeenCalled();
         expect(webhookLogUpdate).toHaveBeenCalled();
+    });
+
+    it('continues to provider initiation when the transactions table is missing', async () => {
+        const providerMock = {
+            initiatePayment: jest.fn(async () => ({ success: true, message: 'OK', providerRef: 'ABC123' })),
+        } as any;
+
+        const registry = require('@/lib/payments/registry');
+        (registry.isSupportedProvider as jest.Mock).mockReturnValue(true);
+        (getPaymentProvider as jest.Mock).mockReturnValue(providerMock);
+        (getTenantClient as jest.Mock).mockImplementation(() => ({
+            paymentChannel: { findFirst: jest.fn(async () => null) },
+            transaction: {
+                findFirst: jest.fn(async () => {
+                    const err: any = new Error('The table "public.transactions" does not exist');
+                    err.code = 'P2021';
+                    throw err;
+                }),
+            },
+        }));
+
+        const result = await paymentService.initiatePayment({
+            tenantId: null,
+            amount: 20000,
+            phone: '0712345678',
+            reference: 'TRACE-TEST',
+            description: 'trace',
+            callbackUrl: 'https://example.com/api/webhooks/palmpesa',
+            providerName: 'PALMPESA',
+            paymentContext: 'LICENSE',
+        });
+
+        expect(result.success).toBe(true);
+        expect(providerMock.initiatePayment).toHaveBeenCalled();
     });
 
     it('falls back to transaction tenant when webhook tenantId is absent', async () => {
