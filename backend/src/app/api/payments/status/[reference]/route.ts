@@ -38,37 +38,51 @@ export async function GET(
       },
     });
 
-    if (!transaction) {
+    // Fallback: check tenantPayment for license renewal payments
+    let paymentRecord = transaction ? null : await globalDb.tenantPayment.findFirst({
+      where: { transactionId: reference },
+    });
+
+    if (!transaction && !paymentRecord) {
       return errorResponse("Transaction not found", 404);
     }
 
-    if (!transaction.tenantId) {
+    if (transaction && !transaction.tenantId) {
       return errorResponse("Invalid transaction tenant data", 500);
     }
 
     // ── Build Base Response ──────────────────────────────────────────────────
-    const baseResponse: Record<string, unknown> = {
+    const baseResponse: Record<string, unknown> = transaction ? {
       reference: transaction.reference,
       status: transaction.status,
       amount: transaction.amount,
       packageName: transaction.planName,
       method: transaction.method,
       createdAt: transaction.createdAt,
+    } : {
+      reference: paymentRecord!.transactionId || reference,
+      status: paymentRecord!.status,
+      amount: paymentRecord!.amount,
+      method: paymentRecord!.paymentMethod,
+      createdAt: paymentRecord!.createdAt,
     };
 
     // ── If COMPLETED, add connection credentials ─────────────────────────────
-    if (transaction.status === "COMPLETED") {
-      const db = getTenantClient(transaction.tenantId ?? null);
-      const subscription = await db.subscription.findFirst({
-        where: { clientId: transaction.clientId, status: "ACTIVE" },
-        orderBy: { createdAt: "desc" },
-      });
+    const status = transaction?.status ?? paymentRecord?.status;
+    if (status === "COMPLETED") {
+      if (transaction) {
+        const db = getTenantClient(transaction.tenantId ?? null);
+        const subscription = await db.subscription.findFirst({
+          where: { clientId: transaction.clientId, status: "ACTIVE" },
+          orderBy: { createdAt: "desc" },
+        });
 
-      baseResponse.username = transaction.client.username;
-      baseResponse.expiresAt = subscription?.expiresAt?.toISOString() ?? transaction.expiryDate?.toISOString();
-      baseResponse.autoConnect = true;
+        baseResponse.username = transaction.client.username;
+        baseResponse.expiresAt = subscription?.expiresAt?.toISOString() ?? transaction.expiryDate?.toISOString();
+        baseResponse.autoConnect = true;
+      }
       baseResponse.message = "Payment confirmed! You can now connect.";
-    } else if (transaction.status === "FAILED") {
+    } else if (status === "FAILED") {
       baseResponse.message = "Payment failed. Please try again.";
     } else {
       baseResponse.message = "Waiting for payment confirmation...";
@@ -76,7 +90,7 @@ export async function GET(
       // ── Live provider poll (optional) ────────────────────────────────────
       if (providerParam && providerRef && isSupportedProvider(providerParam)) {
         try {
-          const tenantId = transaction.tenantId ?? null;
+          const tenantId = transaction?.tenantId ?? paymentRecord?.tenantId ?? null;
           const liveStatus = await paymentService.checkStatus(
             providerParam.toUpperCase(),
             providerRef,

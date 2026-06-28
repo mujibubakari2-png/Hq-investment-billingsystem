@@ -75,6 +75,11 @@ describe('License renewal payment route', () => {
         mockGetTenantClient.mockImplementation((tenantId: string | null) =>
             tenantId === null ? globalDb : tenantDb
         );
+        mockInitiatePayment.mockResolvedValue({
+            success: true,
+            message: 'Payment initiated',
+            providerRef: 'checkout-abc-123',
+        });
 
         const req = new NextRequest('http://localhost/api/license/renew', {
             method: 'POST',
