@@ -87,12 +87,24 @@ export class PalmPesaProvider implements PaymentProvider {
       );
 
       const data = result.data as Record<string, unknown>;
+      const responseCode = String(data?.ResponseCode ?? data?.responseCode ?? "")
+        .trim()
+        .toUpperCase();
+      const isSuccess =
+        result.ok &&
+        (data?.success === true ||
+          data?.success === "true" ||
+          responseCode === "0" ||
+          responseCode === "00" ||
+          responseCode === "SUCCESS" ||
+          responseCode === "SUCCESSFUL");
 
-      if (result.ok && (data?.ResponseCode === "0" || data?.success === true)) {
+      if (isSuccess) {
         return {
           success: true,
           providerRef:
             (data?.CheckoutRequestID as string) ??
+            (data?.checkout_request_id as string) ??
             (data?.transaction_id as string) ??
             undefined,
           message: (data?.ResponseDescription as string) ?? "Payment initiated",
@@ -125,17 +137,20 @@ export class PalmPesaProvider implements PaymentProvider {
       );
 
       const data = result.data as Record<string, unknown>;
-      const rawStatus = (
+      const rawStatus = String(
         data?.ResultCode ??
+        data?.result_code ??
         data?.status ??
         data?.order_status ??
         ""
-      ) as string;
+      ).trim().toUpperCase();
 
       let status: TransactionStatus["status"] = "PENDING";
       if (
         rawStatus === "0" ||
+        rawStatus === "00" ||
         rawStatus === "SUCCESS" ||
+        rawStatus === "SUCCESSFUL" ||
         rawStatus === "COMPLETED" ||
         rawStatus === "PAID"
       ) {
@@ -172,7 +187,7 @@ export class PalmPesaProvider implements PaymentProvider {
     if (!this.webhookSecret) {
       console.error(
         "[PALMPESA] Webhook secret not configured — rejecting webhook. " +
-          "Set webhookSecret on the PaymentChannel record."
+        "Set webhookSecret on the PaymentChannel record."
       );
       return { verified: false, reason: "Webhook secret not configured" };
     }
@@ -199,6 +214,10 @@ export class PalmPesaProvider implements PaymentProvider {
     const b = body as Record<string, unknown>;
 
     // PalmPesa sends ResultCode "0" for success
+    const resultCode = String(
+      b?.ResultCode ?? b?.result_code ?? b?.status ?? "1"
+    ).trim();
+
     return {
       transactionRef:
         (b?.AccountReference as string) ??
@@ -208,10 +227,12 @@ export class PalmPesaProvider implements PaymentProvider {
         (b?.TransactionId as string) ??
         (b?.transaction_id as string) ??
         undefined,
-      resultCode:
-        (b?.ResultCode as string) ?? (b?.result_code as string) ?? "1",
+      resultCode,
       resultMessage:
-        (b?.ResultDesc as string) ?? (b?.message as string) ?? undefined,
+        (b?.ResultDesc as string) ??
+        (b?.result_desc as string) ??
+        (b?.message as string) ??
+        undefined,
       amount: b?.Amount ? Number(b.Amount) : undefined,
       phone: (b?.PhoneNumber as string) ?? undefined,
       rawBody: body,

@@ -73,7 +73,6 @@ export async function POST(req: NextRequest) {
       description,
       buyerName,
       buyerEmail,
-      paymentContext: 'TENANT',
     });
 
     if (!result.success) {
