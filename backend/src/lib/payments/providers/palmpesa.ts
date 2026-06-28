@@ -102,6 +102,8 @@ export class PalmPesaProvider implements PaymentProvider {
       )
         .trim()
         .toUpperCase();
+      const rawText = typeof rawData === "string" ? rawData.trim() : "";
+      const textLooksSuccessful = /\b(success|successful|accepted|approved|ok)\b/i.test(rawText);
       const isSuccess =
         result.ok &&
         (data?.success === true ||
@@ -109,7 +111,8 @@ export class PalmPesaProvider implements PaymentProvider {
           responseCode === "0" ||
           responseCode === "00" ||
           responseCode === "SUCCESS" ||
-          responseCode === "SUCCESSFUL");
+          responseCode === "SUCCESSFUL" ||
+          textLooksSuccessful);
 
       if (isSuccess) {
         return {
@@ -119,7 +122,9 @@ export class PalmPesaProvider implements PaymentProvider {
             (data?.checkout_request_id as string) ??
             (data?.transaction_id as string) ??
             undefined,
-          message: (data?.ResponseDescription as string) ?? "Payment initiated",
+          message:
+            (data?.ResponseDescription as string) ??
+            (typeof rawData === "string" && rawData.trim() ? rawData.trim() : "Payment initiated"),
           rawResponse: data,
         };
       }

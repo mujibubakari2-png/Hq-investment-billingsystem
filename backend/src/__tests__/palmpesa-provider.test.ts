@@ -36,6 +36,31 @@ describe("PalmPesaProvider", () => {
         expect(result.message).toBe("Accepted");
     });
 
+    it("accepts plain-text success responses returned with HTTP 200", async () => {
+        jest.spyOn(utils, "httpPost").mockResolvedValue({
+            ok: true,
+            status: 200,
+            data: "SUCCESS",
+        });
+
+        const provider = new PalmPesaProvider({
+            apiKey: "test-key",
+            apiUrl: "https://example.test/api",
+            environment: "sandbox",
+        });
+
+        const result = await provider.initiatePayment({
+            amount: 5000,
+            phone: "0712345678",
+            reference: "INV-100",
+            description: "Test payment",
+            callbackUrl: "https://example.test/callback",
+        });
+
+        expect(result.success).toBe(true);
+        expect(result.message).toBe("SUCCESS");
+    });
+
     it("parses PalmPesa JSON response bodies returned as plain text", async () => {
         jest.spyOn(utils, "httpPost").mockResolvedValue({
             ok: true,
