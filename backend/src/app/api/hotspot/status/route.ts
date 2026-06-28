@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
+import { buildHotspotPortalFeedback } from "@/lib/hotspotFlow";
 
 /**
  * GET /api/hotspot/status?reference=HP-XXXXX
@@ -59,15 +60,26 @@ export async function GET(req: NextRequest) {
         }
 
         // Build response
+        const feedback = buildHotspotPortalFeedback({
+            kind: 'payment',
+            state: transaction.status === 'COMPLETED'
+                ? 'success'
+                : transaction.status === 'FAILED'
+                    ? 'failed'
+                    : 'pending',
+        });
+
         const response: Record<string, unknown> = {
             status: transaction.status,
             reference: transaction.reference,
             amount: transaction.amount,
             packageName: transaction.planName,
+            title: feedback.title,
+            message: feedback.message,
+            autoConnect: feedback.autoConnect,
         };
 
         if (transaction.status === "COMPLETED") {
-            // Find the active subscription
             const subscription = await db.subscription.findFirst({
                 where: {
                     clientId: transaction.clientId,
@@ -78,12 +90,6 @@ export async function GET(req: NextRequest) {
 
             response.username = transaction.client.username;
             response.expiresAt = subscription?.expiresAt?.toISOString() || transaction.expiryDate?.toISOString();
-            response.message = "Payment confirmed! You can now connect.";
-            response.autoConnect = true;
-        } else if (transaction.status === "FAILED") {
-            response.message = "Payment failed. Please try again.";
-        } else {
-            response.message = "Waiting for payment confirmation...";
         }
 
         return jsonResponse(response);

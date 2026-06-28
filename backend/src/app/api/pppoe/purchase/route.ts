@@ -184,6 +184,7 @@ export async function POST(req: NextRequest) {
         reference,
         description: `PPPoE: ${pkg.name}`,
         buyerName: existingClient.fullName || `PPPoE ${existingClient.username}`,
+        paymentContext: 'TENANT',
       });
 
       if (result.success) {

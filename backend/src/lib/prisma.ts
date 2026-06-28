@@ -3,6 +3,26 @@ import { PrismaClient } from "../generated/prisma";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
 
+// DEBUG HOOK: Wrap JSON.parse to log problematic inputs during dev.
+if (process.env.NODE_ENV !== 'production' && !(globalThis as any).__jsonParseWrapped) {
+    (globalThis as any).__jsonParseWrapped = true;
+    const _origParse = JSON.parse;
+    JSON.parse = (text: any, reviver?: (key: any, value: any) => any) => {
+        try {
+            return _origParse.call(JSON, text, reviver as any);
+        } catch (err: any) {
+            try {
+                const sample = typeof text === 'string' ? text.slice(0, 5000) : String(text);
+                console.error('[DEBUG][JSON.parse] failed to parse input sample (truncated):', sample);
+                console.error('[DEBUG][JSON.parse] thrown error stack:', err && err.stack ? err.stack : '<no stack>');
+            } catch (e) {
+                console.error('[DEBUG][JSON.parse] failed to stringify input');
+            }
+            throw err;
+        }
+    };
+}
+
 // Bug #11 FIX: Lazy initialization — defer pool/client creation until the first
 // actual database call. During `next build`, this module is imported but no DB
 // call is made, so CI/CD environments without DATABASE_URL won't fail at build time.

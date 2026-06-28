@@ -11,17 +11,17 @@
 // ── Complete model factory — prevents tenantPrisma proxy ownership-check failures
 function mkModel(overrides: Record<string, jest.Mock> = {}) {
   return {
-    findFirst:        jest.fn().mockResolvedValue(null),
-    findMany:         jest.fn().mockResolvedValue([]),
-    findUnique:       jest.fn().mockResolvedValue(null),
+    findFirst: jest.fn().mockResolvedValue(null),
+    findMany: jest.fn().mockResolvedValue([]),
+    findUnique: jest.fn().mockResolvedValue(null),
     findFirstOrThrow: jest.fn().mockResolvedValue(null),
-    updateMany:       jest.fn().mockResolvedValue({ count: 0 }),
-    update:           jest.fn().mockResolvedValue({ id: 'mock-id' }),
-    create:           jest.fn().mockResolvedValue({ id: 'mock-id' }),
-    createMany:       jest.fn().mockResolvedValue({ count: 0 }),
-    delete:           jest.fn().mockResolvedValue({}),
-    deleteMany:       jest.fn().mockResolvedValue({ count: 0 }),
-    count:            jest.fn().mockResolvedValue(0),
+    updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+    update: jest.fn().mockResolvedValue({ id: 'mock-id' }),
+    create: jest.fn().mockResolvedValue({ id: 'mock-id' }),
+    createMany: jest.fn().mockResolvedValue({ count: 0 }),
+    delete: jest.fn().mockResolvedValue({}),
+    deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+    count: jest.fn().mockResolvedValue(0),
     ...overrides,
   };
 }
@@ -30,12 +30,12 @@ jest.mock('@/lib/prisma', () => ({
   __esModule: true,
   default: {
     paymentChannel: mkModel(),
-    transaction:    mkModel(),
-    webhookLog:     mkModel({ create: jest.fn().mockResolvedValue({ id: 'wl-001' }) }),
-    subscription:   mkModel(),
-    client:         mkModel(),
-    package:        mkModel(),
-    routerLog:      mkModel(),
+    transaction: mkModel(),
+    webhookLog: mkModel({ create: jest.fn().mockResolvedValue({ id: 'wl-001' }) }),
+    subscription: mkModel(),
+    client: mkModel(),
+    package: mkModel(),
+    routerLog: mkModel(),
     $transaction: jest.fn(async (fn: any) => fn({
       transaction: mkModel(),
       subscription: mkModel(),
@@ -56,7 +56,7 @@ jest.mock('@/lib/payments/registry', () => ({
   isSupportedProvider: jest.fn(() => true),
 }));
 
-import { PaymentService, PaymentContext } from '@/lib/payments/service';
+import { PaymentService, PaymentContext } from '../lib/payments/service';
 
 describe('PaymentService.getChannel — Credential Isolation (CRITICAL-1)', () => {
   let svc: PaymentService;
@@ -65,6 +65,46 @@ describe('PaymentService.getChannel — Credential Isolation (CRITICAL-1)', () =
     svc = new PaymentService();
     jest.clearAllMocks();
   });
+
+  it.each(['PALMPESA', 'ZENOPAY', 'MONGIKE', 'HARAKAPAY'] as const)(
+    'uses a platform channel for LICENSE payments with provider %s',
+    async (provider) => {
+      const prismaMock = require('@/lib/prisma').default;
+      prismaMock.paymentChannel.findFirst.mockResolvedValue({
+        id: `ch-platform-${provider}`,
+        provider,
+        tenantId: null,
+        status: 'ACTIVE',
+      });
+
+      const channel = await svc.getChannel(null, provider, 'LICENSE');
+
+      expect(channel?.tenantId).toBeNull();
+      expect(prismaMock.paymentChannel.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ tenantId: null, provider }) })
+      );
+    }
+  );
+
+  it.each(['PALMPESA', 'ZENOPAY', 'MONGIKE', 'HARAKAPAY'] as const)(
+    'uses a tenant channel for TENANT payments with provider %s',
+    async (provider) => {
+      const prismaMock = require('@/lib/prisma').default;
+      prismaMock.paymentChannel.findFirst.mockResolvedValue({
+        id: `ch-tenant-${provider}`,
+        provider,
+        tenantId: 'tenant-abc',
+        status: 'ACTIVE',
+      });
+
+      const channel = await svc.getChannel('tenant-abc', provider, 'TENANT');
+
+      expect(channel?.tenantId).toBe('tenant-abc');
+      expect(prismaMock.paymentChannel.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ tenantId: 'tenant-abc', provider }) })
+      );
+    }
+  );
 
   // ── LICENSE context checks ──────────────────────────────────────────────
 
@@ -159,22 +199,85 @@ describe('PaymentService.getChannel — Credential Isolation (CRITICAL-1)', () =
   });
 });
 
-describe('PaymentService — Channel isolation: no platform channel for hotspot', () => {
-  it('Platform channels (tenantId=null) are never returned for TENANT context queries', async () => {
-    const prismaMock = require('@/lib/prisma').default;
-    // Even if the DB has a matching provider with tenantId=null,
-    // TENANT context should NEVER find it (the query filters by tenantId='tenant-abc')
-    prismaMock.paymentChannel.findFirst.mockResolvedValue(null); // No tenant channel found
+describe('PaymentService — Channel isolation: no platform channel for tenant payments', () => {
+  it.each(['PALMPESA', 'ZENOPAY', 'MONGIKE', 'HARAKAPAY'] as const)(
+    'never returns a platform channel for TENANT context with provider %s',
+    async (provider) => {
+      const prismaMock = require('@/lib/prisma').default;
+      prismaMock.paymentChannel.findFirst.mockResolvedValue(null);
 
-    const svc = new PaymentService();
-    const channel = await svc.getChannel('tenant-abc', 'PALMPESA', 'TENANT');
+      const svc = new PaymentService();
+      const channel = await svc.getChannel('tenant-abc', provider, 'TENANT');
 
-    // findFirst was called with tenantId='tenant-abc' — not null
-    const callArgs = (prismaMock.paymentChannel.findFirst as jest.Mock).mock.calls[0][0];
-    expect(callArgs.where.tenantId).toBe('tenant-abc');
-    expect(callArgs.where.tenantId).not.toBeNull();
+      const callArgs = (prismaMock.paymentChannel.findFirst as jest.Mock).mock.calls[0][0];
+      expect(callArgs.where.tenantId).toBe('tenant-abc');
+      expect(callArgs.where.tenantId).not.toBeNull();
+      expect(channel).toBeNull();
+    }
+  );
 
-    // Result is null (no tenant channel configured) — not the platform channel
-    expect(channel).toBeNull();
-  });
+  it.each(['PALMPESA', 'ZENOPAY', 'MONGIKE', 'HARAKAPAY'] as const)(
+    'never returns a tenant channel for LICENSE context with provider %s',
+    async (provider) => {
+      const prismaMock = require('@/lib/prisma').default;
+      prismaMock.paymentChannel.findFirst.mockResolvedValue(null);
+
+      const svc = new PaymentService();
+      const channel = await svc.getChannel(null, provider, 'LICENSE');
+
+      const callArgs = (prismaMock.paymentChannel.findFirst as jest.Mock).mock.calls[0][0];
+      expect(callArgs.where.tenantId).toBeNull();
+      expect(channel).toBeNull();
+    }
+  );
+});
+
+describe('PaymentService.initiatePayment — explicit production context', () => {
+  it.each(['PALMPESA', 'ZENOPAY', 'MONGIKE', 'HARAKAPAY'] as const)(
+    'uses LICENSE context for license payments and SaaS renewals with provider %s',
+    async (provider) => {
+      const svc = new PaymentService();
+      const getChannelSpy = jest.spyOn(svc, 'getChannel').mockResolvedValue({ id: `ch-license-${provider}` } as any);
+      const providerMock = {
+        initiatePayment: jest.fn().mockResolvedValue({ success: true, message: 'OK', providerRef: `ref-${provider}` }),
+      };
+      const registry = require('@/lib/payments/registry');
+      (registry.getPaymentProvider as jest.Mock).mockReturnValue(providerMock);
+
+      await svc.initiatePayment({
+        tenantId: null,
+        amount: 1000,
+        phone: '0712345678',
+        providerName: provider,
+        paymentContext: 'LICENSE',
+      } as any);
+
+      expect(getChannelSpy).toHaveBeenCalledWith(null, provider, 'LICENSE');
+      expect(providerMock.initiatePayment).toHaveBeenCalled();
+    }
+  );
+
+  it.each(['PALMPESA', 'ZENOPAY', 'MONGIKE', 'HARAKAPAY'] as const)(
+    'uses TENANT context for customer STK push, hotspot purchases, and PPPoE purchases with provider %s',
+    async (provider) => {
+      const svc = new PaymentService();
+      const getChannelSpy = jest.spyOn(svc, 'getChannel').mockResolvedValue({ id: `ch-tenant-${provider}` } as any);
+      const providerMock = {
+        initiatePayment: jest.fn().mockResolvedValue({ success: true, message: 'OK', providerRef: `ref-${provider}` }),
+      };
+      const registry = require('@/lib/payments/registry');
+      (registry.getPaymentProvider as jest.Mock).mockReturnValue(providerMock);
+
+      await svc.initiatePayment({
+        tenantId: 'tenant-abc',
+        amount: 2000,
+        phone: '0712345678',
+        providerName: provider,
+        paymentContext: 'TENANT',
+      } as any);
+
+      expect(getChannelSpy).toHaveBeenCalledWith('tenant-abc', provider, 'TENANT');
+      expect(providerMock.initiatePayment).toHaveBeenCalled();
+    }
+  );
 });

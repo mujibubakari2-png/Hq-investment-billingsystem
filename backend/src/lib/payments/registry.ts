@@ -6,12 +6,10 @@
  */
 
 import { PaymentProvider, ProviderName, ProviderConfig } from "@/lib/payments/types";
-import { PalmPesaProvider }    from "@/lib/payments/providers/palmpesa";
-import { ZenoPayProvider }     from "@/lib/payments/providers/zenopay";
-import { MongikeProvider }     from "@/lib/payments/providers/mongike";
-import { HarakaPayProvider }   from "@/lib/payments/providers/harakapay";
-import { StripeProvider }      from "@/lib/payments/providers/stripe";
-import { FlutterwaveProvider } from "@/lib/payments/providers/flutterwave";
+import { PalmPesaProvider } from "@/lib/payments/providers/palmpesa";
+import { ZenoPayProvider } from "@/lib/payments/providers/zenopay";
+import { MongikeProvider } from "@/lib/payments/providers/mongike";
+import { HarakaPayProvider } from "@/lib/payments/providers/harakapay";
 // E11 FIX: Removed MPESA
 
 import { env } from "@/lib/env";
@@ -67,19 +65,6 @@ function envConfigFor(provider: ProviderName): ProviderConfig {
         webhookSecret: env.HARAKAPAY_WEBHOOK_SECRET,
         environment,
       };
-    case "STRIPE":
-      return {
-        apiKey:        process.env.STRIPE_SECRET_KEY,
-        webhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
-        environment,
-      };
-    case "FLUTTERWAVE":
-      return {
-        apiKey:        process.env.FLUTTERWAVE_SECRET_KEY,
-        webhookSecret: process.env.FLUTTERWAVE_WEBHOOK_HASH,
-        apiUrl:        process.env.FLUTTERWAVE_API_URL,
-        environment,
-      };
   }
 }
 
@@ -112,9 +97,9 @@ function channelToConfig(channel: ChannelRecord): ProviderConfig {
 
   // Decrypt each sensitive field; decrypt() returns null for null/undefined inputs,
   // so we coerce null → undefined to satisfy ProviderConfig (optional fields).
-  const apiKey       = decrypt(channel.apiKey)       ?? decrypt(cfg.apiKey as string | null)       ?? undefined;
-  const apiSecret    = decrypt(channel.apiSecret)    ?? decrypt(cfg.apiSecret as string | null)    ?? undefined;
-  const webhookSecret= decrypt(channel.webhookSecret)?? decrypt(cfg.webhookSecret as string | null)?? undefined;
+  const apiKey = decrypt(channel.apiKey) ?? decrypt(cfg.apiKey as string | null) ?? undefined;
+  const apiSecret = decrypt(channel.apiSecret) ?? decrypt(cfg.apiSecret as string | null) ?? undefined;
+  const webhookSecret = decrypt(channel.webhookSecret) ?? decrypt(cfg.webhookSecret as string | null) ?? undefined;
 
   return {
     apiKey,
@@ -154,10 +139,6 @@ export function getPaymentProvider(
       return new MongikeProvider(config);
     case "HARAKAPAY":
       return new HarakaPayProvider(config);
-    case "STRIPE":
-      return new StripeProvider(config);
-    case "FLUTTERWAVE":
-      return new FlutterwaveProvider(config);
     default:
       throw new Error(`Unknown payment provider: "${providerName}"`);
   }
@@ -172,8 +153,6 @@ export const SUPPORTED_PROVIDERS: ProviderName[] = [
   "ZENOPAY",
   "MONGIKE",
   "HARAKAPAY",
-  "STRIPE",
-  "FLUTTERWAVE",
 ];
 
 export function isSupportedProvider(name: string): name is ProviderName {

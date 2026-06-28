@@ -3,6 +3,7 @@ import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 import { getMikroTikService, sanitizeMikroTikName } from "@/lib/mikrotik";
 import { syncRadiusUser } from "@/lib/radius";
+import { buildHotspotPortalFeedback } from "@/lib/hotspotFlow";
 
 /**
  * POST /api/hotspot/voucher/redeem
@@ -98,14 +99,18 @@ export async function POST(req: NextRequest) {
         }
 
         if (!client) {
-            // Create a temporary client for the voucher
-            const username = sanitizeMikroTikName(`V-${code}`);
+            // Create a temporary client for the voucher using a non-revealing username.
+            const serviceType = pkg.type === "PPPOE" ? "PPPOE" : "HOTSPOT";
+            const usernamePrefix = serviceType === "PPPOE" ? "PE" : "HS";
+            const usernameSuffix = sanitizeMikroTikName(voucher.id);
+            const username = `${usernamePrefix}-${usernameSuffix}`;
+
             client = await db.client.create({
                 data: {
                     username,
-                    fullName: `Voucher User (${code})`,
+                    fullName: "Voucher User",
                     phone: "0000000000",
-                    serviceType: "HOTSPOT",
+                    serviceType,
                     status: "ACTIVE",
                     macAddress: macAddress || null,
                     tenantId: pkg.tenantId,
@@ -140,14 +145,14 @@ export async function POST(req: NextRequest) {
         const rId = routerId || pkg.routerId;
         let mikrotikSyncSuccess = false;
         let finalSyncStatus = "PENDING";
-        
+
         if (rId) {
             try {
                 const mikrotik = await getMikroTikService(rId);
                 await mikrotik.activateService(client.username, code, pkg.name, "hotspot", expiresAt);
                 mikrotikSyncSuccess = true;
                 finalSyncStatus = "SYNCED";
-                
+
                 await db.routerLog.create({
                     data: {
                         routerId: rId,
@@ -205,11 +210,15 @@ export async function POST(req: NextRequest) {
             }),
         ]);
 
+        const feedback = buildHotspotPortalFeedback({ kind: 'voucher', state: 'success' });
+
         return jsonResponse({
             success: true,
-            message: "Voucher redeemed successfully!",
+            title: feedback.title,
+            message: feedback.message,
+            autoConnect: feedback.autoConnect,
             username: client.username,
-            password: code, // Vouchers usually don't have passwords in this flow, or it's the code itself
+            password: code,
             expiresAt: expiresAt.toISOString(),
         });
 

@@ -63,6 +63,12 @@ export interface InitiatePaymentOptions {
    * Falls back to buildCallbackUrl(providerName) if not provided.
    */
   callbackUrl?: string;
+  /**
+   * Explicit payment context to enforce credential isolation at the service boundary.
+   * LICENSE => platform channel (tenantId=null)
+   * TENANT => tenant channel (tenantId=<value>)
+   */
+  paymentContext?: PaymentContext;
 }
 
 // ─── PaymentService ─────────────────────────────────────────────────────────
@@ -121,7 +127,7 @@ export class PaymentService {
   // ── Initiate Payment ────────────────────────────────────────────────────
 
   async initiatePayment(opts: InitiatePaymentOptions): Promise<PaymentResponse & { reference: string }> {
-    const { tenantId, amount, phone, providerName, description, buyerName, buyerEmail } = opts;
+    const { tenantId, amount, phone, providerName, description, buyerName, buyerEmail, paymentContext } = opts;
 
     // Validate
     if (!isSupportedProvider(providerName)) {
@@ -174,7 +180,7 @@ export class PaymentService {
     }
 
     // Load provider (DB channel config first, env fallback)
-    const channel = await this.getChannel(tenantId, providerName);
+    const channel = await this.getChannel(tenantId, providerName, paymentContext);
     const provider = getPaymentProvider(providerName, channel);
 
     const request: PaymentRequest = {

@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
+import { buildHotspotPortalFeedback } from "@/lib/hotspotFlow";
 
 /**
  * GET /api/hotspot/check-mac?mac=XX:XX:XX:XX:XX:XX
@@ -72,9 +73,15 @@ export async function GET(req: NextRequest) {
         });
 
         if (!subscription) {
-            return jsonResponse({ active: false, message: "No active subscription found" });
+            return jsonResponse({
+                active: false,
+                title: 'No active subscription',
+                message: 'No active subscription found',
+                autoConnect: false,
+            });
         }
 
+        const feedback = buildHotspotPortalFeedback({ kind: 'reconnect', state: 'active' });
         let password = subscription.client.phone;
         if (subscription.method === "VOUCHER") {
             const lastVoucher = await db.voucher.findFirst({
@@ -84,13 +91,20 @@ export async function GET(req: NextRequest) {
 
             if (lastVoucher) {
                 password = lastVoucher.code;
-            } else if (subscription.client.username.startsWith("V-")) {
-                password = subscription.client.username.substring(2);
+            } else {
+                // Legacy support for old voucher usernames that encoded the voucher code.
+                const match = subscription.client.username.match(/^V-(.+)$/i);
+                if (match) {
+                    password = match[1];
+                }
             }
         }
 
         return jsonResponse({
             active: true,
+            title: feedback.title,
+            message: feedback.message,
+            autoConnect: feedback.autoConnect,
             username: subscription.client.username,
             password,
             expiresAt: subscription.expiresAt.toISOString(),

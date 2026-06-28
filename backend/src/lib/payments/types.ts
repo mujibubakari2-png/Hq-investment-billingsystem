@@ -4,7 +4,7 @@
  */
 
 // ─── Provider Names ───────────────────────────────────────────────────────────
-export type ProviderName = "PALMPESA" | "ZENOPAY" | "MONGIKE" | "HARAKAPAY" | "STRIPE" | "FLUTTERWAVE";
+export type ProviderName = "PALMPESA" | "ZENOPAY" | "MONGIKE" | "HARAKAPAY";
 
 
 // ─── Payment Request ──────────────────────────────────────────────────────────

@@ -4,6 +4,7 @@ import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 import { getMikroTikService, sanitizeMikroTikName } from "@/lib/mikrotik";
 import { syncRadiusUser } from "@/lib/radius";
+import { buildHotspotPortalFeedback } from "@/lib/hotspotFlow";
 import { paymentService } from "@/lib/payments/service";
 import { formatPhoneTZ } from "@/lib/payments/utils";
 
@@ -252,6 +253,7 @@ export async function POST(req: NextRequest) {
         description: `Hotspot: ${pkg.name}`,
         buyerName: existingClient?.fullName || `Hotspot ${cleanPhone}`,
         callbackUrl: callbackUrlOverride,
+        paymentContext: 'TENANT',
       });
 
       if (result.success) {
@@ -264,15 +266,19 @@ export async function POST(req: NextRequest) {
       console.error("[HOTSPOT PURCHASE] PaymentService error:", payErr);
     }
 
+    const purchaseFeedback = paymentInitiated
+      ? buildHotspotPortalFeedback({ kind: 'payment', state: 'pending' })
+      : undefined;
+
     if (!paymentInitiated) {
       console.warn(`[HOTSPOT PURCHASE] No payment provider configured for tenant ${pkg.tenantId}. Transaction stays PENDING.`);
     }
 
     return jsonResponse({
       success: true,
-      message: paymentInitiated
-        ? "Payment initiated. Check your phone for the payment prompt."
-        : "Payment provider not configured. Please contact support.",
+      title: purchaseFeedback?.title,
+      message: purchaseFeedback?.message || "Payment provider not configured. Please contact support.",
+      autoConnect: purchaseFeedback?.autoConnect ?? false,
       reference,
       transactionId: transaction.id,
       purchase_id: transaction.id,

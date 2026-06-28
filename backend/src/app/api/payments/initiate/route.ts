@@ -12,6 +12,7 @@ import { canAccessTenant, getAssignTenantId } from '@/lib/tenant';
 import { paymentService } from "@/lib/payments/service";
 import { isSupportedProvider, SUPPORTED_PROVIDERS } from "@/lib/payments/registry";
 import { isValidAmount, formatPhoneTZ } from "@/lib/payments/utils";
+import prisma from '@/lib/prisma';
 
 export async function POST(req: NextRequest) {
   try {
@@ -72,6 +73,7 @@ export async function POST(req: NextRequest) {
       description,
       buyerName,
       buyerEmail,
+      paymentContext: 'TENANT',
     });
 
     if (!result.success) {
@@ -88,6 +90,12 @@ export async function POST(req: NextRequest) {
     }, 200);
 
   } catch (e) {
+    try {
+      const rows = await prisma.systemSetting.findMany({ where: { key: 'paymentGateways' } });
+      console.error('[PAYMENTS/INITIATE] paymentGateways rows:', rows.map(r => ({ id: r.id, tenantId: r.tenantId, value: r.value })));
+    } catch (dbErr) {
+      console.error('[PAYMENTS/INITIATE] failed to read systemSetting.paymentGateways:', dbErr);
+    }
     console.error("[PAYMENTS/INITIATE] Error:", e);
     return errorResponse("Internal server error", 500);
   }

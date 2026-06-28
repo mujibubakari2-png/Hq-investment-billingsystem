@@ -533,6 +533,12 @@ export default function HotspotLoginCustomizer() {
                 if (d && typeof d.error === 'string') { throw new Error(d.error); }
                 document.getElementById('paymentInitial').style.display = 'none';
                 document.getElementById('paymentWait').style.display = 'block';
+                if (d.title) {
+                    document.getElementById('pollStatus').innerText = d.title;
+                }
+                if (d.message) {
+                    document.getElementById('pollMessage').innerText = d.message;
+                }
                 startPolling(d.reference);
             })
             .catch(function(err) {
@@ -551,21 +557,25 @@ export default function HotspotLoginCustomizer() {
                     return r.json();
                 })
                 .then(function(d) {
-                    if (d.status === 'COMPLETED') {
+                        if (d.status === 'COMPLETED') {
                         clearInterval(pollInterval);
-                        document.getElementById('pollStatus').innerText = 'PAID! Connecting...';
+                        document.getElementById('pollStatus').innerText = d.title || 'PAID! Connecting...';
                         document.getElementById('pollStatus').style.background = '#22c55e';
                         document.getElementById('pollStatus').style.color = '#fff';
-                        document.getElementById('pollMessage').innerText = 'Your payment was successful. Getting you online now!';
+                        document.getElementById('pollMessage').innerText = d.message || 'Your payment was successful. Getting you online now!';
                         
-                        // Auto connect
-                        setTimeout(function() {
-                            connectUser(d.username, d.password);
-                        }, 2000);
+                        if (d.autoConnect !== false && d.username && d.password) {
+                            setTimeout(function() {
+                                connectUser(d.username, d.password);
+                            }, 2000);
+                        }
                     } else if (d.status === 'FAILED') {
                         clearInterval(pollInterval);
-                        alert('Payment failed or cancelled. Please try again.');
+                        alert(d.message || 'Payment failed or cancelled. Please try again.');
                         closePayment();
+                    } else if (d.title) {
+                        document.getElementById('pollStatus').innerText = d.title;
+                        document.getElementById('pollMessage').innerText = d.message || 'Waiting for payment confirmation...';
                     }
                 })
                 .catch(function(err) {
@@ -626,7 +636,11 @@ export default function HotspotLoginCustomizer() {
             .then(function(r) { return r.json(); })
                 .then(function(d) {
                 if (d && typeof d.error === 'string') { throw new Error(d.error); }
-                alert('Voucher valid! Connecting...');
+                if (d.title) {
+                    alert(d.title + '\n' + (d.message || 'Connecting...'));
+                } else {
+                    alert('Voucher valid! Connecting...');
+                }
                 connectUser(d.username, d.password || '');
             })
             .catch(function(err) {
@@ -695,6 +709,13 @@ export default function HotspotLoginCustomizer() {
                 fetch(API_BASE + '/api/hotspot/check-mac?mac=' + encodeURIComponent(currentMac) + '&routerId=' + ROUTER_ID, { mode: 'cors' })
                     .then(function(r) { return r.json(); })
                     .then(function(d) {
+                        if (d.title) {
+                            document.getElementById('pollStatus').innerText = d.title;
+                        }
+                        if (d.message) {
+                            document.getElementById('pollMessage').innerText = d.message;
+                        }
+
                         if (d.active) {
                             console.log('[Hotspot] Active subscription found for MAC. Auto-connecting...');
                             connectUser(d.username, d.password);

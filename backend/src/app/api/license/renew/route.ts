@@ -3,8 +3,8 @@ import { randomUUID } from "node:crypto";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 import { requirePermission } from "@/lib/rbac";
-import { getPaymentProvider } from "@/lib/payments/registry";
 import { formatPhoneTZ } from "@/lib/payments/utils";
+import { paymentService } from "@/lib/payments/service";
 import { getJwtTenantId, isPlatformSuperAdmin } from "@/lib/tenant";
 
 export async function POST(req: NextRequest) {
@@ -122,9 +122,9 @@ export async function POST(req: NextRequest) {
 
         try {
             const cleanPhone = formatPhoneTZ(phoneNumber);
-            const provider = getPaymentProvider(providerName, systemChannel);
 
-            const result = await provider.initiatePayment({
+            const result = await paymentService.initiatePayment({
+                tenantId: null,
                 amount: invoice.amount,
                 phone: cleanPhone,
                 reference: invoice.invoiceNumber,
@@ -132,6 +132,8 @@ export async function POST(req: NextRequest) {
                 callbackUrl,
                 buyerName: tenant.name,
                 buyerEmail: tenant.email,
+                providerName,
+                paymentContext: 'LICENSE',
             });
 
             if (result.success) {
