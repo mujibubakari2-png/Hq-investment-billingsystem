@@ -87,6 +87,31 @@ describe("PalmPesaProvider", () => {
         expect(result.message).toBe("Accepted");
     });
 
+    it("treats a 200 response with a generic success message as an accepted initiation", async () => {
+        jest.spyOn(utils, "httpPost").mockResolvedValue({
+            ok: true,
+            status: 200,
+            data: { message: "Payment initiated" },
+        });
+
+        const provider = new PalmPesaProvider({
+            apiKey: "test-key",
+            apiUrl: "https://example.test/api",
+            environment: "sandbox",
+        });
+
+        const result = await provider.initiatePayment({
+            amount: 5000,
+            phone: "0712345678",
+            reference: "INV-100",
+            description: "Test payment",
+            callbackUrl: "https://example.test/callback",
+        });
+
+        expect(result.success).toBe(true);
+        expect(result.message).toBe("Payment initiated");
+    });
+
     it("parses stringified JSON from checkStatus responses", async () => {
         jest.spyOn(utils, "httpGet").mockResolvedValue({
             ok: true,
@@ -105,6 +130,22 @@ describe("PalmPesaProvider", () => {
         expect(status.status).toBe("COMPLETED");
         expect(status.providerRef).toBe("REQ-123");
         expect(status.amount).toBe(5000);
+    });
+
+    it("falls back to raw text when a successful HTTP 200 response is not valid JSON", async () => {
+        jest.spyOn(global, "fetch").mockResolvedValue({
+            ok: true,
+            status: 200,
+            headers: new Headers({ "content-type": "application/json" }),
+            json: jest.fn().mockRejectedValue(new SyntaxError("Unexpected token")),
+            text: jest.fn().mockResolvedValue("Payment initiated"),
+        } as unknown as Response);
+
+        const result = await utils.httpPost("https://example.test/api/process-payment", { test: true }, { "Content-Type": "application/json" });
+
+        expect(result.ok).toBe(true);
+        expect(result.status).toBe(200);
+        expect(result.data).toBe("Payment initiated");
     });
 
     it("parses stringified webhook payload bodies", () => {

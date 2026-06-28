@@ -145,12 +145,24 @@ export async function POST(req: NextRequest) {
                     },
                     200
                 );
-            } else {
-                return errorResponse(result.message || "Failed to initiate STK Push", 500);
             }
+
+            const isGatewayIssue =
+                result.status === "EMPTY" ||
+                result.status === "UNKNOWN" ||
+                result.status?.startsWith("HTTP_") ||
+                /HTTP\s+\d{3}/i.test(result.message || "") ||
+                /unknown response format|response body was empty/i.test(result.message || "");
+            const httpStatus = isGatewayIssue ? 502 : 500;
+            return errorResponse(
+                result.message || "Failed to initiate STK Push",
+                httpStatus,
+                result.code || (isGatewayIssue ? "PALMPESA_GATEWAY" : "PALMPESA_FAILED"),
+                result.status ? `Provider status: ${result.status}` : undefined
+            );
         } catch (paymentErr: any) {
             console.error("STK push error during license renewal:", paymentErr);
-            return errorResponse(paymentErr.message || "Payment provider error", 500);
+            return errorResponse(paymentErr.message || "Payment provider error", 502, "PALMPESA_GATEWAY", "Provider request failed");
         }
     } catch (error) {
         console.error("License Renew API Error:", error);

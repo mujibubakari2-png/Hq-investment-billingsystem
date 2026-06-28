@@ -67,6 +67,82 @@ export class PalmPesaProvider implements PaymentProvider {
   // Confirmed endpoint: POST /api/process-payment
   // Docs: https://palmpesa-docs.netlify.app
 
+  private normalizeResponseBody(rawData: unknown): Record<string, unknown> {
+    if (typeof rawData === "string") {
+      const parsed = safeJsonParse<Record<string, unknown>>(rawData, {});
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+        ? parsed
+        : {};
+    }
+
+    return (rawData as Record<string, unknown>) ?? {};
+  }
+
+  private getResponseCode(data: Record<string, unknown>): string {
+    const value =
+      data?.ResponseCode ??
+      data?.responseCode ??
+      data?.ResultCode ??
+      data?.resultCode ??
+      data?.status ??
+      data?.Status ??
+      data?.code ??
+      data?.Code ??
+      "";
+
+    return String(value ?? "").trim().toUpperCase();
+  }
+
+  private getResponseMessage(data: Record<string, unknown>, rawText: string): string {
+    const message =
+      (data?.ResponseDescription as string | undefined) ??
+      (data?.responseDescription as string | undefined) ??
+      (data?.ResultDesc as string | undefined) ??
+      (data?.resultDesc as string | undefined) ??
+      (data?.message as string | undefined) ??
+      (data?.Message as string | undefined) ??
+      (rawText || "");
+
+    return typeof message === "string" && message.trim() ? message.trim() : "";
+  }
+
+  private getProviderRef(data: Record<string, unknown>): string | undefined {
+    const providerRef =
+      (data?.CheckoutRequestID as string | undefined) ??
+      (data?.checkout_request_id as string | undefined) ??
+      (data?.transaction_id as string | undefined) ??
+      (data?.TransactionId as string | undefined) ??
+      (data?.transactionId as string | undefined) ??
+      (data?.order_id as string | undefined) ??
+      (data?.OrderId as string | undefined) ??
+      undefined;
+
+    return typeof providerRef === "string" && providerRef.trim() ? providerRef.trim() : undefined;
+  }
+
+  private evaluateResponseSuccess(
+    result: { ok: boolean; status: number },
+    data: Record<string, unknown>,
+    rawText: string,
+    responseCode: string,
+    providerRef: string | undefined,
+    message: string
+  ): boolean {
+    const explicitSuccess = ["0", "00", "SUCCESS", "SUCCESSFUL", "ACCEPTED", "APPROVED", "OK"].includes(responseCode);
+    const explicitFailure = ["1", "-1", "FAILED", "FAIL", "DECLINED", "REJECTED", "CANCELLED", "CANCELED", "ERROR", "EXPIRED"].includes(responseCode);
+    const successText = /\b(success|successful|accepted|approved|ok|initiated|processing|queued|created|pending)\b/i.test(rawText || message);
+
+    if (result.ok && (explicitSuccess || data?.success === true || data?.success === "true")) {
+      return true;
+    }
+
+    if (result.ok && !explicitFailure && (successText || Boolean(providerRef))) {
+      return true;
+    }
+
+    return false;
+  }
+
   async initiatePayment(request: PaymentRequest): Promise<PaymentResponse> {
     const phone = formatPhoneTZ(request.phone);
 
@@ -88,54 +164,64 @@ export class PalmPesaProvider implements PaymentProvider {
       );
 
       const rawData = result.data;
-      const data =
-        typeof rawData === "string"
-          ? safeJsonParse<Record<string, unknown>>(rawData, {})
-          : (rawData as Record<string, unknown>);
-      const responseCode = String(
-        data?.ResponseCode ??
-        data?.responseCode ??
-        data?.ResultCode ??
-        data?.resultCode ??
-        data?.status ??
-        ""
-      )
-        .trim()
-        .toUpperCase();
       const rawText = typeof rawData === "string" ? rawData.trim() : "";
-      const textLooksSuccessful = /\b(success|successful|accepted|approved|ok)\b/i.test(rawText);
-      const isSuccess =
-        result.ok &&
-        (data?.success === true ||
-          data?.success === "true" ||
-          responseCode === "0" ||
-          responseCode === "00" ||
-          responseCode === "SUCCESS" ||
-          responseCode === "SUCCESSFUL" ||
-          textLooksSuccessful);
+      const data = this.normalizeResponseBody(rawData);
+      const responseCode = this.getResponseCode(data);
+      const message = this.getResponseMessage(data, rawText);
+      const providerRef = this.getProviderRef(data);
+      const isSuccess = this.evaluateResponseSuccess(result, data, rawText, responseCode, providerRef, message);
+
+      if (process.env.PALMPESA_DEBUG === "1") {
+        console.log("===== PALMPESA DEBUG =====", {
+          requestUrl: `${this.apiUrl}/process-payment`,
+          requestBody: payload,
+          httpStatus: result.status,
+          headers: this.headers,
+          rawBody: rawData,
+          parsedBody: data,
+          responseCode,
+          successEvaluation: isSuccess,
+          returnedResult: { success: isSuccess, providerRef, message, rawResponse: data, status: responseCode || undefined, code: responseCode || undefined },
+        });
+      }
 
       if (isSuccess) {
         return {
           success: true,
-          providerRef:
-            (data?.CheckoutRequestID as string) ??
-            (data?.checkout_request_id as string) ??
-            (data?.transaction_id as string) ??
-            undefined,
-          message:
-            (data?.ResponseDescription as string) ??
-            (typeof rawData === "string" && rawData.trim() ? rawData.trim() : "Payment initiated"),
-          rawResponse: data,
+          providerRef,
+          message: message || (rawText ? rawText : "Payment initiated"),
+          rawResponse: rawData,
+          status: responseCode || "SUCCESS",
+          code: responseCode || undefined,
+        };
+      }
+
+      if (result.ok && !rawText) {
+        return {
+          success: false,
+          message: "PalmPesa returned HTTP 200 but response body was empty.",
+          rawResponse: rawData,
+          status: responseCode || "EMPTY",
+          code: responseCode || "EMPTY",
+        };
+      }
+
+      if (result.ok) {
+        return {
+          success: false,
+          message: message || `PalmPesa returned an unknown response format. HTTP ${result.status}`,
+          rawResponse: rawData,
+          status: responseCode || "UNKNOWN",
+          code: responseCode || "UNKNOWN",
         };
       }
 
       return {
         success: false,
-        message:
-          (data?.ResponseDescription as string) ??
-          (data?.message as string) ??
-          `PalmPesa error (HTTP ${result.status})`,
-        rawResponse: data,
+        message: message || `PalmPesa error (HTTP ${result.status})`,
+        rawResponse: rawData,
+        status: responseCode || `HTTP_${result.status}`,
+        code: responseCode || `HTTP_${result.status}`,
       };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Network error";

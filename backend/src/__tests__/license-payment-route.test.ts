@@ -135,4 +135,53 @@ describe('License renewal payment route', () => {
 
         expect(res.status).toBe(500);
     });
+
+    it('returns a gateway error for PalmPesa responses that were HTTP 200 but unusable', async () => {
+        const tenantDb = {
+            tenant: {
+                findUnique: jest.fn().mockResolvedValue({
+                    id: 'tenant-1',
+                    name: 'Acme ISP',
+                    email: 'ops@example.com',
+                    planId: 'plan-1',
+                    plan: { price: 20000 },
+                }),
+            },
+            tenantInvoice: {
+                findUnique: jest.fn().mockResolvedValue({
+                    id: 'inv-1',
+                    tenantId: 'tenant-1',
+                    amount: 20000,
+                    planId: 'plan-1',
+                    packageMonths: 1,
+                }),
+            },
+        };
+
+        const globalDb = {
+            paymentChannel: {
+                findFirst: jest.fn().mockResolvedValue(null),
+            },
+        };
+
+        mockGetTenantClient.mockImplementation((tenantId: string | null) =>
+            tenantId === null ? globalDb : tenantDb
+        );
+        mockInitiatePayment.mockResolvedValue({
+            success: false,
+            message: 'PalmPesa returned HTTP 200 but response body was empty.',
+            status: 'EMPTY',
+            code: 'EMPTY',
+        });
+
+        const req = new NextRequest('http://localhost/api/license/renew', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ packageMonths: 1, phoneNumber: '0712345678', invoiceId: 'inv-1' }),
+        });
+
+        const res = await route.POST(req);
+
+        expect(res.status).toBe(502);
+    });
 });

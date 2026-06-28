@@ -183,20 +183,38 @@ export async function httpPost(
   const isFormEncoded =
     headers["Content-Type"] === "application/x-www-form-urlencoded";
 
-  const res = await fetch(url, {
-    method: "POST",
-    headers,
-    body: isFormEncoded
-      ? (body as string)
-      : JSON.stringify(body),
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers,
+      body: isFormEncoded
+        ? (body as string)
+        : JSON.stringify(body),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Network error: ${message}`);
+  }
 
-  let data: unknown;
+  const responseText = await res.text();
   const contentType = res.headers.get("content-type") || "";
-  if (contentType.includes("application/json")) {
-    data = await res.json();
-  } else {
-    data = await res.text();
+  const trimmedText = responseText.trim();
+
+  let data: unknown = trimmedText;
+  if (!trimmedText) {
+    data = "";
+  } else if (
+    contentType.includes("application/json") ||
+    trimmedText.startsWith("{") ||
+    trimmedText.startsWith("[") ||
+    trimmedText.startsWith('"')
+  ) {
+    try {
+      data = JSON.parse(trimmedText);
+    } catch {
+      data = trimmedText;
+    }
   }
 
   return { ok: res.ok, status: res.status, data };
@@ -206,14 +224,32 @@ export async function httpGet(
   url: string,
   headers: Record<string, string>
 ): Promise<{ ok: boolean; status: number; data: unknown }> {
-  const res = await fetch(url, { method: "GET", headers });
+  let res: Response;
+  try {
+    res = await fetch(url, { method: "GET", headers });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Network error: ${message}`);
+  }
 
-  let data: unknown;
+  const responseText = await res.text();
   const contentType = res.headers.get("content-type") || "";
-  if (contentType.includes("application/json")) {
-    data = await res.json();
-  } else {
-    data = await res.text();
+  const trimmedText = responseText.trim();
+
+  let data: unknown = trimmedText;
+  if (!trimmedText) {
+    data = "";
+  } else if (
+    contentType.includes("application/json") ||
+    trimmedText.startsWith("{") ||
+    trimmedText.startsWith("[") ||
+    trimmedText.startsWith('"')
+  ) {
+    try {
+      data = JSON.parse(trimmedText);
+    } catch {
+      data = trimmedText;
+    }
   }
 
   return { ok: res.ok, status: res.status, data };

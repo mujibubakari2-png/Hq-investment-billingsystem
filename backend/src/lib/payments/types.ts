@@ -36,6 +36,10 @@ export interface PaymentResponse {
   message: string;
   /** Full raw API response for logging */
   rawResponse?: unknown;
+  /** Provider status string when available */
+  status?: string;
+  /** Provider response code when available */
+  code?: string;
 }
 
 // ─── Transaction Status ───────────────────────────────────────────────────────
