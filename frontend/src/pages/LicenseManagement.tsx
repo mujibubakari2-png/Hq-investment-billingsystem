@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import PeopleIcon from '@mui/icons-material/People';
-import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import WarningIcon from '@mui/icons-material/Warning';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
@@ -109,7 +108,6 @@ export default function LicenseManagement() {
         customersCount,
         pppoeLimit,
         hotspotLimit,
-        paidThisMonth,
         hasOutstanding,
         hasPending,
         plan,
@@ -282,9 +280,6 @@ export default function LicenseManagement() {
                     padding: '20px 30px', borderLeft: '1px solid var(--border-light)',
                     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                 }}>
-                    <AccountBalanceWalletIcon style={{ fontSize: 24, color: 'var(--info)', marginBottom: 4 }} />
-                    <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>TSH {paidThisMonth?.toLocaleString()}</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--info)' }}>SaaS Payments (MTD)</div>
                 </div>
             </div>
 
@@ -306,7 +301,7 @@ export default function LicenseManagement() {
                 {hasAnyPending ? (
                     <>
                         <WarningIcon style={{ fontSize: 48, color: '#ef4444', marginBottom: 12 }} />
-                        <h3 style={{ fontWeight: 700, fontSize: '1.1rem', marginBottom: 4 }}>Outstanding SaaS Billing</h3>
+                        <h3 style={{ fontWeight: 700, fontSize: '1.1rem', marginBottom: 4 }}>Outstanding Invoices</h3>
                         <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: 8 }}>
                             You have {pendingInvoices?.length || outstandingInvoices?.length || 1} unpaid invoice{(pendingInvoices?.length || 1) > 1 ? 's' : ''} pending. Please settle to avoid suspension.
                         </p>
@@ -336,7 +331,7 @@ export default function LicenseManagement() {
                     <>
                         <CheckCircleIcon style={{ fontSize: 48, color: '#16a34a', marginBottom: 12 }} />
                         <h3 style={{ fontWeight: 700, fontSize: '1.1rem', marginBottom: 4 }}>All Invoices Paid!</h3>
-                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: 16 }}>You have no outstanding SaaS invoices.</p>
+                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: 16 }}>You have no outstanding invoices.</p>
                         <button className="btn btn-outline" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }} onClick={() => navigate('/renew')}>
                             <PaymentIcon style={{ fontSize: 16 }} /> Renew / Pay Invoice
                         </button>
