@@ -63,42 +63,6 @@ export class PalmPesaProvider implements PaymentProvider {
     };
   }
 
-  private parsePalmPesaResponse(rawData: unknown): {
-    data: Record<string, unknown> | null;
-    message?: string;
-    isHtmlError: boolean;
-  } {
-    if (typeof rawData === "string") {
-      const trimmed = rawData.trim();
-      if (trimmed.startsWith("<") && /<html[\s>]/i.test(trimmed)) {
-        const titleMatch = trimmed.match(/<title>([^<]+)<\/title>/i);
-        const titleText = titleMatch?.[1]?.trim();
-        return {
-          data: null,
-          message: titleText
-            ? `PalmPesa returned an HTML error page: ${titleText}`
-            : "PalmPesa returned an HTML error page instead of JSON.",
-          isHtmlError: true,
-        };
-      }
-    }
-
-    const parsedData =
-      typeof rawData === "string"
-        ? safeJsonParse<Record<string, unknown>>(rawData, {})
-        : (rawData as Record<string, unknown>);
-
-    const data =
-      parsedData &&
-      typeof parsedData === "object" &&
-      parsedData.data &&
-      typeof parsedData.data === "object"
-        ? (parsedData.data as Record<string, unknown>)
-        : parsedData;
-
-    return { data, isHtmlError: false };
-  }
-
   // ── Initiate Payment (STK Push) ───────────────────────────────────────────
   // Confirmed endpoint: POST /api/process-payment
   // Docs: https://palmpesa-docs.netlify.app
@@ -124,48 +88,24 @@ export class PalmPesaProvider implements PaymentProvider {
       );
 
       const rawData = result.data;
-      const parsed = this.parsePalmPesaResponse(rawData);
-      const data = parsed.data;
-
-      if (parsed.isHtmlError) {
-        return {
-          success: false,
-          message: parsed.message ??
-            "PalmPesa returned an HTML error page instead of JSON.",
-          rawResponse: rawData,
-        };
-      }
-
+      const data =
+        typeof rawData === "string"
+          ? safeJsonParse<Record<string, unknown>>(rawData, {})
+          : (rawData as Record<string, unknown>);
       const responseCode = String(
         data?.ResponseCode ??
         data?.responseCode ??
-        data?.response_code ??
         data?.ResultCode ??
         data?.resultCode ??
-        data?.result_code ??
         data?.status ??
         ""
       )
         .trim()
         .toUpperCase();
-
-      const responseMessage =
-        parsed.message ??
-        (data?.ResponseDescription as string) ??
-        (data?.response_description as string) ??
-        (data?.ResponseDesc as string) ??
-        (data?.responseDesc as string) ??
-        (data?.ResultDesc as string) ??
-        (data?.result_desc as string) ??
-        (data?.message as string) ??
-        (typeof rawData === "string" ? rawData.trim() : undefined);
-
       const isSuccess =
         result.ok &&
         (data?.success === true ||
           data?.success === "true" ||
-          data?.success === "1" ||
-          data?.success === 1 ||
           responseCode === "0" ||
           responseCode === "00" ||
           responseCode === "SUCCESS" ||
@@ -177,11 +117,9 @@ export class PalmPesaProvider implements PaymentProvider {
           providerRef:
             (data?.CheckoutRequestID as string) ??
             (data?.checkout_request_id as string) ??
-            (data?.checkoutRequestID as string) ??
             (data?.transaction_id as string) ??
-            (data?.transactionId as string) ??
             undefined,
-          message: responseMessage ?? "Payment initiated",
+          message: (data?.ResponseDescription as string) ?? "Payment initiated",
           rawResponse: data,
         };
       }
@@ -189,7 +127,9 @@ export class PalmPesaProvider implements PaymentProvider {
       return {
         success: false,
         message:
-          responseMessage ?? `PalmPesa error (HTTP ${result.status})`,
+          (data?.ResponseDescription as string) ??
+          (data?.message as string) ??
+          `PalmPesa error (HTTP ${result.status})`,
         rawResponse: data,
       };
     } catch (err: unknown) {
@@ -209,19 +149,10 @@ export class PalmPesaProvider implements PaymentProvider {
       );
 
       const rawData = result.data;
-      const parsed = this.parsePalmPesaResponse(rawData);
-      if (parsed.isHtmlError) {
-        console.error(
-          `[PALMPESA] checkStatus returned HTML error page: ${parsed.message}`
-        );
-        return {
-          status: "PENDING",
-          providerRef,
-          rawResponse: rawData,
-        };
-      }
-
-      const data = parsed.data;
+      const data =
+        typeof rawData === "string"
+          ? safeJsonParse<Record<string, unknown>>(rawData, {})
+          : (rawData as Record<string, unknown>);
       const rawStatus = String(
         data?.ResultCode ??
         data?.result_code ??

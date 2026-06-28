@@ -62,58 +62,6 @@ describe("PalmPesaProvider", () => {
         expect(result.message).toBe("Accepted");
     });
 
-    it("parses snake_case PalmPesa response bodies", async () => {
-        jest.spyOn(utils, "httpPost").mockResolvedValue({
-            ok: true,
-            status: 200,
-            data: '{"response_code":"0","response_description":"Accepted","checkout_request_id":"REQ-456"}',
-        });
-
-        const provider = new PalmPesaProvider({
-            apiKey: "test-key",
-            apiUrl: "https://example.test/api",
-            environment: "sandbox",
-        });
-
-        const result = await provider.initiatePayment({
-            amount: 5000,
-            phone: "0712345678",
-            reference: "INV-100",
-            description: "Test payment",
-            callbackUrl: "https://example.test/callback",
-        });
-
-        expect(result.success).toBe(true);
-        expect(result.providerRef).toBe("REQ-456");
-        expect(result.message).toBe("Accepted");
-    });
-
-    it("returns an HTML error page message when PalmPesa returns HTML instead of JSON", async () => {
-        jest.spyOn(utils, "httpPost").mockResolvedValue({
-            ok: false,
-            status: 500,
-            data: '<!DOCTYPE html><html><head><title>Palm Pesa — Tanzania\'s Digital Finance OS</title></head><body>Server error</body></html>',
-        });
-
-        const provider = new PalmPesaProvider({
-            apiKey: "test-key",
-            apiUrl: "https://example.test/api",
-            environment: "sandbox",
-        });
-
-        const result = await provider.initiatePayment({
-            amount: 5000,
-            phone: "0712345678",
-            reference: "INV-100",
-            description: "Test payment",
-            callbackUrl: "https://example.test/callback",
-        });
-
-        expect(result.success).toBe(false);
-        expect(result.message).toContain("Palm Pesa — Tanzania's Digital Finance OS");
-        expect(result.message).toContain("HTML error page");
-    });
-
     it("parses stringified JSON from checkStatus responses", async () => {
         jest.spyOn(utils, "httpGet").mockResolvedValue({
             ok: true,
