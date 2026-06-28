@@ -73,6 +73,8 @@ export interface LicenseResponse {
     hasOutstanding?: boolean;
     /** hasPending: true if any PENDING invoice exists (past-due or future-dated). */
     hasPending?: boolean;
+    /** totalOutstanding: sum of all pending invoice amounts. */
+    totalOutstanding?: number;
     message?: string;
     plan?: { id: string; name: string; price: number };
     /** outstandingInvoices: PENDING invoices whose due date has passed. */

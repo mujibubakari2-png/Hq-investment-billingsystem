@@ -181,8 +181,9 @@ export async function GET(req: NextRequest) {
                 dueDate: toISOSafe(i.dueDate),
                 status: i.status,
             })),
-            hasOutstanding: outstandingInvoices.length > 0,
-            hasPending: pendingInvoices.length > 0
+            hasOutstanding: pendingInvoices.length > 0,
+            hasPending: pendingInvoices.length > 0,
+            totalOutstanding: pendingInvoices.reduce((sum, i) => sum + (i.amount || 0), 0),
         };
 
         return jsonResponse(payload);

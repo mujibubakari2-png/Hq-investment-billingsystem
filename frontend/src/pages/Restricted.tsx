@@ -16,7 +16,9 @@ export default function Restricted() {
         licenseApi.getLicense().then(setLicense).catch(console.error);
     }, []);
 
-    const outstandingTotal = license?.outstandingInvoices?.reduce((sum, inv) => sum + inv.amount, 0) || 0;
+    // Use pendingInvoices (ALL pending) OR outstandingInvoices (past-due) as fallback
+    const pendingList = license?.pendingInvoices || license?.outstandingInvoices || [];
+    const outstandingTotal = license?.totalOutstanding ?? pendingList.reduce((sum, inv) => sum + inv.amount, 0);
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: 'var(--bg-lighter)', alignItems: 'center', paddingTop: '4rem', fontFamily: 'var(--font-family)' }}>
@@ -60,10 +62,10 @@ export default function Restricted() {
                 {license?.hasOutstanding && (
                     <div style={{ textAlign: 'left', marginBottom: '1.5rem' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Overdue Invoices</span>
-                            <span style={{ fontSize: '0.75rem', background: '#ffebee', color: '#d32f2f', padding: '2px 8px', borderRadius: '4px', fontWeight: 600 }}>{license.outstandingInvoices?.length} OVERDUE</span>
+                            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Pending Invoices</span>
+                            <span style={{ fontSize: '0.75rem', background: '#ffebee', color: '#d32f2f', padding: '2px 8px', borderRadius: '4px', fontWeight: 600 }}>{pendingList.length} PENDING</span>
                         </div>
-                        {license.outstandingInvoices?.map(inv => (
+                        {pendingList.map(inv => (
                             <div key={inv.id} style={{ background: 'var(--bg-body)', padding: '0.75rem', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
                                 <div>
                                     <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>{inv.invoiceNumber || inv.id.substring(0, 8).toUpperCase()}</div>

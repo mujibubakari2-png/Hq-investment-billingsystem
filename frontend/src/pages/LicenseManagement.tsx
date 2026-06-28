@@ -111,8 +111,16 @@ export default function LicenseManagement() {
         hotspotLimit,
         paidThisMonth,
         hasOutstanding,
+        hasPending,
         plan,
+        outstandingInvoices,
+        pendingInvoices,
+        totalOutstanding: totalOutstandingFromApi,
     } = license || {};
+
+    // Total outstanding amount (all PENDING invoices) — prefer API value, fallback to sum
+    const totalOutstanding = totalOutstandingFromApi ?? (pendingInvoices || []).reduce((sum, inv) => sum + (inv.amount || 0), 0);
+    const hasAnyPending = (hasPending || hasOutstanding) && totalOutstanding > 0;
 
     const copyKey = () => {
         if (licenseKey) {
@@ -281,7 +289,7 @@ export default function LicenseManagement() {
             </div>
 
             {/* Quick Actions */}
-            {(daysRemaining! <= 5 || hasOutstanding) && (
+            {(daysRemaining! <= 5 || hasAnyPending) && (
                 <div style={{ display: 'flex', gap: 12, marginBottom: 24, flexWrap: 'wrap' }}>
                     <button
                         className="btn btn-primary"
@@ -294,23 +302,44 @@ export default function LicenseManagement() {
             )}
 
             {/* Invoice Status */}
-            <div className="card" style={{ padding: '60px 20px', textAlign: 'center' }}>
-                {hasOutstanding ? (
+            <div className="card" style={{ padding: '40px 24px', textAlign: 'center' }}>
+                {hasAnyPending ? (
                     <>
                         <WarningIcon style={{ fontSize: 48, color: '#ef4444', marginBottom: 12 }} />
                         <h3 style={{ fontWeight: 700, fontSize: '1.1rem', marginBottom: 4 }}>Outstanding SaaS Billing</h3>
-                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: 16 }}>
-                            You have unpaid invoices pending. Please settle them to avoid suspension.
+                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: 8 }}>
+                            You have {pendingInvoices?.length || outstandingInvoices?.length || 1} unpaid invoice{(pendingInvoices?.length || 1) > 1 ? 's' : ''} pending. Please settle to avoid suspension.
                         </p>
-                        <button className="btn btn-primary" onClick={() => navigate('/renew')}>
-                            <PaymentIcon style={{ fontSize: 16, marginRight: 6 }} /> Pay Now
+                        {/* Total outstanding amount */}
+                        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '12px 20px', marginBottom: 16, display: 'inline-block', minWidth: 200 }}>
+                            <div style={{ fontSize: '0.75rem', color: '#b91c1c', fontWeight: 600, marginBottom: 4 }}>TOTAL OUTSTANDING INVOICE</div>
+                            <div style={{ fontSize: '1.8rem', fontWeight: 700, color: '#ef4444' }}>
+                                TSH {totalOutstanding.toLocaleString()}
+                            </div>
+                        </div>
+                        {/* List each pending invoice */}
+                        {pendingInvoices && pendingInvoices.length > 0 && (
+                            <div style={{ margin: '0 auto 16px', maxWidth: 480, textAlign: 'left' }}>
+                                {pendingInvoices.map(inv => (
+                                    <div key={inv.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', borderBottom: '1px solid var(--border-light)', fontSize: '0.85rem' }}>
+                                        <span style={{ color: 'var(--text-secondary)' }}>{inv.invoiceNumber}</span>
+                                        <span style={{ fontWeight: 700, color: '#ef4444' }}>TSH {inv.amount.toLocaleString()}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                        <button className="btn btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }} onClick={() => navigate('/renew')}>
+                            <PaymentIcon style={{ fontSize: 16 }} /> Pay Now — TSH {totalOutstanding.toLocaleString()}
                         </button>
                     </>
                 ) : (
                     <>
                         <CheckCircleIcon style={{ fontSize: 48, color: '#16a34a', marginBottom: 12 }} />
                         <h3 style={{ fontWeight: 700, fontSize: '1.1rem', marginBottom: 4 }}>All Invoices Paid!</h3>
-                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>You have no outstanding ISP invoices mapped.</p>
+                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: 16 }}>You have no outstanding SaaS invoices.</p>
+                        <button className="btn btn-outline" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }} onClick={() => navigate('/renew')}>
+                            <PaymentIcon style={{ fontSize: 16 }} /> Renew / Pay Invoice
+                        </button>
                     </>
                 )}
             </div>

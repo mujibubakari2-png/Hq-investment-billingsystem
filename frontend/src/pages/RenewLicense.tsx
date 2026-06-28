@@ -70,8 +70,12 @@ export default function RenewLicense() {
 
     const activePlan = allPlans.find(p => p.id === selectedPlanId) || license?.plan;
     const basePrice = activePlan?.price || 0;
-    const hasPendingInvoice = license?.pendingInvoices && license.pendingInvoices.length > 0;
-    const pendingAmount = hasPendingInvoice ? license.pendingInvoices![0].amount : (location.state?.amount || 0);
+    // Use ALL pending invoices (hasPending covers both past-due and future-dated ones)
+    const hasPendingInvoice = !!(license?.hasPending || license?.hasOutstanding) && (license?.pendingInvoices?.length ?? 0) > 0;
+    // Total pending amount = sum of all pending invoices (not just first one)
+    const pendingAmount = hasPendingInvoice
+        ? (license?.totalOutstanding ?? (license?.pendingInvoices || []).reduce((s, i) => s + i.amount, 0))
+        : (location.state?.amount || 0);
 
     const packages = [
         { months: 1, title: '1 Month License', subtitle: 'Standard 30-day license', price: basePrice, save: 0 },
@@ -401,7 +405,16 @@ export default function RenewLicense() {
                             <div style={{ fontSize: '2rem', fontWeight: 700, margin: '0.5rem 0' }}>
                                 <span style={{ fontSize: '1rem', verticalAlign: 'super' }}>TZS</span> {getAmountToPay().toLocaleString(undefined, { maximumFractionDigits: 0 })}
                             </div>
-                            <span style={{ background: '#00d4ff', color: 'white', padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 600 }}>Invoice Balance</span>
+                            <span style={{
+                                background: selectedPackage === 0 ? '#ef4444' : '#1a1a2e',
+                                color: 'white',
+                                padding: '2px 8px',
+                                borderRadius: '12px',
+                                fontSize: '0.75rem',
+                                fontWeight: 600
+                            }}>
+                                {selectedPackage === 0 ? 'Outstanding Invoice Balance' : `${selectedPackage} Month${selectedPackage > 1 ? 's' : ''} Renewal`}
+                            </span>
                         </div>
 
                         <div className="form-group" style={{ marginTop: '1rem' }}>

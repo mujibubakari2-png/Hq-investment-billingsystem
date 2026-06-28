@@ -1,23 +1,38 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { settingsApi } from '../api';
+import { settingsApi, paymentChannelTestApi } from '../api';
 import { getPublicApiBase } from '../utils/config';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SaveIcon from '@mui/icons-material/Save';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import PaymentIcon from '@mui/icons-material/Payment';
 import VisibilityIcon from '@mui/icons-material/Visibility';
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import LinkIcon from '@mui/icons-material/Link';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ErrorIcon from '@mui/icons-material/Error';
+import NetworkCheckIcon from '@mui/icons-material/NetworkCheck';
+
+const ENV_BASE_URL = (import.meta.env.VITE_MONGIKE_API_URL as string | undefined)?.trim() || '';
 
 export default function MongikeConfig() {
     const navigate = useNavigate();
     const [apiKey, setApiKey] = useState('');
     const [apiSecret, setApiSecret] = useState('');
     const [webhookSecret, setWebhookSecret] = useState('');
-    const [saved, setSaved] = useState(false);
-    const [saving, setSaving] = useState(false);
+    const [apiUrl, setApiUrl] = useState(ENV_BASE_URL);
     const [showSecret, setShowSecret] = useState(false);
     const [showWebhookSecret, setShowWebhookSecret] = useState(false);
+    const [saved, setSaved] = useState(false);
+    const [saving, setSaving] = useState(false);
+
+    // Validation state
+    const [validating, setValidating] = useState(false);
+    const [validationResult, setValidationResult] = useState<{
+        success: boolean;
+        message: string;
+        statusCode?: number;
+    } | null>(null);
 
     useEffect(() => {
         settingsApi.get().then((res: any) => {
@@ -28,162 +43,115 @@ export default function MongikeConfig() {
                     if (parsed.apiKey) setApiKey(parsed.apiKey);
                     if (parsed.apiSecret) setApiSecret(parsed.apiSecret);
                     if (parsed.webhookSecret) setWebhookSecret(parsed.webhookSecret);
+                    if (parsed.apiUrl) setApiUrl(parsed.apiUrl);
                 } catch (e) { }
             }
         }).catch(console.error);
     }, []);
 
-    const handleSave = async () => {
-        setSaving(true);
+    const handleValidateAndSave = async () => {
+        if (!apiKey.trim()) {
+            setValidationResult({ success: false, message: '❌ API Key is required before saving.' });
+            return;
+        }
+        if (!apiUrl.trim()) {
+            setValidationResult({ success: false, message: '❌ Base URL is required.' });
+            return;
+        }
+
+        setValidating(true);
+        setValidationResult(null);
+
         try {
+            const result = await paymentChannelTestApi.test({
+                provider: 'MONGIKE',
+                apiKey: apiKey.trim(),
+                apiUrl: apiUrl.trim(),
+                apiSecret: apiSecret.trim() || undefined,
+            });
+
+            const data = (result as any)?.data || result;
+            setValidationResult({ success: data.success, message: data.message, statusCode: data.statusCode });
+
+            if (!data.success) {
+                setValidating(false);
+                return;
+            }
+
+            setSaving(true);
             await settingsApi.update({
-                payment_config_mongike: JSON.stringify({ apiKey, apiSecret, webhookSecret })
+                payment_config_mongike: JSON.stringify({
+                    apiKey: apiKey.trim(),
+                    apiSecret: apiSecret.trim(),
+                    webhookSecret: webhookSecret.trim(),
+                    apiUrl: apiUrl.trim(),
+                })
             });
             setSaved(true);
-            setTimeout(() => navigate('/payment-channels'), 1500);
-        } catch (err) {
-            console.error(err);
-            alert('Failed to save settings');
+            setTimeout(() => navigate('/payment-channels'), 2000);
+
+        } catch (err: any) {
+            setValidationResult({
+                success: false,
+                message: `❌ ${err?.message || 'Failed to validate API. Please check your connection.'}`,
+            });
         } finally {
+            setValidating(false);
             setSaving(false);
         }
     };
 
     const configuredWebhookUrl = (import.meta.env.VITE_MONGIKE_WEBHOOK_URL as string | undefined)?.trim();
     const webhookUrl = configuredWebhookUrl || `${getPublicApiBase()}/api/webhooks/mongike`;
+    const isProcessing = validating || saving;
 
     return (
         <div style={{ maxWidth: 860, margin: '0 auto', paddingBottom: 40 }}>
             <style>{`
-                .mongike-page {
-                    display: flex;
-                    flex-direction: column;
-                    gap: 16px;
-                }
-                .mongike-header {
-                    display: flex;
-                    align-items: center;
-                    justify-content: space-between;
-                    gap: 12px;
-                    flex-wrap: wrap;
-                }
-                .mongike-header__left {
-                    display: flex;
-                    align-items: center;
-                    gap: 12px;
-                }
+                .mongike-page { display: flex; flex-direction: column; gap: 16px; }
+                .mongike-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+                .mongike-header__left { display: flex; align-items: center; gap: 12px; }
                 .mongike-back-btn {
-                    background: #f1f5f9;
-                    border: none;
-                    width: 40px;
-                    height: 40px;
-                    border-radius: 50%;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    cursor: pointer;
-                    color: var(--text-secondary);
-                    box-shadow: 0 4px 10px rgba(15, 23, 42, 0.06);
+                    background: #f1f5f9; border: none; width: 40px; height: 40px; border-radius: 50%;
+                    display: flex; align-items: center; justify-content: center;
+                    cursor: pointer; color: var(--text-secondary); box-shadow: 0 4px 10px rgba(15,23,42,0.06);
                 }
-                .mongike-title {
-                    font-size: 1.25rem;
-                    font-weight: 700;
-                    margin: 0;
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                }
-                .mongike-subtitle {
-                    font-size: 0.88rem;
-                    color: var(--text-secondary);
-                    margin-top: 4px;
-                }
+                .mongike-title { font-size: 1.25rem; font-weight: 700; margin: 0; display: flex; align-items: center; gap: 8px; }
+                .mongike-subtitle { font-size: 0.88rem; color: var(--text-secondary); margin-top: 4px; }
                 .mongike-card {
-                    background: #fff;
-                    border: 1px solid #e5e7eb;
-                    border-radius: 18px;
-                    padding: 20px;
-                    box-shadow: 0 12px 32px rgba(15, 23, 42, 0.05);
+                    background: #fff; border: 1px solid #e5e7eb; border-radius: 18px;
+                    padding: 20px; box-shadow: 0 12px 32px rgba(15,23,42,0.05);
                 }
-                .mongike-grid {
-                    display: grid;
-                    grid-template-columns: repeat(2, minmax(0, 1fr));
-                    gap: 16px;
-                }
+                .mongike-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
                 .mongike-section {
-                    border: 1px solid #f1f5f9;
-                    border-radius: 14px;
-                    padding: 16px;
+                    border: 1px solid #f1f5f9; border-radius: 14px; padding: 16px;
                     background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
                 }
-                .mongike-section__title {
-                    color: #10b981;
-                    font-weight: 700;
-                    font-size: 0.95rem;
-                    margin: 0 0 14px;
-                }
-                .mongike-section__title--warning {
-                    color: #d97706;
-                }
-                .mongike-input-wrap {
-                    position: relative;
-                }
+                .mongike-section__title { color: #10b981; font-weight: 700; font-size: 0.95rem; margin: 0 0 14px; }
+                .mongike-section__title--warning { color: #d97706; }
+                .mongike-input-wrap { position: relative; }
                 .mongike-eye-btn {
-                    position: absolute;
-                    right: 10px;
-                    top: 50%;
-                    transform: translateY(-50%);
-                    background: transparent;
-                    border: none;
-                    cursor: pointer;
-                    color: var(--text-secondary);
+                    position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+                    background: transparent; border: none; cursor: pointer; color: var(--text-secondary);
                 }
-                .mongike-footer {
-                    display: flex;
-                    justify-content: flex-end;
-                    margin-top: 20px;
-                }
+                .mongike-footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
                 .mongike-save-btn {
-                    background: #10b981;
-                    color: #fff;
-                    font-weight: 600;
-                    padding: 10px 20px;
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                    opacity: 1;
-                    border: none;
-                    border-radius: 999px;
-                    cursor: pointer;
+                    background: #10b981; color: #fff; font-weight: 600; padding: 10px 20px;
+                    display: flex; align-items: center; gap: 8px; border: none; border-radius: 999px; cursor: pointer;
                 }
-                .mongike-save-btn:disabled {
-                    opacity: 0.7;
-                    cursor: not-allowed;
-                }
+                .mongike-save-btn:disabled { opacity: 0.7; cursor: not-allowed; }
                 @media (max-width: 760px) {
-                    .mongike-grid {
-                        grid-template-columns: 1fr;
-                    }
-                    .mongike-card {
-                        padding: 16px;
-                    }
-                    .mongike-footer {
-                        justify-content: stretch;
-                    }
-                    .mongike-save-btn {
-                        width: 100%;
-                        justify-content: center;
-                    }
+                    .mongike-grid { grid-template-columns: 1fr; }
+                    .mongike-card { padding: 16px; }
+                    .mongike-footer { justify-content: stretch; }
+                    .mongike-save-btn { width: 100%; justify-content: center; }
                 }
             `}</style>
 
             <div className="mongike-page">
                 <div className="mongike-header">
                     <div className="mongike-header__left">
-                        <button
-                            onClick={() => navigate('/payment-channels')}
-                            className="mongike-back-btn"
-                        >
+                        <button onClick={() => navigate('/payment-channels')} className="mongike-back-btn">
                             <ArrowBackIcon fontSize="small" />
                         </button>
                         <div>
@@ -209,19 +177,39 @@ export default function MongikeConfig() {
                 )}
 
                 <div className="mongike-card">
+                    {/* Base URL — Full width above the grid */}
+                    <div style={{ marginBottom: 16 }}>
+                        <h3 className="mongike-section__title" style={{ marginBottom: 10 }}>🌐 API Base URL</h3>
+                        <input
+                            type="text"
+                            className="form-input"
+                            placeholder={ENV_BASE_URL}
+                            value={apiUrl}
+                            onChange={e => { setApiUrl(e.target.value); setValidationResult(null); }}
+                        />
+                        <div className="form-hint" style={{ marginTop: 4 }}>
+                            <InfoOutlinedIcon style={{ fontSize: 12, marginRight: 4 }} />
+                            Set <code>VITE_MONGIKE_API_URL</code> in <code>frontend/.env</code>. Backend uses <code>MONGIKE_API_URL</code>. Default: <strong>{ENV_BASE_URL}</strong>
+                        </div>
+                    </div>
+
                     <div className="mongike-grid">
                         <div className="mongike-section">
                             <h3 className="mongike-section__title">🔑 API Credentials</h3>
 
                             <div className="form-group" style={{ marginBottom: 16 }}>
-                                <label className="form-label" style={{ fontWeight: 600 }}>API Key</label>
+                                <label className="form-label" style={{ fontWeight: 600 }}>API Key <span style={{ color: '#e11d48' }}>*</span></label>
                                 <input
                                     type="text"
                                     className="form-input"
                                     placeholder="Enter your Mongike API Key"
                                     value={apiKey}
-                                    onChange={e => setApiKey(e.target.value)}
+                                    onChange={e => { setApiKey(e.target.value); setValidationResult(null); }}
                                 />
+                                <div className="form-hint">
+                                    <InfoOutlinedIcon style={{ fontSize: 12, marginRight: 4 }} />
+                                    Backend env: <code>MONGIKE_API_KEY</code>
+                                </div>
                             </div>
 
                             <div className="form-group" style={{ marginBottom: 16 }}>
@@ -232,15 +220,15 @@ export default function MongikeConfig() {
                                         className="form-input"
                                         placeholder="Enter your Mongike API Secret"
                                         value={apiSecret}
-                                        onChange={e => setApiSecret(e.target.value)}
+                                        onChange={e => { setApiSecret(e.target.value); setValidationResult(null); }}
                                     />
-                                    <button
-                                        type="button"
-                                        className="mongike-eye-btn"
-                                        onClick={() => setShowSecret((prev) => !prev)}
-                                    >
-                                        <VisibilityIcon style={{ fontSize: 18 }} />
+                                    <button type="button" className="mongike-eye-btn" onClick={() => setShowSecret(p => !p)}>
+                                        {showSecret ? <VisibilityOffIcon style={{ fontSize: 18 }} /> : <VisibilityIcon style={{ fontSize: 18 }} />}
                                     </button>
+                                </div>
+                                <div className="form-hint">
+                                    <InfoOutlinedIcon style={{ fontSize: 12, marginRight: 4 }} />
+                                    Backend env: <code>MONGIKE_API_SECRET</code>
                                 </div>
                             </div>
 
@@ -252,19 +240,15 @@ export default function MongikeConfig() {
                                         className="form-input"
                                         placeholder="Enter your Webhook Secret"
                                         value={webhookSecret}
-                                        onChange={e => setWebhookSecret(e.target.value)}
+                                        onChange={e => { setWebhookSecret(e.target.value); setValidationResult(null); }}
                                     />
-                                    <button
-                                        type="button"
-                                        className="mongike-eye-btn"
-                                        onClick={() => setShowWebhookSecret((prev) => !prev)}
-                                    >
-                                        <VisibilityIcon style={{ fontSize: 18 }} />
+                                    <button type="button" className="mongike-eye-btn" onClick={() => setShowWebhookSecret(p => !p)}>
+                                        {showWebhookSecret ? <VisibilityOffIcon style={{ fontSize: 18 }} /> : <VisibilityIcon style={{ fontSize: 18 }} />}
                                     </button>
                                 </div>
                                 <div className="form-hint">
                                     <InfoOutlinedIcon style={{ fontSize: 12, marginRight: 4 }} />
-                                    Used to verify webhook requests from Mongike.
+                                    Used to verify webhook requests. Backend env: <code>MONGIKE_WEBHOOK_SECRET</code>
                                 </div>
                             </div>
                         </div>
@@ -273,9 +257,7 @@ export default function MongikeConfig() {
                             <h3 className="mongike-section__title mongike-section__title--warning">🔗 Webhook Configuration</h3>
 
                             <div className="form-group" style={{ marginBottom: 8 }}>
-                                <label className="form-label" style={{ fontWeight: 600 }}>
-                                    Webhook URL
-                                </label>
+                                <label className="form-label" style={{ fontWeight: 600 }}>Webhook URL</label>
                                 <div className="mongike-input-wrap">
                                     <div style={{
                                         position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)',
@@ -297,19 +279,55 @@ export default function MongikeConfig() {
                                 Copy this URL into your Mongike dashboard webhook settings. The backend will verify payments automatically.
                             </div>
 
-                            <div style={{ background: '#fef3c7', color: '#92400e', padding: '10px 12px', borderRadius: 10, fontSize: '0.84rem', lineHeight: 1.5 }}>
+                            <div style={{ background: '#fef3c7', color: '#92400e', padding: '10px 12px', borderRadius: 10, fontSize: '0.84rem', lineHeight: 1.5, marginBottom: 12 }}>
                                 Make sure the webhook URL is active and the secret matches the value you add in Mongike.
+                            </div>
+
+                            <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '10px 12px', borderRadius: 10, fontSize: '0.82rem', color: '#166534' }}>
+                                <strong>Backend .env variables:</strong><br />
+                                <code>MONGIKE_API_URL</code> · <code>MONGIKE_API_KEY</code><br />
+                                <code>MONGIKE_API_SECRET</code> · <code>MONGIKE_WEBHOOK_SECRET</code>
                             </div>
                         </div>
                     </div>
 
+                    {/* Validation Result Banner */}
+                    {validationResult && (
+                        <div style={{
+                            display: 'flex', alignItems: 'flex-start', gap: 10,
+                            background: validationResult.success ? '#dcfce7' : '#fff1f2',
+                            border: `1px solid ${validationResult.success ? '#a7f3d0' : '#fecdd3'}`,
+                            borderRadius: 10, padding: '12px 16px', marginTop: 16,
+                            color: validationResult.success ? '#065f46' : '#9f1239',
+                            fontSize: '0.85rem', fontWeight: 500,
+                        }}>
+                            {validationResult.success
+                                ? <CheckCircleIcon style={{ fontSize: 18, marginTop: 1, flexShrink: 0 }} />
+                                : <ErrorIcon style={{ fontSize: 18, marginTop: 1, flexShrink: 0 }} />}
+                            <div>{validationResult.message}</div>
+                        </div>
+                    )}
+
                     <div className="mongike-footer">
                         <button
-                            className="mongike-save-btn"
-                            onClick={handleSave}
-                            disabled={saving}
+                            className="btn btn-secondary"
+                            onClick={() => navigate('/payment-channels')}
+                            disabled={isProcessing}
+                            style={{ borderRadius: 999 }}
                         >
-                            <SaveIcon fontSize="small" /> {saving ? 'Saving...' : 'Save Settings'}
+                            Cancel
+                        </button>
+                        <button
+                            className="mongike-save-btn"
+                            onClick={handleValidateAndSave}
+                            disabled={isProcessing}
+                        >
+                            {validating
+                                ? <><NetworkCheckIcon style={{ fontSize: 16 }} /> Validating API...</>
+                                : saving
+                                    ? <><SaveIcon fontSize="small" /> Saving...</>
+                                    : <><NetworkCheckIcon style={{ fontSize: 16 }} /> Validate &amp; Save</>
+                            }
                         </button>
                     </div>
                 </div>

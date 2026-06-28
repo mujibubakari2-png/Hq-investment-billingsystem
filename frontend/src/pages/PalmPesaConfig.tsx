@@ -1,20 +1,37 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { settingsApi } from '../api';
+import { settingsApi, paymentChannelTestApi } from '../api';
 import { getPublicApiBase } from '../utils/config';
 import SaveIcon from '@mui/icons-material/Save';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import VisibilityIcon from '@mui/icons-material/Visibility';
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import PhoneAndroidIcon from '@mui/icons-material/PhoneAndroid';
 import LinkIcon from '@mui/icons-material/Link';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ErrorIcon from '@mui/icons-material/Error';
+import NetworkCheckIcon from '@mui/icons-material/NetworkCheck';
+
+const ENV_BASE_URL = (import.meta.env.VITE_PALMPESA_API_URL as string | undefined)?.trim() || '';
 
 export default function PalmPesaConfig() {
     const navigate = useNavigate();
     const [apiKey, setApiKey] = useState('');
     const [apiToken, setApiToken] = useState('');
     const [secretKey, setSecretKey] = useState('');
+    const [apiUrl, setApiUrl] = useState(ENV_BASE_URL);
+    const [showToken, setShowToken] = useState(false);
+    const [showSecret, setShowSecret] = useState(false);
     const [saved, setSaved] = useState(false);
     const [saving, setSaving] = useState(false);
+
+    // Validation state
+    const [validating, setValidating] = useState(false);
+    const [validationResult, setValidationResult] = useState<{
+        success: boolean;
+        message: string;
+        statusCode?: number;
+    } | null>(null);
 
     useEffect(() => {
         settingsApi.get().then((res: any) => {
@@ -25,29 +42,68 @@ export default function PalmPesaConfig() {
                     if (parsed.apiKey) setApiKey(parsed.apiKey);
                     if (parsed.apiToken) setApiToken(parsed.apiToken);
                     if (parsed.secretKey) setSecretKey(parsed.secretKey);
+                    if (parsed.apiUrl) setApiUrl(parsed.apiUrl);
                 } catch (e) { }
             }
         }).catch(console.error);
     }, []);
 
-    const handleSave = async () => {
-        setSaving(true);
+    const handleValidateAndSave = async () => {
+        if (!apiKey.trim()) {
+            setValidationResult({ success: false, message: '❌ API Account ID is required before saving.' });
+            return;
+        }
+        if (!apiUrl.trim()) {
+            setValidationResult({ success: false, message: '❌ Base URL is required.' });
+            return;
+        }
+
+        setValidating(true);
+        setValidationResult(null);
+
         try {
+            const result = await paymentChannelTestApi.test({
+                provider: 'PALMPESA',
+                apiKey: apiKey.trim(),
+                apiUrl: apiUrl.trim(),
+                // apiToken used as apiSecret for PalmPesa
+                apiSecret: apiToken.trim() || undefined,
+            });
+
+            const data = (result as any)?.data || result;
+            setValidationResult({ success: data.success, message: data.message, statusCode: data.statusCode });
+
+            if (!data.success) {
+                setValidating(false);
+                return;
+            }
+
+            setSaving(true);
             await settingsApi.update({
-                payment_config_palmpesa: JSON.stringify({ apiKey, apiToken, secretKey })
+                payment_config_palmpesa: JSON.stringify({
+                    apiKey: apiKey.trim(),
+                    apiToken: apiToken.trim(),
+                    secretKey: secretKey.trim(),
+                    apiUrl: apiUrl.trim(),
+                })
             });
             setSaved(true);
-            setTimeout(() => navigate('/payment-channels'), 1500);
-        } catch (err) {
-            console.error(err);
-            alert('Failed to save config');
+            setTimeout(() => navigate('/payment-channels'), 2000);
+
+        } catch (err: any) {
+            setValidationResult({
+                success: false,
+                message: `❌ ${err?.message || 'Failed to validate API. Please check your connection.'}`,
+            });
         } finally {
+            setValidating(false);
             setSaving(false);
         }
     };
 
     const configuredWebhookUrl = (import.meta.env.VITE_PALMPESA_WEBHOOK_URL as string | undefined)?.trim();
     const webhookUrl = configuredWebhookUrl || `${getPublicApiBase()}/api/webhooks/palmpesa`;
+    const isProcessing = validating || saving;
 
     return (
         <div>
@@ -61,23 +117,43 @@ export default function PalmPesaConfig() {
             </div>
 
             <div className="card" style={{ padding: 24, marginBottom: 24 }}>
-                {/* API Configuration */}
                 <h3 style={{ color: '#e11d48', fontWeight: 700, fontSize: '0.95rem', marginBottom: 16 }}>
                     ✏️ API Configuration
                 </h3>
+
+                {/* Base URL */}
+                <div className="form-group" style={{ marginBottom: 16 }}>
+                    <label className="form-label" style={{ fontWeight: 600 }}>
+                        🌐 Base URL <span style={{ color: '#e11d48' }}>*</span>
+                    </label>
+                    <input
+                        type="text"
+                        className="form-input"
+                        placeholder={ENV_BASE_URL}
+                        value={apiUrl}
+                        onChange={e => { setApiUrl(e.target.value); setValidationResult(null); }}
+                    />
+                    <div className="form-hint">
+                        <InfoOutlinedIcon style={{ fontSize: 12, marginRight: 4 }} />
+                        Set <code>VITE_PALMPESA_API_URL</code> in <code>frontend/.env</code>. Backend uses <code>PALMPESA_API_URL</code>. Default: <strong>{ENV_BASE_URL}</strong>
+                    </div>
+                </div>
 
                 <div className="grid-2 gap-16" style={{ marginBottom: 16 }}>
                     <div className="form-group">
                         <label className="form-label" style={{ fontWeight: 600 }}>
                             ✏️ API Account ID <span style={{ color: '#e11d48' }}>*</span>
                         </label>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <span>⚙️</span>
-                            <input type="text" className="form-input" value={apiKey} onChange={e => setApiKey(e.target.value)} style={{ flex: 1 }} />
-                        </div>
+                        <input
+                            type="text"
+                            className="form-input"
+                            placeholder="Your PalmPesa Account ID"
+                            value={apiKey}
+                            onChange={e => { setApiKey(e.target.value); setValidationResult(null); }}
+                        />
                         <div className="form-hint">
                             <InfoOutlinedIcon style={{ fontSize: 12, marginRight: 4 }} />
-                            Your account ID or client ID from PalmPesa dashboard account
+                            Your account ID from PalmPesa dashboard
                         </div>
                     </div>
                     <div className="form-group">
@@ -85,12 +161,22 @@ export default function PalmPesaConfig() {
                             🔒 PalmPesa API Token
                         </label>
                         <div style={{ position: 'relative' }}>
-                            <input type="password" className="form-input" value={apiToken} onChange={e => setApiToken(e.target.value)} placeholder="Enter PalmPesa API Token" />
-                            <button style={{
-                                position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
-                                background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)',
-                            }}>
-                                <VisibilityIcon style={{ fontSize: 18 }} />
+                            <input
+                                type={showToken ? 'text' : 'password'}
+                                className="form-input"
+                                placeholder="Enter PalmPesa API Token"
+                                value={apiToken}
+                                onChange={e => { setApiToken(e.target.value); setValidationResult(null); }}
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowToken(p => !p)}
+                                style={{
+                                    position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
+                                    background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)',
+                                }}
+                            >
+                                {showToken ? <VisibilityOffIcon style={{ fontSize: 18 }} /> : <VisibilityIcon style={{ fontSize: 18 }} />}
                             </button>
                         </div>
                         <div className="form-hint">
@@ -102,19 +188,35 @@ export default function PalmPesaConfig() {
 
                 <div className="form-group" style={{ marginBottom: 4 }}>
                     <label className="form-label" style={{ fontWeight: 600 }}>🔑 Secret Key</label>
-                    <input type="text" className="form-input" value={secretKey} onChange={e => setSecretKey(e.target.value)} />
+                    <div style={{ position: 'relative' }}>
+                        <input
+                            type={showSecret ? 'text' : 'password'}
+                            className="form-input"
+                            placeholder="Enter Secret Key"
+                            value={secretKey}
+                            onChange={e => { setSecretKey(e.target.value); setValidationResult(null); }}
+                        />
+                        <button
+                            type="button"
+                            onClick={() => setShowSecret(p => !p)}
+                            style={{
+                                position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
+                                background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)',
+                            }}
+                        >
+                            {showSecret ? <VisibilityOffIcon style={{ fontSize: 18 }} /> : <VisibilityIcon style={{ fontSize: 18 }} />}
+                        </button>
+                    </div>
                 </div>
-
                 <div className="form-hint" style={{ marginBottom: 20 }}>
                     <InfoOutlinedIcon style={{ fontSize: 12, marginRight: 4 }} />
-                    Obtain credentials from PalmPesa. For sandbox: use test credentials provided by the platform.
+                    Obtain credentials from PalmPesa. Backend env: <code>PALMPESA_API_KEY</code> · <code>PALMPESA_WEBHOOK_SECRET</code>
                 </div>
 
                 {/* URL Configuration */}
                 <h3 style={{ color: '#16a34a', fontWeight: 700, fontSize: '0.95rem', marginBottom: 16 }}>
                     <LinkIcon style={{ fontSize: 16, marginRight: 4 }} /> URL Configuration
                 </h3>
-
                 <div className="form-group" style={{ marginBottom: 4 }}>
                     <label className="form-label" style={{ fontWeight: 600 }}>🔗 Webhook / Callback URL</label>
                     <input
@@ -125,22 +227,18 @@ export default function PalmPesaConfig() {
                         style={{ background: '#f8f9fa', color: '#6b7280', cursor: 'text' }}
                     />
                 </div>
-
                 <div style={{
                     background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: 'var(--radius-sm)',
-                    padding: '10px 14px', fontSize: '0.78rem', color: '#065f46', marginBottom: 16,
+                    padding: '10px 14px', fontSize: '0.78rem', color: '#065f46', marginBottom: 20,
                 }}>
                     <InfoOutlinedIcon style={{ fontSize: 12, marginRight: 4 }} />
-                    Copy this Webhook URL and paste it into the PalmPesa dashboard callback settings. The backend will automatically handle payment verifications via this route.
+                    Copy this Webhook URL and paste it into the PalmPesa dashboard callback settings.
                 </div>
 
-
-
-                {/* Integration Information */}
+                {/* Integration Info */}
                 <h3 style={{ color: '#e11d48', fontWeight: 700, fontSize: '0.95rem', marginBottom: 12 }}>
                     🔔 Integration Information
                 </h3>
-
                 <div style={{
                     background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: 'var(--radius-sm)',
                     padding: '14px 16px', marginBottom: 16,
@@ -154,12 +252,8 @@ export default function PalmPesaConfig() {
                         <li>Real-time payment status updates</li>
                         <li>Multi-carrier support: M-Pesa, Tigo Pesa, Airtel</li>
                     </ul>
-                    <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: 8 }}>
-                        Base URL: <span style={{ color: '#2563eb' }}>https://api.palmpesa.com/v1</span>
-                    </div>
                 </div>
 
-                {/* How to Use (Terminal) */}
                 <div style={{
                     background: '#fef3c7', border: '1px solid #fde68a', borderRadius: 'var(--radius-sm)',
                     padding: '14px 16px', marginBottom: 24,
@@ -178,7 +272,6 @@ export default function PalmPesaConfig() {
                 <h3 style={{ color: '#e11d48', fontWeight: 700, fontSize: '0.95rem', marginBottom: 12 }}>
                     📱 Supported Networks
                 </h3>
-
                 <div className="grid-3 gap-12" style={{ marginBottom: 24 }}>
                     {[
                         { name: 'M-Pesa Tanzania', color: '#16a34a', border: '#a7f3d0' },
@@ -195,11 +288,22 @@ export default function PalmPesaConfig() {
                     ))}
                 </div>
 
-                {/* Footer */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: 16 }}>
-                    <InfoOutlinedIcon style={{ fontSize: 14 }} />
-                    Contact PalmPesa support for integration assistance with API Tokens
-                </div>
+                {/* Validation Result Banner */}
+                {validationResult && (
+                    <div style={{
+                        display: 'flex', alignItems: 'flex-start', gap: 10,
+                        background: validationResult.success ? '#dcfce7' : '#fff1f2',
+                        border: `1px solid ${validationResult.success ? '#a7f3d0' : '#fecdd3'}`,
+                        borderRadius: 'var(--radius-sm)', padding: '12px 16px', marginBottom: 16,
+                        color: validationResult.success ? '#065f46' : '#9f1239',
+                        fontSize: '0.85rem', fontWeight: 500,
+                    }}>
+                        {validationResult.success
+                            ? <CheckCircleIcon style={{ fontSize: 18, marginTop: 1, flexShrink: 0 }} />
+                            : <ErrorIcon style={{ fontSize: 18, marginTop: 1, flexShrink: 0 }} />}
+                        <div>{validationResult.message}</div>
+                    </div>
+                )}
 
                 {saved && (
                     <div style={{
@@ -211,13 +315,25 @@ export default function PalmPesaConfig() {
                 )}
 
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-                    <button className="btn btn-secondary" onClick={() => navigate('/payment-channels')}>+ Cancel</button>
-                    <button className="btn" onClick={handleSave} disabled={saving} style={{
-                        background: '#e11d48', color: '#fff', fontWeight: 600,
-                        padding: '8px 20px', display: 'flex', alignItems: 'center', gap: 6,
-                        opacity: saving ? 0.7 : 1, cursor: saving ? 'not-allowed' : 'pointer',
-                    }}>
-                        <SaveIcon fontSize="small" /> {saving ? 'Saving...' : 'Save Configuration'}
+                    <button className="btn btn-secondary" onClick={() => navigate('/payment-channels')} disabled={isProcessing}>
+                        Cancel
+                    </button>
+                    <button
+                        className="btn"
+                        onClick={handleValidateAndSave}
+                        disabled={isProcessing}
+                        style={{
+                            background: '#16a34a', color: '#fff', fontWeight: 600,
+                            padding: '8px 20px', display: 'flex', alignItems: 'center', gap: 6,
+                            opacity: isProcessing ? 0.7 : 1, cursor: isProcessing ? 'not-allowed' : 'pointer',
+                        }}
+                    >
+                        {validating
+                            ? <><NetworkCheckIcon style={{ fontSize: 16 }} /> Validating API...</>
+                            : saving
+                                ? <><SaveIcon fontSize="small" /> Saving...</>
+                                : <><NetworkCheckIcon style={{ fontSize: 16 }} /> Validate &amp; Save</>
+                        }
                     </button>
                 </div>
             </div>

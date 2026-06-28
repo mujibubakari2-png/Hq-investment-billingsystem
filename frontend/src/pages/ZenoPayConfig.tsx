@@ -1,18 +1,34 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { settingsApi } from '../api';
+import { settingsApi, paymentChannelTestApi } from '../api';
 import { getPublicApiBase } from '../utils/config';
 import SaveIcon from '@mui/icons-material/Save';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import VisibilityIcon from '@mui/icons-material/Visibility';
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import PhoneAndroidIcon from '@mui/icons-material/PhoneAndroid';
 import LinkIcon from '@mui/icons-material/Link';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ErrorIcon from '@mui/icons-material/Error';
+import NetworkCheckIcon from '@mui/icons-material/NetworkCheck';
+
+const ENV_BASE_URL = (import.meta.env.VITE_ZENOPAY_API_URL as string | undefined)?.trim() || '';
 
 export default function ZenoPayConfig() {
     const navigate = useNavigate();
     const [apiKey, setApiKey] = useState('');
+    const [apiUrl, setApiUrl] = useState(ENV_BASE_URL);
+    const [showKey, setShowKey] = useState(false);
     const [saved, setSaved] = useState(false);
     const [saving, setSaving] = useState(false);
+
+    // Validation state
+    const [validating, setValidating] = useState(false);
+    const [validationResult, setValidationResult] = useState<{
+        success: boolean;
+        message: string;
+        statusCode?: number;
+    } | null>(null);
 
     useEffect(() => {
         settingsApi.get().then((res: any) => {
@@ -21,29 +37,64 @@ export default function ZenoPayConfig() {
                 try {
                     const parsed = JSON.parse(data.payment_config_zenopay);
                     if (parsed.apiKey) setApiKey(parsed.apiKey);
+                    if (parsed.apiUrl) setApiUrl(parsed.apiUrl);
                 } catch (e) { }
             }
         }).catch(console.error);
     }, []);
 
-    const handleSave = async () => {
-        setSaving(true);
+    /** Step 1: Validate — calls backend which makes a real HTTP request to ZenoPay */
+    const handleValidateAndSave = async () => {
+        if (!apiKey.trim()) {
+            setValidationResult({ success: false, message: '❌ API Key is required before saving.' });
+            return;
+        }
+        if (!apiUrl.trim()) {
+            setValidationResult({ success: false, message: '❌ Base URL is required.' });
+            return;
+        }
+
+        setValidating(true);
+        setValidationResult(null);
+
         try {
+            const result = await paymentChannelTestApi.test({
+                provider: 'ZENOPAY',
+                apiKey: apiKey.trim(),
+                apiUrl: apiUrl.trim(),
+            });
+
+            const data = (result as any)?.data || result;
+            setValidationResult({ success: data.success, message: data.message, statusCode: data.statusCode });
+
+            if (!data.success) {
+                // Stop here — do not save if API is unreachable/invalid
+                setValidating(false);
+                return;
+            }
+
+            // Step 2: Validation passed — now save
+            setSaving(true);
             await settingsApi.update({
-                payment_config_zenopay: JSON.stringify({ apiKey })
+                payment_config_zenopay: JSON.stringify({ apiKey: apiKey.trim(), apiUrl: apiUrl.trim() })
             });
             setSaved(true);
-            setTimeout(() => navigate('/payment-channels'), 1500);
-        } catch (err) {
-            console.error(err);
-            alert('Failed to save config');
+            setTimeout(() => navigate('/payment-channels'), 2000);
+
+        } catch (err: any) {
+            setValidationResult({
+                success: false,
+                message: `❌ ${err?.message || 'Failed to validate API. Please check your connection.'}`,
+            });
         } finally {
+            setValidating(false);
             setSaving(false);
         }
     };
 
     const configuredWebhookUrl = (import.meta.env.VITE_ZENOPAY_WEBHOOK_URL as string | undefined)?.trim();
     const webhookUrl = configuredWebhookUrl || `${getPublicApiBase()}/api/webhooks/zenopay`;
+    const isProcessing = validating || saving;
 
     return (
         <div>
@@ -62,39 +113,56 @@ export default function ZenoPayConfig() {
                     ✏️ API Configuration
                 </h3>
 
+                {/* Base URL */}
+                <div className="form-group" style={{ marginBottom: 16 }}>
+                    <label className="form-label" style={{ fontWeight: 600 }}>
+                        🌐 Base URL <span style={{ color: '#e11d48' }}>*</span>
+                    </label>
+                    <input
+                        type="text"
+                        className="form-input"
+                        placeholder={ENV_BASE_URL}
+                        value={apiUrl}
+                        onChange={e => { setApiUrl(e.target.value); setValidationResult(null); }}
+                    />
+                    <div className="form-hint">
+                        <InfoOutlinedIcon style={{ fontSize: 12, marginRight: 4 }} />
+                        Set <code>VITE_ZENOPAY_API_URL</code> in your <code>frontend/.env</code> to lock this value. Current env default: <strong>{ENV_BASE_URL}</strong>
+                    </div>
+                </div>
+
+                {/* API Key */}
                 <div className="form-group" style={{ marginBottom: 4 }}>
-                    <label className="form-label" style={{ fontWeight: 600 }}>✏️ ZenoPay API Key</label>
+                    <label className="form-label" style={{ fontWeight: 600 }}>✏️ ZenoPay API Key <span style={{ color: '#e11d48' }}>*</span></label>
                     <div style={{ position: 'relative' }}>
-                        <div style={{
-                            position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)',
-                            color: 'var(--text-secondary)', display: 'flex', alignItems: 'center',
-                        }}>✏️</div>
                         <input
-                            type="password"
+                            type={showKey ? 'text' : 'password'}
                             className="form-input"
                             placeholder="Enter your ZenoPay API key"
                             value={apiKey}
-                            onChange={e => setApiKey(e.target.value)}
-                            style={{ paddingLeft: 34 }}
+                            onChange={e => { setApiKey(e.target.value); setValidationResult(null); }}
                         />
-                        <button style={{
-                            position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
-                            background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)',
-                        }}>
-                            <VisibilityIcon style={{ fontSize: 18 }} />
+                        <button
+                            type="button"
+                            onClick={() => setShowKey(p => !p)}
+                            style={{
+                                position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
+                                background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)',
+                            }}
+                        >
+                            {showKey ? <VisibilityOffIcon style={{ fontSize: 18 }} /> : <VisibilityIcon style={{ fontSize: 18 }} />}
                         </button>
                     </div>
                 </div>
                 <div className="form-hint" style={{ marginBottom: 24 }}>
                     <InfoOutlinedIcon style={{ fontSize: 12, marginRight: 4 }} />
-                    Get your API key from ZenoPay dashboard
+                    Get your API key from ZenoPay dashboard. Also set <code>ZENOPAY_API_KEY</code> in <code>backend/.env</code>.
                 </div>
 
                 {/* Webhook Configuration */}
                 <h3 style={{ color: '#d97706', fontWeight: 700, fontSize: '0.95rem', marginBottom: 16 }}>
                     🔗 Webhook Configuration
                 </h3>
-
                 <div className="form-group" style={{ marginBottom: 4 }}>
                     <label className="form-label" style={{ fontWeight: 600 }}>
                         🔗 Webhook URL (Copy this to ZenoPay dashboard)
@@ -117,14 +185,13 @@ export default function ZenoPayConfig() {
                 </div>
                 <div className="form-hint" style={{ marginBottom: 24 }}>
                     <InfoOutlinedIcon style={{ fontSize: 12, marginRight: 4 }} />
-                    Copy this URL and paste it into your ZenoPay dashboard Webhook settings. The backend will automatically handle payment verifications via this route.
+                    Copy this URL and paste it into your ZenoPay dashboard Webhook settings. Set <code>ZENOPAY_WEBHOOK_SECRET</code> in backend/.env.
                 </div>
 
-                {/* Integration Information */}
+                {/* Integration Info */}
                 <h3 style={{ color: '#e11d48', fontWeight: 700, fontSize: '0.95rem', marginBottom: 12 }}>
                     🔔 Integration Information
                 </h3>
-
                 <div style={{
                     background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: 'var(--radius-sm)',
                     padding: '14px 16px', marginBottom: 24,
@@ -139,7 +206,7 @@ export default function ZenoPayConfig() {
                         <li>Real-time payment status updates</li>
                     </ul>
                     <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: 8 }}>
-                        API Endpoint: <span style={{ color: '#2563eb' }}>https://zenoapi.com/api/payments/mobile_money_tanzania</span>
+                        Backend env: <code>ZENOPAY_API_URL</code> · <code>ZENOPAY_API_KEY</code> · <code>ZENOPAY_WEBHOOK_SECRET</code>
                     </div>
                 </div>
 
@@ -147,7 +214,6 @@ export default function ZenoPayConfig() {
                 <h3 style={{ color: '#d97706', fontWeight: 700, fontSize: '0.95rem', marginBottom: 12 }}>
                     📱 Supported Networks
                 </h3>
-
                 <div className="grid-3 gap-12" style={{ marginBottom: 24 }}>
                     {[
                         { name: 'M-Pesa Tanzania', color: '#16a34a', border: '#a7f3d0' },
@@ -164,11 +230,22 @@ export default function ZenoPayConfig() {
                     ))}
                 </div>
 
-                {/* Footer */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: 16 }}>
-                    <InfoOutlinedIcon style={{ fontSize: 14 }} />
-                    Secure payment processing with ZenoPay
-                </div>
+                {/* Validation Result Banner */}
+                {validationResult && (
+                    <div style={{
+                        display: 'flex', alignItems: 'flex-start', gap: 10,
+                        background: validationResult.success ? '#dcfce7' : '#fff1f2',
+                        border: `1px solid ${validationResult.success ? '#a7f3d0' : '#fecdd3'}`,
+                        borderRadius: 'var(--radius-sm)', padding: '12px 16px', marginBottom: 16,
+                        color: validationResult.success ? '#065f46' : '#9f1239',
+                        fontSize: '0.85rem', fontWeight: 500,
+                    }}>
+                        {validationResult.success
+                            ? <CheckCircleIcon style={{ fontSize: 18, marginTop: 1, flexShrink: 0 }} />
+                            : <ErrorIcon style={{ fontSize: 18, marginTop: 1, flexShrink: 0 }} />}
+                        <div>{validationResult.message}</div>
+                    </div>
+                )}
 
                 {saved && (
                     <div style={{
@@ -180,13 +257,25 @@ export default function ZenoPayConfig() {
                 )}
 
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-                    <button className="btn btn-secondary" onClick={() => navigate('/payment-channels')}>+ Cancel</button>
-                    <button className="btn" onClick={handleSave} disabled={saving} style={{
-                        background: '#e11d48', color: '#fff', fontWeight: 600,
-                        padding: '8px 20px', display: 'flex', alignItems: 'center', gap: 6,
-                        opacity: saving ? 0.7 : 1, cursor: saving ? 'not-allowed' : 'pointer',
-                    }}>
-                        <SaveIcon fontSize="small" /> {saving ? 'Saving...' : 'Save Configuration'}
+                    <button className="btn btn-secondary" onClick={() => navigate('/payment-channels')} disabled={isProcessing}>
+                        Cancel
+                    </button>
+                    <button
+                        className="btn"
+                        onClick={handleValidateAndSave}
+                        disabled={isProcessing}
+                        style={{
+                            background: '#e11d48', color: '#fff', fontWeight: 600,
+                            padding: '8px 20px', display: 'flex', alignItems: 'center', gap: 6,
+                            opacity: isProcessing ? 0.7 : 1, cursor: isProcessing ? 'not-allowed' : 'pointer',
+                        }}
+                    >
+                        {validating
+                            ? <><NetworkCheckIcon style={{ fontSize: 16 }} /> Validating API...</>
+                            : saving
+                                ? <><SaveIcon fontSize="small" /> Saving...</>
+                                : <><NetworkCheckIcon style={{ fontSize: 16 }} /> Validate &amp; Save</>
+                        }
                     </button>
                 </div>
             </div>

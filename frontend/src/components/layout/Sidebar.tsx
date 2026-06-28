@@ -113,8 +113,8 @@ const navSections: NavSection[] = [
             { label: 'System Settings',    icon: 'settings', path: '/system-settings' },
             { label: 'Payment Channels',   icon: 'payment',  path: '/payment-channels' },
             { label: 'System Users',       icon: 'admin',    path: '/system-users' },
-            // License Management: Platform Super Admin ONLY — completely hidden from tenant SUPER_ADMINs
-            { label: 'License Management', icon: 'license',  path: '/license-management', platformOnly: true },
+            // License Management: visible to ALL tenant SUPER_ADMINs (not platformOnly)
+            { label: 'License Management', icon: 'license',  path: '/license-management' },
             { label: 'Hotspot Customizer', icon: 'router',   path: '/hotspot-customizer' },
             { label: 'Audit Logs',         icon: 'audit',    path: '/audit-logs' },
         ],

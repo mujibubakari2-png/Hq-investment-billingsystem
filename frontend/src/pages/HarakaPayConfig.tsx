@@ -1,20 +1,32 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { settingsApi } from '../api';
+import { settingsApi, paymentChannelTestApi } from '../api';
 import { getPublicApiBase } from '../utils/config';
 import SaveIcon from '@mui/icons-material/Save';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import VisibilityIcon from '@mui/icons-material/Visibility';
-import PhoneAndroidIcon from '@mui/icons-material/PhoneAndroid';
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ErrorIcon from '@mui/icons-material/Error';
+import NetworkCheckIcon from '@mui/icons-material/NetworkCheck';
+
+const ENV_BASE_URL = (import.meta.env.VITE_HARAKAPAY_API_URL as string | undefined)?.trim() || '';
 
 export default function HarakaPayConfig() {
     const navigate = useNavigate();
     const [apiKey, setApiKey] = useState('');
+    const [apiUrl, setApiUrl] = useState(ENV_BASE_URL);
+    const [showKey, setShowKey] = useState(false);
     const [saved, setSaved] = useState(false);
     const [saving, setSaving] = useState(false);
 
-    const [testing, setTesting] = useState(false);
-    const [testResult, setTestResult] = useState('');
+    // Validation state
+    const [validating, setValidating] = useState(false);
+    const [validationResult, setValidationResult] = useState<{
+        success: boolean;
+        message: string;
+        statusCode?: number;
+    } | null>(null);
 
     useEffect(() => {
         settingsApi.get().then((res: any) => {
@@ -23,37 +35,61 @@ export default function HarakaPayConfig() {
                 try {
                     const parsed = JSON.parse(data.payment_config_harakapay);
                     if (parsed.apiKey) setApiKey(parsed.apiKey);
+                    if (parsed.apiUrl) setApiUrl(parsed.apiUrl);
                 } catch (e) { }
             }
         }).catch(console.error);
     }, []);
 
-    const handleSave = async () => {
-        setSaving(true);
+    const handleValidateAndSave = async () => {
+        if (!apiKey.trim()) {
+            setValidationResult({ success: false, message: '❌ API Key is required before saving.' });
+            return;
+        }
+        if (!apiUrl.trim()) {
+            setValidationResult({ success: false, message: '❌ Base URL is required.' });
+            return;
+        }
+
+        setValidating(true);
+        setValidationResult(null);
+
         try {
+            const result = await paymentChannelTestApi.test({
+                provider: 'HARAKAPAY',
+                apiKey: apiKey.trim(),
+                apiUrl: apiUrl.trim(),
+            });
+
+            const data = (result as any)?.data || result;
+            setValidationResult({ success: data.success, message: data.message, statusCode: data.statusCode });
+
+            if (!data.success) {
+                setValidating(false);
+                return;
+            }
+
+            setSaving(true);
             await settingsApi.update({
-                payment_config_harakapay: JSON.stringify({ apiKey })
+                payment_config_harakapay: JSON.stringify({ apiKey: apiKey.trim(), apiUrl: apiUrl.trim() })
             });
             setSaved(true);
-            setTimeout(() => navigate('/payment-channels'), 1500);
-        } catch (err) {
-            console.error(err);
-            alert('Failed to save config');
+            setTimeout(() => navigate('/payment-channels'), 2000);
+
+        } catch (err: any) {
+            setValidationResult({
+                success: false,
+                message: `❌ ${err?.message || 'Failed to validate API. Please check your connection.'}`,
+            });
         } finally {
+            setValidating(false);
             setSaving(false);
         }
     };
 
-    const handleTestPayment = () => {
-        setTesting(true);
-        setTimeout(() => {
-            setTesting(false);
-            setTestResult('Verification successful!');
-        }, 2000);
-    };
-
     const configuredWebhookUrl = (import.meta.env.VITE_HARAKAPAY_WEBHOOK_URL as string | undefined)?.trim();
     const webhookUrl = configuredWebhookUrl || `${getPublicApiBase()}/api/webhooks/harakapay`;
+    const isProcessing = validating || saving;
 
     return (
         <div>
@@ -67,31 +103,53 @@ export default function HarakaPayConfig() {
             </div>
 
             <div className="card" style={{ padding: 24, marginBottom: 24 }}>
-                {/* API Configuration */}
                 <h3 style={{ color: '#e11d48', fontWeight: 700, fontSize: '0.95rem', marginBottom: 16 }}>
                     ✏️ API Configuration
                 </h3>
 
+                {/* Base URL */}
+                <div className="form-group" style={{ marginBottom: 16 }}>
+                    <label className="form-label" style={{ fontWeight: 600 }}>
+                        🌐 Base URL <span style={{ color: '#e11d48' }}>*</span>
+                    </label>
+                    <input
+                        type="text"
+                        className="form-input"
+                        placeholder={ENV_BASE_URL}
+                        value={apiUrl}
+                        onChange={e => { setApiUrl(e.target.value); setValidationResult(null); }}
+                    />
+                    <div className="form-hint">
+                        <InfoOutlinedIcon style={{ fontSize: 12, marginRight: 4 }} />
+                        Set <code>VITE_HARAKAPAY_API_URL</code> in <code>frontend/.env</code>. Backend uses <code>HARAKAPAY_API_URL</code>. Default: <strong>{ENV_BASE_URL}</strong>
+                    </div>
+                </div>
+
+                {/* API Key */}
                 <div className="form-group" style={{ marginBottom: 20 }}>
-                    <label className="form-label" style={{ fontWeight: 600 }}>✏️ Accessibility API Key</label>
+                    <label className="form-label" style={{ fontWeight: 600 }}>✏️ Accessibility API Key <span style={{ color: '#e11d48' }}>*</span></label>
                     <div style={{ position: 'relative' }}>
                         <input
-                            type="password"
+                            type={showKey ? 'text' : 'password'}
                             className="form-input"
                             placeholder="Enter your HarakaPay API Key"
                             value={apiKey}
-                            onChange={e => setApiKey(e.target.value)}
+                            onChange={e => { setApiKey(e.target.value); setValidationResult(null); }}
                         />
-                        <button style={{
-                            position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
-                            background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)',
-                        }}>
-                            <VisibilityIcon style={{ fontSize: 18 }} />
+                        <button
+                            type="button"
+                            onClick={() => setShowKey(p => !p)}
+                            style={{
+                                position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
+                                background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)',
+                            }}
+                        >
+                            {showKey ? <VisibilityOffIcon style={{ fontSize: 18 }} /> : <VisibilityIcon style={{ fontSize: 18 }} />}
                         </button>
                     </div>
                     <div className="form-hint">
                         <InfoOutlinedIcon style={{ fontSize: 12, marginRight: 4 }} />
-                        Get your API key from <strong>HarakaPay Dashboard</strong> {'>'} Developer {'>'} API Keys
+                        Get your API key from <strong>HarakaPay Dashboard</strong> {'>'} Developer {'>'} API Keys. Backend env: <code>HARAKAPAY_API_KEY</code>
                     </div>
                 </div>
 
@@ -99,7 +157,6 @@ export default function HarakaPayConfig() {
                 <h3 style={{ color: '#d97706', fontWeight: 700, fontSize: '0.95rem', marginBottom: 16 }}>
                     🔗 Webhook Configuration
                 </h3>
-
                 <div className="form-group" style={{ marginBottom: 4 }}>
                     <label className="form-label" style={{ fontWeight: 600 }}>
                         🔗 Webhook URL (Copy this to HarakaPay dashboard)
@@ -114,14 +171,13 @@ export default function HarakaPayConfig() {
                 </div>
                 <div className="form-hint" style={{ marginBottom: 24 }}>
                     <InfoOutlinedIcon style={{ fontSize: 12, marginRight: 4 }} />
-                    Copy this URL and paste it into your HarakaPay dashboard Webhook/Callback settings. The backend will automatically handle payment verifications via this route.
+                    Copy this URL and paste it into your HarakaPay dashboard Webhook/Callback settings. Backend env: <code>HARAKAPAY_WEBHOOK_SECRET</code>
                 </div>
 
                 {/* Integration Information */}
                 <h3 style={{ color: '#e11d48', fontWeight: 700, fontSize: '0.95rem', marginBottom: 12 }}>
                     🔔 Integration Information
                 </h3>
-
                 <div style={{
                     background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: 'var(--radius-sm)',
                     padding: '14px 16px', marginBottom: 20,
@@ -136,20 +192,13 @@ export default function HarakaPayConfig() {
                         <li>Real-time payment verification</li>
                         <li>Automatic service activation</li>
                     </ul>
-                    <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: 8 }}>
-                        API Endpoint: <span style={{ color: '#2563eb' }}>https://api.harakapay.co.tz/v1/ussd-push</span>
-                    </div>
                 </div>
 
                 {/* Transaction Fees */}
                 <h3 style={{ color: '#e11d48', fontWeight: 700, fontSize: '0.95rem', marginBottom: 12 }}>
                     🏦 Transaction Fees (6%)
                 </h3>
-
-                <div style={{
-                    border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)',
-                    overflow: 'hidden', marginBottom: 20,
-                }}>
+                <div style={{ border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)', overflow: 'hidden', marginBottom: 20 }}>
                     <table className="data-table" style={{ margin: 0 }}>
                         <thead>
                             <tr>
@@ -178,32 +227,10 @@ export default function HarakaPayConfig() {
                     </table>
                 </div>
 
-                {/* Supported Mobile Networks */}
+                {/* Support */}
                 <h3 style={{ color: '#e11d48', fontWeight: 700, fontSize: '0.95rem', marginBottom: 12 }}>
-                    📱 Supported Mobile Networks
+                    📚 Support &amp; Documentation
                 </h3>
-
-                <div className="grid-3 gap-12" style={{ marginBottom: 20 }}>
-                    {[
-                        { name: 'M-Pesa Tanzania', color: '#16a34a', border: '#a7f3d0' },
-                        { name: 'Tigo Pesa', color: '#e11d48', border: '#fecdd3' },
-                        { name: 'Airtel Money', color: '#d97706', border: '#fde68a' },
-                    ].map(network => (
-                        <div key={network.name} style={{
-                            padding: '20px 16px', borderRadius: 'var(--radius-sm)',
-                            border: `2px solid ${network.border}`, textAlign: 'center',
-                        }}>
-                            <PhoneAndroidIcon style={{ fontSize: 28, color: network.color, marginBottom: 4 }} />
-                            <div style={{ fontWeight: 600, fontSize: '0.85rem', color: network.color }}>{network.name}</div>
-                        </div>
-                    ))}
-                </div>
-
-                {/* Support & Documentation */}
-                <h3 style={{ color: '#e11d48', fontWeight: 700, fontSize: '0.95rem', marginBottom: 12 }}>
-                    📚 Support & Documentation
-                </h3>
-
                 <div style={{
                     background: '#fefce8', border: '1px solid #fde68a', borderRadius: 'var(--radius-sm)',
                     padding: '14px 16px', marginBottom: 24,
@@ -215,11 +242,22 @@ export default function HarakaPayConfig() {
                     </ul>
                 </div>
 
-                {/* Footer */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: 16 }}>
-                    <InfoOutlinedIcon style={{ fontSize: 14 }} />
-                    Contact HarakaPay support for integration assistance
-                </div>
+                {/* Validation Result Banner */}
+                {validationResult && (
+                    <div style={{
+                        display: 'flex', alignItems: 'flex-start', gap: 10,
+                        background: validationResult.success ? '#dcfce7' : '#fff1f2',
+                        border: `1px solid ${validationResult.success ? '#a7f3d0' : '#fecdd3'}`,
+                        borderRadius: 'var(--radius-sm)', padding: '12px 16px', marginBottom: 16,
+                        color: validationResult.success ? '#065f46' : '#9f1239',
+                        fontSize: '0.85rem', fontWeight: 500,
+                    }}>
+                        {validationResult.success
+                            ? <CheckCircleIcon style={{ fontSize: 18, marginTop: 1, flexShrink: 0 }} />
+                            : <ErrorIcon style={{ fontSize: 18, marginTop: 1, flexShrink: 0 }} />}
+                        <div>{validationResult.message}</div>
+                    </div>
+                )}
 
                 {saved && (
                     <div style={{
@@ -231,28 +269,27 @@ export default function HarakaPayConfig() {
                 )}
 
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-                    <button className="btn btn-secondary" onClick={() => navigate('/payment-channels')}>Cancel</button>
-                    <button className="btn btn-secondary" onClick={handleTestPayment} disabled={testing}>
-                        {testing ? 'Testing...' : 'Test Payment'}
+                    <button className="btn btn-secondary" onClick={() => navigate('/payment-channels')} disabled={isProcessing}>
+                        Cancel
                     </button>
-                    <button className="btn" onClick={handleSave} disabled={saving} style={{
-                        background: '#e11d48', color: '#fff', fontWeight: 600,
-                        padding: '8px 20px', display: 'flex', alignItems: 'center', gap: 6,
-                        opacity: saving ? 0.7 : 1, cursor: saving ? 'not-allowed' : 'pointer',
-                    }}>
-                        <SaveIcon fontSize="small" /> {saving ? 'Saving...' : 'Save Configuration'}
+                    <button
+                        className="btn"
+                        onClick={handleValidateAndSave}
+                        disabled={isProcessing}
+                        style={{
+                            background: '#2563eb', color: '#fff', fontWeight: 600,
+                            padding: '8px 20px', display: 'flex', alignItems: 'center', gap: 6,
+                            opacity: isProcessing ? 0.7 : 1, cursor: isProcessing ? 'not-allowed' : 'pointer',
+                        }}
+                    >
+                        {validating
+                            ? <><NetworkCheckIcon style={{ fontSize: 16 }} /> Validating API...</>
+                            : saving
+                                ? <><SaveIcon fontSize="small" /> Saving...</>
+                                : <><NetworkCheckIcon style={{ fontSize: 16 }} /> Validate &amp; Save</>
+                        }
                     </button>
                 </div>
-
-                {testResult && (
-                    <div style={{
-                        marginTop: 16, padding: '12px 16px', background: '#f0f9ff',
-                        border: '1px solid #bae6fd', color: '#0369a1', borderRadius: 'var(--radius-sm)',
-                        fontSize: '0.85rem', fontWeight: 500
-                    }}>
-                        {testResult}
-                    </div>
-                )}
             </div>
         </div>
     );

@@ -27,6 +27,19 @@ export const settingsApi = {
     update: (data: Record<string, string>) => put<{ message: string }>('/system-settings', data),
 };
 
+/** Test a payment gateway API key/URL before saving. Returns { success, message, statusCode, baseUrl } */
+export const paymentChannelTestApi = {
+    test: (data: {
+        provider: string;
+        apiKey: string;
+        apiUrl: string;
+        apiSecret?: string;
+    }) => post<{ success: boolean; message: string; statusCode: number; baseUrl: string; reachable: boolean }>(
+        '/payment-channels/test-api',
+        data
+    ),
+};
+
 export interface DashboardResponse {
     todayRevenue: number;
     monthlyRevenue: number;
