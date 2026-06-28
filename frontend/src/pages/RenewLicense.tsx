@@ -390,7 +390,7 @@ export default function RenewLicense() {
                                 }}
                             >
                                 <div>
-                                    <div style={{ fontWeight: 600 }}>Pay Generated Invoice</div>
+                                    <div style={{ fontWeight: 600 }}>Pay Outstanding Invoice</div>
                                     <div style={{ fontSize: '0.8rem', opacity: 0.9 }}>{license.pendingInvoices![0].invoiceNumber}</div>
                                 </div>
                                 <div style={{ textAlign: 'right' }}>

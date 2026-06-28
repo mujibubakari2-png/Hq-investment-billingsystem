@@ -5,7 +5,7 @@
  * into a single wallet. Contact: Support@palmpesa.co.tz
  *
  * Auth: Bearer token (API Key)
- * Base URL: https://api.palmpesa.com/v1  (update from developer portal)
+ * Base URL: https://palmpesa.drmlelwa.co.tz/api
  */
 
 import {
@@ -140,9 +140,6 @@ export class PalmPesaProvider implements PaymentProvider {
     _rawBody: string
   ): Promise<WebhookVerification> {
     if (!this.webhookSecret) {
-      // PAY-003/PAY-004 FIX: Reject webhooks when no secret is configured.
-      // Previously this returned verified:true which allowed anyone to forge payment confirmations.
-      // Require webhookSecret to be set on the PaymentChannel record before accepting any callbacks.
       console.error("[PALMPESA] Webhook secret not configured — rejecting webhook. Set webhookSecret on the PaymentChannel record.");
       return { verified: false, reason: "Webhook secret not configured" };
     }
