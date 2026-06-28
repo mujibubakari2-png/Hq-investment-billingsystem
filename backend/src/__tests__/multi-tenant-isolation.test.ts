@@ -37,6 +37,9 @@ jest.mock('@/lib/prisma', () => {
     default: {
       paymentChannel: mkModel(),
       transaction:    mkModel(),
+      tenantInvoice:  mkModel(),
+      tenantPayment:  mkModel(),
+      invoice:        mkModel(),
       webhookLog:     mkModel({ create: jest.fn().mockResolvedValue({ id: 'wl-001' }) }),
       tenant:         mkModel(),
       subscription:   mkModel(),
@@ -46,6 +49,8 @@ jest.mock('@/lib/prisma', () => {
       $transaction: jest.fn(async (fn: any) =>
         fn({
           transaction:  { findFirst: jest.fn().mockResolvedValue(null), update: jest.fn().mockResolvedValue({}), updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+          tenantInvoice: { findFirst: jest.fn().mockResolvedValue(null), update: jest.fn().mockResolvedValue({}) },
+          tenantPayment: { findFirst: jest.fn().mockResolvedValue(null), update: jest.fn().mockResolvedValue({}) },
           subscription: { findFirst: jest.fn().mockResolvedValue(null), create: jest.fn().mockResolvedValue({ id: 'sub-001' }), update: jest.fn().mockResolvedValue({}) },
           client:       { update: jest.fn().mockResolvedValue({}) },
           invoice:      { update: jest.fn().mockResolvedValue({}) },
@@ -200,6 +205,8 @@ describe('Multi-Tenant Isolation — Webhook cannot activate cross-tenant invoic
     // Simulate cross-tenant scenario: transaction not found in tenant-abc's scope
     prisma.paymentChannel.findFirst.mockResolvedValue(null);
     prisma.transaction.findFirst.mockResolvedValue(null);
+    prisma.tenantInvoice.findFirst.mockResolvedValue(null);
+    prisma.tenantPayment.findFirst.mockResolvedValue(null);
     prisma.webhookLog.create.mockResolvedValue({ id: 'wl-1' });
     prisma.webhookLog.findFirst.mockResolvedValue({ id: 'wl-1' }); // ownership check
     prisma.webhookLog.update.mockResolvedValue({});

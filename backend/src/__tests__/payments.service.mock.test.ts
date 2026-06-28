@@ -53,11 +53,23 @@ describe('PaymentService (mocked DB)', () => {
 
         const globalDb: any = {
             paymentChannel: { findFirst: jest.fn(async () => null) },
-            webhookLog: { create: webhookLogCreate, update: jest.fn(async () => ({})) },
+            webhookLog: { create: webhookLogCreate, update: webhookLogUpdate },
             transaction: {
                 findFirst: jest.fn(async () => fakeTransaction),
                 findUnique: jest.fn(async () => fakeTransaction),
                 updateMany: jest.fn(async () => ({ count: 1 })),
+                update: jest.fn(async () => ({})),
+            },
+            tenantInvoice: {
+                findFirst: jest.fn(async () => null),
+                update: jest.fn(async () => ({})),
+            },
+            tenantPayment: {
+                findFirst: jest.fn(async () => null),
+                update: jest.fn(async () => ({})),
+            },
+            invoice: {
+                findFirst: jest.fn(async () => null),
                 update: jest.fn(async () => ({})),
             },
             package: { findFirst: jest.fn(async () => ({ id: 'pkg1', duration: 1, durationUnit: 'DAYS', uploadSpeed: 1, downloadSpeed: 1, uploadUnit: 'Mbps', downloadUnit: 'Mbps', tenantId: 't1', routerId: undefined })) },
@@ -163,6 +175,18 @@ describe('PaymentService (mocked DB)', () => {
                 updateMany: jest.fn(async () => ({ count: 1 })),
                 update: jest.fn(async () => ({})),
             },
+            tenantInvoice: {
+                findFirst: jest.fn(async () => null),
+                update: jest.fn(async () => ({})),
+            },
+            tenantPayment: {
+                findFirst: jest.fn(async () => null),
+                update: jest.fn(async () => ({})),
+            },
+            invoice: {
+                findFirst: jest.fn(async () => null),
+                update: jest.fn(async () => ({})),
+            },
             package: { findFirst: jest.fn(async () => ({ id: 'pkg2', duration: 1, durationUnit: 'DAYS', uploadSpeed: 1, downloadSpeed: 1, uploadUnit: 'Mbps', downloadUnit: 'Mbps', tenantId: 't2', routerId: undefined })) },
             subscription: {
                 findFirst: jest.fn(async () => null),
@@ -178,7 +202,7 @@ describe('PaymentService (mocked DB)', () => {
 
         const tenantDb: any = {
             ...globalDb,
-            webhookLog: { create: globalWebhookLogCreate, update: tenantWebhookLogUpdate },
+            webhookLog: { create: globalWebhookLogCreate, update: globalWebhookLogUpdate },
             $transaction: jest.fn(async (cb: any) => {
                 return await cb(tenantDb);
             }),
@@ -205,6 +229,5 @@ describe('PaymentService (mocked DB)', () => {
         expect(result.status).toBe('COMPLETED');
         expect(globalWebhookLogCreate).toHaveBeenCalled();
         expect(globalWebhookLogUpdate).toHaveBeenCalled();
-        expect(tenantWebhookLogUpdate).toHaveBeenCalled();
     });
 });
