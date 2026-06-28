@@ -115,6 +115,7 @@ export class PalmPesaProvider implements PaymentProvider {
       (data?.transactionId as string | undefined) ??
       (data?.order_id as string | undefined) ??
       (data?.OrderId as string | undefined) ??
+      (data?.reference as string | undefined) ??
       undefined;
 
     return typeof providerRef === "string" && providerRef.trim() ? providerRef.trim() : undefined;
@@ -164,14 +165,12 @@ export class PalmPesaProvider implements PaymentProvider {
         Authorization: this.headers.Authorization ? "Bearer [REDACTED]" : "",
       };
 
-      if (process.env.PALMPESA_DEBUG === "1") {
-        console.log("===== PALMPESA REQUEST =====", {
-          method: "POST",
-          url: requestUrl,
-          headers: maskedHeaders,
-          payload,
-        });
-      }
+      console.log("===== PALMPESA REQUEST =====", {
+        method: "POST",
+        url: requestUrl,
+        headers: maskedHeaders,
+        payload,
+      });
 
       const result = await retryWithBackoff(
         () =>
@@ -187,17 +186,15 @@ export class PalmPesaProvider implements PaymentProvider {
       const providerRef = this.getProviderRef(data);
       const isSuccess = this.evaluateResponseSuccess(result, data, rawText, responseCode, providerRef, message);
 
-      if (process.env.PALMPESA_DEBUG === "1") {
-        console.log("===== PALMPESA RESPONSE =====", {
-          httpStatus: result.status,
-          rawBody: rawData,
-          parsedBody: data,
-          responseCode,
-          successEvaluation: isSuccess,
-          providerRef,
-          message,
-        });
-      }
+      console.log("===== PALMPESA RESPONSE =====", {
+        httpStatus: result.status,
+        rawBody: rawData,
+        parsedBody: data,
+        responseCode,
+        successEvaluation: isSuccess,
+        providerRef,
+        message,
+      });
 
       if (isSuccess) {
         console.log("[TRACE][PalmPesaProvider.initiatePayment] EXIT_SUCCESS", { providerRef, message, status: responseCode || "SUCCESS" });
