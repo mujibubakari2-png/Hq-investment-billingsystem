@@ -90,9 +90,9 @@ export class PalmPesaProvider implements PaymentProvider {
 
     const data =
       parsedData &&
-        typeof parsedData === "object" &&
-        parsedData.data &&
-        typeof parsedData.data === "object"
+      typeof parsedData === "object" &&
+      parsedData.data &&
+      typeof parsedData.data === "object"
         ? (parsedData.data as Record<string, unknown>)
         : parsedData;
 
