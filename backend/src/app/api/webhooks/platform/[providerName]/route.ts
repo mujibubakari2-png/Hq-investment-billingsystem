@@ -13,13 +13,19 @@ export async function POST(
     if (rateLimitRes) return rateLimitRes;
 
     const { providerName } = resolvedParams;
+    const { isSupportedProvider } = await import("@/lib/payments/registry");
+    if (!isSupportedProvider(providerName)) {
+      return NextResponse.json({ error: "Unsupported provider" }, { status: 400 });
+    }
+
     const rawBody = await req.text();
     const headers: Record<string, string> = {};
     req.headers.forEach((value, key) => {
       headers[key.toLowerCase()] = value;
     });
 
-    const result = await paymentService.processWebhook(providerName, headers, rawBody);
+    // Explicitly pass tenantId: null for PLATFORM webhooks, and skipTenant to strictly process licenses only
+    const result = await paymentService.processWebhook(providerName, headers, rawBody, null, { skipTenant: true });
 
     if (!result.processed && result.message?.includes("rejected")) {
       return NextResponse.json({ error: result.message }, { status: 401 });

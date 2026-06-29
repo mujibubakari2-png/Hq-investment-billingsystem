@@ -30,7 +30,7 @@ export async function POST(
     const paymentService = new PaymentService();
     // processWebhook handles DB PaymentChannel lookup, signature verification via decrypted secret,
     // and subsequent subscription updates strictly scoped to the tenant.
-    const result = await paymentService.processWebhook(providerName, headers, rawBody, tenantId);
+    const result = await paymentService.processWebhook(providerName, headers, rawBody, tenantId, { skipLicense: true });
 
     if (result.processed) {
       return NextResponse.json({ message: result.message }, { status: 200 });

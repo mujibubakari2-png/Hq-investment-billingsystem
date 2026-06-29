@@ -22,7 +22,9 @@ export async function POST(req: NextRequest) {
     const result = await paymentService.processWebhook(
       "PALMPESA",
       headers,
-      rawBody
+      rawBody,
+      null,
+      { skipLicense: true }
     );
 
     if (!result.processed && result.message?.includes("rejected")) {

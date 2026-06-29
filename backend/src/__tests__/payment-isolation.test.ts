@@ -1,3 +1,6 @@
+/// <reference types="jest" />
+/// <reference types="node" />
+
 /**
  * Payment Credential Isolation Tests
  *
@@ -36,6 +39,8 @@ jest.mock('@/lib/prisma', () => ({
     client: mkModel(),
     package: mkModel(),
     routerLog: mkModel(),
+    tenantInvoice: mkModel(),
+    tenantPayment: mkModel(),
     $transaction: jest.fn(async (fn: any) => fn({
       transaction: mkModel(),
       subscription: mkModel(),
@@ -281,3 +286,50 @@ describe('PaymentService.initiatePayment — explicit production context', () =>
     }
   );
 });
+
+describe('PaymentService.processWebhook — Route Fallback Isolation', () => {
+  it('Tenant webhook with skipLicense=true should NEVER query license invoices', async () => {
+    const prismaMock = require('@/lib/prisma').default;
+    const svc = new PaymentService();
+    // Bypass verification
+    const registry = require('@/lib/payments/registry');
+    registry.getPaymentProvider.mockReturnValue({
+      verifyWebhook: jest.fn().mockResolvedValue({ verified: true }),
+      parseWebhookPayload: jest.fn().mockReturnValue({ transactionRef: 'TENANT-REF', providerRef: 'P-REF', resultCode: '0' }),
+    });
+
+    // Mock getChannel to avoid errors
+    jest.spyOn(svc, 'getChannel').mockResolvedValue({ id: 'ch' } as any);
+
+    // Call processWebhook
+    await svc.processWebhook('PALMPESA', {}, '{}', 'tenant-123', { skipLicense: true });
+
+    // Ensure it queried transaction table
+    expect(prismaMock.transaction.findFirst).toHaveBeenCalled();
+    // Ensure it NEVER queried tenantInvoice
+    expect(prismaMock.tenantInvoice.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('Platform webhook with skipTenant=true should NEVER query tenant transactions', async () => {
+    const prismaMock = require('@/lib/prisma').default;
+    // Clear mocks from previous test
+    jest.clearAllMocks();
+
+    const svc = new PaymentService();
+    const registry = require('@/lib/payments/registry');
+    registry.getPaymentProvider.mockReturnValue({
+      verifyWebhook: jest.fn().mockResolvedValue({ verified: true }),
+      parseWebhookPayload: jest.fn().mockReturnValue({ transactionRef: 'LICENSE-REF', providerRef: 'P-REF', resultCode: '0' }),
+    });
+
+    jest.spyOn(svc, 'getChannel').mockResolvedValue({ id: 'ch' } as any);
+
+    await svc.processWebhook('PALMPESA', {}, '{}', null, { skipTenant: true });
+
+    // Ensure it NEVER queried transaction table
+    expect(prismaMock.transaction.findFirst).not.toHaveBeenCalled();
+    // Ensure it queried tenantInvoice table
+    expect(prismaMock.tenantInvoice.findFirst).toHaveBeenCalled();
+  });
+});
+

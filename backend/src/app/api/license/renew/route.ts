@@ -116,9 +116,9 @@ export async function POST(req: NextRequest) {
         }
 
         // FIX: Correct callback URL path.
-        // Previously pointed to /api/payments/{provider}/webhook (deprecated/removed endpoint).
-        // All provider webhooks are handled at /api/webhooks/{provider}.
-        const callbackUrl = buildCallbackUrl(providerName, req, appUrl);
+        // Platform payments MUST go to the isolated platform webhook route to avoid mixing with tenant transactions.
+        const base = appUrl.replace(/\/$/, "");
+        const callbackUrl = `${base}/api/payments/${providerName.toLowerCase()}/webhook`;
 
         let paymentRecord: any = null;
         try {

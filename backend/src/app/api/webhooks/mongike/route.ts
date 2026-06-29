@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
     const headers: Record<string, string> = {};
     req.headers.forEach((value, key) => { headers[key.toLowerCase()] = value; });
 
-    const result = await paymentService.processWebhook("MONGIKE", headers, rawBody);
+    const result = await paymentService.processWebhook("MONGIKE", headers, rawBody, null, { skipLicense: true });
 
     if (!result.processed && result.message?.includes("rejected")) {
       return NextResponse.json({ error: result.message }, { status: 401 });

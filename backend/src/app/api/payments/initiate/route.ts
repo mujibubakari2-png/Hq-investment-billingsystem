@@ -73,6 +73,7 @@ export async function POST(req: NextRequest) {
       description,
       buyerName,
       buyerEmail,
+      paymentContext: "TENANT", // EXPLICIT ISOLATION GUARD
     });
 
     if (!result.success) {

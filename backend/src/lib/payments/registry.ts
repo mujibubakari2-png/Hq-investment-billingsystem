@@ -10,12 +10,8 @@ import { PalmPesaProvider } from "@/lib/payments/providers/palmpesa";
 import { ZenoPayProvider } from "@/lib/payments/providers/zenopay";
 import { MongikeProvider } from "@/lib/payments/providers/mongike";
 import { HarakaPayProvider } from "@/lib/payments/providers/harakapay";
-// E11 FIX: Removed MPESA
 
 import { env } from "@/lib/env";
-// CRED-001 FIX: Import decrypt so DB-stored credentials are decrypted before being
-// handed to provider instances. Without this, providers receive raw "enc:v1:..." strings
-// as their API keys and every payment call fails with an auth/invalid-key error.
 import { decrypt } from "@/lib/encryption";
 
 // ─── Build ProviderConfig from environment variables (fallback) ───────────────
@@ -23,8 +19,6 @@ import { decrypt } from "@/lib/encryption";
 function envConfigFor(provider: ProviderName): ProviderConfig {
   const environment = (env.PAYMENT_ENVIRONMENT ?? "sandbox") as "sandbox" | "live";
 
-  // E03 FIX: Alert loudly in production when payment gateway is still in sandbox mode.
-  // Real money transactions will fail silently or go to a test bucket if this is left as 'sandbox'.
   if (process.env.NODE_ENV === "production" && environment === "sandbox") {
     console.error(
       "[PAYMENT] CRITICAL: PAYMENT_ENVIRONMENT=sandbox in a production environment! " +
@@ -35,33 +29,46 @@ function envConfigFor(provider: ProviderName): ProviderConfig {
 
   switch (provider) {
     case "PALMPESA":
+      // Official base URL: https://palmpesa.drmlelwa.co.tz (no /api suffix).
+      // PalmPesaProvider constructs the full path internally per endpoint.
       return {
-        apiKey: env.PALMPESA_API_KEY,
-        apiUrl: env.PALMPESA_API_URL,
+        apiKey:        env.PALMPESA_API_KEY,
+        apiUrl:        env.PALMPESA_API_URL ?? "https://palmpesa.drmlelwa.co.tz",
         webhookSecret: env.PALMPESA_WEBHOOK_SECRET,
         environment,
-      };
+      } as ProviderConfig;
+
     case "ZENOPAY":
+      // Official base URL: https://zenoapi.com/api/payments
+      // Initiate: POST /mobile_money_tanzania
+      // Status:   GET  /order-status?order_id={order_id}
       return {
-        apiKey: env.ZENOPAY_API_KEY,
-        accountId: env.ZENOPAY_ACCOUNT_ID,
-        apiUrl: env.ZENOPAY_API_URL,
+        apiKey:        env.ZENOPAY_API_KEY,
+        accountId:     env.ZENOPAY_ACCOUNT_ID,
+        apiUrl:        env.ZENOPAY_API_URL ?? "https://zenoapi.com/api/payments",
         webhookSecret: env.ZENOPAY_WEBHOOK_SECRET,
         environment,
       };
+
     case "MONGIKE":
+      // FIX-MG-001: Official base URL is https://mongike.com/api/v1 (NOT api.mongike.com/v1)
+      // Verified against official OpenAPI spec at https://mongike.docs.buildwithfern.com/
+      // POST /payments/mobile-money/tanzania
       return {
-        apiKey: env.MONGIKE_API_KEY,
-        apiSecret: env.MONGIKE_API_SECRET,
-        apiUrl: env.MONGIKE_API_URL,
+        apiKey:        env.MONGIKE_API_KEY,
+        apiSecret:     env.MONGIKE_API_SECRET,
+        apiUrl:        env.MONGIKE_API_URL ?? "https://mongike.com/api/v1",
         webhookSecret: env.MONGIKE_WEBHOOK_SECRET,
         environment,
       };
+
     case "HARAKAPAY":
+      // Official base URL: https://harakapay.net
+      // Auth: X-API-Key header (single key, no secret)
+      // Verified against https://harakapay.net/api/docs
       return {
-        apiKey: env.HARAKAPAY_API_KEY,
-        apiSecret: env.HARAKAPAY_API_SECRET,
-        apiUrl: env.HARAKAPAY_API_URL,
+        apiKey:        env.HARAKAPAY_API_KEY,
+        apiUrl:        env.HARAKAPAY_API_URL ?? "https://harakapay.net",
         webhookSecret: env.HARAKAPAY_WEBHOOK_SECRET,
         environment,
       };
@@ -81,13 +88,6 @@ export interface ChannelRecord {
 
 /**
  * CRED-001 FIX: Decrypt sensitive channel fields before building ProviderConfig.
- *
- * PaymentChannel rows store apiKey / apiSecret / webhookSecret encrypted as
- * "enc:v1:<iv>:<tag>:<ciphertext>" strings (written by encryptPaymentChannelFields).
- * Previously these were passed raw to provider instances, causing every API call to
- * be rejected by the payment gateway because the key was an unreadable cipher string.
- *
- * decrypt() is idempotent — plaintext (unencrypted legacy rows) pass through unchanged.
  */
 function channelToConfig(channel: ChannelRecord): ProviderConfig {
   const cfg = (channel.config ?? {}) as Record<string, unknown>;
@@ -95,31 +95,22 @@ function channelToConfig(channel: ChannelRecord): ProviderConfig {
     | "sandbox"
     | "live";
 
-  // Decrypt each sensitive field; decrypt() returns null for null/undefined inputs,
-  // so we coerce null → undefined to satisfy ProviderConfig (optional fields).
-  const apiKey = decrypt(channel.apiKey) ?? decrypt(cfg.apiKey as string | null) ?? undefined;
-  const apiSecret = decrypt(channel.apiSecret) ?? decrypt(cfg.apiSecret as string | null) ?? undefined;
+  const apiKey        = decrypt(channel.apiKey)        ?? decrypt(cfg.apiKey        as string | null) ?? undefined;
+  const apiSecret     = decrypt(channel.apiSecret)     ?? decrypt(cfg.apiSecret     as string | null) ?? undefined;
   const webhookSecret = decrypt(channel.webhookSecret) ?? decrypt(cfg.webhookSecret as string | null) ?? undefined;
 
   return {
     apiKey,
     apiSecret,
-    apiUrl: (cfg.apiUrl as string) ?? undefined,
+    apiUrl:       (cfg.apiUrl    as string) ?? undefined,
     webhookSecret,
-    accountId: (cfg.accountId as string) ?? undefined,
+    accountId:    (cfg.accountId as string) ?? undefined,
     environment,
-  };
+  } as ProviderConfig;
 }
 
 // ─── Factory ──────────────────────────────────────────────────────────────────
 
-/**
- * Get a fully configured PaymentProvider instance.
- *
- * Priority:
- *   1. channel record from DB (per-tenant credentials, decrypted)
- *   2. environment variables (global fallback)
- */
 export function getPaymentProvider(
   providerName: string,
   channel?: ChannelRecord | null
@@ -144,10 +135,6 @@ export function getPaymentProvider(
   }
 }
 
-/**
- * Returns all supported provider names.
- */
-// E11 FIX: Removed MPESA from supported providers list
 export const SUPPORTED_PROVIDERS: ProviderName[] = [
   "PALMPESA",
   "ZENOPAY",

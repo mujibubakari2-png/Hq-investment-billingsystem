@@ -195,7 +195,8 @@ export class PaymentService {
     providerName: string,
     headers: Record<string, string | string[] | undefined>,
     rawBody: string,
-    tenantId: string | null = null
+    tenantId: string | null = null,
+    options?: { skipLicense?: boolean; skipTenant?: boolean }
   ): Promise<WebhookResult> {
     if (!isSupportedProvider(providerName)) {
       return { processed: false, message: `Unsupported provider: ${providerName}` };
@@ -256,14 +257,41 @@ export class PaymentService {
       return { processed: false, message: "Missing transaction reference in payload" };
     }
 
-    // 4. Try to find a hotspot/PPPoE transaction first
-    let transaction = await (db.transaction.findFirst as any)({
-      where: {
-        reference: parsed.transactionRef,
-        ...(tenantId ? { tenantId } : {}),
-      },
-      include: { client: true, invoice: true },
-    }) as any;
+    let transaction: any = null;
+
+    if (!options?.skipTenant) {
+      // 4. Try to find a hotspot/PPPoE transaction.
+      //    Primary lookup: by our internal reference.
+      //    FIX-PP-002 FALLBACK: PalmPesa Endpoint 02 callback does NOT echo our transaction_id
+      //    back. It only returns its own order_id. If the primary lookup fails and we have a
+      //    providerRef, try matching by the providerRef stored on the transaction record.
+      transaction = await (db.transaction.findFirst as any)({
+        where: {
+          reference: parsed.transactionRef,
+          ...(tenantId ? { tenantId } : {}),
+        },
+        include: { client: true, invoice: true },
+      }) as any;
+
+      // Fallback: lookup by providerRef (for providers that only echo their own order_id)
+      if (!transaction && parsed.providerRef && parsed.providerRef !== parsed.transactionRef) {
+        transaction = await (db.transaction.findFirst as any)({
+          where: {
+            providerRef: parsed.providerRef,
+            ...(tenantId ? { tenantId } : {}),
+          },
+          include: { client: true, invoice: true },
+        }) as any;
+
+        if (transaction) {
+          console.log("[PAYMENT SERVICE] Resolved transaction via providerRef fallback", {
+            transactionRef: parsed.transactionRef,
+            providerRef: parsed.providerRef,
+            transactionId: transaction.id,
+          });
+        }
+      }
+    }
 
     if (!tenantId && transaction?.tenantId) {
       db = getTenantClient(transaction.tenantId);
@@ -275,9 +303,20 @@ export class PaymentService {
 
     // ── LICENSE PAYMENT FALLBACK ──────────────────────────────────────────────
     // If no hotspot/PPPoE transaction found, check if this is a LICENSE payment.
-    // License payments are tracked via tenantInvoice (invoiceNumber = transactionRef)
-    // and tenantPayment (linked to the invoice). They have no `transaction` record.
     if (!transaction) {
+      if (options?.skipLicense) {
+        console.error(`[PAYMENT SERVICE] Transaction not found and skipLicense is true. Reference: ${parsed.transactionRef}`);
+        await globalDb.webhookLog.update({
+          where: { id: webhookLog.id },
+          data: { status: "FAILED", errorMessage: "Tenant transaction not found (License fallback skipped)" },
+        });
+        return {
+          processed: false,
+          transactionRef: parsed.transactionRef,
+          message: "Transaction not found",
+        };
+      }
+
       const licenseResult = await this.processLicenseWebhook(
         parsed,
         webhookLog.id,
@@ -498,12 +537,12 @@ export class PaymentService {
 
   // ── LICENSE Webhook Handler ───────────────────────────────────────────────
   /**
-   * Handle a webhook where the transactionRef matches a tenantInvoice.invoiceNumber.
-   * This is the LICENSE payment path — completely separate from hotspot/PPPoE transactions.
+   * Handle a webhook where the transactionRef matches a tenantInvoice.invoiceNumber
+   * OR a providerRef. This is the LICENSE payment path.
    *
    * Returns:
-   *   WebhookResult  — if the ref matched a license invoice (processed or duplicate)
-   *   null           — if the ref did NOT match any license invoice (caller should handle 404)
+   *   WebhookResult  — if the ref matched a license invoice
+   *   null           — if no match (caller handles 404)
    */
   private async processLicenseWebhook(
     parsed: import("@/lib/payments/types").ParsedWebhookPayload,
@@ -512,8 +551,8 @@ export class PaymentService {
   ): Promise<WebhookResult | null> {
     const globalDb = getTenantClient(null);
 
-    // Look up invoice by invoiceNumber (= AccountReference sent during STK push)
-    const invoice = await globalDb.tenantInvoice.findFirst({
+    // Primary lookup: invoiceNumber = our reference sent during initiation
+    let invoice = await globalDb.tenantInvoice.findFirst({
       where: { invoiceNumber: parsed.transactionRef },
       include: {
         payments: { orderBy: { createdAt: "desc" }, take: 1 },
@@ -521,14 +560,24 @@ export class PaymentService {
       },
     }) as any;
 
+    // FIX-PP-002 FALLBACK: For PalmPesa Endpoint 02, transactionRef = PalmPesa order_id.
+    // Try matching via providerRef stored on the invoice.
+    if (!invoice && parsed.providerRef && parsed.providerRef !== parsed.transactionRef) {
+      invoice = await globalDb.tenantInvoice.findFirst({
+        where: { providerRef: parsed.providerRef } as any,
+        include: {
+          payments: { orderBy: { createdAt: "desc" }, take: 1 },
+          tenant: { include: { plan: true } },
+        },
+      }) as any;
+    }
+
     if (!invoice) {
-      // Not a license payment — signal caller to handle 404
       return null;
     }
 
     console.log("[LICENSE WEBHOOK] Found invoice", { invoiceId: invoice.id, invoiceNumber: invoice.invoiceNumber, tenantId: invoice.tenantId });
 
-    // Idempotency: already paid
     if (invoice.status === "PAID") {
       await globalDb.webhookLog.update({
         where: { id: webhookLogId },
@@ -539,7 +588,6 @@ export class PaymentService {
 
     const tenantPayment = invoice.payments[0] ?? null;
 
-    // Handle FAILED payment
     if (parsed.resultCode !== "0") {
       if (tenantPayment) {
         await globalDb.tenantPayment.update({
@@ -554,7 +602,6 @@ export class PaymentService {
       return { processed: true, transactionRef: parsed.transactionRef, status: "FAILED", message: parsed.resultMessage ?? "License payment failed" };
     }
 
-    // Amount verification
     if (parsed.amount !== undefined && parsed.amount < invoice.amount) {
       if (tenantPayment) {
         await globalDb.tenantPayment.update({
@@ -574,29 +621,24 @@ export class PaymentService {
       return { processed: true, transactionRef: parsed.transactionRef, status: "FAILED", message: "Payment amount does not match invoice amount" };
     }
 
-    // SUCCESS — update tenantPayment, tenantInvoice, and extend tenant license
     try {
       const now = new Date();
       const packageMonths: number = invoice.packageMonths ?? 1;
 
-      // Calculate new license expiry
       const tenant = invoice.tenant;
       const currentExpiry = tenant?.licenseExpiresAt
         ? new Date(tenant.licenseExpiresAt)
         : now;
-      // Extend from today if already expired, otherwise extend from current expiry
       const baseExpiry = currentExpiry < now ? now : currentExpiry;
       const newExpiry = new Date(baseExpiry);
       newExpiry.setMonth(newExpiry.getMonth() + packageMonths);
 
       await globalDb.$transaction(async (tx: any) => {
-        // Mark invoice PAID
         await tx.tenantInvoice.update({
           where: { id: invoice.id },
           data: { status: "PAID" },
         });
 
-        // Mark tenantPayment COMPLETED
         if (tenantPayment) {
           await tx.tenantPayment.update({
             where: { id: tenantPayment.id },
@@ -607,7 +649,6 @@ export class PaymentService {
           });
         }
 
-        // Extend tenant license and reactivate if suspended
         await tx.tenant.update({
           where: { id: invoice.tenantId },
           data: {
