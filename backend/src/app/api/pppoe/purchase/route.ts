@@ -131,23 +131,7 @@ export async function POST(req: NextRequest) {
     let provider = (body.provider || body.method || "").toUpperCase();
 
     if (!provider || provider === "MOBILE_MONEY" || provider === "M-PESA") {
-      const tenantSettings = await db.systemSetting.findMany({
-        where: { tenantId: pkg.tenantId ?? null },
-      });
-
-      const gwSetting = tenantSettings.find((s) => s.key === "paymentGateways");
-      let gateways: { name: string; isDefault?: boolean; enabled?: boolean }[] = [];
-      if (gwSetting) {
-        try { gateways = JSON.parse(gwSetting.value); } catch { /* ignore */ }
-      }
-
-      const defaultGw =
-        gateways.find((g) => g.isDefault && g.enabled) ||
-        gateways.find((g) => g.enabled);
-
-      if (defaultGw) {
-        provider = defaultGw.name.toUpperCase();
-      } else {
+      {
         const channel = await db.paymentChannel.findFirst({
           where: {
             status: "ACTIVE",
@@ -173,6 +157,11 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Initiate Payment via PaymentService ───────────────────────────────────
+    await db.transaction.update({
+      where: { id: transaction.id },
+      data: { method: provider },
+    });
+
     let providerRef: string | undefined;
     let paymentInitiated = false;
 

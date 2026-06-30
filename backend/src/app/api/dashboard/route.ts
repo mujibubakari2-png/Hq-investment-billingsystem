@@ -7,6 +7,7 @@ import { isPlatformSuperAdmin } from "@/lib/tenant";
 import { toISOSafe, toTimestampSafe, getStartOfTodayTZ, getStartOfMonthTZ } from "@/lib/dateUtils";
 import { Redis } from 'ioredis';
 import logger from "@/lib/logger";
+import { backfillRadiusAccountingTenants } from "@/lib/radiusTenant";
 
 // Connection-related error codes that should be suppressed (Redis not available)
 const REDIS_CONN_ERRORS = new Set(['ECONNREFUSED', 'ENOENT', 'ENOTFOUND', 'ETIMEDOUT', 'ECONNRESET', 'EPIPE']);
@@ -102,27 +103,11 @@ export async function GET(req: NextRequest) {
             }
         }
 
-        if (shouldSync && isPlatformAdmin) {
+        if (shouldSync) {
 
-            // Ensure all radacct records have a tenantId by mapping nasipaddress to Router table.
+            // Ensure radacct rows have tenantId by mapping nasipaddress to Router and RADIUS NAS tables.
             try {
-                const routers = await globalDb.router.findMany({
-                    where: { tenantId: { not: null } },
-                    select: { host: true, tenantId: true, wgTunnelIp: true }
-                });
-
-                for (const router of routers) {
-                    const possibleIps = [router.host, router.wgTunnelIp].filter(Boolean) as string[];
-                    if (possibleIps.length > 0) {
-                        await globalDb.radAcct.updateMany({
-                            where: {
-                                nasipaddress: { in: possibleIps },
-                                tenantId: null
-                            },
-                            data: { tenantId: router.tenantId }
-                        });
-                    }
-                }
+                await backfillRadiusAccountingTenants(globalDb);
             } catch (e) {
                 logger.error("[DASHBOARD SYNC ERROR]: Failed to map RADIUS sessions to tenants", {
                     endpoint: "GET /api/dashboard",
@@ -276,7 +261,8 @@ export async function GET(req: NextRequest) {
                 where: {
                     ...tenantFilter,
                     createdAt: { gte: todayStart },
-                    status: "COMPLETED",
+                    status: { in: ["COMPLETED", "PENDING", "FAILED"] },
+                    type: { in: ["MOBILE", "VOUCHER"] },
                 },
                 take: 10,
                 orderBy: { createdAt: "desc" },
@@ -473,13 +459,15 @@ export async function GET(req: NextRequest) {
         const transactionActivities = recentTransactions.map((t) => {
             const transactionType = t.type === "VOUCHER" ? "Voucher" : t.type === "MOBILE" ? "Payment" : "Manual";
             const paymentChannel = t.method || "Unknown";
+            const statusLabel = t.status.charAt(0) + t.status.slice(1).toLowerCase();
+            const action = t.status === "COMPLETED" ? "paid" : t.status === "FAILED" ? "failed to pay" : "started payment of";
             return {
                 id: t.id,
                 title: `${transactionType} Transaction`,
-                description: `${t.client.username} paid ${t.amount.toLocaleString()} TZS via ${paymentChannel}`,
+                description: `${t.client.username} ${action} ${t.amount.toLocaleString()} TZS via ${paymentChannel}`,
                 date: toISOSafe(t.createdAt),
                 timestamp: toTimestampSafe(t.createdAt),
-                status: t.status.charAt(0) + t.status.slice(1).toLowerCase(),
+                status: statusLabel,
                 type: "transaction",
             };
         });
@@ -572,6 +560,9 @@ export async function GET(req: NextRequest) {
                     paymentChannel: t.method || "N/A",
                     planType: t.planName || "N/A",
                     status: t.status.charAt(0) + t.status.slice(1).toLowerCase(),
+                    reference: t.providerRef || t.reference || null,
+                    transactionId: t.providerRef || t.reference || null,
+                    providerRef: t.providerRef || null,
                     date: toISOSafe(t.createdAt),
                     timeActiveSys: "N/A",
                 };

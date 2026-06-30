@@ -97,6 +97,7 @@ export async function POST(
             providerName: channel.provider,
             description: `Invoice ${invoice.invoiceNumber} — ${client.fullName}`,
             buyerName: client.fullName || undefined,
+            paymentContext: "TENANT",
         });
 
         if (!result.success) {
@@ -108,10 +109,18 @@ export async function POST(
             return errorResponse(result.message || "Payment initiation failed", 502);
         }
 
+        if (result.providerRef) {
+            await db.transaction.update({
+                where: { id: transaction.id },
+                data: { providerRef: result.providerRef },
+            });
+        }
+
         return jsonResponse({
             success: true,
             reference,
             transactionId: transaction.id,
+            providerRef: result.providerRef ?? null,
             provider: channel.provider,
             message: "Payment initiated — customer will receive a prompt on their phone",
         });

@@ -139,6 +139,8 @@ export default function Dashboard() {
         isVoucher: t.isVoucher,
         transactionType: t.transactionType,
         paymentChannel: t.paymentChannel,
+        status: t.status,
+        reference: t.providerRef || t.transactionId || t.reference || null,
     }));
 
     const revenueAnalyticsData = (stats?.revenueAnalytics?.[analyticsPeriod] ?? []).map(d => ({

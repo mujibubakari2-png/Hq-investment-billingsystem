@@ -3,6 +3,7 @@ import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 import { getTenantFilter } from "@/lib/tenant";
 import { requirePermission } from "@/lib/rbac";
+import { backfillRadiusAccountingTenants } from "@/lib/radiusTenant";
 
 // GET /api/radius/sessions – list RADIUS accounting sessions (tenant-isolated)
 export async function GET(req: NextRequest) {
@@ -11,8 +12,10 @@ export async function GET(req: NextRequest) {
         if (guard.error) return guard.error;
         const userPayload = guard.user;
         const db = getTenantClient(userPayload);
+        const globalDb = getTenantClient(null);
 
         const { filter } = getTenantFilter(userPayload);
+        await backfillRadiusAccountingTenants(globalDb);
 
         const { searchParams } = new URL(req.url);
         const status = searchParams.get("status") || "active"; // active | closed | all

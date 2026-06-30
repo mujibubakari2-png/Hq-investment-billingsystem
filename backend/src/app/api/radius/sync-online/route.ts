@@ -2,6 +2,8 @@ import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { requirePermission } from "@/lib/rbac";
+import { getTenantFilter } from "@/lib/tenant";
+import { backfillRadiusAccountingTenants } from "@/lib/radiusTenant";
 
 /**
  * POST /api/radius/sync-online
@@ -20,8 +22,11 @@ export async function POST(req: NextRequest) {
         if (guard.error) return guard.error;
         const userPayload = guard.user;
         const db = getTenantClient(userPayload);
+        const globalDb = getTenantClient(null);
 
-        const tenantFilter = { tenantId: userPayload.tenantId };
+        const { filter: tenantFilter } = getTenantFilter(userPayload);
+
+        await backfillRadiusAccountingTenants(globalDb);
 
         // 1. Get all unique usernames currently online in RADIUS
         const activeRadiusSessions = await db.radAcct.findMany({
@@ -97,8 +102,11 @@ export async function GET(req: NextRequest) {
         if (guard.error) return guard.error;
         const userPayload = guard.user;
         const db = getTenantClient(userPayload);
+        const globalDb = getTenantClient(null);
 
-        const tenantFilter = { tenantId: userPayload.tenantId };
+        const { filter: tenantFilter } = getTenantFilter(userPayload);
+
+        await backfillRadiusAccountingTenants(globalDb);
 
         const [activeSessions, totalActive] = await Promise.all([
             db.radAcct.findMany({

@@ -8,14 +8,14 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import BlockIcon from '@mui/icons-material/Block';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
-import { mobileTransactionsApi } from '../api';
+import { mobileTransactionsApi, type MobileTransactionEntry } from '../api';
 import { formatDateTime } from '../utils/formatters';
 
 export default function MobileTransactions() {
     const [searchTerm, setSearchTerm] = useState('');
     const [entriesPerPage, setEntriesPerPage] = useState<number | 'All'>(25);
     const [currentPage, setCurrentPage] = useState(1);
-    const [transactions, setTransactions] = useState<any[]>([]);
+    const [transactions, setTransactions] = useState<MobileTransactionEntry[]>([]);
     const [totalTxs, setTotalTxs] = useState(0);
     const [loading, setLoading] = useState(true);
     const [summaries, setSummaries] = useState<any>(null);

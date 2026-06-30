@@ -88,9 +88,11 @@ CREATE TABLE IF NOT EXISTS radgroupcheck (
     groupname VARCHAR(64)  NOT NULL DEFAULT '',
     attribute VARCHAR(64)  NOT NULL,
     op        VARCHAR(2)   NOT NULL DEFAULT ':=',
-    value     VARCHAR(253) NOT NULL
+    value     VARCHAR(253) NOT NULL,
+    "tenantId" TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_radgroupcheck_groupname ON radgroupcheck(groupname);
+CREATE INDEX IF NOT EXISTS idx_radgroupcheck_tenantid ON radgroupcheck("tenantId");
 
 -- radgroupreply: group-level reply attributes
 CREATE TABLE IF NOT EXISTS radgroupreply (
@@ -98,18 +100,26 @@ CREATE TABLE IF NOT EXISTS radgroupreply (
     groupname VARCHAR(64)  NOT NULL DEFAULT '',
     attribute VARCHAR(64)  NOT NULL,
     op        VARCHAR(2)   NOT NULL DEFAULT '=',
-    value     VARCHAR(253) NOT NULL
+    value     VARCHAR(253) NOT NULL,
+    "tenantId" TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_radgroupreply_groupname ON radgroupreply(groupname);
+CREATE INDEX IF NOT EXISTS idx_radgroupreply_tenantid ON radgroupreply("tenantId");
 
 -- radusergroup: maps users to groups
 CREATE TABLE IF NOT EXISTS radusergroup (
     id        SERIAL      PRIMARY KEY,
     username  VARCHAR(64) NOT NULL DEFAULT '',
     groupname VARCHAR(64) NOT NULL DEFAULT '',
-    priority  INT         NOT NULL DEFAULT 1
+    priority  INT         NOT NULL DEFAULT 1,
+    "tenantId" TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_radusergroup_username ON radusergroup(username);
+CREATE INDEX IF NOT EXISTS idx_radusergroup_tenantid ON radusergroup("tenantId");
+
+ALTER TABLE radgroupcheck ADD COLUMN IF NOT EXISTS "tenantId" TEXT;
+ALTER TABLE radgroupreply ADD COLUMN IF NOT EXISTS "tenantId" TEXT;
+ALTER TABLE radusergroup ADD COLUMN IF NOT EXISTS "tenantId" TEXT;
 SQL
 echo "✅ RADIUS tables ready"
 
@@ -164,12 +174,24 @@ sql {
     }
 
     # ── authorize_check_query ───────────────────────────────────────
-    # Fetch all check attributes for this username.
-    # NOTE: "tenantId" is quoted because Prisma creates it as camelCase.
+    # Fetch check attributes for this username, scoped to the tenant that owns
+    # the NAS IP. This prevents cross-tenant username collisions.
     authorize_check_query = "\
         SELECT id, username, attribute, value, op \
         FROM radcheck \
         WHERE username = '%{SQL-User-Name}' \
+          AND \"tenantId\" = ( \
+              SELECT rn.\"tenantId\" \
+              FROM radius_nas rn \
+              WHERE (rn.\"nasName\" = '%{NAS-IP-Address}' OR rn.server = '%{NAS-IP-Address}') \
+                AND rn.\"tenantId\" IS NOT NULL \
+              UNION \
+              SELECT r.\"tenantId\" \
+              FROM routers r \
+              WHERE (r.host = '%{NAS-IP-Address}' OR r.\"wgTunnelIp\" = '%{NAS-IP-Address}') \
+                AND r.\"tenantId\" IS NOT NULL \
+              LIMIT 1 \
+          ) \
         ORDER BY id"
 
     # ── authorize_reply_query ───────────────────────────────────────
@@ -178,6 +200,18 @@ sql {
         SELECT id, username, attribute, value, op \
         FROM radreply \
         WHERE username = '%{SQL-User-Name}' \
+          AND \"tenantId\" = ( \
+              SELECT rn.\"tenantId\" \
+              FROM radius_nas rn \
+              WHERE (rn.\"nasName\" = '%{NAS-IP-Address}' OR rn.server = '%{NAS-IP-Address}') \
+                AND rn.\"tenantId\" IS NOT NULL \
+              UNION \
+              SELECT r.\"tenantId\" \
+              FROM routers r \
+              WHERE (r.host = '%{NAS-IP-Address}' OR r.\"wgTunnelIp\" = '%{NAS-IP-Address}') \
+                AND r.\"tenantId\" IS NOT NULL \
+              LIMIT 1 \
+          ) \
         ORDER BY id"
 
     # ── authorize_group_check_query ─────────────────────────────────
@@ -185,6 +219,18 @@ sql {
         SELECT id, groupname, attribute, value, op \
         FROM radgroupcheck \
         WHERE groupname = '%{SQL-Group}' \
+          AND \"tenantId\" = ( \
+              SELECT rn.\"tenantId\" \
+              FROM radius_nas rn \
+              WHERE (rn.\"nasName\" = '%{NAS-IP-Address}' OR rn.server = '%{NAS-IP-Address}') \
+                AND rn.\"tenantId\" IS NOT NULL \
+              UNION \
+              SELECT r.\"tenantId\" \
+              FROM routers r \
+              WHERE (r.host = '%{NAS-IP-Address}' OR r.\"wgTunnelIp\" = '%{NAS-IP-Address}') \
+                AND r.\"tenantId\" IS NOT NULL \
+              LIMIT 1 \
+          ) \
         ORDER BY id"
 
     # ── authorize_group_reply_query ─────────────────────────────────
@@ -192,6 +238,18 @@ sql {
         SELECT id, groupname, attribute, value, op \
         FROM radgroupreply \
         WHERE groupname = '%{SQL-Group}' \
+          AND \"tenantId\" = ( \
+              SELECT rn.\"tenantId\" \
+              FROM radius_nas rn \
+              WHERE (rn.\"nasName\" = '%{NAS-IP-Address}' OR rn.server = '%{NAS-IP-Address}') \
+                AND rn.\"tenantId\" IS NOT NULL \
+              UNION \
+              SELECT r.\"tenantId\" \
+              FROM routers r \
+              WHERE (r.host = '%{NAS-IP-Address}' OR r.\"wgTunnelIp\" = '%{NAS-IP-Address}') \
+                AND r.\"tenantId\" IS NOT NULL \
+              LIMIT 1 \
+          ) \
         ORDER BY id"
 
     # ── group_membership_query ──────────────────────────────────────
@@ -199,6 +257,18 @@ sql {
         SELECT groupname \
         FROM radusergroup \
         WHERE username = '%{SQL-User-Name}' \
+          AND \"tenantId\" = ( \
+              SELECT rn.\"tenantId\" \
+              FROM radius_nas rn \
+              WHERE (rn.\"nasName\" = '%{NAS-IP-Address}' OR rn.server = '%{NAS-IP-Address}') \
+                AND rn.\"tenantId\" IS NOT NULL \
+              UNION \
+              SELECT r.\"tenantId\" \
+              FROM routers r \
+              WHERE (r.host = '%{NAS-IP-Address}' OR r.\"wgTunnelIp\" = '%{NAS-IP-Address}') \
+                AND r.\"tenantId\" IS NOT NULL \
+              LIMIT 1 \
+          ) \
         ORDER BY priority ASC"
 
     # ── Accounting: INSERT on Start ─────────────────────────────────
@@ -210,7 +280,7 @@ sql {
              acctstoptime, acctsessiontime, acctauthentic, \
              connectinfo_start, acctinputoctets, acctoutputoctets, \
              calledstationid, callingstationid, acctterminatecause, \
-             servicetype, framedprotocol, framedipaddress) \
+             servicetype, framedprotocol, framedipaddress, \"tenantId\") \
         VALUES \
             ('%{Acct-Session-Id}', '%{Acct-Unique-Session-Id}', \
              '%{SQL-User-Name}', '%{Realm}', \
@@ -220,7 +290,12 @@ sql {
              NULL, 0, '%{Acct-Authentic}', \
              '%{Connect-Info}', 0, 0, \
              '%{Called-Station-Id}', '%{Calling-Station-Id}', '', \
-             '%{Service-Type}', '%{Framed-Protocol}', '%{Framed-IP-Address}')"
+             '%{Service-Type}', '%{Framed-Protocol}', '%{Framed-IP-Address}', \
+             (SELECT tenant_id FROM ( \
+                SELECT rn.\"tenantId\" AS tenant_id FROM radius_nas rn WHERE (rn.\"nasName\" = '%{NAS-IP-Address}' OR rn.server = '%{NAS-IP-Address}') AND rn.\"tenantId\" IS NOT NULL \
+                UNION \
+                SELECT r.\"tenantId\" AS tenant_id FROM routers r WHERE (r.host = '%{NAS-IP-Address}' OR r.\"wgTunnelIp\" = '%{NAS-IP-Address}') AND r.\"tenantId\" IS NOT NULL \
+              ) resolved_radius_tenant LIMIT 1))"
 
     # ── Accounting: UPDATE on Interim-Update ───────────────────────
     accounting_update_query = "\
@@ -248,12 +323,17 @@ sql {
 
     # ── Post-Auth logging ────────────────────────────────────────────
     postauth_query = "\
-        INSERT INTO radpostauth (username, pass, reply, authdate) \
+        INSERT INTO radpostauth (username, pass, reply, authdate, \"tenantId\") \
         VALUES (\
             '%{SQL-User-Name}', \
             '%{%{User-Password}:-%{Chap-Password}}', \
             '%{reply:Packet-Type}', \
-            NOW())"
+            NOW(), \
+            (SELECT tenant_id FROM ( \
+                SELECT rn.\"tenantId\" AS tenant_id FROM radius_nas rn WHERE (rn.\"nasName\" = '%{NAS-IP-Address}' OR rn.server = '%{NAS-IP-Address}') AND rn.\"tenantId\" IS NOT NULL \
+                UNION \
+                SELECT r.\"tenantId\" AS tenant_id FROM routers r WHERE (r.host = '%{NAS-IP-Address}' OR r.\"wgTunnelIp\" = '%{NAS-IP-Address}') AND r.\"tenantId\" IS NOT NULL \
+             ) resolved_radius_tenant LIMIT 1))"
 }
 EOF
 

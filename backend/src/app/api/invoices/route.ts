@@ -70,6 +70,8 @@ export async function POST(req: NextRequest) {
         }
         const data = parsed.data;
 
+        let invoiceTenantId = userPayload.tenantId ?? null;
+
         // API-002 FIX: Validate that clientId belongs to the requesting tenant.
         if (data.clientId) {
             const client = await db.client.findUnique({ where: { id: data.clientId } });
@@ -77,6 +79,17 @@ export async function POST(req: NextRequest) {
             if (!isSuperAdmin && client.tenantId !== userPayload.tenantId) {
                 return errorResponse("Forbidden: client does not belong to your tenant", 403);
             }
+            if (isSuperAdmin && data.tenantId && data.tenantId !== client.tenantId) {
+                return errorResponse("Forbidden: tenantId does not match invoice client", 403);
+            }
+            invoiceTenantId = client.tenantId;
+        } else if (isSuperAdmin) {
+            if (!data.tenantId) {
+                return errorResponse("tenantId is required when creating an invoice without a client", 400);
+            }
+            const tenant = await db.tenant.findUnique({ where: { id: data.tenantId } });
+            if (!tenant) return errorResponse("Tenant not found", 404);
+            invoiceTenantId = data.tenantId;
         }
 
         const invoiceData: any = {
@@ -85,14 +98,14 @@ export async function POST(req: NextRequest) {
             status: (data.status || "DRAFT") as any,
             dueDate: parseSafeDate(data.dueDate) || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
             issuedDate: parseSafeDate(data.issuedDate) || new Date(),
-            tenantId: userPayload.tenantId ?? null,
+            tenantId: invoiceTenantId,
             items: {
                 create: (data.items || []).map((item: { description: string; quantity: number; unitPrice: number; total: number }) => ({
                     description: item.description,
                     quantity: parseInt(String(item.quantity)),
                     unitPrice: parseFloat(String(item.unitPrice)),
                     total: parseFloat(String(item.total)),
-                    tenantId: userPayload.tenantId ?? null,
+                    tenantId: invoiceTenantId,
                 })),
             },
         };

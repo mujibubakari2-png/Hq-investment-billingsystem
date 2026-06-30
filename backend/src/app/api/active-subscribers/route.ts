@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 import { requirePermission } from "@/lib/rbac";
+import { getTenantFilter } from "@/lib/tenant";
 import { toISOSafe } from "@/lib/dateUtils";
 
 
@@ -12,7 +13,7 @@ export async function GET(req: NextRequest) {
         const userPayload = guard.user;
         const db = getTenantClient(userPayload);
 
-        const tenantFilter = { tenantId: userPayload.tenantId };
+        const { filter: tenantFilter } = getTenantFilter(userPayload);
 
         const { searchParams } = new URL(req.url);
         const search = searchParams.get("search")?.toLowerCase() || "";

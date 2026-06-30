@@ -16,7 +16,7 @@ interface SaasInvoice {
     status: string; // 'PENDING' | 'PAID'
     dueDate: string;
     createdAt: string;
-    displayStatus: 'Paid' | 'Unpaid' | 'Overdue';
+    displayStatus: 'Paid' | 'Unpaid' | 'Overdue' | 'Active' | 'Trial' | 'Suspended';
 }
 
 export default function Invoices() {
@@ -31,9 +31,17 @@ export default function Invoices() {
             const res = await adminInvoicesApi.list();
 
             const mapped = res.map((inv: any) => {
-                let displayStatus: 'Paid' | 'Unpaid' | 'Overdue' = 'Unpaid';
+                let displayStatus: SaasInvoice['displayStatus'] = 'Unpaid';
                 if (inv.status === 'PAID') {
                     displayStatus = 'Paid';
+                } else if (inv.status === 'OVERDUE' || inv.status === 'EXPIRED') {
+                    displayStatus = 'Overdue';
+                } else if (inv.status === 'ACTIVE') {
+                    displayStatus = 'Active';
+                } else if (inv.status === 'TRIALLING') {
+                    displayStatus = 'Trial';
+                } else if (inv.status === 'SUSPENDED' || inv.status === 'CANCELLED') {
+                    displayStatus = 'Suspended';
                 } else if (inv.status === 'PENDING') {
                     if (new Date(inv.dueDate) < new Date()) {
                         displayStatus = 'Overdue';
@@ -142,6 +150,9 @@ export default function Invoices() {
                             <option value="Paid">Paid</option>
                             <option value="Unpaid">Unpaid</option>
                             <option value="Overdue">Overdue</option>
+                            <option value="Active">Active</option>
+                            <option value="Trial">Trial</option>
+                            <option value="Suspended">Suspended</option>
                         </select>
                     </div>
                     <div className="table-toolbar-right">
@@ -169,13 +180,13 @@ export default function Invoices() {
                         <tbody>
                             {loading ? (
                                 <tr>
-                                    <td colSpan={7} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
+                                    <td colSpan={8} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
                                         Loading invoices...
                                     </td>
                                 </tr>
                             ) : filtered.length === 0 ? (
                                 <tr>
-                                    <td colSpan={7} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
+                                    <td colSpan={8} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
                                         No invoices found matching your criteria.
                                     </td>
                                 </tr>
@@ -187,7 +198,7 @@ export default function Invoices() {
                                         <td>{inv.planName}</td>
                                         <td style={{ fontWeight: 600 }}>{inv.amount.toLocaleString()} TZS</td>
                                         <td>
-                                            <span className={`badge ${inv.displayStatus === 'Paid' ? 'active' : inv.displayStatus === 'Overdue' ? 'expired' : 'inactive'}`}>
+                                            <span className={`badge ${inv.displayStatus === 'Paid' || inv.displayStatus === 'Active' ? 'active' : inv.displayStatus === 'Overdue' ? 'expired' : 'inactive'}`}>
                                                 {inv.displayStatus}
                                             </span>
                                         </td>

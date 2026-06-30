@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { settingsApi } from '../api';
+import { loadProviderChannel, saveProviderChannel } from '../utils/paymentChannelConfig';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import SecurityIcon from '@mui/icons-material/Security';
@@ -21,23 +21,22 @@ export default function BankPaymentConfig() {
     const [saved, setSaved] = useState(false);
 
     useEffect(() => {
-        settingsApi.get().then((res: any) => {
-            const data = res.data || res;
-            if (data?.payment_config_bank) {
-                try {
-                    const parsed = JSON.parse(data.payment_config_bank);
-                    if (parsed.paybillNumber) setPaybillNumber(parsed.paybillNumber);
-                    if (parsed.accountNumber) setAccountNumber(parsed.accountNumber);
-                } catch (e) {}
-            }
+        loadProviderChannel('BANK_TRANSFER').then((channel: any) => {
+            if (!channel) return;
+            if (channel.config?.paybillNumber) setPaybillNumber(channel.config.paybillNumber);
+            if (channel.config?.accountNumber) setAccountNumber(channel.config.accountNumber);
+            if (!channel.config?.accountNumber && channel.accountNumber) setAccountNumber(channel.accountNumber);
         }).catch(console.error);
     }, []);
 
     const handleSave = async () => {
         setSaving(true);
         try {
-            await settingsApi.update({
-                payment_config_bank: JSON.stringify({ paybillNumber, accountNumber })
+            await saveProviderChannel({
+                provider: 'BANK_TRANSFER',
+                name: 'Bank Deposit',
+                accountNumber,
+                config: { paybillNumber, accountNumber },
             });
             setSaved(true);
             setTimeout(() => navigate('/payment-channels'), 1500);

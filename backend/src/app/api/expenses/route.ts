@@ -4,6 +4,7 @@ import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { requirePermission } from "@/lib/rbac";
 import { parseSafeDate, toISOSafe } from "@/lib/dateUtils";
 import { ExpenseCreateSchema } from "@/lib/validators";
+import { getAssignTenantId, getTenantFilter } from "@/lib/tenant";
 
 // GET /api/expenses
 export async function GET(req: NextRequest) {
@@ -13,8 +14,7 @@ export async function GET(req: NextRequest) {
         const userPayload = guard.user;
         const db = getTenantClient(userPayload);
 
-        const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
-        const tenantFilter = { tenantId: userPayload.tenantId };
+        const { filter: tenantFilter } = getTenantFilter(userPayload);
 
         const { searchParams } = new URL(req.url);
         const category = searchParams.get("category") || "";
@@ -44,6 +44,7 @@ export async function GET(req: NextRequest) {
             date: Date;
             reference: string | null;
             createdBy: { username: string };
+            tenant?: { name: string } | null;
         }) => ({
             id: e.id,
             category: e.category,
@@ -52,6 +53,7 @@ export async function GET(req: NextRequest) {
             date: toISOSafe(e.date),
             reference: e.reference,
             createdBy: e.createdBy.username,
+            tenantName: e.tenant?.name ?? null,
         }));
 
         return jsonResponse(mapped);
@@ -69,7 +71,6 @@ export async function POST(req: NextRequest) {
         const userPayload = guard.user;
         const db = getTenantClient(userPayload);
 
-        const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
         const body = await req.json();
         const parsed = ExpenseCreateSchema.safeParse(body);
         if (!parsed.success) {
@@ -78,12 +79,13 @@ export async function POST(req: NextRequest) {
         }
         const { category, description, amount, date, reference, receipt } = parsed.data;
 
-        let createdById = body.createdById || body.created_by || userPayload.userId;
+        let createdById: string | undefined = userPayload.userId;
         if (!createdById) {
+            const tenantIdForLookup = getAssignTenantId(userPayload, body.tenantId ?? null);
             const admin = await db.user.findFirst({
                 where: {
                     role: { in: ["ADMIN", "SUPER_ADMIN"] },
-                    ...({ tenantId: userPayload.tenantId })
+                    ...(tenantIdForLookup ? { tenantId: tenantIdForLookup } : {})
                 }
             });
             createdById = admin?.id;
@@ -93,7 +95,8 @@ export async function POST(req: NextRequest) {
             return errorResponse("Creator user ID is required");
         }
 
-        const tenantIdValue = userPayload.tenantId;
+        const creatorId = createdById;
+        const tenantIdValue = getAssignTenantId(userPayload, body.tenantId ?? null);
 
         const expense = await db.expense.create({
             data: {
@@ -103,7 +106,7 @@ export async function POST(req: NextRequest) {
                 date: parseSafeDate(date as any) || new Date(),
                 reference,
                 receipt,
-                createdById,
+                createdById: creatorId,
                 tenantId: tenantIdValue
             },
         });

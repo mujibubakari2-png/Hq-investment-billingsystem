@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { requirePermission } from "@/lib/rbac";
+import { getTenantFilter } from "@/lib/tenant";
 import { getMikroTikService } from "@/lib/mikrotik";
 import { syncRadiusUser } from "@/lib/radius";
 
@@ -12,8 +13,7 @@ export async function POST(req: NextRequest) {
         const userPayload = guard.user;
         const db = getTenantClient(userPayload);
 
-        const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
-        const tenantFilter = { tenantId: userPayload.tenantId };
+        const { filter: tenantFilter } = getTenantFilter(userPayload);
 
         const body = await req.json();
         const { subscriptionIds, durationDays = 30 } = body;
@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
                 const mikrotik = await getMikroTikService(sub.routerId);
                 const pwd = sub.client.phone || "123456";
                 const type = sub.client.serviceType === "HOTSPOT" ? "hotspot" : "pppoe";
-                await mikrotik.activateService(sub.client.username, pwd, sub.package.name, type);
+                await mikrotik.activateService(sub.client.username, pwd, sub.package.name, type, newExpiresDate);
 
                 // Update database
                 await db.subscription.update({
@@ -66,7 +66,8 @@ export async function POST(req: NextRequest) {
                         action: "BULK_EXTEND_SUCCESS",
                         details: `Admin bulk extended ${type} plan ${sub.package.name}`,
                         status: "success",
-                        username: sub.client.username
+                        username: sub.client.username,
+                        tenantId: sub.tenantId,
                     }
                 });
 
@@ -110,7 +111,8 @@ export async function POST(req: NextRequest) {
                             action: "BULK_EXTEND_FAILED",
                             details: `Bulk extend failed: ${err.message}`,
                             status: "error",
-                            username: sub.client.username
+                            username: sub.client.username,
+                            tenantId: sub.tenantId,
                         }
                     });
                 }

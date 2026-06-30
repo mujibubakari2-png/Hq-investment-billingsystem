@@ -104,6 +104,9 @@ export async function GET(
     if (!invoice && !payment) {
       return errorResponse("Payment record not found", 404);
     }
+    if (tenantId && invoice?.tenantId !== tenantId) {
+      return errorResponse("Payment record not found", 404);
+    }
 
     let dbStatus   = payment?.status ?? "PENDING";
     let mappedStatus = STATUS_MAP[dbStatus] ?? dbStatus;
@@ -127,9 +130,12 @@ export async function GET(
         const raw = String(liveStatus.status ?? "").toUpperCase();
 
         if (raw === "COMPLETED" || raw === "PAID") {
-          // Webhook may not have landed yet; PROCESSING is a bridge state.
-          // Frontend keeps polling; DB will flip to COMPLETED once webhook fires.
-          mappedStatus = "PROCESSING";
+          const completion = await paymentService.completeLicenseInvoiceFromStatus(
+            invoice?.invoiceNumber ?? reference,
+            effectiveProviderRef,
+            liveStatus.amount
+          );
+          mappedStatus = completion.completed ? "PAID" : "PROCESSING";
         } else if (raw === "FAILED") {
           mappedStatus = "FAILED";
         } else if (raw === "CANCELLED") {

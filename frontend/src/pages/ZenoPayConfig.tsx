@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { settingsApi, paymentChannelTestApi } from '../api';
+import { paymentChannelTestApi } from '../api';
+import { loadProviderChannel, saveProviderChannel } from '../utils/paymentChannelConfig';
 import { getPublicApiBase } from '../utils/config';
 import SaveIcon from '@mui/icons-material/Save';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
@@ -19,6 +20,7 @@ export default function ZenoPayConfig() {
     const [apiKey, setApiKey] = useState('');
     const [apiUrl, setApiUrl] = useState(ENV_BASE_URL);
     const [showKey, setShowKey] = useState(false);
+    const [hasSavedApiKey, setHasSavedApiKey] = useState(false);
     const [saved, setSaved] = useState(false);
     const [saving, setSaving] = useState(false);
 
@@ -31,21 +33,16 @@ export default function ZenoPayConfig() {
     } | null>(null);
 
     useEffect(() => {
-        settingsApi.get().then((res: any) => {
-            const data = res.data || res;
-            if (data?.payment_config_zenopay) {
-                try {
-                    const parsed = JSON.parse(data.payment_config_zenopay);
-                    if (parsed.apiKey) setApiKey(parsed.apiKey);
-                    if (parsed.apiUrl) setApiUrl(parsed.apiUrl);
-                } catch (e) { }
-            }
+        loadProviderChannel('ZENOPAY').then((channel: any) => {
+            if (!channel) return;
+            setHasSavedApiKey(!!channel.hasApiKey);
+            if (channel.config?.apiUrl) setApiUrl(channel.config.apiUrl);
         }).catch(console.error);
     }, []);
 
     /** Step 1: Validate — calls backend which makes a real HTTP request to ZenoPay */
     const handleValidateAndSave = async () => {
-        if (!apiKey.trim()) {
+        if (!apiKey.trim() && !hasSavedApiKey) {
             setValidationResult({ success: false, message: '❌ API Key is required before saving.' });
             return;
         }
@@ -58,25 +55,30 @@ export default function ZenoPayConfig() {
         setValidationResult(null);
 
         try {
-            const result = await paymentChannelTestApi.test({
+            if (apiKey.trim()) {
+                const result = await paymentChannelTestApi.test({
                 provider: 'ZENOPAY',
                 apiKey: apiKey.trim(),
                 apiUrl: apiUrl.trim(),
-            });
+                });
 
-            const data = (result as any)?.data || result;
-            setValidationResult({ success: data.success, message: data.message, statusCode: data.statusCode });
+                const data = (result as any)?.data || result;
+                setValidationResult({ success: data.success, message: data.message, statusCode: data.statusCode });
 
-            if (!data.success) {
+                if (!data.success) {
                 // Stop here — do not save if API is unreachable/invalid
                 setValidating(false);
                 return;
+                }
             }
 
             // Step 2: Validation passed — now save
             setSaving(true);
-            await settingsApi.update({
-                payment_config_zenopay: JSON.stringify({ apiKey: apiKey.trim(), apiUrl: apiUrl.trim() })
+            await saveProviderChannel({
+                provider: 'ZENOPAY',
+                name: 'ZenoPay',
+                apiKey: apiKey.trim(),
+                apiUrl: apiUrl.trim(),
             });
             setSaved(true);
             setTimeout(() => navigate('/payment-channels'), 2000);

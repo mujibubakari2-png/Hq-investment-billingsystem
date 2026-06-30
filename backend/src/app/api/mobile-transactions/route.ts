@@ -5,6 +5,11 @@ import { requirePermission } from "@/lib/rbac";
 import { getTenantFilter } from "@/lib/tenant";
 import { toISOSafe, toTimestampSafe, getStartOfTodayTZ, getStartOfMonthTZ, getEndOfMonthTZ } from "@/lib/dateUtils";
 
+function formatTransactionStatus(status: unknown) {
+    const raw = typeof status === "string" && status.trim() ? status.trim().toUpperCase() : "PENDING";
+    return raw.charAt(0) + raw.slice(1).toLowerCase();
+}
+
 export async function GET(req: NextRequest) {
     try {
         const guard = requirePermission(req, "transactions:read");
@@ -22,24 +27,14 @@ export async function GET(req: NextRequest) {
             tenantFilter.tenantId = targetTenantId;
         }
 
-        // Fetch settings to determine active gateways scoped by tenantId
-        let gwSetting = await db.systemSetting.findFirst({ where: { key: 'paymentGateways', ...tenantFilter } });
-
-        // Fallback to global setting if no tenant-specific override exists
-        if (!gwSetting && !(isPlatformSuperAdmin || isTenantSuperAdmin)) {
-            gwSetting = await db.systemSetting.findFirst({ where: { key: 'paymentGateways', tenantId: null } });
-        }
-
         let activeGws: string[] = [];
-
-        if (gwSetting?.value) {
-            try {
-                const parsed = JSON.parse(gwSetting.value);
-                if (Array.isArray(parsed)) {
-                    activeGws = parsed.filter((g: any) => g.enabled).map((g: any) => g.name.toLowerCase());
-                }
-            } catch (e) { }
-        }
+        try {
+            const activeChannels = await db.paymentChannel.findMany({
+                where: { status: "ACTIVE", ...tenantFilter },
+                select: { provider: true, name: true },
+            });
+            activeGws = Array.from(new Set(activeChannels.flatMap((ch: any) => [ch.provider, ch.name].filter(Boolean).map((v: string) => v.toLowerCase()))));
+        } catch { }
 
         // Parse URL Query Parameters for server-side pagination and filtering
         const search = searchParams.get("search")?.toLowerCase() || "";
@@ -49,9 +44,9 @@ export async function GET(req: NextRequest) {
         const limitParam = searchParams.get("limit") || "25";
         const limit = limitParam === "All" ? 999999 : parseInt(limitParam);
 
-        // Fetch all transactions scoped by tenantId
+        // Fetch mobile payment transactions scoped by tenantId
         const transactions = await db.transaction.findMany({
-            where: { ...tenantFilter },
+            where: { type: "MOBILE", ...tenantFilter },
             include: { client: { select: { username: true, fullName: true } } },
             orderBy: { createdAt: "desc" },
         });
@@ -64,18 +59,16 @@ export async function GET(req: NextRequest) {
             amount: t.amount,
             type: t.type.charAt(0) + t.type.slice(1).toLowerCase(),
             method: t.method || "Cash",
-            status: t.status.charAt(0) + t.status.slice(1).toLowerCase(),
+            status: formatTransactionStatus(t.status),
             date: toISOSafe(t.createdAt),
             timestamp: toTimestampSafe(t.createdAt),
             expiryDate: toISOSafe(t.expiryDate),
-            reference: t.reference || t.transactionId,
+            reference: t.providerRef || t.reference,
+            transactionId: t.providerRef || t.reference,
+            providerRef: t.providerRef,
         }));
 
-        // Base filter: Strictly match active payment channels
-        const channelTxs = allMapped.filter(tx => {
-            const m = (tx.method || "").toLowerCase();
-            return activeGws.some(g => m.includes(g) || g.includes(m));
-        });
+        const channelTxs = allMapped;
 
         // Compute Summaries (Always computed unconditionally against all channel transactions, unfiltered by search)
         // Fixed: Use timezone-aware boundaries (Africa/Dar_es_Salaam) to match frontend display

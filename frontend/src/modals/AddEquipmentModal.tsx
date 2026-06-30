@@ -27,7 +27,7 @@ export default function AddEquipmentModal({ onClose, onSave }: AddEquipmentModal
 
     return (
         <div className="modal-overlay" onClick={onClose}>
-            <div className="modal" style={{ maxWidth: 600 }} onClick={e => e.stopPropagation()}>
+            <div className="modal modal-md" onClick={e => e.stopPropagation()}>
                 <div className="modal-header">
                     <div className="modal-header-left">
                         <div className="modal-header-icon" style={{ background: 'var(--teal-light)', color: 'var(--teal)' }}>

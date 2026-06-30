@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { settingsApi } from '../api';
+import { paymentChannelsApi } from '../api/financeApi';
 import PaymentIcon from '@mui/icons-material/Payment';
 import SaveIcon from '@mui/icons-material/Save';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
@@ -9,44 +9,62 @@ import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 
 interface Gateway {
     id: string;
+    provider: string;
     name: string;
     description: string;
     isDefault: boolean;
     enabled: boolean;
     number: number;
+    persisted: boolean;
 }
 
+const gatewayCatalog: Gateway[] = [
+    { id: 'BANK_TRANSFER', provider: 'BANK_TRANSFER', name: 'Bank Deposit', description: 'Enable direct bank deposit payments', isDefault: false, enabled: false, number: 1, persisted: false },
+    { id: 'HARAKAPAY', provider: 'HARAKAPAY', name: 'Harakapay', description: 'HarakaPay payment gateway', isDefault: false, enabled: false, number: 2, persisted: false },
+    { id: 'PALMPESA', provider: 'PALMPESA', name: 'Palmpesa', description: 'PalmPesa payment gateway', isDefault: false, enabled: false, number: 3, persisted: false },
+    { id: 'ZENOPAY', provider: 'ZENOPAY', name: 'Zenopay', description: 'ZenoPay payment gateway', isDefault: false, enabled: false, number: 4, persisted: false },
+    { id: 'MONGIKE', provider: 'MONGIKE', name: 'Mongike', description: 'Mongike payment gateway integration', isDefault: false, enabled: false, number: 5, persisted: false },
+];
+
 export default function PaymentChannels() {
-    const [gateways, setGateways] = useState<Gateway[]>([
-        { id: '1', name: 'Bank Deposit', description: 'Enable direct bank deposit payments', isDefault: false, enabled: false, number: 1 },
-        { id: '3', name: 'Harakapay', description: 'Additional payment gateway', isDefault: false, enabled: false, number: 2 },
-        { id: '5', name: 'Palmpesa', description: 'Additional payment gateway', isDefault: true, enabled: false, number: 3 },
-        { id: '6', name: 'Zenopay', description: 'Additional payment gateway', isDefault: false, enabled: false, number: 4 },
-        { id: '7', name: 'Mongike', description: 'Mongike payment gateway integration', isDefault: false, enabled: false, number: 5 },
-    ]);
+    const [gateways, setGateways] = useState<Gateway[]>(gatewayCatalog);
 
     const [saving, setSaving] = useState(false);
 
     useEffect(() => {
-        settingsApi.get().then((res: any) => {
-            const data = res.data || res;
-            if (data?.paymentGateways) {
-                try {
-                    const parsed = JSON.parse(data.paymentGateways);
-                    if (Array.isArray(parsed) && parsed.length > 0) {
-                        setGateways(parsed);
-                    }
-                } catch (e) {
-                    console.error('Failed to parse gateway settings', e);
-                }
-            }
+        paymentChannelsApi.list().then((channels: any) => {
+            const rows = Array.isArray(channels) ? channels : [];
+            const byProvider = new Map(rows.map((ch: any) => [String(ch.provider || '').toUpperCase(), ch]));
+            const merged = gatewayCatalog.map((gw) => {
+                const channel = byProvider.get(gw.provider);
+                if (!channel) return gw;
+                const enabled = String(channel.status || '').toUpperCase() === 'ACTIVE' || channel.status === 'Active';
+                return {
+                    ...gw,
+                    id: channel.id,
+                    name: channel.name || gw.name,
+                    enabled,
+                    isDefault: false,
+                    persisted: true,
+                };
+            });
+            const firstActive = merged.findIndex((gw) => gw.enabled);
+            if (firstActive >= 0) merged[firstActive] = { ...merged[firstActive], isDefault: true };
+            setGateways(merged);
         }).catch(console.error);
     }, []);
 
     const handleSave = async () => {
         setSaving(true);
         try {
-            await settingsApi.update({ paymentGateways: JSON.stringify(gateways) });
+            const unconfiguredEnabled = gateways.filter((gw) => gw.enabled && !gw.persisted);
+            if (unconfiguredEnabled.length > 0) {
+                alert(`Configure ${unconfiguredEnabled.map((gw) => gw.name).join(', ')} before enabling.`);
+                return;
+            }
+            await Promise.all(gateways
+                .filter((gw) => gw.persisted)
+                .map((gw) => paymentChannelsApi.update(gw.id, { status: gw.enabled ? 'ACTIVE' : 'INACTIVE' })));
             alert('Payment channels saved successfully!');
         } catch (err) {
             console.error('Failed to save payment channels', err);
@@ -65,13 +83,10 @@ export default function PaymentChannels() {
             const target = prev.find(p => p.id === id);
             if (!target) return prev;
             const willBeEnabled = !target.enabled;
-            
+
             return prev.map(g => {
                 if (g.id === id) {
-                    return { ...g, enabled: willBeEnabled, isDefault: willBeEnabled };
-                }
-                if (willBeEnabled) {
-                    return { ...g, enabled: false, isDefault: false };
+                    return { ...g, enabled: willBeEnabled, isDefault: willBeEnabled && !prev.some(other => other.id !== id && other.isDefault) };
                 }
                 return g;
             });
@@ -79,17 +94,17 @@ export default function PaymentChannels() {
     };
 
     const setDefault = (id: string) => {
-        setGateways(prev => prev.map(g => ({ ...g, isDefault: g.id === id })));
+        setGateways(prev => prev.map(g => ({ ...g, isDefault: g.id === id && g.enabled })));
     };
 
     const navigate = useNavigate();
 
     const configRoutes: Record<string, string> = {
-        '1': '/bank-payment-config',
-        '3': '/harakapay-config',
-        '5': '/palmpesa-config',
-        '6': '/zenopay-config',
-        '7': '/mongike-config',
+        BANK_TRANSFER: '/bank-payment-config',
+        HARAKAPAY: '/harakapay-config',
+        PALMPESA: '/palmpesa-config',
+        ZENOPAY: '/zenopay-config',
+        MONGIKE: '/mongike-config',
     };
 
     return (
@@ -171,7 +186,7 @@ export default function PaymentChannels() {
                                         </div>
                                     </td>
                                     <td>
-                                        <button onClick={() => navigate(configRoutes[gw.id])} style={{
+                                        <button onClick={() => navigate(configRoutes[gw.provider])} style={{
                                             background: 'transparent', border: 'none', cursor: 'pointer',
                                             color: '#ef4444', fontSize: '1.1rem',
                                         }}>

@@ -3,6 +3,7 @@ import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 import { requirePermission } from "@/lib/rbac";
 import { suspendRadiusUser } from "@/lib/radius";
+import { getTenantFilter } from "@/lib/tenant";
 import { toISOSafe } from "@/lib/dateUtils";
 
 /**
@@ -25,7 +26,7 @@ export async function POST(req: NextRequest) {
         const userPayload = guard.user;
         const db = getTenantClient(userPayload);
 
-        const tenantFilter = { tenantId: userPayload.tenantId };
+        const { filter: tenantFilter } = getTenantFilter(userPayload);
         const now = new Date();
 
         // 1. Find all ACTIVE voucher subscriptions that have expired
@@ -39,6 +40,7 @@ export async function POST(req: NextRequest) {
             },
             select: {
                 id: true,
+                tenantId: true,
                 expiresAt: true,
                 client: {
                     select: { username: true },
@@ -69,7 +71,7 @@ export async function POST(req: NextRequest) {
 
                 // 3. Suspend the user in RADIUS — sets Expiration to past
                 //    so FreeRADIUS immediately rejects new auth attempts
-                await suspendRadiusUser(username, tenantFilter.tenantId ?? null);
+                await suspendRadiusUser(username, sub.tenantId ?? null);
 
                 results.push({ username, status: "expired" });
             } catch (err) {
@@ -109,7 +111,7 @@ export async function GET(req: NextRequest) {
         const userPayload = guard.user;
         const db = getTenantClient(userPayload);
 
-        const tenantFilter = { tenantId: userPayload.tenantId };
+        const { filter: tenantFilter } = getTenantFilter(userPayload);
         const now = new Date();
 
         // Use select-only (never mix include + select — Prisma disallows it)
@@ -122,6 +124,7 @@ export async function GET(req: NextRequest) {
             },
             select: {
                 id: true,
+                tenantId: true,
                 expiresAt: true,
                 method: true,
                 client: {

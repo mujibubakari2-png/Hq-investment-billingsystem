@@ -3,6 +3,7 @@ import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 import { getTenantFilter } from "@/lib/tenant";
 import { requirePermission } from "@/lib/rbac";
+import { backfillRadiusAccountingTenants } from "@/lib/radiusTenant";
 import { exec } from "child_process";
 import { promisify } from "util";
 
@@ -15,15 +16,18 @@ export async function GET(req: NextRequest) {
         if (guard.error) return guard.error;
         const userPayload = guard.user;
         const db = getTenantClient(userPayload);
+        const globalDb = getTenantClient(null);
 
         const { filter } = getTenantFilter(userPayload);
+        await backfillRadiusAccountingTenants(globalDb);
 
         // ── 1. Database checks ────────────────────────────────────────────────
-        const [radcheckCount, nasCount, activeSessionCount, radreplyCount] = await Promise.all([
+        const [radcheckCount, nasCount, activeSessionCount, radreplyCount, unmappedActiveSessionCount] = await Promise.all([
             db.radCheck.count({ where: { ...filter } }),
             db.radiusNas.count({ where: { ...filter } }),
             db.radAcct.count({ where: { acctstoptime: null, ...filter } }),
             db.radReply.count({ where: { ...filter } }),
+            globalDb.radAcct.count({ where: { acctstoptime: null, tenantId: null } }),
         ]);
 
         // ── 2. FreeRADIUS process check (server-side) ─────────────────────────
@@ -94,6 +98,13 @@ export async function GET(req: NextRequest) {
             );
         }
 
+        if (unmappedActiveSessionCount > 0) {
+            warnings.push(
+                `${unmappedActiveSessionCount} active RADIUS accounting session(s) are not mapped to any tenant. ` +
+                "Add the MikroTik NAS IP under RADIUS NAS Clients or ensure router host/wgTunnelIp matches NAS-IP-Address."
+            );
+        }
+
         // ── 5. Build status ───────────────────────────────────────────────────
         const overallStatus =
             freeradiusRunning && nasCount > 0 && radcheckCount > 0
@@ -115,6 +126,7 @@ export async function GET(req: NextRequest) {
                 radreplyEntries: radreplyCount,
                 nasClients: nasCount,
                 activeSessions: activeSessionCount,
+                unmappedActiveSessions: unmappedActiveSessionCount,
             },
             warnings,
             fixCommand: freeradiusRunning

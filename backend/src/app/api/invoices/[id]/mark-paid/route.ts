@@ -164,7 +164,7 @@ export async function POST(
                     const mt = await getMikroTikService(pkg.routerId, invoice.tenantId);
                     const pwd = client.phone || "123456";
                     const type = client.serviceType === "HOTSPOT" ? "hotspot" : "pppoe";
-                    await mt.activateService(client.username, pwd, pkg.name, type, new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000));
+                    await mt.activateService(client.username, pwd, pkg.name, type, expiresAt);
                     if (newSub?.id) {
                         await db.subscription.update({
                             where: { id: newSub.id },

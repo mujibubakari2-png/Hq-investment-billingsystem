@@ -101,6 +101,9 @@ export async function POST(req: NextRequest) {
             });
 
             if (!invoice) return errorResponse("Invoice not found", 404);
+            if (invoice.status === "PAID") {
+                return errorResponse("Invoice is already paid", 409);
+            }
 
             await db.$transaction(async (tx) => {
                 await tx.tenantInvoice.update({

@@ -10,10 +10,32 @@ export const transactionsApi = {
     delete: (id: string)                    => del<{ message: string }>(`/transactions/${id}`),
 };
 
+export interface MobileTransactionEntry {
+    id: string;
+    user: string;
+    planName?: string | null;
+    plan?: string | null;
+    planId?: string | null;
+    amount: number;
+    type: string;
+    method: string;
+    status: string;
+    date: string | null;
+    timestamp: number | null;
+    expiryDate: string | null;
+    reference: string | null;
+    transactionId: string | null;
+    providerRef: string | null;
+}
+
 export const mobileTransactionsApi = {
     list: (params?: Record<string, string | number>) => {
-        const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
-        return get<{ data: Record<string, unknown>[]; total: number; activeGateways: string[]; summaries: Record<string, unknown> }>(`/mobile-transactions${qs}`);
+        const qs = params
+            ? '?' + new URLSearchParams(
+                Object.entries(params).map(([key, value]) => [key, String(value)])
+            ).toString()
+            : '';
+        return get<{ data: MobileTransactionEntry[]; total: number; activeGateways: string[]; summaries: Record<string, unknown> }>(`/mobile-transactions${qs}`);
     },
 };
 

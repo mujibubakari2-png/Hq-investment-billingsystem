@@ -62,6 +62,7 @@ export async function GET(
         tenantId:   true,
         clientId:   true,
         expiryDate: true,
+        providerRef: true,
         client: {
           select: { id: true, username: true },  // phone/macAddress NOT selected — privacy
         },
@@ -116,18 +117,34 @@ export async function GET(
       // ── Live provider poll (optional) ─────────────────────────────────────
       // ISOLATION: use the transaction's tenantId to load the TENANT channel.
       // Never use null (platform channel) for a tenant transaction live poll.
-      if (providerParam && providerRef && isSupportedProvider(providerParam)) {
+      const effectiveProviderRef = providerRef ?? transaction.providerRef;
+      if (providerParam && effectiveProviderRef && isSupportedProvider(providerParam)) {
         try {
           const liveStatus = await paymentService.checkStatus(
             providerParam.toUpperCase(),
-            providerRef,
+            effectiveProviderRef,
             transaction.tenantId   // ← tenant's own channel, not platform channel
           );
 
           baseResponse.liveStatus = liveStatus.status;
 
           if (liveStatus.status === "COMPLETED") {
-            baseResponse.message = "Payment confirmed by provider — processing...";
+            const completion = await paymentService.completeTenantTransactionFromStatus(
+              reference,
+              providerParam.toUpperCase(),
+              effectiveProviderRef,
+              liveStatus.amount
+            );
+
+            if (completion.completed) {
+              baseResponse.status = "COMPLETED";
+              baseResponse.username = completion.username ?? transaction.client?.username ?? null;
+              baseResponse.expiresAt = completion.expiresAt?.toISOString() ?? transaction.expiryDate?.toISOString() ?? null;
+              baseResponse.autoConnect = true;
+              baseResponse.message = "Payment confirmed! You can now connect.";
+            } else {
+              baseResponse.message = completion.message || "Payment confirmed by provider - processing...";
+            }
           } else if (liveStatus.status === "FAILED") {
             baseResponse.message = "Payment failed. Please try again.";
           }

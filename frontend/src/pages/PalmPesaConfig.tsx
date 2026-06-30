@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { settingsApi, paymentChannelTestApi } from '../api';
+import { paymentChannelTestApi } from '../api';
+import { loadProviderChannel, saveProviderChannel } from '../utils/paymentChannelConfig';
 import { getPublicApiBase } from '../utils/config';
 import SaveIcon from '@mui/icons-material/Save';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
@@ -22,6 +23,7 @@ export default function PalmPesaConfig() {
     const [apiUrl, setApiUrl] = useState(ENV_BASE_URL);
     const [showToken, setShowToken] = useState(false);
     const [showSecret, setShowSecret] = useState(false);
+    const [hasSavedApiKey, setHasSavedApiKey] = useState(false);
     const [saved, setSaved] = useState(false);
     const [saving, setSaving] = useState(false);
 
@@ -34,22 +36,17 @@ export default function PalmPesaConfig() {
     } | null>(null);
 
     useEffect(() => {
-        settingsApi.get().then((res: any) => {
-            const data = res.data || res;
-            if (data?.payment_config_palmpesa) {
-                try {
-                    const parsed = JSON.parse(data.payment_config_palmpesa);
-                    if (parsed.apiKey) setApiKey(parsed.apiKey);
-                    if (parsed.apiToken) setApiToken(parsed.apiToken);
-                    if (parsed.secretKey) setSecretKey(parsed.secretKey);
-                    if (parsed.apiUrl) setApiUrl(parsed.apiUrl);
-                } catch (e) { }
-            }
+        loadProviderChannel('PALMPESA').then((channel: any) => {
+            if (!channel) return;
+            setHasSavedApiKey(!!channel.hasApiKey);
+            if (channel.hasApiSecret) setApiToken('');
+            if (channel.hasWebhookSecret) setSecretKey('');
+            if (channel.config?.apiUrl) setApiUrl(channel.config.apiUrl);
         }).catch(console.error);
     }, []);
 
     const handleValidateAndSave = async () => {
-        if (!apiKey.trim()) {
+        if (!apiKey.trim() && !hasSavedApiKey) {
             setValidationResult({ success: false, message: '❌ API Account ID is required before saving.' });
             return;
         }
@@ -62,30 +59,32 @@ export default function PalmPesaConfig() {
         setValidationResult(null);
 
         try {
-            const result = await paymentChannelTestApi.test({
-                provider: 'PALMPESA',
-                apiKey: apiKey.trim(),
-                apiUrl: apiUrl.trim(),
-                // apiToken used as apiSecret for PalmPesa
-                apiSecret: apiToken.trim() || undefined,
-            });
+            if (apiKey.trim()) {
+                const result = await paymentChannelTestApi.test({
+                    provider: 'PALMPESA',
+                    apiKey: apiKey.trim(),
+                    apiUrl: apiUrl.trim(),
+                    // apiToken used as apiSecret for PalmPesa
+                    apiSecret: apiToken.trim() || undefined,
+                });
 
-            const data = (result as any)?.data || result;
-            setValidationResult({ success: data.success, message: data.message, statusCode: data.statusCode });
+                const data = (result as any)?.data || result;
+                setValidationResult({ success: data.success, message: data.message, statusCode: data.statusCode });
 
-            if (!data.success) {
-                setValidating(false);
-                return;
+                if (!data.success) {
+                    setValidating(false);
+                    return;
+                }
             }
 
             setSaving(true);
-            await settingsApi.update({
-                payment_config_palmpesa: JSON.stringify({
-                    apiKey: apiKey.trim(),
-                    apiToken: apiToken.trim(),
-                    secretKey: secretKey.trim(),
-                    apiUrl: apiUrl.trim(),
-                })
+            await saveProviderChannel({
+                provider: 'PALMPESA',
+                name: 'PalmPesa',
+                apiKey: apiKey.trim(),
+                apiSecret: apiToken.trim(),
+                webhookSecret: secretKey.trim(),
+                apiUrl: apiUrl.trim(),
             });
             setSaved(true);
             setTimeout(() => navigate('/payment-channels'), 2000);

@@ -103,6 +103,7 @@ export const InvoiceItemSchema = z.object({
 export const InvoiceCreateSchema = z.object({
   invoiceNumber: z.string().optional(),
   clientId: z.string().optional(),
+  tenantId: z.string().optional(),
   amount: z.number().min(0),
   status: z.enum(['PAID', 'UNPAID', 'OVERDUE', 'DRAFT']).optional(),
   dueDate: z.string().optional(),

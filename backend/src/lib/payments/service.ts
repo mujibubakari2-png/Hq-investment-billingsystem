@@ -221,6 +221,303 @@ export class PaymentService {
    * credentials are isolated and are only ever compared against that tenant's own
    * channel, never cross-applied to another tenant or to the platform.
    */
+  async completeTenantTransactionFromStatus(
+    reference: string,
+    providerName: string,
+    providerRef?: string | null,
+    paidAmount?: number
+  ): Promise<{ completed: boolean; status?: string; message: string; expiresAt?: Date | null; username?: string | null }> {
+    const globalDb = getTenantClient(null);
+    const transaction = await (globalDb.transaction.findFirst as any)({
+      where: {
+        reference,
+        type: "MOBILE",
+        tenantId: { not: null },
+      },
+      include: { client: true, invoice: true },
+    }) as any;
+
+    if (!transaction) {
+      return { completed: false, message: "Transaction not found" };
+    }
+    if (!transaction.tenantId) {
+      return { completed: false, message: "Tenant transaction is missing tenantId" };
+    }
+    if (transaction.status === "COMPLETED") {
+      return {
+        completed: true,
+        status: "COMPLETED",
+        message: "Already completed",
+        expiresAt: transaction.expiryDate ?? null,
+        username: transaction.client?.username ?? null,
+      };
+    }
+
+    const db = getTenantClient(transaction.tenantId);
+
+    if (paidAmount !== undefined && paidAmount < transaction.amount) {
+      await db.transaction.update({
+        where: { id: transaction.id },
+        data: { status: "FAILED" },
+      });
+      return { completed: false, status: "FAILED", message: "Payment amount does not match transaction amount" };
+    }
+
+    const pkg = await db.package.findFirst({
+      where: transaction.packageId
+        ? { id: transaction.packageId, tenantId: transaction.tenantId }
+        : { name: transaction.planName ?? "", tenantId: transaction.tenantId },
+    });
+
+    let duplicateDetected = false;
+    const result = await db.$transaction(async (tx: any) => {
+      const now = new Date();
+      let baseDate = now;
+
+      if (pkg) {
+        const existingActiveSub = await tx.subscription.findFirst({
+          where: { clientId: transaction.clientId, packageId: pkg.id, status: "ACTIVE", expiresAt: { gt: now } },
+          orderBy: { expiresAt: "desc" },
+        });
+        if (existingActiveSub) baseDate = existingActiveSub.expiresAt;
+      }
+
+      const expiresAt = new Date(baseDate);
+      if (pkg) {
+        switch (pkg.durationUnit) {
+          case "MINUTES": expiresAt.setMinutes(expiresAt.getMinutes() + pkg.duration); break;
+          case "HOURS": expiresAt.setHours(expiresAt.getHours() + pkg.duration); break;
+          case "DAYS": expiresAt.setDate(expiresAt.getDate() + pkg.duration); break;
+          case "MONTHS": expiresAt.setMonth(expiresAt.getMonth() + pkg.duration); break;
+        }
+      }
+
+      const updateResult = await tx.transaction.updateMany({
+        where: { id: transaction.id, status: { not: "COMPLETED" } },
+        data: {
+          status: "COMPLETED",
+          expiryDate: expiresAt,
+          ...(providerRef ? { providerRef } : {}),
+          method: providerName.toUpperCase(),
+        },
+      });
+
+      if (updateResult.count === 0) {
+        duplicateDetected = true;
+        return { sub: null, expiresAt };
+      }
+
+      if ((transaction as any).invoiceId) {
+        await (tx.invoice.update as any)({
+          where: { id: (transaction as any).invoiceId },
+          data: { status: "PAID", paidAt: now, transactionId: transaction.id },
+        });
+      }
+
+      let sub = null;
+      if (pkg) {
+        const existingSub = await tx.subscription.findFirst({
+          where: { clientId: transaction.clientId, packageId: pkg.id, status: "ACTIVE" },
+        });
+        if (existingSub) {
+          sub = await tx.subscription.update({
+            where: { id: existingSub.id },
+            data: { expiresAt, updatedAt: new Date(), syncStatus: "PENDING", onlineStatus: "ONLINE" },
+          });
+        } else {
+          sub = await tx.subscription.create({
+            data: {
+              clientId: transaction.clientId,
+              packageId: pkg.id,
+              routerId: pkg.routerId ?? undefined,
+              status: "ACTIVE",
+              method: "MOBILE",
+              activatedAt: now,
+              expiresAt,
+              onlineStatus: "ONLINE",
+              syncStatus: "PENDING",
+              tenantId: transaction.tenantId,
+            },
+          });
+        }
+      }
+
+      await tx.client.update({ where: { id: transaction.clientId }, data: { status: "ACTIVE" } });
+      return { sub, expiresAt };
+    });
+
+    if (duplicateDetected) {
+      return {
+        completed: true,
+        status: "COMPLETED",
+        message: "Already processed concurrently",
+        expiresAt: result.expiresAt,
+        username: transaction.client?.username ?? null,
+      };
+    }
+
+    const { sub: newSub } = result;
+
+    if (pkg) {
+      try {
+        const client = transaction.client;
+        let rateLimit: string | undefined;
+        if (pkg.uploadSpeed && pkg.downloadSpeed) {
+          const ul = pkg.uploadUnit === "Mbps" ? "M" : "k";
+          const dl = pkg.downloadUnit === "Mbps" ? "M" : "k";
+          rateLimit = `${pkg.uploadSpeed}${ul}/${pkg.downloadSpeed}${dl}`;
+        }
+        await syncRadiusUser({
+          username: client.username,
+          password: client.phone || client.username,
+          tenantId: pkg.tenantId || null,
+          fullName: client.fullName || undefined,
+          expiresAt: (newSub as any)?.expiresAt ?? result.expiresAt,
+          status: "Active",
+          rateLimit,
+          profileName: pkg.name,
+        });
+      } catch (radErr) {
+        console.error(`[PAYMENT SERVICE] RADIUS sync failed during status completion:`, radErr);
+        if (newSub?.id) {
+          await db.subscription.update({
+            where: { id: newSub.id },
+            data: { syncStatus: "PENDING_RADIUS_SYNC" },
+          }).catch((e) => console.error("[PAYMENT SERVICE] Failed to mark PENDING_RADIUS_SYNC:", e));
+        }
+      }
+    }
+
+    if (pkg?.routerId) {
+      try {
+        const mikrotik = await getMikroTikService(pkg.routerId);
+        const client = transaction.client;
+        const pwd = client.phone || "123456";
+        const type = client.serviceType === "HOTSPOT" ? "hotspot" : "pppoe";
+        await mikrotik.activateService(client.username, pwd, pkg.name, type, (newSub as any)?.expiresAt ?? result.expiresAt);
+        if (newSub?.id) {
+          await db.subscription.update({ where: { id: newSub.id }, data: { syncStatus: "SYNCED" } });
+        }
+        await db.routerLog.create({
+          data: {
+            routerId: pkg.routerId,
+            action: "PAYMENT_STATUS_ACTIVATED",
+            details: `${providerName} status confirmed: ${reference}`,
+            status: "success",
+            username: transaction.client.username,
+            tenantId: transaction.tenantId,
+          },
+        });
+      } catch (mkErr: unknown) {
+        const msg = mkErr instanceof Error ? mkErr.message : "Unknown";
+        console.error(`[PAYMENT SERVICE] MikroTik activation failed during status completion:`, msg);
+        await db.routerLog.create({
+          data: {
+            routerId: pkg.routerId,
+            action: "PAYMENT_STATUS_ACTIVATION_FAILED",
+            details: msg,
+            status: "error",
+            username: transaction.client.username,
+            tenantId: transaction.tenantId,
+          },
+        }).catch(() => {});
+      }
+    }
+
+    return {
+      completed: true,
+      status: "COMPLETED",
+      message: "Payment processed successfully",
+      expiresAt: (newSub as any)?.expiresAt ?? result.expiresAt,
+      username: transaction.client?.username ?? null,
+    };
+  }
+
+  async completeLicenseInvoiceFromStatus(
+    invoiceNumber: string,
+    providerRef?: string | null,
+    paidAmount?: number
+  ): Promise<{ completed: boolean; status?: string; message: string; expiresAt?: Date | null }> {
+    const globalDb = getTenantClient(null);
+    const invoice = await globalDb.tenantInvoice.findFirst({
+      where: providerRef
+        ? { OR: [{ invoiceNumber }, { providerRef }] } as any
+        : { invoiceNumber },
+      include: {
+        payments: { orderBy: { createdAt: "desc" }, take: 1 },
+        tenant: { include: { plan: true } },
+      },
+    }) as any;
+
+    if (!invoice) {
+      return { completed: false, message: "License invoice not found" };
+    }
+    if (invoice.status === "PAID") {
+      return { completed: true, status: "COMPLETED", message: "License invoice already paid", expiresAt: invoice.tenant?.licenseExpiresAt ?? null };
+    }
+    if (paidAmount !== undefined && paidAmount < invoice.amount) {
+      const tenantPayment = invoice.payments?.[0] ?? null;
+      if (tenantPayment) {
+        await globalDb.tenantPayment.update({
+          where: { id: tenantPayment.id },
+          data: { status: "FAILED" },
+        }).catch(() => {});
+      }
+      return { completed: false, status: "FAILED", message: "Payment amount does not match invoice amount" };
+    }
+
+    const now = new Date();
+    const packageMonths: number = invoice.packageMonths ?? 1;
+    const currentExpiry = invoice.tenant?.licenseExpiresAt
+      ? new Date(invoice.tenant.licenseExpiresAt)
+      : now;
+    const baseExpiry = currentExpiry < now ? now : currentExpiry;
+    const newExpiry = new Date(baseExpiry);
+    newExpiry.setMonth(newExpiry.getMonth() + packageMonths);
+    const tenantPayment = invoice.payments?.[0] ?? null;
+
+    await globalDb.$transaction(async (tx: any) => {
+      await tx.tenantInvoice.update({
+        where: { id: invoice.id },
+        data: {
+          status: "PAID",
+          ...(providerRef ? { providerRef } : {}),
+        },
+      });
+
+      if (tenantPayment) {
+        await tx.tenantPayment.update({
+          where: { id: tenantPayment.id },
+          data: {
+            status: "COMPLETED",
+            ...(providerRef ? { transactionId: providerRef } : {}),
+          },
+        });
+      } else {
+        await tx.tenantPayment.create({
+          data: {
+            invoiceId: invoice.id,
+            tenantId: invoice.tenantId,
+            amount: invoice.amount,
+            transactionId: providerRef ?? null,
+            status: "COMPLETED",
+            paymentMethod: "UNKNOWN",
+          },
+        });
+      }
+
+      await tx.tenant.update({
+        where: { id: invoice.tenantId },
+        data: {
+          licenseExpiresAt: newExpiry,
+          status: "ACTIVE",
+        },
+      });
+    });
+
+    return { completed: true, status: "COMPLETED", message: "License renewed successfully", expiresAt: newExpiry };
+  }
+
   private async resolveWebhookChannel(
     providerName: string,
     headers: Record<string, string | string[] | undefined>,

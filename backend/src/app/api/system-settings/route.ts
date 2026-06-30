@@ -2,6 +2,8 @@ import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 import { requirePermission } from "@/lib/rbac";
+
+const BLOCKED_SETTING_KEYS = new Set(["paymentGateways"]);
 // GET /api/settings — all roles can read (branding, company name, etc.)
 export async function GET(req: NextRequest) {
     try {
@@ -22,6 +24,7 @@ export async function GET(req: NextRequest) {
 
         const mapped: Record<string, string> = {};
         settings.forEach((s) => {
+            if (BLOCKED_SETTING_KEYS.has(s.key)) return;
             mapped[s.key] = s.value;
         });
         return jsonResponse(mapped);
@@ -43,6 +46,9 @@ export async function PUT(req: NextRequest) {
         const body = await req.json();
 
         for (const [key, value] of Object.entries(body)) {
+            if (BLOCKED_SETTING_KEYS.has(key)) {
+                return errorResponse(`${key} is managed by Payment Channels`, 400);
+            }
             const existing = await db.systemSetting.findFirst({
                 where: { key, tenantId: tenantIdValue }
             });

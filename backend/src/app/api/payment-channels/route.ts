@@ -67,6 +67,7 @@ export async function GET(req: NextRequest) {
                 hasApiKey: !!decrypted.apiKey,
                 hasApiSecret: !!decrypted.apiSecret,
                 hasWebhookSecret: !!decrypted.webhookSecret,
+                config: ch.config ?? null,
                 tenantId: platformAdmin ? ch.tenantId : undefined,
                 tenantName: platformAdmin ? ch.tenant?.name : undefined,
             };

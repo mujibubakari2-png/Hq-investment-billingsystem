@@ -4,7 +4,7 @@ import AddIcon from '@mui/icons-material/Add';
 import SearchIcon from '@mui/icons-material/Search';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import DeleteIcon from '@mui/icons-material/Delete';
-import { transactionsApi, voucherCodesApi, settingsApi } from '../api';
+import { transactionsApi, voucherCodesApi } from '../api';
 import type { Transaction } from '../types';
 import AddTransactionModal from '../modals/AddTransactionModal';
 import ViewTransactionModal from '../modals/ViewTransactionModal';
@@ -45,29 +45,10 @@ export default function AllTransactions() {
     const fetchTransactions = async () => {
         setLoading(true);
         try {
-            const [txRes, vRes, settingsRes] = await Promise.all([
-                transactionsApi.list(),
-                voucherCodesApi.list(),
-                settingsApi.get()
+            const [txRes, vRes] = await Promise.all([
+                transactionsApi.list({ limit: 'All' }),
+                voucherCodesApi.list()
             ]);
-
-            // Parse settings to get active gateways
-            const settingsData = settingsRes as Record<string, string>;
-            let activeGws: string[] = [];
-            const paymentGatewaysStr = settingsData['paymentGateways'] || settingsData['payment_gateways'];
-            if (typeof paymentGatewaysStr === 'string' && paymentGatewaysStr) {
-                try {
-                    const parsed = JSON.parse(paymentGatewaysStr);
-                    if (Array.isArray(parsed)) {
-                        activeGws = parsed
-                            .filter((g: Record<string, unknown>) => g.enabled)
-                            .map((g: Record<string, unknown>) => String(g.name));
-                    }
-                } catch (e) {
-                    // Ignore parsing errors
-                }
-            }
-            setAvailableMethods(activeGws);
 
             const txs = (txRes.data || []) as unknown as Transaction[];
             const vs = (vRes.data || []) as unknown as Record<string, unknown>[];
@@ -92,20 +73,8 @@ export default function AllTransactions() {
                 };
             });
 
-            // Filter out transactions that aren't from activated payment channels (or manual/vouchers)
-            // User requested: "all vouchers and all transaction which payed from any payment channel which is configured and activated"
             let combined = [...txs, ...mappedVouchers];
-
-            // Clean up old transactions using disabled methods if specifically needed. 
-            // We'll trust that the user wants everything from the active gateways + manual + vouchers.
-            const validMethodsUpper = [...activeGws.map(g => g.toUpperCase()), 'VOUCHER', 'MANUAL'];
-            combined = combined.filter(tx => {
-                if (tx.method) {
-                    return validMethodsUpper.includes(tx.method.toUpperCase()) ||
-                        validMethodsUpper.some(m => tx.method.toUpperCase().includes(m));
-                }
-                return true;
-            });
+            setAvailableMethods(Array.from(new Set(combined.map(tx => tx.method).filter(Boolean))));
 
             // Sort newest first logically and perfectly deterministically!
             combined.sort((a: any, b: any) => {

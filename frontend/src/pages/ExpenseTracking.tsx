@@ -67,9 +67,14 @@ export default function ExpenseTracking() {
         }
     };
 
+    const now = new Date();
     const totalExpenses = expenses.reduce((sum, exp) => sum + exp.amount, 0);
-    const pendingAmount = expenses.reduce((sum, exp) => sum + (exp.status?.toLowerCase() === 'pending' ? exp.amount : 0), 0);
-    const thisMonthAmount = totalExpenses;
+    const thisMonthAmount = expenses.reduce((sum, exp) => {
+        const d = new Date(exp.date);
+        return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()
+            ? sum + exp.amount
+            : sum;
+    }, 0);
 
     return (
         <div>
@@ -115,8 +120,8 @@ export default function ExpenseTracking() {
                     <div className="stat-card-value">{thisMonthAmount.toLocaleString()}</div>
                 </div>
                 <div className="stat-card orange">
-                    <div className="stat-card-label">Pending</div>
-                    <div className="stat-card-value">{pendingAmount.toLocaleString()}</div>
+                    <div className="stat-card-label">Records</div>
+                    <div className="stat-card-value">{expenses.length.toLocaleString()}</div>
                 </div>
             </div>
 
@@ -129,20 +134,19 @@ export default function ExpenseTracking() {
                                 <th>Category</th>
                                 <th>Amount (TZS)</th>
                                 <th>Date</th>
-                                <th>Status</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             {loading ? (
                                 <tr>
-                                    <td colSpan={6} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
+                                    <td colSpan={5} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
                                         Loading expenses...
                                     </td>
                                 </tr>
                             ) : expenses.length === 0 ? (
                                 <tr>
-                                    <td colSpan={6} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
+                                    <td colSpan={5} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
                                         No expenses found.
                                     </td>
                                 </tr>
@@ -153,7 +157,6 @@ export default function ExpenseTracking() {
                                         <td><span className="badge active">{exp.category}</span></td>
                                         <td>{exp.amount.toLocaleString()}</td>
                                         <td>{formatDate(exp.date)}</td>
-                                        <td><span className={`badge ${(exp.status || 'approved').toLowerCase() === 'approved' ? 'active' : 'pending'}`}>{exp.status || 'Approved'}</span></td>
                                         <td>
                                             <div className="table-actions">
                                                 <button className="btn-icon edit" title="Edit" onClick={() => setEditExpense(exp)}><EditIcon style={{ fontSize: 16 }} /></button>

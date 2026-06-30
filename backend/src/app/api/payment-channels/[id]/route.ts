@@ -46,6 +46,13 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
             },
         });
 
+        if (channel.tenantId && existing.provider !== channel.provider) {
+            await db.tenantPaymentGateway.updateMany({
+                where: { tenantId: channel.tenantId, provider: existing.provider },
+                data: { enabled: false, status: "INACTIVE" },
+            });
+        }
+
         if (channel.tenantId) {
             await db.tenantPaymentGateway.upsert({
                 where: {

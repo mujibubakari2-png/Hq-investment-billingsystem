@@ -2,6 +2,8 @@ import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 import { buildHotspotPortalFeedback } from "@/lib/hotspotFlow";
+import { paymentService } from "@/lib/payments/service";
+import { isSupportedProvider } from "@/lib/payments/registry";
 
 /**
  * GET /api/hotspot/status?reference=HP-XXXXX
@@ -17,6 +19,8 @@ export async function GET(req: NextRequest) {
         const { searchParams } = new URL(req.url);
         const reference = searchParams.get("reference");
         const routerId = searchParams.get("routerId") || searchParams.get("router_id");
+        const providerParam = searchParams.get("provider");
+        const providerRefParam = searchParams.get("providerRef") || searchParams.get("checkoutRequestId");
 
         if (!reference) {
             return errorResponse("Reference is required", 400);
@@ -57,6 +61,33 @@ export async function GET(req: NextRequest) {
 
         if (!transaction) {
             return errorResponse("Transaction not found", 404);
+        }
+
+        if (transaction.status === "PENDING") {
+            const providerName = (providerParam || transaction.method || "").toUpperCase();
+            const providerRef = providerRefParam || transaction.providerRef;
+            if (providerName && providerRef && isSupportedProvider(providerName)) {
+                try {
+                    const liveStatus = await paymentService.checkStatus(providerName, providerRef, router.tenantId);
+                    if (liveStatus.status === "COMPLETED") {
+                        await paymentService.completeTenantTransactionFromStatus(
+                            reference,
+                            providerName,
+                            providerRef,
+                            liveStatus.amount
+                        );
+                        transaction.status = "COMPLETED";
+                    } else if (liveStatus.status === "FAILED" || liveStatus.status === "EXPIRED") {
+                        await db.transaction.update({
+                            where: { id: transaction.id },
+                            data: { status: liveStatus.status },
+                        });
+                        transaction.status = liveStatus.status;
+                    }
+                } catch (pollErr) {
+                    console.warn("[HOTSPOT STATUS] Live provider poll failed:", pollErr);
+                }
+            }
         }
 
         // Build response

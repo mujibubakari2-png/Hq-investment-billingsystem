@@ -48,7 +48,7 @@ export const createUserSchema = z.object({
 // Transaction validation schemas
 export const createTransactionSchema = z.object({
     clientId: z.string().min(1, 'Client ID is required'),
-    amount: z.number().min(0, 'Amount must be positive'),
+    amount: z.number().positive('Amount must be greater than zero'),
     type: z.enum(['MANUAL', 'MOBILE', 'VOUCHER']),
     method: z.string().min(1, 'Payment method is required'),
     reference: z.string().min(1, 'Reference is required'),

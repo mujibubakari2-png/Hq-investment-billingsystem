@@ -21,11 +21,18 @@ export default function Reports() {
             ]);
 
             let totalExpenses = 0;
+            let monthlyExpenses = 0;
             const expensesByCategory: Record<string, number> = {};
+            const now = new Date();
+            const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
             expensesData.forEach((exp: any) => {
                 const amount = Number(exp.amount) || 0;
                 totalExpenses += amount;
+                const expenseDate = exp.date ? new Date(exp.date) : null;
+                if (expenseDate && !Number.isNaN(expenseDate.getTime()) && expenseDate >= monthStart) {
+                    monthlyExpenses += amount;
+                }
                 const cat = exp.category || 'OTHER';
                 expensesByCategory[cat] = (expensesByCategory[cat] || 0) + amount;
             });
@@ -33,6 +40,7 @@ export default function Reports() {
             setReportData({
                 ...dashData,
                 totalExpenses,
+                monthlyExpenses,
                 expensesByCategory
             });
         } catch (err) {
@@ -88,11 +96,11 @@ export default function Reports() {
                     <div className="stat-card-icon"><GroupIcon style={{ fontSize: 48 }} /></div>
                 </div>
                 <div className="stat-card orange">
-                    <div className="stat-card-label">Total Expenses</div>
+                    <div className="stat-card-label">Monthly Expenses</div>
                     <div className="stat-card-value">
-                        {((reportData.totalExpenses || 0) / 1000).toFixed(0)}K
+                        {((reportData.monthlyExpenses || 0) / 1000).toFixed(0)}K
                     </div>
-                    <div style={{ fontSize: '0.8rem', opacity: 0.8 }}>TZS this period</div>
+                    <div style={{ fontSize: '0.8rem', opacity: 0.8 }}>TZS This Month</div>
                     <div className="stat-card-icon"><BarChartIcon style={{ fontSize: 48 }} /></div>
                 </div>
             </div>
@@ -170,9 +178,9 @@ export default function Reports() {
                     {[
                         { 
                             label: 'Net Profit', 
-                            value: `${((reportData.totalRevenue || 0) - (reportData.totalExpenses || 0)).toLocaleString()} TZS`, 
-                            positive: ((reportData.totalRevenue || 0) - (reportData.totalExpenses || 0)) >= 0,
-                            negative: ((reportData.totalRevenue || 0) - (reportData.totalExpenses || 0)) < 0 
+                            value: `${((reportData.monthlyRevenue || 0) - (reportData.monthlyExpenses || 0)).toLocaleString()} TZS`,
+                            positive: ((reportData.monthlyRevenue || 0) - (reportData.monthlyExpenses || 0)) >= 0,
+                            negative: ((reportData.monthlyRevenue || 0) - (reportData.monthlyExpenses || 0)) < 0
                         },
                         { 
                             label: 'Avg Revenue/Client', 

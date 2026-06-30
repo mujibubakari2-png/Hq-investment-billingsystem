@@ -18,7 +18,6 @@ export default function EditExpenseModal({ expense, onClose, onSave }: EditExpen
     const [category, setCategory] = useState(expense.category);
     const [amount, setAmount] = useState(String(expense.amount));
     const [date, setDate] = useState(formatDateForInput(expense.date));
-    const [status, setStatus] = useState(expense.status || 'Approved');
     const [reference, setReference] = useState(expense.reference || '');
 
     const handleSave = () => {
@@ -28,7 +27,6 @@ export default function EditExpenseModal({ expense, onClose, onSave }: EditExpen
             category,
             amount: Number(amount),
             date,
-            status,
             reference,
         });
     };
@@ -68,19 +66,9 @@ export default function EditExpenseModal({ expense, onClose, onSave }: EditExpen
                         </div>
                     </div>
 
-                    <div className="form-row">
-                        <div className="form-group">
-                            <label className="form-label">Date</label>
-                            <input type="date" className="form-input" value={date} onChange={e => setDate(e.target.value)} />
-                        </div>
-                        <div className="form-group">
-                            <label className="form-label">Status</label>
-                            <select className="form-select" value={status} onChange={e => setStatus(e.target.value)}>
-                                <option>Approved</option>
-                                <option>Pending</option>
-                                <option>Rejected</option>
-                            </select>
-                        </div>
+                    <div className="form-group">
+                        <label className="form-label">Date</label>
+                        <input type="date" className="form-input" value={date} onChange={e => setDate(e.target.value)} />
                     </div>
 
                     <div className="form-group">

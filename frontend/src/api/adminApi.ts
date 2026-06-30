@@ -72,6 +72,10 @@ export interface DashboardResponse {
         isVoucher: boolean;
         transactionType: string;
         paymentChannel: string;
+        status: string;
+        reference?: string | null;
+        transactionId?: string | null;
+        providerRef?: string | null;
     }>;
     revenueAnalytics: Record<string, Array<{
         name: string;

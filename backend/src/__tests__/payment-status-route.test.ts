@@ -4,6 +4,7 @@ import { NextRequest } from 'next/server';
 
 const mockGetTenantClient = jest.fn();
 const mockCheckStatus = jest.fn();
+const mockCompleteLicenseInvoiceFromStatus = jest.fn();
 const mockIsSupportedProvider = jest.fn();
 const mockRequirePermission = jest.fn();
 const mockGetJwtTenantId = jest.fn();
@@ -16,6 +17,7 @@ jest.mock('@/lib/tenantPrisma', () => ({
 jest.mock('@/lib/payments/service', () => ({
   paymentService: {
     checkStatus: jest.fn((...args: any[]) => mockCheckStatus(...args)),
+    completeLicenseInvoiceFromStatus: jest.fn((...args: any[]) => mockCompleteLicenseInvoiceFromStatus(...args)),
   },
 }));
 
@@ -75,5 +77,40 @@ describe('payment status route', () => {
     expect(body.status).toBe('PENDING');
     expect(body.amount).toBe(20000);
     expect(body.providerRef).toBe('checkout-123');
+  });
+
+  it('finalizes license invoice when provider polling returns completed before webhook arrives', async () => {
+    const globalDb = {
+      tenantInvoice: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'inv-1',
+          invoiceNumber: 'INV-1001',
+          amount: 20000,
+          tenantId: 'tenant-1',
+          payments: [{
+            id: 'pay-1',
+            status: 'PENDING',
+            amount: 20000,
+            tenantId: 'tenant-1',
+            paymentMethod: 'PALMPESA',
+            transactionId: 'checkout-123',
+            createdAt: new Date(),
+          }],
+        }),
+      },
+    };
+
+    mockGetTenantClient.mockReturnValue(globalDb);
+    mockIsSupportedProvider.mockReturnValue(true);
+    mockCheckStatus.mockResolvedValue({ status: 'COMPLETED', amount: 20000 });
+    mockCompleteLicenseInvoiceFromStatus.mockResolvedValue({ completed: true, status: 'COMPLETED' });
+
+    const req = new NextRequest('http://localhost/api/license/payment-status/INV-1001?provider=PALMPESA&providerRef=checkout-123');
+    const res = await route.GET(req, { params: Promise.resolve({ reference: 'INV-1001' }) });
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(mockCompleteLicenseInvoiceFromStatus).toHaveBeenCalledWith('INV-1001', 'checkout-123', 20000);
+    expect(body.status).toBe('PAID');
   });
 });

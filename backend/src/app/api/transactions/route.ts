@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { requirePermission } from "@/lib/rbac";
+import { getTenantFilter } from "@/lib/tenant";
 import { toISOSafe, toTimestampSafe, parseSafeDate } from "@/lib/dateUtils";
 import { invalidateNamespace } from "@/lib/cache";
 
@@ -14,15 +15,15 @@ export async function GET(req: NextRequest) {
         const userPayload = guard.user;
         const db = getTenantClient(userPayload);
 
-        const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
-        const tenantFilter = { tenantId: userPayload.tenantId };
+        const { filter: tenantFilter } = getTenantFilter(userPayload);
 
         const { searchParams } = new URL(req.url);
         const search = searchParams.get("search") || "";
         const status = searchParams.get("status") || "";
         const type = searchParams.get("type") || "";
         const page = parseInt(searchParams.get("page") || "1");
-        const limit = parseInt(searchParams.get("limit") || "50");
+        const limitParam = searchParams.get("limit") || "50";
+        const limit = limitParam === "All" ? 999999 : parseInt(limitParam);
         const skip = (page - 1) * limit;
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -77,7 +78,9 @@ export async function GET(req: NextRequest) {
                 paid: stats.find((s: any) => s.status === 'COMPLETED')?._count?._all || 0,
                 unpaid: stats.find((s: any) => s.status === 'PENDING')?._count?._all || 0,
                 failed: stats.find((s: any) => s.status === 'FAILED')?._count?._all || 0,
-                canceled: stats.find((s: any) => s.status === 'CANCELED')?._count?._all || 0,
+                canceled:
+                    (stats.find((s: any) => s.status === 'FAILED')?._count?._all || 0) +
+                    (stats.find((s: any) => s.status === 'EXPIRED')?._count?._all || 0),
             };
         }
 
@@ -96,40 +99,62 @@ export async function POST(req: NextRequest) {
         const userPayload = guard.user;
         const db = getTenantClient(userPayload);
 
-        const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
-        const tenantFilter = { tenantId: userPayload.tenantId };
+        const { filter: tenantFilter, isPlatformSuperAdmin } = getTenantFilter(userPayload);
 
         const body = await req.json();
 
         // Resolve client ID natively if a username was provided instead
         let clientId = body.clientId;
+        let clientRecord: { id: string; tenantId: string | null } | null = null;
         if (!clientId && body.username) {
+            const lookupTenantFilter = {
+                ...tenantFilter,
+                ...(isPlatformSuperAdmin && body.tenantId ? { tenantId: body.tenantId } : {}),
+            };
             const client = await db.client.findFirst({
                 where: {
                     OR: [
                         { username: body.username },
                         { phone: body.username }
                     ],
-                    ...tenantFilter
+                    ...lookupTenantFilter
                 }
             });
             if (client) {
                 clientId = client.id;
+                clientRecord = client;
             } else {
                 return errorResponse("Client not found based on the provided username/phone.", 404);
             }
         }
 
+        if (!clientId) return errorResponse("Client ID or Username is required", 400);
+        if (!clientRecord) {
+            clientRecord = await db.client.findUnique({
+                where: { id: clientId },
+                select: { id: true, tenantId: true },
+            });
+            if (!clientRecord) return errorResponse("Client not found", 404);
+        }
+        if (!isPlatformSuperAdmin && clientRecord.tenantId !== userPayload.tenantId) {
+            return errorResponse("Forbidden: client does not belong to your tenant", 403);
+        }
+        if (isPlatformSuperAdmin && body.tenantId && body.tenantId !== clientRecord.tenantId) {
+            return errorResponse("Forbidden: tenantId does not match transaction client", 403);
+        }
+
+        const tenantIdValue = clientRecord.tenantId;
+
         // Resolve plan name natively if a planId was provided instead
         let planName = body.planName;
         if (!planName && body.planId) {
             const plan = await db.package.findUnique({ where: { id: body.planId } });
-            if (plan && (isSuperAdmin || plan.tenantId === userPayload.tenantId)) {
-                planName = plan.name;
+            if (!plan) return errorResponse("Package not found", 404);
+            if (plan.tenantId !== tenantIdValue) {
+                return errorResponse("Forbidden: package does not belong to the transaction tenant", 403);
             }
+            planName = plan.name;
         }
-
-        if (!clientId) return errorResponse("Client ID or Username is required", 400);
 
         // SEC-FIN-001 FIX: Validate amount is a positive, finite integer within the allowed range.
         // Math.round(parseFloat()) silently coerces NaN → 0 and Infinity → Infinity.
@@ -142,8 +167,6 @@ export async function POST(req: NextRequest) {
         if (amount > 10_000_000) {
             return errorResponse("Invalid amount: exceeds maximum transaction limit of 10,000,000 TZS", 400);
         }
-
-        const tenantIdValue = userPayload.tenantId;
 
         const transaction = await db.transaction.create({
             data: {

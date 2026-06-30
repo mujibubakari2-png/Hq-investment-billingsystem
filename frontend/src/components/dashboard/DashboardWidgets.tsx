@@ -320,7 +320,18 @@ export function RechargeRecordsCard({ stats }: { stats: DashboardResponse | null
 
 // ── RecentTransactionsCard ────────────────────────────────────────────────────
 
-interface TxRow { user: string; time: string; planType: string; amount: string; isVoucher: boolean; paymentChannel: string }
+interface TxRow { user: string; time: string; planType: string; amount: string; isVoucher: boolean; paymentChannel: string; status: string; reference?: string | null }
+
+function getTransactionStatusStyle(status: string) {
+    const normalized = status.toLowerCase();
+    if (normalized === 'completed' || normalized === 'paid') {
+        return { background: 'rgba(76,175,80,0.12)', color: '#2e7d32', label: 'Completed' };
+    }
+    if (normalized === 'pending') {
+        return { background: 'rgba(245,158,11,0.14)', color: '#b45309', label: 'Pending' };
+    }
+    return { background: 'rgba(229,57,53,0.12)', color: '#c62828', label: status || 'Failed' };
+}
 
 export function RecentTransactionsCard({ transactions }: { transactions: TxRow[] }) {
     const navigate = useNavigate();
@@ -337,7 +348,7 @@ export function RecentTransactionsCard({ transactions }: { transactions: TxRow[]
                     <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>No transactions recorded today yet.</div>
                 ) : (
                     <table className="dash-transactions-table">
-                        <thead><tr><th>User</th><th>Plan</th><th>Amount</th><th>Channel</th></tr></thead>
+                        <thead><tr><th>User</th><th>Plan</th><th>Amount</th><th>Status</th><th>Channel</th></tr></thead>
                         <tbody>
                             {transactions.map((tx, i) => (
                                 <tr key={i}>
@@ -349,6 +360,12 @@ export function RecentTransactionsCard({ transactions }: { transactions: TxRow[]
                                     </td>
                                     <td><div className="tx-plan">{tx.planType}</div></td>
                                     <td><div className="tx-amount">{tx.amount}</div></td>
+                                    <td>
+                                        {(() => {
+                                            const statusStyle = getTransactionStatusStyle(tx.status);
+                                            return <span style={{ display: 'inline-flex', alignItems: 'center', background: statusStyle.background, color: statusStyle.color, borderRadius: 6, padding: '2px 8px', fontSize: '0.72rem', fontWeight: 700 }}>{statusStyle.label}</span>;
+                                        })()}
+                                    </td>
                                     <td>
                                         {tx.isVoucher ? (
                                             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'rgba(156,39,176,0.12)', color: '#9c27b0', borderRadius: 6, padding: '2px 8px', fontSize: '0.72rem', fontWeight: 700 }}>🎟️ Voucher</span>

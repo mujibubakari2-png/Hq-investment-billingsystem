@@ -14,6 +14,7 @@
     "db:check-migrations": "tsx scripts/check-migrations.js",
     "db:fix-migrations": "tsx scripts/fix-migrations.js",
     "db:generate": "prisma generate",
+    "cron:clients": "tsx scripts/cron_clients.ts",
     "test": "prisma generate && node scripts/setup-test-db.js && jest --config jest.config.ts --runInBand --verbose",
     "test:coverage": "prisma generate && node scripts/setup-test-db.js && jest --config jest.config.ts --coverage --runInBand --verbose"
   },

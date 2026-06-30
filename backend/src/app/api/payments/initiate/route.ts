@@ -13,6 +13,7 @@ import { paymentService } from "@/lib/payments/service";
 import { isSupportedProvider, SUPPORTED_PROVIDERS } from "@/lib/payments/registry";
 import { isValidAmount, formatPhoneTZ } from "@/lib/payments/utils";
 import prisma from '@/lib/prisma';
+import { getTenantClient } from "@/lib/tenantPrisma";
 
 export async function POST(req: NextRequest) {
   try {
@@ -62,6 +63,30 @@ export async function POST(req: NextRequest) {
     if (!canAccessTenant(userPayload, tenantId)) {
       return errorResponse("Forbidden", 403);
     }
+    if (!tenantId) {
+      return errorResponse("Tenant payment initiation requires a tenantId", 400);
+    }
+    if (!reference) {
+      return errorResponse("reference is required. Create a transaction first via the Hotspot, PPPoE, or invoice payment flow.", 400);
+    }
+
+    const db = getTenantClient(tenantId);
+    const existingTransaction = await db.transaction.findFirst({
+      where: {
+        reference,
+        tenantId,
+        type: "MOBILE",
+        status: "PENDING",
+      },
+      select: { id: true, amount: true },
+    });
+
+    if (!existingTransaction) {
+      return errorResponse("Pending tenant transaction not found for this reference", 404);
+    }
+    if (Math.round(existingTransaction.amount) !== Math.round(amountNum)) {
+      return errorResponse("Payment amount does not match the pending transaction", 400);
+    }
 
     // ── Initiate ────────────────────────────────────────────────────────────
     const result = await paymentService.initiatePayment({
@@ -79,6 +104,15 @@ export async function POST(req: NextRequest) {
     if (!result.success) {
       return errorResponse(result.message, 502);
     }
+    if (result.providerRef) {
+      await db.transaction.update({
+        where: { id: existingTransaction.id },
+        data: {
+          providerRef: result.providerRef,
+          method: provider.toUpperCase(),
+        },
+      });
+    }
 
     return jsonResponse({
       success: true,
@@ -90,12 +124,6 @@ export async function POST(req: NextRequest) {
     }, 200);
 
   } catch (e) {
-    try {
-      const rows = await prisma.systemSetting.findMany({ where: { key: 'paymentGateways' } });
-      console.error('[PAYMENTS/INITIATE] paymentGateways rows:', rows.map(r => ({ id: r.id, tenantId: r.tenantId, value: r.value })));
-    } catch (dbErr) {
-      console.error('[PAYMENTS/INITIATE] failed to read systemSetting.paymentGateways:', dbErr);
-    }
     console.error("[PAYMENTS/INITIATE] Error:", e);
     return errorResponse("Internal server error", 500);
   }

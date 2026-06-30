@@ -2,6 +2,7 @@ import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 import { requirePermission } from "@/lib/rbac";
 import { NextRequest } from "next/server";
+import { getTenantFilter } from "@/lib/tenant";
 
 // GET /api/reports
 export async function GET(req: NextRequest) {
@@ -11,8 +12,7 @@ export async function GET(req: NextRequest) {
         const userPayload = guard.user;
         const db = getTenantClient(userPayload);
 
-        const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
-        const tenantFilter = { tenantId: userPayload.tenantId };
+        const { filter: tenantFilter } = getTenantFilter(userPayload);
 
         const { searchParams } = new URL(req.url);
         const period = searchParams.get("period") || "month"; // day, week, month, year
