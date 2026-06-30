@@ -103,6 +103,14 @@ export async function POST(req: NextRequest) {
 
         const body = await req.json();
 
+        const requestedAmount = parseFloat(body.amount);
+        if (!isFinite(requestedAmount) || isNaN(requestedAmount) || requestedAmount <= 0) {
+            return errorResponse("Invalid amount: must be a positive number", 400);
+        }
+        if (Math.round(requestedAmount) > 10_000_000) {
+            return errorResponse("Invalid amount: exceeds maximum transaction limit of 10,000,000 TZS", 400);
+        }
+
         // Resolve client ID natively if a username was provided instead
         let clientId = body.clientId;
         let clientRecord: { id: string; tenantId: string | null } | null = null;

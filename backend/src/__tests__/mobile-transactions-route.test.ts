@@ -30,6 +30,7 @@ describe('mobile transactions route', () => {
     });
 
     it('returns tenant mobile payment statuses and provider references without old gateway settings', async () => {
+        const now = new Date();
         const db = {
             paymentChannel: {
                 findMany: jest.fn().mockResolvedValue([
@@ -49,7 +50,7 @@ describe('mobile transactions route', () => {
                         type: 'MOBILE',
                         method: 'PALMPESA',
                         status: 'PENDING',
-                        createdAt: new Date('2026-06-30T08:00:00Z'),
+                        createdAt: now,
                         expiryDate: null,
                         reference: 'INT-001',
                         providerRef: 'PALM-ORDER-001',
@@ -62,7 +63,7 @@ describe('mobile transactions route', () => {
                         type: 'MOBILE',
                         method: 'PALMPESA',
                         status: 'COMPLETED',
-                        createdAt: new Date('2026-06-30T09:00:00Z'),
+                        createdAt: now,
                         expiryDate: null,
                         reference: 'INT-002',
                         providerRef: 'PALM-ORDER-002',
