@@ -6,12 +6,13 @@
  */
 
 import { getTenantClient } from "@/lib/tenantPrisma";
-import { getPaymentProvider, isSupportedProvider } from "@/lib/payments/registry";
+import { getPaymentProvider, isSupportedProvider, ChannelRecord } from "@/lib/payments/registry";
 import {
   PaymentRequest,
   PaymentResponse,
   TransactionStatus,
   WebhookResult,
+  WebhookVerification,
 } from "@/lib/payments/types";
 import {
   buildCallbackUrl,
@@ -189,6 +190,93 @@ export class PaymentService {
     return provider.checkStatus(providerRef);
   }
 
+  // ── Resolve Webhook Channel ──────────────────────────────────────────────
+  /**
+   * MULTI-TENANT WEBHOOK ISOLATION FIX
+   * ===================================
+   * Provider webhook callback URLs (e.g. /api/webhooks/palmpesa) are SHARED across
+   * every tenant using that provider — the provider has no concept of "tenant" and
+   * posts to one fixed callback URL per provider. When the webhook arrives we do NOT
+   * yet know which tenant (or the platform) it belongs to — that is only knowable
+   * AFTER the payload is parsed and matched against a transaction/invoice.
+   *
+   * BUG (pre-fix): processWebhook() always called getChannel(tenantId, providerName)
+   * with tenantId fixed at whatever the caller passed in (typically null from the
+   * shared /api/webhooks/{provider} routes). Because getChannel() defaults its
+   * paymentContext to "LICENSE" whenever tenantId is null, this silently picked the
+   * PLATFORM (tenantId=null) PaymentChannel ONLY — even for webhooks that actually
+   * belong to a tenant's Hotspot/PPPoE payment. Concretely this meant:
+   *   - A tenant's own webhookSecret/apiKey credentials were NEVER used to verify
+   *     that tenant's incoming webhook; verification ran against the platform's
+   *     credentials instead.
+   *   - If a tenant's PaymentChannel secret differs from the platform's (the normal
+   *     case — each tenant configures their own credentials from the frontend),
+   *     every legitimate tenant webhook would be rejected as "signature mismatch".
+   *   - If a tenant's PaymentChannel secret happened to collide with the platform's,
+   *     the wrong channel's identity/credentials would silently be used.
+   *
+   * FIX: when the tenant is not explicitly known, try EVERY ACTIVE PaymentChannel
+   * configured for this provider — the platform's channel AND every tenant's own
+   * channel — and accept the first one whose verifyWebhook() succeeds. Each tenant's
+   * credentials are isolated and are only ever compared against that tenant's own
+   * channel, never cross-applied to another tenant or to the platform.
+   */
+  private async resolveWebhookChannel(
+    providerName: string,
+    headers: Record<string, string | string[] | undefined>,
+    rawBody: string,
+    explicitTenantId: string | null
+  ): Promise<{
+    channel: (ChannelRecord & { id: string; tenantId: string | null }) | null;
+    provider: ReturnType<typeof getPaymentProvider> | null;
+    verification: WebhookVerification;
+  }> {
+    // Caller already knows the tenant explicitly — resolve directly and
+    // isolate verification to that one tenant's channel only. Used by routes
+    // (e.g. /api/payments/{provider}/webhook) that have already determined
+    // this is unambiguously a PLATFORM (tenantId=null) callback path.
+    if (explicitTenantId !== undefined && explicitTenantId !== null) {
+      const channel = await this.getChannel(explicitTenantId, providerName, "TENANT");
+      if (!channel) {
+        return {
+          channel: null,
+          provider: null,
+          verification: { verified: false, reason: "No active payment channel for this tenant/provider" },
+        };
+      }
+      const provider = getPaymentProvider(providerName, channel);
+      const verification = await provider.verifyWebhook(headers, rawBody);
+      return { channel: channel as any, provider, verification };
+    }
+
+    // Unknown tenant: enumerate every ACTIVE channel for this provider — the
+    // platform's (tenantId=null) channel AND every tenant's own channel — and
+    // verify the incoming signature against each one IN ISOLATION until one
+    // matches. No tenant's credentials are ever compared against another
+    // tenant's webhook; each candidate is tried independently.
+    const globalDb = getTenantClient(null);
+    const candidateChannels = await globalDb.paymentChannel.findMany({
+      where: { provider: providerName.toUpperCase(), status: "ACTIVE" },
+    });
+
+    let lastReason = "No active payment channel configured for this provider";
+    for (const candidate of candidateChannels) {
+      const candidateProvider = getPaymentProvider(providerName, candidate as any);
+      const verification = await candidateProvider.verifyWebhook(headers, rawBody);
+      if (verification.verified) {
+        console.log("[TRACE][PaymentService.resolveWebhookChannel] MATCHED_CHANNEL", {
+          providerName,
+          channelId: (candidate as any).id,
+          tenantId: candidate.tenantId ?? null,
+        });
+        return { channel: candidate as any, provider: candidateProvider, verification };
+      }
+      lastReason = verification.reason ?? lastReason;
+    }
+
+    return { channel: null, provider: null, verification: { verified: false, reason: lastReason } };
+  }
+
   // ── Process Webhook ─────────────────────────────────────────────────────
 
   async processWebhook(
@@ -202,8 +290,11 @@ export class PaymentService {
       return { processed: false, message: `Unsupported provider: ${providerName}` };
     }
 
-    const channel = await this.getChannel(tenantId, providerName);
-    const provider = getPaymentProvider(providerName, channel);
+    // MULTI-TENANT WEBHOOK ISOLATION FIX: resolve which channel (the platform's
+    // or a SPECIFIC tenant's) actually owns this webhook BEFORE trusting it,
+    // instead of unconditionally assuming the platform (tenantId=null) channel.
+    // See resolveWebhookChannel() doc comment for full rationale.
+    const resolved = await this.resolveWebhookChannel(providerName, headers, rawBody, tenantId);
 
     let body: unknown;
     try {
@@ -212,13 +303,37 @@ export class PaymentService {
       body = rawBody;
     }
 
-    // 1. Verify webhook authenticity
-    const verification = await provider.verifyWebhook(headers, rawBody);
-
     const globalDb = getTenantClient(null);
-    let db = getTenantClient(tenantId);
 
-    // 2. Log to webhook_logs
+    if (!resolved.channel || !resolved.provider) {
+      // No channel (platform's or any tenant's) could verify this webhook.
+      // Log it unscoped (tenant unknown) for audit, then reject — this is the
+      // ONLY case where we fall back to an unscoped (tenantId=null) log write,
+      // because by definition no tenant or platform identity was established.
+      await globalDb.webhookLog.create({
+        data: {
+          provider: providerName.toUpperCase(),
+          payload: body as object,
+          headers: headers as object,
+          verified: false,
+          status: "FAILED",
+          errorMessage: resolved.verification.reason ?? "No matching payment channel",
+          tenantId: null,
+        },
+      }).catch(() => { /* best-effort logging */ });
+      return { processed: false, message: `Webhook rejected: ${resolved.verification.reason ?? "No matching payment channel"}` };
+    }
+
+    const provider = resolved.provider;
+    const verification = resolved.verification;
+    // The resolved channel tells us DEFINITIVELY whether this webhook belongs to
+    // the PLATFORM (tenantId=null) or to a SPECIFIC tenant (tenantId=<value>).
+    // From this point forward we trust resolvedTenantId, not the caller's
+    // original (possibly unknown / always-null-from-shared-routes) tenantId.
+    const resolvedTenantId: string | null = resolved.channel.tenantId ?? null;
+    let db = getTenantClient(resolvedTenantId);
+
+    // 2. Log to webhook_logs — scoped to the tenant whose channel verified this webhook
     const webhookLog = await globalDb.webhookLog.create({
       data: {
         provider: providerName.toUpperCase(),
@@ -226,7 +341,7 @@ export class PaymentService {
         headers: headers as object,
         verified: verification.verified,
         status: "RECEIVED",
-        tenantId: tenantId ?? null,
+        tenantId: resolvedTenantId,
       },
     });
 
@@ -265,21 +380,19 @@ export class PaymentService {
       //    FIX-PP-002 FALLBACK: PalmPesa Endpoint 02 callback does NOT echo our transaction_id
       //    back. It only returns its own order_id. If the primary lookup fails and we have a
       //    providerRef, try matching by the providerRef stored on the transaction record.
+      //    ISOLATION: `db` is already scoped to resolvedTenantId via getTenantClient(), so the
+      //    tenant-scoping proxy (tenantPrisma.ts) forces tenantId = resolvedTenantId on every
+      //    query automatically. We do NOT need to (and must NOT) pass the caller's original
+      //    `tenantId` parameter here, since for shared webhook routes it is always null.
       transaction = await (db.transaction.findFirst as any)({
-        where: {
-          reference: parsed.transactionRef,
-          ...(tenantId ? { tenantId } : {}),
-        },
+        where: { reference: parsed.transactionRef },
         include: { client: true, invoice: true },
       }) as any;
 
       // Fallback: lookup by providerRef (for providers that only echo their own order_id)
       if (!transaction && parsed.providerRef && parsed.providerRef !== parsed.transactionRef) {
         transaction = await (db.transaction.findFirst as any)({
-          where: {
-            providerRef: parsed.providerRef,
-            ...(tenantId ? { tenantId } : {}),
-          },
+          where: { providerRef: parsed.providerRef },
           include: { client: true, invoice: true },
         }) as any;
 
@@ -293,19 +406,45 @@ export class PaymentService {
       }
     }
 
-    if (!tenantId && transaction?.tenantId) {
-      db = getTenantClient(transaction.tenantId);
+    // NOTE: db is already correctly scoped via resolvedTenantId above (set right after
+    // channel resolution). We deliberately do NOT re-derive `db` from transaction.tenantId
+    // here — doing so previously allowed a transaction's OWN tenantId to silently override
+    // the tenant whose credentials verified the webhook, which is the isolation violation
+    // this fix closes. If they ever disagree, that is a sign of an integrity issue worth
+    // surfacing rather than silently trusting the transaction's tenantId.
+    if (transaction?.tenantId && transaction.tenantId !== resolvedTenantId) {
+      console.error("[PAYMENT SERVICE] ISOLATION MISMATCH: webhook channel tenant differs from matched transaction tenant", {
+        resolvedTenantId,
+        transactionTenantId: transaction.tenantId,
+        transactionRef: parsed.transactionRef,
+      });
       await globalDb.webhookLog.update({
         where: { id: webhookLog.id },
-        data: { tenantId: transaction.tenantId },
+        data: { status: "FAILED", errorMessage: "Cross-tenant mismatch between webhook channel and matched transaction" },
       });
+      return {
+        processed: false,
+        transactionRef: parsed.transactionRef,
+        message: "Transaction not found (cross-tenant mismatch)",
+      };
     }
 
-    // ── LICENSE PAYMENT FALLBACK ──────────────────────────────────────────────
-    // If no hotspot/PPPoE transaction found, check if this is a LICENSE payment.
+    // ── LICENSE PAYMENT FALLBACK ─────────────────────────────────────────────────────
+    // If no hotspot/PPPoE transaction found, check if this is a LICENSE payment —
+    // but ONLY when the webhook was verified against the PLATFORM channel
+    // (resolvedTenantId === null). A webhook verified against a SPECIFIC TENANT's
+    // channel must never fall through to license invoice processing — that tenant's
+    // payment credentials must never be able to mark a platform license invoice as paid.
     if (!transaction) {
-      if (options?.skipLicense) {
-        console.error(`[PAYMENT SERVICE] Transaction not found and skipLicense is true. Reference: ${parsed.transactionRef}`);
+      if (options?.skipLicense || resolvedTenantId !== null) {
+        if (resolvedTenantId !== null) {
+          console.warn("[PAYMENT SERVICE] Tenant-scoped webhook had no matching transaction — refusing license fallback (isolation guard)", {
+            resolvedTenantId,
+            transactionRef: parsed.transactionRef,
+          });
+        } else {
+          console.error(`[PAYMENT SERVICE] Transaction not found and skipLicense is true. Reference: ${parsed.transactionRef}`);
+        }
         await globalDb.webhookLog.update({
           where: { id: webhookLog.id },
           data: { status: "FAILED", errorMessage: "Tenant transaction not found (License fallback skipped)" },
