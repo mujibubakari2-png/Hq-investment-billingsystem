@@ -1025,131 +1025,7 @@ table {
   gap: 16px;
 }
 
-/* ======================
-   Responsive Modal Base
-   ====================== */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(2, 6, 23, 0.55);
-  z-index: 1200;
-  padding: 20px;
-}
-
-.modal {
-  background: var(--bg-card);
-  border-radius: 12px;
-  box-shadow: var(--shadow-lg);
-  width: 100% !important;
-  max-width: 1100px !important;
-  margin: 0 auto;
-  overflow: hidden;
-  max-height: 92vh;
-  display: flex;
-  flex-direction: column;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  box-sizing: border-box;
-}
-
-.modal-header,
-.modal-footer {
-  padding: 12px 16px;
-  align-items: center;
-  display: flex;
-  gap: 12px;
-  border-bottom: 1px solid var(--border-light);
-}
-
-.modal-header {
-  justify-content: space-between;
-}
-
-.modal-footer {
-  justify-content: space-between;
-  border-top: 1px solid var(--border-light);
-}
-
-.modal-title {
-  font-weight: 700;
-  font-size: 1rem;
-  color: var(--text-primary);
-}
-
-.modal-subtitle {
-  font-size: 0.88rem;
-  color: var(--text-secondary);
-}
-
-.modal-close {
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  padding: 8px;
-  border-radius: 8px;
-}
-
-.modal-body {
-  padding: 18px !important;
-  overflow: auto;
-  color: var(--text-primary);
-}
-
-/* Variants (can be applied via class names on modal) */
-.modal-sm {
-  max-width: 520px !important;
-}
-
-.modal-md {
-  max-width: 720px !important;
-}
-
-.modal-lg {
-  max-width: 980px !important;
-}
-
-.modal-xl {
-  max-width: 1200px !important;
-}
-
-/* Responsive breakpoints — ensure small screens are safe */
-@media (max-width: 900px) {
-  .modal {
-    max-width: calc(100% - 40px) !important;
-  }
-
-  .modal-body {
-    padding: 14px !important;
-  }
-}
-
-@media (max-width: 600px) {
-  .modal {
-    max-width: calc(100% - 28px) !important;
-    border-radius: 10px;
-  }
-
-  .modal-header,
-  .modal-footer {
-    padding: 10px 12px;
-  }
-
-  .modal-body {
-    padding: 12px !important;
-  }
-}
-
-/* utility classes */
-.modal-body--center {
-  text-align: center !important;
-}
-
-.modal-footer--wrap {
-  flex-wrap: wrap;
-  gap: 8px;
-}
+/* (Old fragmented modal base removed — consolidated below in ONE canonical block) */
 
 
 @media (max-width: 600px) {
@@ -1277,7 +1153,11 @@ table {
   color: var(--text-primary);
 }
 
-/* Modal */
+/* ============================================================
+   CANONICAL MODAL SYSTEM (single source of truth)
+   - Centered on both mobile and desktop
+   - Width controlled via size variants: modal-sm/md/lg/xl
+   ============================================================ */
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -1285,13 +1165,14 @@ table {
   right: 0;
   bottom: 0;
   background: var(--bg-modal-overlay);
-  z-index: 1000;
+  z-index: 1200;
   display: flex;
   align-items: center;
   justify-content: center;
   animation: fadeInOverlay 0.2s ease;
-  padding: 16px;
+  padding: 20px;
   overflow-y: auto;
+  box-sizing: border-box;
 }
 
 .modal {
@@ -1300,8 +1181,9 @@ table {
   -webkit-backdrop-filter: var(--glass-blur);
   border-radius: var(--radius-xl);
   width: 100%;
-  max-width: min(760px, calc(100vw - 32px));
-  max-height: calc(100dvh - 32px);
+  max-width: min(720px, calc(100vw - 40px));
+  max-height: calc(100dvh - 40px);
+  margin: auto;
   display: flex;
   flex-direction: column;
   animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -1309,6 +1191,25 @@ table {
   border: 1px solid var(--border);
   overflow: hidden;
   min-width: 280px;
+  box-sizing: border-box;
+  position: relative;
+}
+
+/* Width variants — apply directly on the .modal element to narrow specific modals */
+.modal-sm {
+  max-width: min(440px, calc(100vw - 40px)) !important;
+}
+
+.modal-md {
+  max-width: min(640px, calc(100vw - 40px)) !important;
+}
+
+.modal-lg {
+  max-width: min(860px, calc(100vw - 40px)) !important;
+}
+
+.modal-xl {
+  max-width: min(1080px, calc(100vw - 40px)) !important;
 }
 
 .modal-header {
@@ -1319,6 +1220,7 @@ table {
   gap: 12px;
   padding: 20px 24px;
   border-bottom: 1px solid var(--border-light);
+  min-width: 0;
 }
 
 .modal-header-left {
@@ -1327,6 +1229,7 @@ table {
   gap: 12px;
   flex-wrap: wrap;
   min-width: 0;
+  overflow: hidden;
 }
 
 .modal-header-icon {
@@ -1338,6 +1241,7 @@ table {
   align-items: center;
   justify-content: center;
   color: var(--info);
+  flex-shrink: 0;
 }
 
 .modal-title {
@@ -1359,6 +1263,8 @@ table {
   height: 32px;
   border-radius: 50%;
   background: none;
+  border: none;
+  cursor: pointer;
   color: var(--text-secondary);
   display: flex;
   align-items: center;
@@ -1377,6 +1283,7 @@ table {
   overflow-y: auto;
   flex: 1;
   min-height: 0;
+  color: var(--text-primary);
 }
 
 .modal-footer {
@@ -1400,6 +1307,18 @@ table {
   gap: 8px;
   flex-wrap: wrap;
 }
+
+/* utility classes */
+.modal-body--center {
+  text-align: center !important;
+}
+
+.modal-footer--wrap {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+
 
 /* Info Box */
 .info-box {
@@ -1688,20 +1607,23 @@ table {
   }
 
   .modal {
-    width: 100% !important;
-    max-width: 100% !important;
-    max-height: 92dvh !important;
-    margin: 0 !important;
-    border-radius: var(--radius-lg) var(--radius-lg) 0 0 !important;
-    position: fixed !important;
-    bottom: 0 !important;
-    left: 0 !important;
-    animation: slideUpSheet 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    width: calc(100% - 24px) !important;
+    max-width: calc(100vw - 24px) !important;
+    max-height: calc(100dvh - 24px) !important;
+    margin: auto !important;
+    border-radius: var(--radius-lg) !important;
+    position: relative !important;
+    top: auto !important;
+    left: auto !important;
+    bottom: auto !important;
+    right: auto !important;
+    animation: fadeIn 0.25s ease !important;
   }
 
   .modal-overlay {
-    align-items: flex-end;
-    padding: 0;
+    align-items: center;
+    justify-content: center;
+    padding: 12px;
   }
 
   .modal-header {
@@ -1814,81 +1736,8 @@ table {
     width: 100%;
     flex: 1;
   }
-
-  /* Modal: bottom sheet on mobile */
-  .modal {
-    width: 100% !important;
-    max-width: 100% !important;
-    max-height: 92dvh !important;
-    margin: 0 !important;
-    border-radius: var(--radius-lg) var(--radius-lg) 0 0 !important;
-    position: fixed !important;
-    bottom: 0 !important;
-    left: 0 !important;
-    animation: slideUpSheet 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-  }
-
-  .modal-overlay {
-    align-items: flex-end;
-    padding: 0;
-  }
-
-  .modal-header {
-    padding: 16px 20px;
-  }
-
-  .modal-body {
-    padding: 16px 20px;
-  }
-
-  .modal-footer {
-    padding: 16px 20px;
-    flex-direction: column;
-    gap: 10px;
-  }
-
-  .modal-footer-left {
-    text-align: center;
-    width: 100%;
-    order: 2;
-  }
-
-  .modal-footer-right {
-    width: 100%;
-    display: flex;
-    gap: 10px;
-    order: 1;
-  }
-
-  .modal-footer-right .btn {
-    flex: 1;
-    justify-content: center;
-  }
-
-  /* Pagination */
-  .pagination {
-    flex-direction: column;
-    gap: 8px;
-    align-items: center;
-    padding: 10px 12px;
-  }
-
-  .pagination-buttons {
-    justify-content: center;
-  }
-
-  /* Tables: horizontal scroll with momentum */
-  .table-container {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    overscroll-behavior-x: contain;
-  }
-
-  /* Card body tighter on mobile */
-  .card-body {
-    padding: 16px;
-  }
 }
+
 
 /* Mobile 480px */
 @media (max-width: 480px) {
@@ -2250,21 +2099,6 @@ body {
   }
 }
 
-/* Modal: bottom-sheet on mobile */
-@media (max-width: 480px) {
-  .modal-overlay {
-    align-items: flex-end;
-    padding: 0;
-  }
-
-  .modal {
-    border-bottom-left-radius: 0;
-    border-bottom-right-radius: 0;
-    max-height: 92dvh;
-    animation: slideUpSheet 0.35s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-}
-
 /* Pre tags inside modals: prevent horizontal overflow */
 .modal pre,
 .modal-body pre {
@@ -2448,22 +2282,6 @@ body {
   .conn-counts {
     grid-template-columns: 1fr !important;
   }
-
-  /* Force modal to utilize full width and height properly on small screens */
-  .modal {
-    width: 100% !important;
-    height: 100% !important;
-    max-height: 100dvh !important;
-    border-radius: 0 !important;
-    margin: 0 !important;
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-  }
-
-  .modal-overlay {
-    padding: 0 !important;
-  }
 }
 
 /* Ultra small screens (320px - 360px) safety */
@@ -2488,5 +2306,68 @@ body {
 
   .page-title {
     font-size: 1.1rem !important;
+  }
+}
+
+/* ============================================================
+   MODAL CENTERING FIX (final override — wins the cascade)
+   Forces ALL modals to stay centered on screen on mobile,
+   instead of the earlier bottom-sheet / fullscreen rules.
+   Desktop sizing (max-width per modal) is left untouched here.
+   ============================================================ */
+@media (max-width: 768px) {
+  .modal-overlay {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 14px !important;
+  }
+
+  .modal {
+    position: relative !important;
+    top: auto !important;
+    left: auto !important;
+    bottom: auto !important;
+    right: auto !important;
+    margin: auto !important;
+    max-width: calc(100vw - 28px) !important;
+    max-height: calc(100dvh - 28px) !important;
+    border-radius: var(--radius-lg) !important;
+    animation: fadeIn 0.25s ease !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .modal-overlay {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 10px !important;
+  }
+
+  .modal {
+    position: relative !important;
+    top: auto !important;
+    left: auto !important;
+    bottom: auto !important;
+    right: auto !important;
+    margin: auto !important;
+    width: calc(100% - 20px) !important;
+    height: auto !important;
+    max-width: calc(100vw - 20px) !important;
+    max-height: calc(100dvh - 20px) !important;
+    border-radius: var(--radius) !important;
+  }
+}
+
+@media (max-width: 360px) {
+  .modal-overlay {
+    padding: 8px !important;
+  }
+
+  .modal {
+    width: calc(100% - 16px) !important;
+    max-width: calc(100vw - 16px) !important;
+    max-height: calc(100dvh - 16px) !important;
   }
 }
