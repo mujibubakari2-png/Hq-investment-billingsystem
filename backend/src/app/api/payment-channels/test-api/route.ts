@@ -74,7 +74,7 @@ const PROVIDER_DEFAULTS: Record<
   },
 };
 
-function normalizeUrl(baseUrl: string, path: string): string {
+export function normalizeUrl(baseUrl: string, path: string): string {
   return `${baseUrl.replace(/\/+$/, "")}/${path.replace(/^\/+/, "")}`;
 }
 

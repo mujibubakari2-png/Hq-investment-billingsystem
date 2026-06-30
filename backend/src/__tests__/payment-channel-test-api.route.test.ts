@@ -23,14 +23,10 @@ describe('Payment channel test API route', () => {
         global.fetch = originalFetch;
     });
 
-    it('normalizes URLs and includes /api fallback for non-API base URLs', () => {
-        expect(route.normalizeUrl('https://example.com/', '/payments/status/test-ping')).toBe(
-            'https://example.com/payments/status/test-ping'
+    it('normalizes official provider test URLs without adding undocumented fallbacks', () => {
+        expect(route.normalizeUrl('https://example.com/', '/api/order-status')).toBe(
+            'https://example.com/api/order-status'
         );
-        expect(route.getTestUrls('https://example.com/', '/payments/status/test-ping')).toEqual([
-            'https://example.com/payments/status/test-ping',
-            'https://example.com/api/payments/status/test-ping',
-        ]);
     });
 
     it('returns success when the provider endpoint responds with HTTP 200', async () => {
@@ -55,7 +51,7 @@ describe('Payment channel test API route', () => {
         expect(res.status).toBe(200);
         expect(json.success).toBe(true);
         expect(json.provider).toBe('ZENOPAY');
-        expect(json.testedUrl).toBe('https://zenoapi.com/api/payments/status/test-ping');
+        expect(json.testedUrl).toBe('https://zenoapi.com/api/order-status?order_id=test-ping');
     });
 
     it('returns success when the provider endpoint responds with HTTP 404 and 404 is considered reachable', async () => {
@@ -70,7 +66,7 @@ describe('Payment channel test API route', () => {
             body: JSON.stringify({
                 provider: 'HARAKAPAY',
                 apiKey: 'test-key',
-                apiUrl: 'https://harakapay.net/api',
+            apiUrl: 'https://harakapay.net',
             }),
         });
 
@@ -78,8 +74,8 @@ describe('Payment channel test API route', () => {
         const json = await res.json();
 
         expect(res.status).toBe(200);
-        expect(json.success).toBe(true);
+        expect(json.success).toBe(false);
         expect(json.statusCode).toBe(404);
-        expect(json.message).toContain('API is reachable');
+        expect(json.message).toContain('responded with HTTP 404');
     });
 });

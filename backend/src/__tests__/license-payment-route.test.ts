@@ -59,12 +59,16 @@ describe('License renewal payment route', () => {
                     planId: 'plan-1',
                     packageMonths: 1,
                 }),
+                update: jest.fn().mockResolvedValue({}),
             },
         };
 
         const globalDb = {
             paymentChannel: {
                 findFirst: jest.fn().mockResolvedValue(null),
+            },
+            tenantInvoice: {
+                update: jest.fn().mockResolvedValue({}),
             },
             tenantPayment: {
                 create: jest.fn().mockResolvedValue({ id: 'pay-1' }),
@@ -99,6 +103,10 @@ describe('License renewal payment route', () => {
                 phone: expect.any(String),
             })
         );
+        expect(globalDb.tenantInvoice.update).toHaveBeenCalledWith({
+            where: { id: 'inv-1' },
+            data: { providerRef: 'checkout-abc-123' },
+        });
     });
 
     it('returns an error when the license payment initiation fails', async () => {
@@ -120,12 +128,16 @@ describe('License renewal payment route', () => {
                     planId: 'plan-1',
                     packageMonths: 1,
                 }),
+                update: jest.fn().mockResolvedValue({}),
             },
         };
 
         const globalDb = {
             paymentChannel: {
                 findFirst: jest.fn().mockResolvedValue(null),
+            },
+            tenantInvoice: {
+                update: jest.fn().mockResolvedValue({}),
             },
             tenantPayment: {
                 create: jest.fn().mockResolvedValue({ id: 'pay-1' }),
@@ -168,12 +180,16 @@ describe('License renewal payment route', () => {
                     planId: 'plan-1',
                     packageMonths: 1,
                 }),
+                update: jest.fn().mockResolvedValue({}),
             },
         };
 
         const globalDb = {
             paymentChannel: {
                 findFirst: jest.fn().mockResolvedValue(null),
+            },
+            tenantInvoice: {
+                update: jest.fn().mockResolvedValue({}),
             },
             tenantPayment: {
                 create: jest.fn().mockResolvedValue({ id: 'pay-1' }),

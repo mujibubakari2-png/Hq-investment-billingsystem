@@ -9,14 +9,13 @@ describe("PalmPesaProvider", () => {
         jest.restoreAllMocks();
     });
 
-    it("treats a zero-padded response code as a successful initiation", async () => {
+    it("accepts the official Endpoint 02 initiation response", async () => {
         jest.spyOn(utils, "httpPost").mockResolvedValue({
             ok: true,
             status: 200,
             data: {
-                ResponseCode: "00",
-                ResponseDescription: "Accepted",
-                CheckoutRequestID: "REQ-123",
+                message: "Payment initiated. Processing will continue asynchronously.",
+                order_id: "PALMPESA17682869972044",
             },
         });
 
@@ -35,11 +34,11 @@ describe("PalmPesaProvider", () => {
         });
 
         expect(result.success).toBe(true);
-        expect(result.providerRef).toBe("REQ-123");
-        expect(result.message).toBe("Accepted");
+        expect(result.providerRef).toBe("PALMPESA17682869972044");
+        expect(result.message).toBe("Payment initiated. Processing will continue asynchronously.");
     });
 
-    it("accepts plain-text success responses returned with HTTP 200", async () => {
+    it("rejects successful-looking HTTP 200 responses that have no order_id", async () => {
         jest.spyOn(utils, "httpPost").mockResolvedValue({
             ok: true,
             status: 200,
@@ -60,15 +59,15 @@ describe("PalmPesaProvider", () => {
             callbackUrl: "https://example.test/callback",
         });
 
-        expect(result.success).toBe(true);
-        expect(result.message).toBe("SUCCESS");
+        expect(result.success).toBe(false);
+        expect(result.message).toBe("PalmPesa error (HTTP 200)");
     });
 
     it("parses PalmPesa JSON response bodies returned as plain text", async () => {
         jest.spyOn(utils, "httpPost").mockResolvedValue({
             ok: true,
             status: 200,
-            data: '{"ResponseCode":"00","ResponseDescription":"Accepted","CheckoutRequestID":"REQ-123"}',
+            data: '{"message":"Payment initiated. Processing will continue asynchronously.","order_id":"PALMPESA17682869972044"}',
         });
 
         const provider = new PalmPesaProvider({
@@ -86,11 +85,11 @@ describe("PalmPesaProvider", () => {
         });
 
         expect(result.success).toBe(true);
-        expect(result.providerRef).toBe("REQ-123");
-        expect(result.message).toBe("Accepted");
+        expect(result.providerRef).toBe("PALMPESA17682869972044");
+        expect(result.message).toBe("Payment initiated. Processing will continue asynchronously.");
     });
 
-    it("treats a 200 response with a generic success message as an accepted initiation", async () => {
+    it("does not accept an initiation response without PalmPesa order_id", async () => {
         jest.spyOn(utils, "httpPost").mockResolvedValue({
             ok: true,
             status: 200,
@@ -111,15 +110,15 @@ describe("PalmPesaProvider", () => {
             callbackUrl: "https://example.test/callback",
         });
 
-        expect(result.success).toBe(true);
+        expect(result.success).toBe(false);
         expect(result.message).toBe("Payment initiated");
     });
 
     it("parses stringified JSON from checkStatus responses", async () => {
-        jest.spyOn(utils, "httpGet").mockResolvedValue({
+        jest.spyOn(utils, "httpPost").mockResolvedValue({
             ok: true,
             status: 200,
-            data: '{"ResultCode":"0","order_status":"COMPLETED","Amount":5000}',
+            data: '{"reference":"0927530628","resultcode":"000","result":"SUCCESS","message":"Order fetch successful","data":[{"order_id":"REQ-123","amount":"5000","payment_status":"COMPLETED","transid":"805613901007"}]}',
         });
 
         const provider = new PalmPesaProvider({
@@ -174,19 +173,15 @@ describe("PalmPesaProvider", () => {
         });
 
         const payload = JSON.stringify({
-            TransactionId: "TX-123",
-            AccountReference: "INV-100",
-            Amount: 5000,
-            ResultCode: "0",
-            ResultDesc: "Payment successful",
+            order_id: "PALMPESA17683440586334",
+            payment_status: "COMPLETED",
         });
 
         const parsed = provider.parseWebhookPayload(payload);
 
-        expect(parsed.transactionRef).toBe("INV-100");
-        expect(parsed.providerRef).toBe("TX-123");
+        expect(parsed.transactionRef).toBe("PALMPESA17683440586334");
+        expect(parsed.providerRef).toBe("PALMPESA17683440586334");
         expect(parsed.resultCode).toBe("0");
-        expect(parsed.resultMessage).toBe("Payment successful");
-        expect(parsed.amount).toBe(5000);
+        expect(parsed.resultMessage).toBe("COMPLETED");
     });
 });

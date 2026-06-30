@@ -259,6 +259,12 @@ export async function POST(req: NextRequest) {
       if (result.success) {
         providerRef = result.providerRef;
         paymentInitiated = true;
+        if (providerRef) {
+          await db.transaction.update({
+            where: { id: transaction.id },
+            data: { providerRef },
+          });
+        }
       } else {
         console.warn(`[HOTSPOT PURCHASE] Payment initiation failed: ${result.message}`);
       }

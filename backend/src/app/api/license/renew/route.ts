@@ -166,11 +166,18 @@ export async function POST(req: NextRequest) {
                     return errorResponse('PalmPesa did not create a transaction (missing provider reference)', 502, 'PALMPESA_INVALID_RESPONSE');
                 }
                 // Persist provider reference (transaction id / checkout id) when available
-                if (result.providerRef && paymentRecord && paymentRecord.id) {
-                    await unscopedDb.tenantPayment.update({
-                        where: { id: paymentRecord.id },
-                        data: { transactionId: result.providerRef, status: 'PENDING' },
+                if (result.providerRef) {
+                    await unscopedDb.tenantInvoice.update({
+                        where: { id: invoice.id },
+                        data: { providerRef: result.providerRef },
                     }).catch(() => { /* best-effort */ });
+
+                    if (paymentRecord && paymentRecord.id) {
+                        await unscopedDb.tenantPayment.update({
+                            where: { id: paymentRecord.id },
+                            data: { transactionId: result.providerRef, status: 'PENDING' },
+                        }).catch(() => { /* best-effort */ });
+                    }
                 }
 
                 return jsonResponse(

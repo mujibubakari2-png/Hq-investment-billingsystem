@@ -116,6 +116,7 @@ export async function POST(req: NextRequest) {
       data: {
         clientId,
         planName: pkg.name,
+        packageId: pkg.id,
         amount: pkg.price,
         type: "MOBILE",
         method: "MOBILE_MONEY",
@@ -190,6 +191,12 @@ export async function POST(req: NextRequest) {
       if (result.success) {
         providerRef = result.providerRef;
         paymentInitiated = true;
+        if (providerRef) {
+          await db.transaction.update({
+            where: { id: transaction.id },
+            data: { providerRef },
+          });
+        }
       } else {
         console.warn(`[PPPOE PURCHASE] Payment initiation failed: ${result.message}`);
       }

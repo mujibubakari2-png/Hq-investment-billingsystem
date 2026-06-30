@@ -225,12 +225,27 @@ export class PaymentService {
     providerName: string,
     headers: Record<string, string | string[] | undefined>,
     rawBody: string,
-    explicitTenantId: string | null
+    explicitTenantId: string | null,
+    scope: PaymentContext | "ANY" = "ANY"
   ): Promise<{
     channel: (ChannelRecord & { id: string; tenantId: string | null }) | null;
     provider: ReturnType<typeof getPaymentProvider> | null;
     verification: WebhookVerification;
   }> {
+    if (scope === "LICENSE") {
+      const channel = await this.getChannel(null, providerName, "LICENSE");
+      if (!channel) {
+        return {
+          channel: null,
+          provider: null,
+          verification: { verified: false, reason: "No active platform payment channel for this provider" },
+        };
+      }
+      const provider = getPaymentProvider(providerName, channel);
+      const verification = await provider.verifyWebhook(headers, rawBody);
+      return { channel: channel as any, provider, verification };
+    }
+
     // Caller already knows the tenant explicitly — resolve directly and
     // isolate verification to that one tenant's channel only. Used by routes
     // (e.g. /api/payments/{provider}/webhook) that have already determined
@@ -256,7 +271,11 @@ export class PaymentService {
     // tenant's webhook; each candidate is tried independently.
     const globalDb = getTenantClient(null);
     const candidateChannels = await globalDb.paymentChannel.findMany({
-      where: { provider: providerName.toUpperCase(), status: "ACTIVE" },
+      where: {
+        provider: providerName.toUpperCase(),
+        status: "ACTIVE",
+        ...(scope === "TENANT" ? { tenantId: { not: null } } : {}),
+      },
     });
 
     let lastReason = "No active payment channel configured for this provider";
@@ -290,11 +309,17 @@ export class PaymentService {
       return { processed: false, message: `Unsupported provider: ${providerName}` };
     }
 
+    const webhookScope: PaymentContext | "ANY" =
+      options?.skipTenant ? "LICENSE" :
+      options?.skipLicense ? "TENANT" :
+      tenantId ? "TENANT" :
+      "ANY";
+
     // MULTI-TENANT WEBHOOK ISOLATION FIX: resolve which channel (the platform's
     // or a SPECIFIC tenant's) actually owns this webhook BEFORE trusting it,
     // instead of unconditionally assuming the platform (tenantId=null) channel.
     // See resolveWebhookChannel() doc comment for full rationale.
-    const resolved = await this.resolveWebhookChannel(providerName, headers, rawBody, tenantId);
+    const resolved = await this.resolveWebhookChannel(providerName, headers, rawBody, tenantId, webhookScope);
 
     let body: unknown;
     try {

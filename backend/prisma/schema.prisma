@@ -163,6 +163,7 @@ model Transaction {
   method     String
   status     TransactionStatus @default(PENDING)
   reference  String            @unique
+  providerRef String?
   expiryDate DateTime?
   createdAt  DateTime          @default(now())
   updatedAt  DateTime          @updatedAt
@@ -180,6 +181,7 @@ model Transaction {
   @@index([createdAt])
   @@index([status, createdAt])
   @@index([invoiceId])
+  @@index([providerRef])
   @@map("transactions")
 }
 
@@ -636,6 +638,7 @@ model TenantInvoice {
   planId        String
   packageMonths Int?
   amount        Float
+  providerRef   String?
   status        TenantInvoiceStatus @default(PENDING)
   dueDate       DateTime
   createdAt     DateTime            @default(now())
@@ -644,6 +647,7 @@ model TenantInvoice {
   tenant        Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   payments      TenantPayment[]
 
+  @@index([providerRef])
   @@map("tenant_invoices")
 }
 

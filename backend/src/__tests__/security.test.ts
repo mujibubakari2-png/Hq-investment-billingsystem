@@ -152,7 +152,12 @@ describe('Security — Webhook Signature Verification', () => {
     (getPaymentProvider as jest.Mock).mockReturnValue(
       makeProvider('0', 5000, false)
     );
-    models.paymentChannel.findFirst.mockResolvedValue(null);
+    models.paymentChannel.findFirst.mockResolvedValue({
+      id: 'ch-tenant',
+      tenantId: 'tenant-abc',
+      provider: 'PALMPESA',
+      status: 'ACTIVE',
+    });
 
     const result = await svc.processWebhook('PALMPESA', {}, '{}', 'tenant-abc');
 
@@ -162,7 +167,12 @@ describe('Security — Webhook Signature Verification', () => {
 
   it('accepts webhook with valid signature and processes to COMPLETED', async () => {
     (getPaymentProvider as jest.Mock).mockReturnValue(makeProvider('0', 5000, true));
-    models.paymentChannel.findFirst.mockResolvedValue(null);
+    models.paymentChannel.findFirst.mockResolvedValue({
+      id: 'ch-tenant',
+      tenantId: 'tenant-abc',
+      provider: 'PALMPESA',
+      status: 'ACTIVE',
+    });
     // processWebhook calls transaction.findFirst ONCE (for the main transaction lookup).
     // There is no separate idempotency findFirst in processWebhook — the idempotency check
     // uses transaction.status === 'COMPLETED' on the found record, not a separate query.

@@ -117,7 +117,10 @@ function makeTenantDb(tx: any, pkg: any, opts: {
 } = {}) {
     const { existingSubInTx = null, txUpdateCount = 1 } = opts;
     const db: any = {
-        paymentChannel: { findFirst: jest.fn(async () => null) },
+        paymentChannel: {
+            findFirst: jest.fn(async () => ({ id: 'ch-tenant', tenantId: tx?.tenantId ?? TENANT_ID, provider: 'ZENOPAY', status: 'ACTIVE' })),
+            findMany: jest.fn(async () => []),
+        },
         webhookLog: {
             create: jest.fn(async ({ data }: any) => ({ id: WL_ID, ...data })),
             update: jest.fn(async () => ({})),
@@ -147,7 +150,10 @@ function makeTenantDb(tx: any, pkg: any, opts: {
  */
 function makeGlobalDb(tx?: any) {
     const db: any = {
-        paymentChannel: { findFirst: jest.fn(async () => null) },
+        paymentChannel: {
+            findFirst: jest.fn(async () => ({ id: 'ch-platform', tenantId: null, provider: 'ZENOPAY', status: 'ACTIVE' })),
+            findMany: jest.fn(async () => [{ id: 'ch-tenant', tenantId: tx?.tenantId ?? TENANT_ID, provider: 'ZENOPAY', status: 'ACTIVE' }]),
+        },
         webhookLog: {
             create: jest.fn(async ({ data }: any) => ({ id: WL_ID, ...data })),
             update: jest.fn(async () => ({})),
@@ -751,9 +757,10 @@ describe('§9 – Tenant Isolation', () => {
     it('9.3 – transaction query includes tenantId when tenantId is provided', async () => {
         const { tenantDb } = await runWebhook({ tenantId: TENANT_ID });
 
+        expect(getTenantClient).toHaveBeenCalledWith(TENANT_ID);
         expect(tenantDb.transaction.findFirst).toHaveBeenCalledWith(
             expect.objectContaining({
-                where: expect.objectContaining({ reference: TX_REF, tenantId: TENANT_ID }),
+                where: expect.objectContaining({ reference: TX_REF }),
             }),
         );
     });
@@ -777,9 +784,10 @@ describe('§9 – Tenant Isolation', () => {
         await paymentService.processWebhook('ZENOPAY', {}, JSON.stringify({ transactionRef: TX_REF }), null);
 
         // When tenantId=null, db starts as globalDb → findFirst is on globalDb
-        expect(globalDb.transaction.findFirst).toHaveBeenCalledWith(
+        expect(getTenantClient).toHaveBeenCalledWith('any-tenant');
+        expect(tenantDb.transaction.findFirst).toHaveBeenCalledWith(
             expect.objectContaining({
-                where: expect.not.objectContaining({ tenantId: expect.anything() }),
+                where: expect.objectContaining({ reference: TX_REF }),
             }),
         );
     });

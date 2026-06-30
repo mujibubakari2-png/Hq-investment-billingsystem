@@ -52,7 +52,10 @@ describe('PaymentService (mocked DB)', () => {
         const webhookLogUpdate = jest.fn(async () => ({}));
 
         const globalDb: any = {
-            paymentChannel: { findFirst: jest.fn(async () => null) },
+            paymentChannel: {
+                findFirst: jest.fn(async () => ({ id: 'ch-t1', tenantId: 't1', provider: 'MOCK', status: 'ACTIVE' })),
+                findMany: jest.fn(async () => []),
+            },
             webhookLog: { create: webhookLogCreate, update: webhookLogUpdate },
             transaction: {
                 findFirst: jest.fn(async () => fakeTransaction),
@@ -167,7 +170,10 @@ describe('PaymentService (mocked DB)', () => {
         const tenantWebhookLogUpdate = jest.fn(async () => ({}));
 
         const globalDb: any = {
-            paymentChannel: { findFirst: jest.fn(async () => null) },
+            paymentChannel: {
+                findFirst: jest.fn(async () => null),
+                findMany: jest.fn(async () => [{ id: 'ch-t2', tenantId: 't2', provider: 'MOCK', status: 'ACTIVE' }]),
+            },
             webhookLog: { create: globalWebhookLogCreate, update: globalWebhookLogUpdate },
             transaction: {
                 findFirst: jest.fn(async () => fakeTransaction),

@@ -50,7 +50,7 @@ describe('Tenant webhook route', () => {
         const json = await response.json();
         expect(json).toEqual({ message: 'Webhook processed' });
         expect(PaymentService).toHaveBeenCalledTimes(1);
-        expect(mockProcessWebhook).toHaveBeenCalledWith('MOCK', expect.any(Object), rawBody, 't1');
+        expect(mockProcessWebhook).toHaveBeenCalledWith('MOCK', expect.any(Object), rawBody, 't1', { skipLicense: true });
     });
 
     it('returns 400 when processWebhook reports not processed', async () => {
@@ -78,7 +78,7 @@ describe('Tenant webhook route', () => {
         expect(response.status).toBe(400);
         const json = await response.json();
         expect(json).toEqual({ error: 'Invalid webhook' });
-        expect(mockProcess).toHaveBeenCalledWith('MOCK', expect.any(Object), rawBody, 't2');
+        expect(mockProcess).toHaveBeenCalledWith('MOCK', expect.any(Object), rawBody, 't2', { skipLicense: true });
     });
 
     it('handles invalid JSON body by sending empty object headers and still calling processWebhook', async () => {
@@ -103,6 +103,6 @@ describe('Tenant webhook route', () => {
         expect(response.status).toBe(200);
         const json = await response.json();
         expect(json).toEqual({ message: 'Webhook processed' });
-        expect(mockProcessWebhook).toHaveBeenCalledWith('MOCK', expect.any(Object), rawBody, 't3');
+        expect(mockProcessWebhook).toHaveBeenCalledWith('MOCK', expect.any(Object), rawBody, 't3', { skipLicense: true });
     });
 });

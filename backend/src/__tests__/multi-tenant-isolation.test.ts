@@ -180,7 +180,12 @@ describe('Multi-Tenant Isolation — PaymentChannel cross-tenant prevention', ()
 
   it('Platform channel (tenantId=null) query never includes a tenantId value', async () => {
     const prisma = require('@/lib/prisma').default;
-    prisma.paymentChannel.findFirst.mockResolvedValue(null);
+    prisma.paymentChannel.findFirst.mockResolvedValue({
+      id: 'ch-tenant-abc',
+      tenantId: 'tenant-abc',
+      provider: 'PALMPESA',
+      status: 'ACTIVE',
+    });
 
     await svc.getChannel(null, 'PALMPESA', 'LICENSE');
 
@@ -203,7 +208,12 @@ describe('Multi-Tenant Isolation — Webhook cannot activate cross-tenant invoic
     });
 
     // Simulate cross-tenant scenario: transaction not found in tenant-abc's scope
-    prisma.paymentChannel.findFirst.mockResolvedValue(null);
+    prisma.paymentChannel.findFirst.mockResolvedValue({
+      id: 'ch-tenant-abc',
+      tenantId: 'tenant-abc',
+      provider: 'PALMPESA',
+      status: 'ACTIVE',
+    });
     prisma.transaction.findFirst.mockResolvedValue(null);
     prisma.tenantInvoice.findFirst.mockResolvedValue(null);
     prisma.tenantPayment.findFirst.mockResolvedValue(null);
