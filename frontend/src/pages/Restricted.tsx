@@ -31,7 +31,7 @@ export default function Restricted() {
                 
                 <div style={{ background: '#fff0f0', border: '1px solid #ffcdd2', borderRadius: '8px', padding: '1rem', textAlign: 'left', marginBottom: '1.5rem' }}>
                     <div style={{ color: '#d32f2f', fontWeight: 600, fontSize: '0.9rem', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <span>Why is my account restricted?</span>
+                        <span>Why am I seeing this?</span>
                     </div>
                     <ul style={{ margin: 0, paddingLeft: '1.5rem', color: '#c62828', fontSize: '0.85rem' }}>
                         <li style={{ marginBottom: '0.25rem' }}>
@@ -88,9 +88,9 @@ export default function Restricted() {
             </div>
 
             <div style={{ marginTop: '2rem', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-                <p>Need help? Email us at <a href="mailto:support@yourdomain.com" style={{ color: 'var(--primary)', textDecoration: 'none', fontWeight: 500 }}>support@yourdomain.com</a> or call +255 621 085 215 — we're here to help.</p>
+                <p>Need assistance? Contact our support team.</p>
                 <button onClick={() => { logout(); navigate('/login'); }} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', textDecoration: 'underline', cursor: 'pointer', marginTop: '1rem' }}>
-                    Sign out and switch accounts
+                    Sign out and use a different account
                 </button>
             </div>
             

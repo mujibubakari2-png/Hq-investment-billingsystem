@@ -111,14 +111,22 @@ export default function LicenseManagement() {
         hasOutstanding,
         hasPending,
         plan,
-        outstandingInvoices,
         pendingInvoices,
         totalOutstanding: totalOutstandingFromApi,
+        paidThisMonth,
     } = license || {};
 
     // Total outstanding amount (all PENDING invoices) — prefer API value, fallback to sum
     const totalOutstanding = totalOutstandingFromApi ?? (pendingInvoices || []).reduce((sum, inv) => sum + (inv.amount || 0), 0);
     const hasAnyPending = (hasPending || hasOutstanding) && totalOutstanding > 0;
+
+    // Sort invoices by due date (soonest/most urgent first) so the table always shows
+    // a predictable order instead of raw API order.
+    const sortedPendingInvoices = [...(pendingInvoices || [])].sort((a, b) => {
+        const aTime = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
+        const bTime = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
+        return aTime - bTime;
+    });
 
     const copyKey = () => {
         if (licenseKey) {
@@ -285,100 +293,87 @@ export default function LicenseManagement() {
                     padding: '20px 30px', borderLeft: '1px solid var(--border-light)',
                     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                 }}>
+                    <PaymentIcon style={{ fontSize: 24, color: '#16a34a', marginBottom: 4 }} />
+                    <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>TSH {(paidThisMonth ?? 0).toLocaleString()}</div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Paid This Month</div>
                 </div>
             </div>
 
-            {/* Quick Actions */}
-            {(daysRemaining! <= 5 || hasAnyPending) && (
-                <div style={{ display: 'flex', gap: 12, marginBottom: 24, flexWrap: 'wrap' }}>
-                    <button
-                        className="btn btn-primary"
-                        style={{ display: 'flex', alignItems: 'center', gap: 6 }}
-                        onClick={() => navigate('/renew')}
-                    >
-                        <PaymentIcon style={{ fontSize: 16 }} /> Pay Invoice / Renew
+            {/* Invoice Status — one clear card, one action per invoice row (no duplicate Pay buttons) */}
+            {hasAnyPending ? (
+                <div className="card" style={{ overflow: 'hidden' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12, padding: '18px 24px', borderBottom: '1px solid var(--border-light)' }}>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                            <WarningIcon style={{ fontSize: 22, color: '#ef4444', marginTop: 2 }} />
+                            <div>
+                                <div style={{ fontWeight: 700, fontSize: '1rem' }}>Unpaid Invoices</div>
+                                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                                    {sortedPendingInvoices.length} invoice{sortedPendingInvoices.length > 1 ? 's' : ''} pending payment
+                                </div>
+                            </div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                            <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>Total Due</div>
+                            <div style={{ fontSize: '1.3rem', fontWeight: 700, color: '#ef4444' }}>TSH {totalOutstanding.toLocaleString()}</div>
+                        </div>
+                    </div>
+
+                    {/* Unpaid invoices table — Invoice / Period / Due Date / Amount / Action, sorted by due date */}
+                    <div style={{ overflowX: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                            <thead>
+                                <tr style={{ background: 'var(--bg-page)' }}>
+                                    <th style={{ textAlign: 'left', padding: '10px 24px', fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>Invoice</th>
+                                    <th style={{ textAlign: 'left', padding: '10px 14px', fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>Period</th>
+                                    <th style={{ textAlign: 'left', padding: '10px 14px', fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>Due Date</th>
+                                    <th style={{ textAlign: 'right', padding: '10px 14px', fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>Amount</th>
+                                    <th style={{ textAlign: 'right', padding: '10px 24px', fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {sortedPendingInvoices.map(inv => {
+                                    const isOverdue = inv.dueDate ? new Date(inv.dueDate).getTime() < Date.now() : false;
+                                    return (
+                                        <tr key={inv.id} style={{ borderTop: '1px solid var(--border-light)' }}>
+                                            <td style={{ padding: '14px 24px' }}>
+                                                <div style={{ fontWeight: 700, fontSize: '0.85rem' }}>{inv.invoiceNumber}</div>
+                                                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{inv.invoiceDate ? formatDate(inv.invoiceDate) : '—'}</div>
+                                            </td>
+                                            <td style={{ padding: '14px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                                                {inv.invoiceDate && inv.dueDate ? `${formatDate(inv.invoiceDate)} - ${formatDate(inv.dueDate)}` : '—'}
+                                            </td>
+                                            <td style={{ padding: '14px', fontSize: '0.8rem' }}>
+                                                <span style={{ color: isOverdue ? '#ef4444' : 'var(--text-secondary)', fontWeight: isOverdue ? 700 : 500 }}>
+                                                    {isOverdue ? 'Overdue' : (inv.dueDate ? formatDate(inv.dueDate) : '—')}
+                                                </span>
+                                            </td>
+                                            <td style={{ padding: '14px', textAlign: 'right', fontWeight: 700 }}>TSH {inv.amount.toLocaleString()}</td>
+                                            <td style={{ padding: '14px 24px', textAlign: 'right' }}>
+                                                <button
+                                                    className="btn btn-primary"
+                                                    style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '0.75rem', padding: '5px 12px', background: '#1a1a2e' }}
+                                                    onClick={() => navigate('/renew', { state: { amount: inv.amount, invoiceId: inv.id } })}
+                                                >
+                                                    <PaymentIcon style={{ fontSize: 13 }} /> Pay Now
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            ) : (
+                <div className="card" style={{ padding: '40px 24px', textAlign: 'center' }}>
+                    <CheckCircleIcon style={{ fontSize: 48, color: '#16a34a', marginBottom: 12 }} />
+                    <h3 style={{ fontWeight: 700, fontSize: '1.1rem', marginBottom: 4 }}>All Invoices Paid!</h3>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: 16 }}>You have no outstanding invoices.</p>
+                    <button className="btn btn-outline" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }} onClick={() => navigate('/renew')}>
+                        <PaymentIcon style={{ fontSize: 16 }} /> Renew / Pay Invoice
                     </button>
                 </div>
             )}
-
-            {/* Invoice Status */}
-            <div className="card" style={{ padding: '40px 24px', textAlign: 'center' }}>
-                {hasAnyPending ? (
-                    <>
-                        <WarningIcon style={{ fontSize: 48, color: '#ef4444', marginBottom: 12 }} />
-                        <h3 style={{ fontWeight: 700, fontSize: '1.1rem', marginBottom: 4 }}>Outstanding Invoices</h3>
-                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: 8 }}>
-                            You have {pendingInvoices?.length || outstandingInvoices?.length || 1} unpaid invoice{(pendingInvoices?.length || 1) > 1 ? 's' : ''} pending. Please settle to avoid suspension.
-                        </p>
-                        {/* Total outstanding amount */}
-                        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '12px 20px', marginBottom: 16, display: 'inline-block', minWidth: 200 }}>
-                            <div style={{ fontSize: '0.75rem', color: '#b91c1c', fontWeight: 600, marginBottom: 4 }}>TOTAL OUTSTANDING INVOICE</div>
-                            <div style={{ fontSize: '1.8rem', fontWeight: 700, color: '#ef4444' }}>
-                                TSH {totalOutstanding.toLocaleString()}
-                            </div>
-                        </div>
-                        {/* Unpaid invoices table — Invoice / Period / Due Date / Amount / Action */}
-                        {pendingInvoices && pendingInvoices.length > 0 && (
-                            <div style={{ margin: '0 auto 20px', maxWidth: 720, textAlign: 'left', border: '1px solid var(--border-light)', borderRadius: 8, overflow: 'hidden' }}>
-                                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                                    <thead>
-                                        <tr style={{ background: 'var(--bg-page)' }}>
-                                            <th style={{ textAlign: 'left', padding: '10px 14px', fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>Invoice</th>
-                                            <th style={{ textAlign: 'left', padding: '10px 14px', fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>Period</th>
-                                            <th style={{ textAlign: 'left', padding: '10px 14px', fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>Due Date</th>
-                                            <th style={{ textAlign: 'right', padding: '10px 14px', fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>Amount</th>
-                                            <th style={{ textAlign: 'right', padding: '10px 14px', fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>Action</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {pendingInvoices.map(inv => {
-                                            const isOverdue = inv.dueDate ? new Date(inv.dueDate).getTime() < Date.now() : false;
-                                            return (
-                                                <tr key={inv.id} style={{ borderTop: '1px solid var(--border-light)' }}>
-                                                    <td style={{ padding: '12px 14px' }}>
-                                                        <div style={{ fontWeight: 700, fontSize: '0.85rem' }}>{inv.invoiceNumber}</div>
-                                                        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{inv.invoiceDate ? formatDate(inv.invoiceDate) : '—'}</div>
-                                                    </td>
-                                                    <td style={{ padding: '12px 14px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                                                        {inv.invoiceDate && inv.dueDate ? `${formatDate(inv.invoiceDate)} - ${formatDate(inv.dueDate)}` : '—'}
-                                                    </td>
-                                                    <td style={{ padding: '12px 14px', fontSize: '0.8rem' }}>
-                                                        <span style={{ color: isOverdue ? '#ef4444' : 'var(--text-secondary)', fontWeight: isOverdue ? 700 : 500 }}>
-                                                            {isOverdue ? 'Overdue' : (inv.dueDate ? formatDate(inv.dueDate) : '—')}
-                                                        </span>
-                                                    </td>
-                                                    <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: 700 }}>TSH {inv.amount.toLocaleString()}</td>
-                                                    <td style={{ padding: '12px 14px', textAlign: 'right' }}>
-                                                        <button
-                                                            className="btn btn-primary"
-                                                            style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '0.75rem', padding: '5px 10px' }}
-                                                            onClick={() => navigate('/renew', { state: { amount: inv.amount, invoiceId: inv.id } })}
-                                                        >
-                                                            <PaymentIcon style={{ fontSize: 13 }} /> Pay Now
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
-                        <button className="btn btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }} onClick={() => navigate('/renew')}>
-                            <PaymentIcon style={{ fontSize: 16 }} /> Pay Now — TSH {totalOutstanding.toLocaleString()}
-                        </button>
-                    </>
-                ) : (
-                    <>
-                        <CheckCircleIcon style={{ fontSize: 48, color: '#16a34a', marginBottom: 12 }} />
-                        <h3 style={{ fontWeight: 700, fontSize: '1.1rem', marginBottom: 4 }}>All Invoices Paid!</h3>
-                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: 16 }}>You have no outstanding invoices.</p>
-                        <button className="btn btn-outline" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }} onClick={() => navigate('/renew')}>
-                            <PaymentIcon style={{ fontSize: 16 }} /> Renew / Pay Invoice
-                        </button>
-                    </>
-                )}
-            </div>
         </div>
     );
 }

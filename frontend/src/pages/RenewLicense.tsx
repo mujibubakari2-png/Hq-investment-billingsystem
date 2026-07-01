@@ -495,7 +495,7 @@ export default function RenewLicense() {
                                 🔄 Changing plan from {license.plan.name} to <strong>{allPlans.find(p => p.id === selectedPlanId)?.name}</strong> on payment.
                             </div>
                         )}
-                        <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Choose Renewal Duration:</div>
+                        <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Choose Payment Package:</div>
 
                         {packages.map(pkg => (
                             <div key={pkg.months} onClick={() => setSelectedPackage(pkg.months)}

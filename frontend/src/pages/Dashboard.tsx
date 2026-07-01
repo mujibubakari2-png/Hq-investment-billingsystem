@@ -17,6 +17,12 @@ import authStore from '../stores/authStore';
 import { formatDateTime } from '../utils/formatters';
 import ErrorIcon from '@mui/icons-material/Error';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import PercentIcon from '@mui/icons-material/Percent';
+import ConfirmationNumberIcon from '@mui/icons-material/ConfirmationNumber';
+import GroupIcon from '@mui/icons-material/Group';
+import PersonIcon from '@mui/icons-material/Person';
 import {
     WelcomeBar,
     DateTimeBar,
@@ -125,17 +131,16 @@ export default function Dashboard() {
     const todayVoucherTrend = getTrendMeta(stats?.todayVoucherRev, stats?.todayVoucherRevTrend, 'Voucher revenue');
     const monthlyVoucherTrend = getTrendMeta(stats?.monthlyVoucherRev, stats?.monthlyVoucherRevTrend, 'Voucher revenue');
 
-    const revenueCards = [
-        { label: "Today's Revenue", value: fmt(stats?.todayRevenue ?? 0), subtitle: todayRevenueTrend.subtitle ?? `${stats?.todayRechargesMobile || 0} payments received today`, change: todayRevenueTrend.change, color: '#e53935', icon: '💰', accent: 'accent-red' },
-        { label: 'Monthly Revenue', value: fmt(stats?.monthlyRevenue ?? 0), subtitle: monthlyRevenueTrend.subtitle ?? `${stats?.monthlyRechargesMobile || 0} payments this month`, change: monthlyRevenueTrend.change, color: '#00bcd4', icon: '📊', accent: 'accent-blue' },
-        // Active Subscribers & Total Customers show a plain headcount — no % change badge
-        { label: 'Active Subscribers', value: String(stats?.activeSubscribers ?? 0), subtitle: `⚡ ${stats?.onlineUsers ?? 0} currently online`, change: null, color: '#4caf50', icon: '👥', accent: 'accent-green' },
-        { label: 'Total Customers', value: String(stats?.totalClients ?? 0), subtitle: `${stats?.newCustomersThisMonth || 0} new this month`, change: null, color: '#9c27b0', icon: '🔋', accent: 'accent-purple' },
-    ];
-
-    const voucherCards = [
-        { label: 'Today Voucher Rev', value: fmt(stats?.todayVoucherRev ?? 0), subtitle: todayVoucherTrend.subtitle ?? `${stats?.vouchersUsedToday || 0} active vouchers`, change: todayVoucherTrend.change, color: '#2196f3', accent: 'accent-blue' },
-        { label: 'Monthly Voucher Rev', value: fmt(stats?.monthlyVoucherRev ?? 0), subtitle: monthlyVoucherTrend.subtitle ?? `${stats?.vouchersUsedMonth || 0} active vouchers`, change: monthlyVoucherTrend.change, color: '#e91e63', accent: 'accent-red' },
+    // Card order & styling matches the reference design: 3-column grid, pastel icon
+    // badges, no subtitle text on the % cards, plain (non-pill) trend indicator.
+    const statCards = [
+        { label: "Today's Revenue", value: fmt(stats?.todayRevenue ?? 0), subtitle: null, change: todayRevenueTrend.change, iconBg: '#fee2e2', iconColor: '#e53935', icon: <AccountBalanceWalletIcon style={{ fontSize: 20 }} />, accent: 'accent-red' },
+        { label: 'Monthly Revenue', value: fmt(stats?.monthlyRevenue ?? 0), subtitle: null, change: monthlyRevenueTrend.change, iconBg: '#dcfce7', iconColor: '#16a34a', icon: <TrendingUpIcon style={{ fontSize: 20 }} />, accent: 'accent-green' },
+        { label: 'Monthly Voucher Rev', value: fmt(stats?.monthlyVoucherRev ?? 0), subtitle: null, change: monthlyVoucherTrend.change, iconBg: '#cffafe', iconColor: '#06b6d4', icon: <PercentIcon style={{ fontSize: 20 }} />, accent: 'accent-teal' },
+        { label: 'Today Voucher Rev', value: fmt(stats?.todayVoucherRev ?? 0), subtitle: null, change: todayVoucherTrend.change, iconBg: '#dbeafe', iconColor: '#3b82f6', icon: <ConfirmationNumberIcon style={{ fontSize: 20 }} />, accent: 'accent-blue' },
+        // Active Users & Total Customers show a plain headcount — no % change badge
+        { label: 'Active Users', value: String(stats?.activeSubscribers ?? 0), subtitle: `⚡ ${stats?.onlineUsers ?? 0} online`, change: null, iconBg: '#dbeafe', iconColor: '#2563eb', icon: <GroupIcon style={{ fontSize: 20 }} />, accent: 'accent-blue' },
+        { label: 'Total Customers', value: String(stats?.totalClients ?? 0), subtitle: `${stats?.newCustomersThisMonth || 0} new this month`, change: null, iconBg: '#f3e8ff', iconColor: '#9333ea', icon: <PersonIcon style={{ fontSize: 20 }} />, accent: 'accent-purple' },
     ];
 
     const recentTransactions = (stats?.recentTransactions ?? []).map(t => ({
@@ -208,11 +213,8 @@ export default function Dashboard() {
                 onRefresh={fetchData}
             />
 
-            {/* Revenue stat cards */}
-            <StatCards cards={revenueCards} hiddenCards={hiddenCards} idOffset={0} onToggle={toggleCardVisibility} />
-
-            {/* Voucher revenue cards (offset by 100 to avoid id clash) */}
-            <StatCards cards={voucherCards} hiddenCards={hiddenCards} idOffset={100} onToggle={toggleCardVisibility} />
+            {/* Stat cards — single 3-column grid matching the reference layout */}
+            <StatCards cards={statCards} hiddenCards={hiddenCards} idOffset={0} onToggle={toggleCardVisibility} />
 
             <div className="dash-two-col">
                 <RouterStatusCard stats={stats} routerData={routerData} />

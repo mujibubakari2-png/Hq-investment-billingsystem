@@ -191,13 +191,8 @@
 /* --- Stat Cards Grid --- */
 .dash-stat-grid {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 16px;
-    margin-bottom: 16px;
-}
-
-.dash-stat-grid.voucher-row {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
     margin-bottom: 24px;
 }
 
@@ -234,9 +229,9 @@
 }
 
 .dash-stat-icon-wrap {
-    width: 36px;
-    height: 36px;
-    border-radius: var(--radius);
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -288,21 +283,17 @@
     display: inline-flex;
     align-items: center;
     gap: 3px;
-    font-size: 0.72rem;
+    font-size: 0.78rem;
     font-weight: 600;
     margin-top: 6px;
-    padding: 2px 8px;
-    border-radius: 12px;
 }
 
 .dash-stat-change.up {
-    color: #2e7d32;
-    background: #e8f5e9;
+    color: #16a34a;
 }
 
 .dash-stat-change.down {
-    color: #c62828;
-    background: #ffebee;
+    color: #ef4444;
 }
 
 /* --- Cards --- */

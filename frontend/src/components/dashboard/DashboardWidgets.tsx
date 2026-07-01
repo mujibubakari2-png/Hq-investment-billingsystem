@@ -5,6 +5,7 @@
  * All components are pure/presentational — data is passed as props from Dashboard.tsx.
  */
 
+import type { ReactNode } from 'react';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import TrendingDownIcon from '@mui/icons-material/TrendingDown';
 import VisibilityIcon from '@mui/icons-material/Visibility';
@@ -133,7 +134,7 @@ export function DateTimeBar({ dateStr, timeStr, loading, onRefresh }: DateTimeBa
 
 interface StatCardData {
     label: string; value: string; subtitle: string | null;
-    change: number | null; color: string; icon?: string; accent: string;
+    change: number | null; iconBg: string; iconColor: string; icon?: ReactNode; accent: string;
 }
 
 interface StatCardsProps {
@@ -151,14 +152,14 @@ export function StatCards({ cards, hiddenCards, idOffset = 0, onToggle }: StatCa
                 return (
                     <div className={`dash-stat-card ${card.accent}`} key={id}>
                         <div className="dash-stat-top">
-                            <div className="dash-stat-icon-wrap" style={{ color: card.color }}>
-                                {card.icon && <span style={{ fontSize: 20 }}>{card.icon}</span>}
+                            <div className="dash-stat-icon-wrap" style={{ background: card.iconBg, color: card.iconColor }}>
+                                {card.icon}
                             </div>
                             <button className="dash-stat-eye" onClick={() => onToggle(id)} title={hiddenCards.has(id) ? 'Show' : 'Hide'}>
                                 {hiddenCards.has(id) ? <VisibilityOffIcon style={{ fontSize: 16 }} /> : <VisibilityIcon style={{ fontSize: 16 }} />}
                             </button>
                         </div>
-                        <div className="dash-stat-value" style={{ color: card.color }}>
+                        <div className="dash-stat-value">
                             {hiddenCards.has(id) ? '•••••' : card.value}
                         </div>
                         <div className="dash-stat-label">{card.label}</div>
@@ -166,7 +167,7 @@ export function StatCards({ cards, hiddenCards, idOffset = 0, onToggle }: StatCa
                         {card.change !== null && card.change !== undefined && (
                             <div className={`dash-stat-change ${card.change >= 0 ? 'up' : 'down'}`}>
                                 {card.change >= 0 ? <TrendingUpIcon style={{ fontSize: 14 }} /> : <TrendingDownIcon style={{ fontSize: 14 }} />}
-                                {card.change >= 0 ? '▲' : '▼'} {card.change >= 0 ? '+' : '-'}{Math.abs(card.change).toFixed(1)}%
+                                {card.change >= 0 ? '+' : '-'}{Math.abs(card.change).toFixed(0)}%
                             </div>
                         )}
                     </div>
