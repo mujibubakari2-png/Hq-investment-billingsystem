@@ -42,6 +42,7 @@ export const paymentChannelTestApi = {
 
 export interface DashboardResponse {
     todayRevenue: number;
+    todayRevenueTrend?: number;
     monthlyRevenue: number;
     todayRechargesMobile: number;
     monthlyRechargesMobile: number;
@@ -50,6 +51,7 @@ export interface DashboardResponse {
     totalClients: number;
     newCustomersThisMonth: number;
     todayVoucherRev: number;
+    todayVoucherRevTrend?: number;
     vouchersUsedToday: number;
     vouchersGeneratedToday?: number;
     monthlyVoucherRev: number;

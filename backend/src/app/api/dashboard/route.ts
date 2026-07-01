@@ -188,6 +188,10 @@ export async function GET(req: NextRequest) {
         lastMonthStart.setMonth(lastMonthStart.getMonth() - 1);
         const lastMonthEnd = new Date(monthStart);
 
+        // Yesterday's boundaries (Africa/Dar_es_Salaam) — used for today-vs-yesterday trend badges
+        const yesterdayStart = new Date(todayStart);
+        yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+
         const lastYear = new Date();
         lastYear.setFullYear(lastYear.getFullYear() - 1);
 
@@ -218,6 +222,9 @@ export async function GET(req: NextRequest) {
             packagesData,
             hotspotOnlineUsers,
             pppoeOnlineUsers,
+            // Yesterday comparisons (for today-vs-yesterday trend badges)
+            yesterdayRevenue,
+            yesterdayVoucherRev,
         ] = await Promise.all([
             db.client.count({ where: tenantFilter }),
             db.subscription.count({ where: { status: "ACTIVE", ...tenantFilter, ...routerFilter } }),
@@ -314,9 +321,25 @@ export async function GET(req: NextRequest) {
             db.radAcct.count({ where: { acctstoptime: null, framedprotocol: { not: "PPP" }, ...tenantFilter } }),
             // RADIUS-based PPPoE online count (acctstoptime IS NULL, framedprotocol = PPP)
             db.radAcct.count({ where: { acctstoptime: null, framedprotocol: "PPP", ...tenantFilter } }),
+            isAdmin ? db.transaction.aggregate({
+                where: {
+                    status: "COMPLETED",
+                    createdAt: { gte: yesterdayStart, lt: todayStart },
+                    ...tenantFilter,
+                },
+                _sum: { amount: true },
+            }) : Promise.resolve({ _sum: { amount: 0 } }),
+            isAdmin ? db.transaction.aggregate({
+                where: { status: "COMPLETED", type: "VOUCHER", createdAt: { gte: yesterdayStart, lt: todayStart }, ...tenantFilter },
+                _sum: { amount: true }
+            }) : Promise.resolve({ _sum: { amount: 0 } }),
         ]);
 
         // Calculate analytics trends
+        // NOTE: when the current value drops to 0 while the previous value was > 0, the
+        // real percentage change IS -100% (a full drop) — that is correct and expected,
+        // not a bug. The only bug case to guard against is 0 -> 0 (no data either period),
+        // which should read as "0% / no change" rather than leaking a stray value.
         const currRev = monthlyRevenue._sum.amount || 0;
         const prevRev = lastMonthRevenue._sum.amount || 0;
         const monthlyRevenueTrend = prevRev === 0 ? (currRev > 0 ? 100 : 0) : ((currRev - prevRev) / prevRev) * 100;
@@ -324,6 +347,16 @@ export async function GET(req: NextRequest) {
         const currVoucherRev = monthlyVoucherRev._sum.amount || 0;
         const prevVoucherRev = lastMonthVoucherRev._sum.amount || 0;
         const monthlyVoucherRevTrend = prevVoucherRev === 0 ? (currVoucherRev > 0 ? 100 : 0) : ((currVoucherRev - prevVoucherRev) / prevVoucherRev) * 100;
+
+        // Today's Revenue vs Yesterday
+        const currTodayRev = todayRevenue._sum.amount || 0;
+        const prevTodayRev = yesterdayRevenue._sum.amount || 0;
+        const todayRevenueTrend = prevTodayRev === 0 ? (currTodayRev > 0 ? 100 : 0) : ((currTodayRev - prevTodayRev) / prevTodayRev) * 100;
+
+        // Today's Voucher Revenue vs Yesterday
+        const currTodayVoucherRev = todayVoucherRev._sum.amount || 0;
+        const prevTodayVoucherRev = yesterdayVoucherRev._sum.amount || 0;
+        const todayVoucherRevTrend = prevTodayVoucherRev === 0 ? (currTodayVoucherRev > 0 ? 100 : 0) : ((currTodayVoucherRev - prevTodayVoucherRev) / prevTodayVoucherRev) * 100;
 
         let revenueChartData: any[] = [];
         let revenueAnalytics = { daily: [], weekly: [], monthly: [], yearly: [] } as any;
@@ -515,10 +548,12 @@ export async function GET(req: NextRequest) {
             totalRevenue: totalRevenue._sum.amount || 0,
             revenue: totalRevenue._sum.amount || 0,
             todayRevenue: todayRevenue._sum.amount || 0,
+            todayRevenueTrend, // Added trend (vs yesterday)
             monthlyRevenue: monthlyRevenue._sum.amount || 0,
             monthlyRevenueTrend, // Added trend
 
             todayVoucherRev: todayVoucherRev._sum.amount || 0,
+            todayVoucherRevTrend, // Added trend (vs yesterday)
             monthlyVoucherRev: monthlyVoucherRev._sum.amount || 0,
             monthlyVoucherRevTrend, // Added trend
             vouchersUsedToday,

@@ -175,7 +175,7 @@ export default function RenewLicense() {
     const packages = [
         { months: 1,  title: '1 Month License',  subtitle: 'Standard 30-day license',                                                                   price: basePrice,                                  save: 0 },
         { months: 3,  title: '3 Months License',  subtitle: `Save TZS ${(basePrice * 3 * 0.167).toLocaleString()} (16.7% off)`,                          price: basePrice * 3  - (basePrice * 3  * 0.167),  save: basePrice * 3  * 0.167 },
-        { months: 6,  title: '6 Months License',  subtitle: 'Best value for half year',                                                                   price: basePrice * 6  - (basePrice * 6  * 0.20),   save: basePrice * 6  * 0.20 },
+        { months: 6,  title: '6 Months License',  subtitle: `Save TZS ${(basePrice * 6 * 0.167).toLocaleString()} (16.7% off)`,                          price: basePrice * 6  - (basePrice * 6  * 0.167),  save: basePrice * 6  * 0.167 },
         { months: 12, title: '12 Months License', subtitle: `Save TZS ${(basePrice * 12 * 0.167).toLocaleString()} (16.7% off)`,                         price: basePrice * 12 - (basePrice * 12 * 0.167),  save: basePrice * 12 * 0.167 },
     ];
 
@@ -563,7 +563,20 @@ export default function RenewLicense() {
                 </div>
 
                 {/* Right Column - Invoice Preview */}
-                <div style={{ flex: '1 1 400px', background: '#fff', borderRadius: '12px', boxShadow: 'var(--shadow-md)', padding: 'clamp(14px, 3.5vw, 2rem)', display: 'flex', flexDirection: 'column', overflowX: 'auto' }}>
+                <div style={{ flex: '1 1 400px', background: '#fff', borderRadius: '12px', boxShadow: 'var(--shadow-md)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                    {(() => {
+                        const dueDateStr = license?.pendingInvoices?.[0]?.dueDate;
+                        if (!dueDateStr) return null;
+                        const daysOverdue = Math.floor((Date.now() - new Date(dueDateStr).getTime()) / (1000 * 60 * 60 * 24));
+                        if (daysOverdue <= 0) return null;
+                        return (
+                            <div style={{ background: '#d32f2f', color: '#fff', padding: '8px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.78rem', fontWeight: 700, letterSpacing: 0.5 }}>
+                                <span>⛔ OVERDUE</span>
+                                <span>{daysOverdue} {daysOverdue === 1 ? 'day' : 'days'} past due</span>
+                            </div>
+                        );
+                    })()}
+                    <div style={{ padding: 'clamp(14px, 3.5vw, 2rem)', display: 'flex', flexDirection: 'column', flex: 1, overflowX: 'auto' }}>
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginBottom: '2rem' }}>
                         <button className="btn btn-outline" style={{ display: 'flex', alignItems: 'center', gap: '4px' }} onClick={handlePrintInvoice}><PrintIcon fontSize="small" /> Print</button>
                         <button className="btn btn-outline" style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#333', color: 'white' }} onClick={() => { alert('Choose "Save as PDF" as the destination in the print dialog to save.'); handlePrintInvoice(); }}><DescriptionIcon fontSize="small" /> PDF</button>
@@ -650,6 +663,7 @@ export default function RenewLicense() {
 
                     <div style={{ background: '#f8f9fa', padding: '1rem', textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-secondary)', borderRadius: '4px', borderTop: '1px solid var(--border-light)', marginTop: '2rem' }}>
                         Thank you for your business! Questions? Contact support@{license?.platformName ? license.platformName.toLowerCase().replace(/\s+/g, '') : 'company'}.com
+                    </div>
                     </div>
                 </div>
 

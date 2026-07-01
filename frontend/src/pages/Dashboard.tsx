@@ -35,7 +35,7 @@ import './Dashboard.css';
 
 function fmt(n: number) { return `TSH ${n.toLocaleString('en-US', { minimumFractionDigits: 2 })}`; }
 
-function getTrendMeta(currentValue: number | undefined, trend: number | null | undefined) {
+function getTrendMeta(currentValue: number | undefined, trend: number | null | undefined, noun = 'Sales') {
     if (trend === null || trend === undefined || Number.isNaN(trend)) {
         return { change: null as number | null, subtitle: null as string | null };
     }
@@ -44,14 +44,20 @@ function getTrendMeta(currentValue: number | undefined, trend: number | null | u
     const normalizedTrend = Number(trend ?? 0);
     const direction = normalizedTrend >= 0 ? 'up' : 'down';
     const absoluteTrend = Math.abs(normalizedTrend);
-    const previousValue = normalizedTrend === 0 ? safeCurrent : safeCurrent / (1 + normalizedTrend / 100);
+    const divisor = 1 + normalizedTrend / 100;
+    // Guard against division by zero / negative divisor (e.g. a -100% drop to zero) —
+    // without this guard, previousValue becomes Infinity/NaN and the subtitle breaks.
+    const previousValue = normalizedTrend === 0 || divisor <= 0 ? safeCurrent : safeCurrent / divisor;
     const changeAmount = Math.abs(safeCurrent - previousValue);
+    const hasValidAmount = Number.isFinite(changeAmount);
 
     return {
         change: Math.round(normalizedTrend),
         subtitle: normalizedTrend === 0
             ? 'No change vs last period'
-            : `Sales ${direction === 'up' ? 'up' : 'down'} by ${fmt(changeAmount)}`,
+            : !hasValidAmount
+                ? `${noun} ${direction === 'up' ? 'up' : 'down'} vs last period`
+                : `${noun} ${direction === 'up' ? 'up' : 'down'} by ${fmt(changeAmount)}`,
         percentLabel: `${direction === 'up' ? '+' : '-'}${absoluteTrend.toFixed(1)}%`,
     };
 }
@@ -114,18 +120,21 @@ export default function Dashboard() {
     const dateStr = now.toLocaleDateString('en-US', { timeZone: 'Africa/Dar_es_Salaam', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     const timeStr = now.toLocaleTimeString('en-US', { timeZone: 'Africa/Dar_es_Salaam', hour12: false });
 
-    const monthlyRevenueTrend = getTrendMeta(stats?.monthlyRevenue, stats?.monthlyRevenueTrend);
-    const monthlyVoucherTrend = getTrendMeta(stats?.monthlyVoucherRev, stats?.monthlyVoucherRevTrend);
+    const todayRevenueTrend = getTrendMeta(stats?.todayRevenue, stats?.todayRevenueTrend, 'Revenue');
+    const monthlyRevenueTrend = getTrendMeta(stats?.monthlyRevenue, stats?.monthlyRevenueTrend, 'Sales');
+    const todayVoucherTrend = getTrendMeta(stats?.todayVoucherRev, stats?.todayVoucherRevTrend, 'Voucher revenue');
+    const monthlyVoucherTrend = getTrendMeta(stats?.monthlyVoucherRev, stats?.monthlyVoucherRevTrend, 'Voucher revenue');
 
     const revenueCards = [
-        { label: "Today's Revenue", value: fmt(stats?.todayRevenue ?? 0), subtitle: `${stats?.todayRechargesMobile || 0} payments received today`, change: null, color: '#e53935', icon: '💰', accent: 'accent-red' },
+        { label: "Today's Revenue", value: fmt(stats?.todayRevenue ?? 0), subtitle: todayRevenueTrend.subtitle ?? `${stats?.todayRechargesMobile || 0} payments received today`, change: todayRevenueTrend.change, color: '#e53935', icon: '💰', accent: 'accent-red' },
         { label: 'Monthly Revenue', value: fmt(stats?.monthlyRevenue ?? 0), subtitle: monthlyRevenueTrend.subtitle ?? `${stats?.monthlyRechargesMobile || 0} payments this month`, change: monthlyRevenueTrend.change, color: '#00bcd4', icon: '📊', accent: 'accent-blue' },
+        // Active Subscribers & Total Customers show a plain headcount — no % change badge
         { label: 'Active Subscribers', value: String(stats?.activeSubscribers ?? 0), subtitle: `⚡ ${stats?.onlineUsers ?? 0} currently online`, change: null, color: '#4caf50', icon: '👥', accent: 'accent-green' },
         { label: 'Total Customers', value: String(stats?.totalClients ?? 0), subtitle: `${stats?.newCustomersThisMonth || 0} new this month`, change: null, color: '#9c27b0', icon: '🔋', accent: 'accent-purple' },
     ];
 
     const voucherCards = [
-        { label: 'Today Voucher Rev', value: fmt(stats?.todayVoucherRev ?? 0), subtitle: `${stats?.vouchersUsedToday || 0} active vouchers`, change: null, color: '#2196f3', accent: 'accent-blue' },
+        { label: 'Today Voucher Rev', value: fmt(stats?.todayVoucherRev ?? 0), subtitle: todayVoucherTrend.subtitle ?? `${stats?.vouchersUsedToday || 0} active vouchers`, change: todayVoucherTrend.change, color: '#2196f3', accent: 'accent-blue' },
         { label: 'Monthly Voucher Rev', value: fmt(stats?.monthlyVoucherRev ?? 0), subtitle: monthlyVoucherTrend.subtitle ?? `${stats?.vouchersUsedMonth || 0} active vouchers`, change: monthlyVoucherTrend.change, color: '#e91e63', accent: 'accent-red' },
     ];
 
