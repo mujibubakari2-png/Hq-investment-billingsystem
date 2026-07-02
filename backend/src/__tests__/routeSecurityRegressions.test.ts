@@ -87,8 +87,8 @@ describe('RBAC Permission Guards Regression Tests', () => {
             expect(hasPermission(role, 'license:read')).toBe(false);
         });
 
-        it('ADMIN can write payment-channels', () => {
-            expect(hasPermission(role, 'payment-channels:write')).toBe(true);
+        it('ADMIN cannot write payment-channels (SUPER_ADMIN only)', () => {
+            expect(hasPermission(role, 'payment-channels:write')).toBe(false);
         });
     });
 
