@@ -108,15 +108,15 @@ const navSections: NavSection[] = [
     {
         // Administration: tenant SUPER_ADMIN sees most items; platformOnly items filtered separately
         title: 'ADMINISTRATION',
-        roles: ['SUPER_ADMIN'],
+        roles: ['SUPER_ADMIN', 'ADMIN'],
         items: [
-            { label: 'System Settings',    icon: 'settings', path: '/system-settings' },
+            { label: 'System Settings',    icon: 'settings', path: '/system-settings', roles: ['SUPER_ADMIN'] },
             { label: 'Payment Channels',   icon: 'payment',  path: '/payment-channels' },
-            { label: 'System Users',       icon: 'admin',    path: '/system-users' },
+            { label: 'System Users',       icon: 'admin',    path: '/system-users', roles: ['SUPER_ADMIN'] },
             // License Management: visible to ALL tenant SUPER_ADMINs (not platformOnly)
-            { label: 'License Management', icon: 'license',  path: '/license-management' },
-            { label: 'Hotspot Customizer', icon: 'router',   path: '/hotspot-customizer' },
-            { label: 'Audit Logs',         icon: 'audit',    path: '/audit-logs' },
+            { label: 'License Management', icon: 'license',  path: '/license-management', roles: ['SUPER_ADMIN'] },
+            { label: 'Hotspot Customizer', icon: 'router',   path: '/hotspot-customizer', roles: ['SUPER_ADMIN'] },
+            { label: 'Audit Logs',         icon: 'audit',    path: '/audit-logs', roles: ['SUPER_ADMIN'] },
         ],
     },
     {

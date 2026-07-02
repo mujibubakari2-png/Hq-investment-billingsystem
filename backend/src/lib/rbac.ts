@@ -31,10 +31,10 @@ export const PERMISSIONS = {
   "license:purchase": ["SUPER_ADMIN"],
   "license:renew": ["SUPER_ADMIN"],
 
-  // Payment gateway configuration — SUPER_ADMIN only
-  // Sub-users inherit the gateway config set by Super Admin
-  "payment-channels:write": ["SUPER_ADMIN"],
-  "payment-channels:read": ["SUPER_ADMIN"],
+  // Payment gateway configuration — SUPER_ADMIN and ADMIN (tenant managers)
+  // Sub-users inherit the gateway config set by managers
+  "payment-channels:write": ["SUPER_ADMIN", "ADMIN"],
+  "payment-channels:read": ["SUPER_ADMIN", "ADMIN"],
 
   // System-wide settings — SUPER_ADMIN only
   "system-settings:write": ["SUPER_ADMIN"],

@@ -140,16 +140,9 @@ export default function App() {
                   {/* ── SUPER_ADMIN ONLY ADMINISTRATION ROUTES ────────────────── */}
                   <Route element={<RoleGuard roles={['SUPER_ADMIN']} />}>
                     <Route path="/system-settings"    element={<SystemSettings />} />
-                    <Route path="/payment-channels"   element={<PaymentChannels />} />
                     <Route path="/system-users"       element={<SystemUsers />} />
                     <Route path="/hotspot-customizer" element={<HotspotLoginCustomizer />} />
                     <Route path="/audit-logs"         element={<AuditLogs />} />
-                    {/* Payment provider config pages */}
-                    <Route path="/bank-payment-config"  element={<BankPaymentConfig />} />
-                    <Route path="/harakapay-config"     element={<HarakaPayConfig />} />
-                    <Route path="/palmpesa-config"      element={<PalmPesaConfig />} />
-                    <Route path="/zenopay-config"       element={<ZenoPayConfig />} />
-                    <Route path="/mongike-config"       element={<MongikeConfig />} />
                     {/* Router setup requires admin privileges */}
                     <Route path="/router-setup/:id"     element={<RouterSetupWizard />} />
                   </Route>
@@ -164,6 +157,12 @@ export default function App() {
                     <Route path="/add-package"     element={<AddPackage />} />
                     <Route path="/edit-package/:id" element={<EditPackage />} />
                     <Route path="/edit-plan/:id"   element={<EditPlan />} />
+                    <Route path="/payment-channels"   element={<PaymentChannels />} />
+                    <Route path="/bank-payment-config"  element={<BankPaymentConfig />} />
+                    <Route path="/harakapay-config"     element={<HarakaPayConfig />} />
+                    <Route path="/palmpesa-config"      element={<PalmPesaConfig />} />
+                    <Route path="/zenopay-config"       element={<ZenoPayConfig />} />
+                    <Route path="/mongike-config"       element={<MongikeConfig />} />
                   </Route>
 
                   {/* MISC (all authenticated users) */}
