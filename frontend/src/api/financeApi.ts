@@ -113,6 +113,8 @@ export const licenseApi = {
         post<{ success: boolean; message: string; status: string; reference: string; provider?: string; providerRef?: string | null; paymentId?: string; expiresAt?: string }>('/license/renew', data),
     changePlan:  (planId: string) =>
         post<{ message: string; plan: { id: string; name: string; price: number; pppoeLimit: number; hotspotLimit: number | null; maxRouters: number } }>('/license/change-plan', { planId }),
+    verifyCoupon: (couponCode: string) =>
+        post<{ success: boolean; message: string }>('/license/verify-coupon', { couponCode }),
 };
 
 export interface SaasPlan { id: string; name: string; price: number; pppoeLimit: number; hotspotLimit: number | null; maxRouters: number; }

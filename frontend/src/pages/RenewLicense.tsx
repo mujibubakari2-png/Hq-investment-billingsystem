@@ -5,6 +5,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import PrintIcon from '@mui/icons-material/Print';
 import DescriptionIcon from '@mui/icons-material/Description';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
+import LockIcon from '@mui/icons-material/Lock';
 import { licenseApi, saasPlansApi, type LicenseResponse, type SaasPlan } from '../api';
 import authStore from '../stores/authStore';
 import { formatDate } from '../utils/formatters';
@@ -20,6 +21,7 @@ export default function RenewLicense() {
     const [phone, setPhone] = useState(user?.phone || '');
     const [name, setName] = useState(user?.fullName || user?.username || '');
     const [email, setEmail] = useState(user?.email || '');
+    const [couponCode, setCouponCode] = useState('');
     const [submitting, setSubmitting] = useState(false);
 
     // Payment flow state machine
@@ -162,7 +164,7 @@ export default function RenewLicense() {
         }, 60_000);
 
         return stop;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [paymentState.status, paymentState.reference]);
 
     const activePlan = allPlans.find(p => p.id === selectedPlanId) || license?.plan;
@@ -173,15 +175,39 @@ export default function RenewLicense() {
         : (location.state?.amount || 0);
 
     const packages = [
-        { months: 1,  title: '1 Month License',  subtitle: 'Standard 30-day license',                                                                   price: basePrice,                                  save: 0 },
-        { months: 3,  title: '3 Months License',  subtitle: `Save TZS ${(basePrice * 3 * 0.167).toLocaleString()} (16.7% off)`,                          price: basePrice * 3  - (basePrice * 3  * 0.167),  save: basePrice * 3  * 0.167 },
-        { months: 6,  title: '6 Months License',  subtitle: `Save TZS ${(basePrice * 6 * 0.167).toLocaleString()} (16.7% off)`,                          price: basePrice * 6  - (basePrice * 6  * 0.167),  save: basePrice * 6  * 0.167 },
-        { months: 12, title: '12 Months License', subtitle: `Save TZS ${(basePrice * 12 * 0.167).toLocaleString()} (16.7% off)`,                         price: basePrice * 12 - (basePrice * 12 * 0.167),  save: basePrice * 12 * 0.167 },
+        { months: 1, title: '1 Month License', subtitle: 'Standard 30-day license', price: basePrice, save: 0 },
+        { months: 3, title: '3 Months License', subtitle: `Save TZS ${(basePrice * 3 * 0.167).toLocaleString()} (16.7% off)`, price: basePrice * 3 - (basePrice * 3 * 0.167), save: basePrice * 3 * 0.167 },
+        { months: 6, title: '6 Months License', subtitle: `Save TZS ${(basePrice * 6 * 0.167).toLocaleString()} (16.7% off)`, price: basePrice * 6 - (basePrice * 6 * 0.167), save: basePrice * 6 * 0.167 },
+        { months: 12, title: '12 Months License', subtitle: `Save TZS ${(basePrice * 12 * 0.167).toLocaleString()} (16.7% off)`, price: basePrice * 12 - (basePrice * 12 * 0.167), save: basePrice * 12 * 0.167 },
     ];
 
     const getAmountToPay = () => {
         if (selectedPackage === 0) return pendingAmount;
-        return packages.find(p => p.months === selectedPackage)?.price || 0;
+        const pkg = packages.find(p => p.months === selectedPackage);
+        return pkg ? pkg.price : 0;
+    };
+
+    const handleApplyCoupon = async () => {
+        if (!couponCode.trim()) return;
+        try {
+            setSubmitting(true);
+            setPaymentState({ status: 'SENDING', message: 'Verifying payment reference...' });
+            
+            const res = await licenseApi.verifyCoupon(couponCode);
+            if (res.success) {
+                setPaymentState({ status: 'COMPLETED', message: res.message || "Payment verified successfully. Your account is now active!" });
+                // Optionally reload after a short delay
+                setTimeout(() => {
+                    window.location.href = '/dashboard';
+                }, 2500);
+            } else {
+                setPaymentState({ status: 'FAILED', message: res.message || "Invalid Reference or Coupon Code" });
+            }
+        } catch (err: any) {
+            setPaymentState({ status: 'FAILED', message: err?.message || "Invalid Reference or Coupon Code" });
+        } finally {
+            setSubmitting(false);
+        }
     };
 
     const handlePayment = async () => {
@@ -240,13 +266,13 @@ export default function RenewLicense() {
     };
 
     const handlePrintInvoice = () => {
-        const issueDate  = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        const issueDate = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
         const periodFrom = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-        const periodTo   = new Date(Date.now() + (selectedPackage || 1) * 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-        const dueDate    = license?.pendingInvoices?.[0]?.dueDate || 'Immediately';
+        const periodTo = new Date(Date.now() + (selectedPackage || 1) * 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        const dueDate = license?.pendingInvoices?.[0]?.dueDate || 'Immediately';
         const invoiceRef = license?.pendingInvoices?.[0]?.invoiceNumber || 'INV-RENEWAL';
         const description = selectedPackage === 0 ? 'Invoice Balance' : `${currentPlanName} — License Fee (${selectedPackage} Month${selectedPackage > 1 ? 's' : ''})`;
-        const amount     = getAmountToPay().toLocaleString(undefined, { maximumFractionDigits: 0 });
+        const amount = getAmountToPay().toLocaleString(undefined, { maximumFractionDigits: 0 });
 
         const printContent = `
             <html><head><title>Invoice ${invoiceRef}</title>
@@ -412,7 +438,7 @@ export default function RenewLicense() {
 
     if (['FAILED', 'CANCELLED', 'EXPIRED', 'TIMEOUT', 'UNKNOWN'].includes(paymentState.status)) {
         const isCancelled = paymentState.status === 'CANCELLED';
-        const isTimeout   = paymentState.status === 'TIMEOUT';
+        const isTimeout = paymentState.status === 'TIMEOUT';
         return (
             <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: 'var(--bg-lighter)', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-family)', padding: '2rem' }}>
                 <div className="card" style={{ maxWidth: 560, width: '100%', padding: '2.5rem 2rem', textAlign: 'center', boxShadow: 'var(--shadow-md)', borderTop: '4px solid #b91c1c' }}>
@@ -525,6 +551,29 @@ export default function RenewLicense() {
                             </div>
                         )}
 
+                        {/* Coupon Code Section */}
+                        <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                            <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Have a Coupon Code?</div>
+                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                <input
+                                    type="text"
+                                    className="form-control"
+                                    placeholder="Enter coupon code"
+                                    value={couponCode}
+                                    onChange={e => setCouponCode(e.target.value)}
+                                    style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid var(--border-light)' }}
+                                />
+                                <button
+                                    className="btn btn-secondary"
+                                    style={{ border: '1px solid var(--border-light)', background: '#f8f9fa', padding: '0 1rem', borderRadius: '8px', fontWeight: 600 }}
+                                    onClick={handleApplyCoupon}
+                                    disabled={submitting}
+                                >
+                                    {submitting ? 'Verifying...' : 'Verify'}
+                                </button>
+                            </div>
+                        </div>
+
                         <div style={{ background: '#f5f5f5', padding: '1.5rem', borderRadius: '8px', textAlign: 'center', marginTop: '1rem' }}>
                             <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Amount to Pay</div>
                             <div style={{ fontSize: '2rem', fontWeight: 700, margin: '0.5rem 0' }}>
@@ -557,8 +606,15 @@ export default function RenewLicense() {
                             onClick={handlePayment}
                             disabled={submitting}
                         >
-                            <PaymentIcon fontSize="small" /> {submitting ? 'Processing...' : `Pay TZS ${getAmountToPay().toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
+                            <LockIcon fontSize="small" style={{ marginRight: '4px' }} /> {submitting ? 'Processing...' : `Pay TZS ${getAmountToPay().toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
                         </button>
+
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', color: 'var(--text-secondary)', fontSize: '0.8rem', marginTop: '0.5rem' }}>
+                            <LockIcon style={{ fontSize: 16 }} /> Secure payments
+                        </div>
+                        <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '0.25rem' }}>
+                            You'll receive a prompt on your phone to confirm payment.
+                        </div>
                     </div>
                 </div>
 
@@ -577,93 +633,93 @@ export default function RenewLicense() {
                         );
                     })()}
                     <div style={{ padding: 'clamp(14px, 3.5vw, 2rem)', display: 'flex', flexDirection: 'column', flex: 1, overflowX: 'auto' }}>
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginBottom: '2rem' }}>
-                        <button className="btn btn-outline" style={{ display: 'flex', alignItems: 'center', gap: '4px' }} onClick={handlePrintInvoice}><PrintIcon fontSize="small" /> Print</button>
-                        <button className="btn btn-outline" style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#333', color: 'white' }} onClick={() => { alert('Choose "Save as PDF" as the destination in the print dialog to save.'); handlePrintInvoice(); }}><DescriptionIcon fontSize="small" /> PDF</button>
-                    </div>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginBottom: '2rem' }}>
+                            <button className="btn btn-outline" style={{ display: 'flex', alignItems: 'center', gap: '4px' }} onClick={handlePrintInvoice}><PrintIcon fontSize="small" /> Print</button>
+                            <button className="btn btn-outline" style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#333', color: 'white' }} onClick={() => { alert('Choose "Save as PDF" as the destination in the print dialog to save.'); handlePrintInvoice(); }}><DescriptionIcon fontSize="small" /> PDF</button>
+                        </div>
 
-                    <div style={{ borderTop: '4px solid #d32f2f', paddingTop: '1.5rem', display: 'flex', justifyContent: 'space-between', marginBottom: '2rem' }}>
-                        <div>
-                            <h2 style={{ fontSize: '1.2rem', fontWeight: 700, margin: '0 0 0.5rem 0' }}>{license?.platformName || 'Our Company'}</h2>
-                            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                                support@{license?.platformName ? license.platformName.toLowerCase().replace(/\s+/g, '') : 'company'}.com<br />
-                                {license?.platformPhone || '+255787109988'}
+                        <div style={{ borderTop: '4px solid #d32f2f', paddingTop: '1.5rem', display: 'flex', justifyContent: 'space-between', marginBottom: '2rem' }}>
+                            <div>
+                                <h2 style={{ fontSize: '1.2rem', fontWeight: 700, margin: '0 0 0.5rem 0' }}>{license?.platformName || 'Our Company'}</h2>
+                                <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                                    support@{license?.platformName ? license.platformName.toLowerCase().replace(/\s+/g, '') : 'company'}.com<br />
+                                    {license?.platformPhone || '+255787109988'}
+                                </div>
+                            </div>
+                            <div style={{ textAlign: 'right' }}>
+                                <h1 style={{ fontSize: '1.5rem', fontWeight: 300, color: 'var(--text-secondary)', letterSpacing: 2, margin: '0 0 0.5rem 0' }}>INVOICE</h1>
+                                <div style={{ fontWeight: 600 }}>{license?.pendingInvoices?.[0]?.invoiceNumber || 'INV-RENEWAL'}</div>
                             </div>
                         </div>
-                        <div style={{ textAlign: 'right' }}>
-                            <h1 style={{ fontSize: '1.5rem', fontWeight: 300, color: 'var(--text-secondary)', letterSpacing: 2, margin: '0 0 0.5rem 0' }}>INVOICE</h1>
-                            <div style={{ fontWeight: 600 }}>{license?.pendingInvoices?.[0]?.invoiceNumber || 'INV-RENEWAL'}</div>
-                        </div>
-                    </div>
 
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2rem', justifyContent: 'space-between', marginBottom: '2rem' }}>
-                        <div>
-                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>BILL TO</div>
-                            <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>{license?.companyName?.toUpperCase() || name.toUpperCase()}</div>
-                            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>{email}<br />{phone}</div>
-                        </div>
-                        <div>
-                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>ISSUED</div>
-                            <div style={{ fontWeight: 500, marginBottom: '1rem' }}>{new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
-                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>PERIOD</div>
-                            <div style={{ fontWeight: 500 }}>
-                                {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} - {new Date(Date.now() + (selectedPackage || 1) * 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2rem', justifyContent: 'space-between', marginBottom: '2rem' }}>
+                            <div>
+                                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>BILL TO</div>
+                                <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>{license?.companyName?.toUpperCase() || name.toUpperCase()}</div>
+                                <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>{email}<br />{phone}</div>
+                            </div>
+                            <div>
+                                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>ISSUED</div>
+                                <div style={{ fontWeight: 500, marginBottom: '1rem' }}>{new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
+                                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>PERIOD</div>
+                                <div style={{ fontWeight: 500 }}>
+                                    {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} - {new Date(Date.now() + (selectedPackage || 1) * 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                </div>
+                            </div>
+                            <div style={{ textAlign: 'right' }}>
+                                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>DUE DATE</div>
+                                <div style={{ fontWeight: 500, color: '#d32f2f' }}>
+                                    {license?.pendingInvoices?.[0]?.dueDate ? formatDate(license.pendingInvoices[0].dueDate) : 'Immediately'}
+                                </div>
                             </div>
                         </div>
-                        <div style={{ textAlign: 'right' }}>
-                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>DUE DATE</div>
-                            <div style={{ fontWeight: 500, color: '#d32f2f' }}>
-                                {license?.pendingInvoices?.[0]?.dueDate ? formatDate(license.pendingInvoices[0].dueDate) : 'Immediately'}
+
+                        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '2rem' }}>
+                            <thead>
+                                <tr style={{ borderBottom: '2px solid var(--border-light)' }}>
+                                    <th style={{ textAlign: 'left', padding: '0.5rem 0', fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500 }}>DESCRIPTION</th>
+                                    <th style={{ textAlign: 'right', padding: '0.5rem 0', fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500 }}>QTY</th>
+                                    <th style={{ textAlign: 'right', padding: '0.5rem 0', fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500 }}>PRICE</th>
+                                    <th style={{ textAlign: 'right', padding: '0.5rem 0', fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500 }}>TOTAL</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr style={{ borderBottom: '1px solid var(--border-light)' }}>
+                                    <td style={{ padding: '1rem 0', fontWeight: 500, fontSize: '0.9rem' }}>
+                                        {selectedPackage === 0 ? 'Outstanding Invoice Balance' : `${currentPlanName} — License Fee (${selectedPackage} Month${selectedPackage > 1 ? 's' : ''})`}
+                                    </td>
+                                    <td style={{ padding: '1rem 0', textAlign: 'right', color: '#1976d2' }}>1</td>
+                                    <td style={{ padding: '1rem 0', textAlign: 'right' }}>TZS {getAmountToPay().toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
+                                    <td style={{ padding: '1rem 0', textAlign: 'right', fontWeight: 600 }}>TZS {getAmountToPay().toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '2rem' }}>
+                            <div style={{ width: 'min(250px, 100%)' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0', borderBottom: '1px solid var(--border-light)', fontSize: '0.9rem' }}>
+                                    <span style={{ color: 'var(--text-secondary)' }}>Subtotal</span>
+                                    <span>TZS {getAmountToPay().toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0', fontWeight: 700, fontSize: '1.1rem' }}>
+                                    <span>Balance Due</span>
+                                    <span>TZS {getAmountToPay().toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                                </div>
                             </div>
                         </div>
-                    </div>
 
-                    <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '2rem' }}>
-                        <thead>
-                            <tr style={{ borderBottom: '2px solid var(--border-light)' }}>
-                                <th style={{ textAlign: 'left', padding: '0.5rem 0', fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500 }}>DESCRIPTION</th>
-                                <th style={{ textAlign: 'right', padding: '0.5rem 0', fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500 }}>QTY</th>
-                                <th style={{ textAlign: 'right', padding: '0.5rem 0', fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500 }}>PRICE</th>
-                                <th style={{ textAlign: 'right', padding: '0.5rem 0', fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500 }}>TOTAL</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr style={{ borderBottom: '1px solid var(--border-light)' }}>
-                                <td style={{ padding: '1rem 0', fontWeight: 500, fontSize: '0.9rem' }}>
-                                    {selectedPackage === 0 ? 'Outstanding Invoice Balance' : `${currentPlanName} — License Fee (${selectedPackage} Month${selectedPackage > 1 ? 's' : ''})`}
-                                </td>
-                                <td style={{ padding: '1rem 0', textAlign: 'right', color: '#1976d2' }}>1</td>
-                                <td style={{ padding: '1rem 0', textAlign: 'right' }}>TZS {getAmountToPay().toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
-                                <td style={{ padding: '1rem 0', textAlign: 'right', fontWeight: 600 }}>TZS {getAmountToPay().toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
-                            </tr>
-                        </tbody>
-                    </table>
-
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '2rem' }}>
-                        <div style={{ width: 'min(250px, 100%)' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0', borderBottom: '1px solid var(--border-light)', fontSize: '0.9rem' }}>
-                                <span style={{ color: 'var(--text-secondary)' }}>Subtotal</span>
-                                <span>TZS {getAmountToPay().toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                        <div style={{ marginTop: 'auto' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
+                                <DescriptionIcon fontSize="small" /> Notes
                             </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0', fontWeight: 700, fontSize: '1.1rem' }}>
-                                <span>Balance Due</span>
-                                <span>TZS {getAmountToPay().toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
-                            </div>
+                            <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                                Auto-generated: License renewal - Cycle from {new Date().toLocaleDateString('en-US')} to {new Date(Date.now() + (selectedPackage || 1) * 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US')} - TSH {getAmountToPay().toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                            </p>
                         </div>
-                    </div>
 
-                    <div style={{ marginTop: 'auto' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
-                            <DescriptionIcon fontSize="small" /> Notes
+                        <div style={{ background: '#f8f9fa', padding: '1rem', textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-secondary)', borderRadius: '4px', borderTop: '1px solid var(--border-light)', marginTop: '2rem' }}>
+                            Thank you for your business! Questions? Contact support@{license?.platformName ? license.platformName.toLowerCase().replace(/\s+/g, '') : 'company'}.com
                         </div>
-                        <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                            Auto-generated: License renewal - Cycle from {new Date().toLocaleDateString('en-US')} to {new Date(Date.now() + (selectedPackage || 1) * 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US')} - TSH {getAmountToPay().toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                        </p>
-                    </div>
-
-                    <div style={{ background: '#f8f9fa', padding: '1rem', textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-secondary)', borderRadius: '4px', borderTop: '1px solid var(--border-light)', marginTop: '2rem' }}>
-                        Thank you for your business! Questions? Contact support@{license?.platformName ? license.platformName.toLowerCase().replace(/\s+/g, '') : 'company'}.com
-                    </div>
                     </div>
                 </div>
 

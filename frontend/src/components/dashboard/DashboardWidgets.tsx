@@ -19,6 +19,7 @@ import SettingsInputAntennaIcon from '@mui/icons-material/SettingsInputAntenna';
 import CableIcon from '@mui/icons-material/Cable';
 import WifiIcon from '@mui/icons-material/Wifi';
 import PersonIcon from '@mui/icons-material/Person';
+import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
 import SmsIcon from '@mui/icons-material/Sms';
 import PeopleIcon from '@mui/icons-material/People';
 import DataUsageIcon from '@mui/icons-material/DataUsage';
@@ -163,7 +164,18 @@ export function StatCards({ cards, hiddenCards, idOffset = 0, onToggle }: StatCa
                             {hiddenCards.has(id) ? '•••••' : card.value}
                         </div>
                         <div className="dash-stat-label">{card.label}</div>
-                        {card.subtitle && <div className="dash-stat-subtitle">{card.subtitle}</div>}
+                        {card.subtitle && (
+                            <div className="dash-stat-subtitle" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                {card.subtitle.startsWith('person_icon') ? (
+                                    <>
+                                        <PersonOutlineIcon style={{ fontSize: 14, color: card.iconColor }} />
+                                        {card.subtitle.replace('person_icon ', '')}
+                                    </>
+                                ) : (
+                                    card.subtitle
+                                )}
+                            </div>
+                        )}
                         {card.change !== null && card.change !== undefined && (
                             <div className={`dash-stat-change ${card.change >= 0 ? 'up' : 'down'}`}>
                                 {card.change >= 0 ? <TrendingUpIcon style={{ fontSize: 14 }} /> : <TrendingDownIcon style={{ fontSize: 14 }} />}

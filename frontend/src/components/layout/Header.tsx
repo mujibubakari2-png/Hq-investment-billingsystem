@@ -120,7 +120,7 @@ export default function Header({
             {license &&
                 typeof license.daysRemaining === 'number' &&
                 license.daysRemaining > 0 &&
-                license.daysRemaining <= 7 && (
+                license.daysRemaining <= 5 && (
                     <div
                         style={{
                             background: license.daysRemaining <= 2 ? '#fee2e2' : '#fef3c7',

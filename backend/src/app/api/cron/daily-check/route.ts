@@ -25,8 +25,8 @@ export async function GET(req: Request) {
         // E15 FIX: Widened window from exactly 2.1 days to 23h–25h (±1 hour around the 24h mark).
         // This guarantees exactly one notification per account per day even if the cron runs
         // slightly late or early, eliminating the silent miss from the original 2.1-day window.
-        const windowStart = new Date(now.getTime() + 23 * 60 * 60 * 1000); // 23 hours from now
-        const windowEnd = new Date(now.getTime() + 25 * 60 * 60 * 1000); // 25 hours from now
+        const windowStart = new Date(now.getTime() + 119 * 60 * 60 * 1000); // 119 hours from now (5 days - 1hr)
+        const windowEnd = new Date(now.getTime() + 121 * 60 * 60 * 1000); // 121 hours from now (5 days + 1hr)
 
         const db = getTenantClient(null);
         const expiringTenants = await db.tenant.findMany({
@@ -51,7 +51,7 @@ export async function GET(req: Request) {
         });
 
         if (expiringTenants.length === 0) {
-            return NextResponse.json({ message: "No tenants expiring in 2 days." });
+            return NextResponse.json({ message: "No tenants expiring in 5 days." });
         }
 
         const transporter = nodemailer.createTransport({
@@ -74,12 +74,12 @@ export async function GET(req: Request) {
                 const mailOptions = {
                     from: process.env.SMTP_FROM || '"HQ INVESTMENT" <no-reply@hqinvestment.local>',
                     to: tenant.email,
-                    subject: "Action Required: Your License Expires in 2 Days",
+                    subject: "Action Required: Your License Expires in 5 Days",
                     text: `Hello ${tenant.name},\n\nYour license is scheduled to expire on ${formattedDate}. Please log in to your dashboard and make a payment to renew your license before your account gets restricted.\n\nDashboard: ${getAppUrl()}/`,
                     html: `<div style="font-family: sans-serif; padding: 20px;">
                             <h2>Subscription Expiration Warning</h2>
                             <p>Hello <strong>${tenant.name}</strong>,</p>
-                            <p>This is a courtesy reminder that your license is expiring in <strong>2 days</strong> (on ${formattedDate}).</p>
+                            <p>This is a courtesy reminder that your license is expiring in <strong>5 days</strong> (on ${formattedDate}).</p>
                             <p>To avoid any service interruption and restriction of your account, please log in and generate an invoice payment.</p>
                             <a href="${getAppUrl()}/renew" style="background-color: #d97706; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin-top: 10px;">Renew Now</a>
                            </div>`

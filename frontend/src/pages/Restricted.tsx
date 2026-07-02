@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import LockPersonIcon from '@mui/icons-material/LockPerson';
-import PaymentIcon from '@mui/icons-material/Payment';
-import ConfirmationNumberIcon from '@mui/icons-material/ConfirmationNumber';
 import { licenseApi, type LicenseResponse } from '../api';
 import authStore from '../stores/authStore';
 import { formatDate } from '../utils/formatters';
@@ -41,48 +39,53 @@ export default function Restricted() {
                             }
                         </li>
                         {license?.hasOutstanding && (
-                            <li>You have {license?.outstandingInvoices?.length} overdue invoice totaling {outstandingTotal.toLocaleString()}/=. Please make payment to restore access.</li>
+                            <li>You have {pendingList.length} overdue invoice{pendingList.length !== 1 ? 's' : ''} totaling {outstandingTotal.toLocaleString()}/=. Please make payment to restore access.</li>
                         )}
                     </ul>
                 </div>
 
-                <div style={{ textAlign: 'left', marginBottom: '1.5rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                        <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Status</span>
-                        <span style={{ fontSize: '0.75rem', background: '#ffebee', color: '#d32f2f', padding: '2px 8px', borderRadius: '4px', fontWeight: 600 }}>{license?.status || 'SUSPENDED'}</span>
+                <div style={{ textAlign: 'left', marginBottom: '1.5rem', background: 'var(--bg-body)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                        <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>License Status</span>
+                        <span style={{ fontSize: '0.75rem', background: '#ffebee', color: '#d32f2f', padding: '4px 8px', borderRadius: '4px', fontWeight: 700 }}>{license?.status || 'EXPIRED'}</span>
                     </div>
                     {license?.expiresAt && (
-                        <div style={{ background: 'var(--bg-body)', padding: '0.75rem', borderRadius: '8px', display: 'flex', justifyContent: 'space-between' }}>
-                            <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>Expiry Date</span>
-                            <span style={{ fontSize: '0.85rem', color: '#d32f2f', fontWeight: 600 }}>{formatDate(license.expiresAt)}</span>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-secondary)' }}>Expiry Date</span>
+                            <span style={{ fontSize: '0.9rem', color: '#d32f2f', fontWeight: 700 }}>{formatDate(license.expiresAt)}</span>
                         </div>
                     )}
                 </div>
 
                 {license?.hasOutstanding && (
                     <div style={{ textAlign: 'left', marginBottom: '1.5rem' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Pending Invoices</span>
-                            <span style={{ fontSize: '0.75rem', background: '#ffebee', color: '#d32f2f', padding: '2px 8px', borderRadius: '4px', fontWeight: 600 }}>{pendingList.length} PENDING</span>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>Overdue Invoices</span>
+                            <span style={{ fontSize: '0.75rem', background: '#ffebee', color: '#d32f2f', padding: '4px 8px', borderRadius: '4px', fontWeight: 700 }}>{pendingList.length} OVERDUE</span>
                         </div>
                         {pendingList.map(inv => (
-                            <div key={inv.id} style={{ background: 'var(--bg-body)', padding: '0.75rem', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                            <div key={inv.id} style={{ background: 'var(--bg-body)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
                                 <div>
-                                    <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>{inv.invoiceNumber || inv.id.substring(0, 8).toUpperCase()}</div>
+                                    <div style={{ fontSize: '0.9rem', fontWeight: 700 }}>{inv.invoiceNumber || inv.id.substring(0, 8).toUpperCase()}</div>
                                     <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Due: {formatDate(inv.dueDate)}</div>
                                 </div>
-                                <div style={{ fontSize: '0.9rem', color: '#d32f2f', fontWeight: 600 }}>{inv.amount.toLocaleString()}/=</div>
+                                <div style={{ fontSize: '1rem', color: 'var(--text-primary)', fontWeight: 700 }}>{inv.amount.toLocaleString()}/=</div>
                             </div>
                         ))}
+
+                        <div style={{ background: '#d32f2f', padding: '1.25rem', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'white', marginTop: '1rem' }}>
+                            <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>Total Outstanding</span>
+                            <span style={{ fontSize: '1.5rem', fontWeight: 700 }}>{outstandingTotal.toLocaleString()}/=</span>
+                        </div>
                     </div>
                 )}
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    <button className="btn btn-primary" onClick={() => navigate('/renew', { state: { amount: outstandingTotal } })} style={{ width: '100%', background: '#1a1a2e', color: 'white' }}>
-                        <PaymentIcon fontSize="small" /> Pay Outstanding Invoices
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    <button className="btn btn-primary" onClick={() => navigate('/renew', { state: { amount: outstandingTotal } })} style={{ width: '100%', background: '#1a1a2e', color: 'white', padding: '0.75rem', fontWeight: 600 }}>
+                        Pay Outstanding Invoices
                     </button>
-                    <button className="btn btn-secondary" onClick={() => navigate('/license-management')} style={{ width: '100%', border: '1px solid var(--border-light)' }}>
-                        <ConfirmationNumberIcon fontSize="small" /> Renew License
+                    <button className="btn btn-secondary" onClick={() => navigate('/license-management')} style={{ width: '100%', background: '#ffffff', color: '#1a1a2e', border: '1px solid var(--border-light)', padding: '0.75rem', fontWeight: 600 }}>
+                        Renew License
                     </button>
                 </div>
             </div>

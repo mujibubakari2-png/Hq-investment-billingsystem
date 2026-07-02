@@ -134,13 +134,13 @@ export default function Dashboard() {
     // Card order & styling matches the reference design: 3-column grid, pastel icon
     // badges, no subtitle text on the % cards, plain (non-pill) trend indicator.
     const statCards = [
-        { label: "Today's Revenue", value: fmt(stats?.todayRevenue ?? 0), subtitle: null, change: todayRevenueTrend.change, iconBg: '#fee2e2', iconColor: '#e53935', icon: <AccountBalanceWalletIcon style={{ fontSize: 20 }} />, accent: 'accent-red' },
-        { label: 'Monthly Revenue', value: fmt(stats?.monthlyRevenue ?? 0), subtitle: null, change: monthlyRevenueTrend.change, iconBg: '#dcfce7', iconColor: '#16a34a', icon: <TrendingUpIcon style={{ fontSize: 20 }} />, accent: 'accent-green' },
-        { label: 'Monthly Voucher Rev', value: fmt(stats?.monthlyVoucherRev ?? 0), subtitle: null, change: monthlyVoucherTrend.change, iconBg: '#cffafe', iconColor: '#06b6d4', icon: <PercentIcon style={{ fontSize: 20 }} />, accent: 'accent-teal' },
-        { label: 'Today Voucher Rev', value: fmt(stats?.todayVoucherRev ?? 0), subtitle: null, change: todayVoucherTrend.change, iconBg: '#dbeafe', iconColor: '#3b82f6', icon: <ConfirmationNumberIcon style={{ fontSize: 20 }} />, accent: 'accent-blue' },
+        { label: "Today's Revenue", value: fmt(stats?.todayRevenue ?? 0), subtitle: null, change: todayRevenueTrend.change, iconBg: '#fee2e2', iconColor: '#ef4444', icon: <AccountBalanceWalletIcon style={{ fontSize: 24 }} />, accent: 'accent-red' },
+        { label: 'Monthly Revenue', value: fmt(stats?.monthlyRevenue ?? 0), subtitle: null, change: monthlyRevenueTrend.change, iconBg: '#dcfce7', iconColor: '#22c55e', icon: <TrendingUpIcon style={{ fontSize: 24 }} />, accent: 'accent-green' },
+        { label: 'Monthly Voucher Rev', value: fmt(stats?.monthlyVoucherRev ?? 0), subtitle: null, change: monthlyVoucherTrend.change, iconBg: '#cffafe', iconColor: '#0ea5e9', icon: <PercentIcon style={{ fontSize: 24 }} />, accent: 'accent-teal' },
+        { label: 'Today\'s Voucher Rev', value: fmt(stats?.todayVoucherRev ?? 0), subtitle: null, change: todayVoucherTrend.change, iconBg: '#e0f2fe', iconColor: '#3b82f6', icon: <ConfirmationNumberIcon style={{ fontSize: 24 }} />, accent: 'accent-blue' },
         // Active Users & Total Customers show a plain headcount — no % change badge
-        { label: 'Active Users', value: String(stats?.activeSubscribers ?? 0), subtitle: `⚡ ${stats?.onlineUsers ?? 0} online`, change: null, iconBg: '#dbeafe', iconColor: '#2563eb', icon: <GroupIcon style={{ fontSize: 20 }} />, accent: 'accent-blue' },
-        { label: 'Total Customers', value: String(stats?.totalClients ?? 0), subtitle: `${stats?.newCustomersThisMonth || 0} new this month`, change: null, iconBg: '#f3e8ff', iconColor: '#9333ea', icon: <PersonIcon style={{ fontSize: 20 }} />, accent: 'accent-purple' },
+        { label: 'Active Users', value: String(stats?.activeSubscribers ?? 0), subtitle: `person_icon ${stats?.onlineUsers ?? 0} online`, change: null, iconBg: '#e0f2fe', iconColor: '#2563eb', icon: <GroupIcon style={{ fontSize: 24 }} />, accent: 'accent-blue' },
+        { label: 'Total Customers', value: String(stats?.totalClients ?? 0), subtitle: `person_icon ${stats?.newCustomersThisMonth || 0} new this month`, change: null, iconBg: '#f3e8ff', iconColor: '#9333ea', icon: <PersonIcon style={{ fontSize: 24 }} />, accent: 'accent-purple' },
     ];
 
     const recentTransactions = (stats?.recentTransactions ?? []).map(t => ({

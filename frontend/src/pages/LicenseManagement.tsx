@@ -300,77 +300,28 @@ export default function LicenseManagement() {
             </div>
 
             {/* Invoice Status — one clear card, one action per invoice row (no duplicate Pay buttons) */}
-            {hasAnyPending ? (
-                <div className="card" style={{ overflow: 'hidden' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12, padding: '18px 24px', borderBottom: '1px solid var(--border-light)' }}>
-                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-                            <WarningIcon style={{ fontSize: 22, color: '#ef4444', marginTop: 2 }} />
-                            <div>
-                                <div style={{ fontWeight: 700, fontSize: '1rem' }}>Unpaid Invoices</div>
-                                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                                    {sortedPendingInvoices.length} invoice{sortedPendingInvoices.length > 1 ? 's' : ''} pending payment
-                                </div>
+            {hasAnyPending && sortedPendingInvoices.length > 0 && (
+                <div style={{
+                    background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '8px', padding: '16px 24px', 
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px',
+                    marginBottom: '24px'
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <WarningIcon style={{ fontSize: 28, color: '#dc2626' }} />
+                        <div>
+                            <div style={{ fontWeight: 700, fontSize: '1.05rem', color: '#991b1b' }}>Action Required: Unpaid License Invoice</div>
+                            <div style={{ fontSize: '0.85rem', color: '#b91c1c', marginTop: '4px' }}>
+                                You have {sortedPendingInvoices.length} unpaid invoice{sortedPendingInvoices.length > 1 ? 's' : ''} totaling <strong>TSH {totalOutstanding.toLocaleString()}</strong>.
+                                Please settle your balance to avoid service interruption.
                             </div>
                         </div>
-                        <div style={{ textAlign: 'right' }}>
-                            <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>Total Due</div>
-                            <div style={{ fontSize: '1.3rem', fontWeight: 700, color: '#ef4444' }}>TSH {totalOutstanding.toLocaleString()}</div>
-                        </div>
                     </div>
-
-                    {/* Unpaid invoices table — Invoice / Period / Due Date / Amount / Action, sorted by due date */}
-                    <div style={{ overflowX: 'auto' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                            <thead>
-                                <tr style={{ background: 'var(--bg-page)' }}>
-                                    <th style={{ textAlign: 'left', padding: '10px 24px', fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>Invoice</th>
-                                    <th style={{ textAlign: 'left', padding: '10px 14px', fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>Period</th>
-                                    <th style={{ textAlign: 'left', padding: '10px 14px', fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>Due Date</th>
-                                    <th style={{ textAlign: 'right', padding: '10px 14px', fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>Amount</th>
-                                    <th style={{ textAlign: 'right', padding: '10px 24px', fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>Action</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {sortedPendingInvoices.map(inv => {
-                                    const isOverdue = inv.dueDate ? new Date(inv.dueDate).getTime() < Date.now() : false;
-                                    return (
-                                        <tr key={inv.id} style={{ borderTop: '1px solid var(--border-light)' }}>
-                                            <td style={{ padding: '14px 24px' }}>
-                                                <div style={{ fontWeight: 700, fontSize: '0.85rem' }}>{inv.invoiceNumber}</div>
-                                                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{inv.invoiceDate ? formatDate(inv.invoiceDate) : '—'}</div>
-                                            </td>
-                                            <td style={{ padding: '14px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                                                {inv.invoiceDate && inv.dueDate ? `${formatDate(inv.invoiceDate)} - ${formatDate(inv.dueDate)}` : '—'}
-                                            </td>
-                                            <td style={{ padding: '14px', fontSize: '0.8rem' }}>
-                                                <span style={{ color: isOverdue ? '#ef4444' : 'var(--text-secondary)', fontWeight: isOverdue ? 700 : 500 }}>
-                                                    {isOverdue ? 'Overdue' : (inv.dueDate ? formatDate(inv.dueDate) : '—')}
-                                                </span>
-                                            </td>
-                                            <td style={{ padding: '14px', textAlign: 'right', fontWeight: 700 }}>TSH {inv.amount.toLocaleString()}</td>
-                                            <td style={{ padding: '14px 24px', textAlign: 'right' }}>
-                                                <button
-                                                    className="btn btn-primary"
-                                                    style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '0.75rem', padding: '5px 12px', background: '#1a1a2e' }}
-                                                    onClick={() => navigate('/renew', { state: { amount: inv.amount, invoiceId: inv.id } })}
-                                                >
-                                                    <PaymentIcon style={{ fontSize: 13 }} /> Pay Now
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            ) : (
-                <div className="card" style={{ padding: '40px 24px', textAlign: 'center' }}>
-                    <CheckCircleIcon style={{ fontSize: 48, color: '#16a34a', marginBottom: 12 }} />
-                    <h3 style={{ fontWeight: 700, fontSize: '1.1rem', marginBottom: 4 }}>All Invoices Paid!</h3>
-                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: 16 }}>You have no outstanding invoices.</p>
-                    <button className="btn btn-outline" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }} onClick={() => navigate('/renew')}>
-                        <PaymentIcon style={{ fontSize: 16 }} /> Renew / Pay Invoice
+                    <button
+                        className="btn btn-primary"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#dc2626', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: '6px', fontWeight: 600 }}
+                        onClick={() => navigate('/renew', { state: { amount: sortedPendingInvoices[0].amount, invoiceId: sortedPendingInvoices[0].id } })}
+                    >
+                        <PaymentIcon style={{ fontSize: 18 }} /> Pay TSH {sortedPendingInvoices[0].amount.toLocaleString()} Now
                     </button>
                 </div>
             )}
