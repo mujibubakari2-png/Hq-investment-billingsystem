@@ -4,6 +4,8 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
 import logger from "@/lib/logger";
 
+let prismaPool: Pool | null = null;
+
 // HIGH-SEC-004 FIX: The previous JSON.parse monkey-patch has been removed.
 // It was logging up to 5,000 characters of any failed parse input — which could
 // include passwords, API keys, webhook payloads, and other sensitive data.
@@ -46,7 +48,7 @@ function createPrismaClient(): PrismaClient {
     const maxConnections = isProduction ? 10 : 3;
     const idleTimeoutMillis = isProduction ? 30000 : 10000;
 
-    const pool = new Pool({
+    prismaPool = new Pool({
         connectionString,
         max: maxConnections,
         idleTimeoutMillis,
@@ -58,7 +60,7 @@ function createPrismaClient(): PrismaClient {
             : { rejectUnauthorized: false }
     });
 
-    const adapter = new PrismaPg(pool);
+    const adapter = new PrismaPg(prismaPool);
     process.stdout.write(`[DATABASE] Connection pool created (max: ${maxConnections}, idle timeout: ${idleTimeoutMillis}ms)\n`);
 
     const client = new PrismaClient({
@@ -130,6 +132,25 @@ if (process.env.NODE_ENV === "production" && !isNextBuild()) {
             process.exit(0);
         }
     });
+}
+
+export async function disconnectPrismaClient(): Promise<void> {
+    try {
+        if (prisma) {
+            await prisma.$disconnect();
+        }
+    } catch {
+        // Ignore disconnect errors during teardown.
+    }
+
+    try {
+        if (prismaPool) {
+            await prismaPool.end();
+            prismaPool = null;
+        }
+    } catch {
+        // Ignore pool shutdown errors during teardown.
+    }
 }
 
 export default prisma;
