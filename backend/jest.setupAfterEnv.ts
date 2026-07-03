@@ -6,22 +6,6 @@ beforeAll(() => {
     jest.spyOn(console, 'warn').mockImplementation(() => {});
 });
 
-afterAll(async () => {
+afterAll(() => {
     jest.restoreAllMocks();
-    
-    // Close Prisma connection created in this test file's environment
-    try {
-        const { prisma } = await import('@/lib/prisma');
-        await prisma.$disconnect();
-    } catch (e) {
-        // Ignore
-    }
-
-    // Close Redis connection created in this test file's environment
-    try {
-        const { closeCache } = await import('@/lib/cache');
-        await closeCache();
-    } catch (e) {
-        // Ignore
-    }
 });

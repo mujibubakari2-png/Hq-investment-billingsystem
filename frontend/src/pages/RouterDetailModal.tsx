@@ -4,42 +4,55 @@ import CloseIcon from '@mui/icons-material/Close';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import RouterIcon from '@mui/icons-material/Router';
 import VpnLockIcon from '@mui/icons-material/VpnLock';
-import SettingsIcon from '@mui/icons-material/Settings';
+import DownloadIcon from '@mui/icons-material/Download';
 import EditIcon from '@mui/icons-material/Edit';
 import LoginIcon from '@mui/icons-material/Login';
 import DeleteIcon from '@mui/icons-material/Delete';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import WireGuardConfigModal from './WireGuardConfigModal';
+import { getPublicApiBase } from '../utils/config';
 import type { Router } from '../types';
 import { formatDateTime } from '../utils/formatters';
+import { sanitizeMikroTikName } from '../utils/mikrotikUtils';
+import { generateMikrotikScript } from '../utils/mikrotikScriptGenerator';
 
 interface RouterDetailModalProps {
     router: Router;
     onClose: () => void;
     onDelete?: (router: Router) => void;
-    // FIX (was broken): "Download Script" used to call generateMikrotikScript()
-    // directly with only routerName/username/password — that function REQUIRES
-    // lanIp/lanGateway/hotspotPoolRange/pppoePoolRange/dns and throws when they
-    // are missing, so this button threw an error on every single click. The
-    // only place that safely collects all required fields and generates a
-    // secure script (VPN-scoped firewall, real RADIUS secret, TLS cert) is the
-    // Router Setup Wizard, so we route there instead of generating inline.
-    onOpenWizard?: (router: Router) => void;
 }
 
-export default function RouterDetailModal({ router, onClose, onDelete, onOpenWizard }: RouterDetailModalProps) {
+export default function RouterDetailModal({ router, onClose, onDelete }: RouterDetailModalProps) {
     const navigate = useNavigate();
     const [showWireGuard, setShowWireGuard] = useState(false);
 
-    const openWizard = () => {
-        if (onOpenWizard) {
-            onOpenWizard(router);
-        } else {
-            // Fallback for any caller that doesn't wire onOpenWizard: navigate to
-            // the dedicated wizard route instead of silently doing nothing.
-            onClose();
-            navigate(`/router-setup/${router.id}`);
-        }
+    const downloadScript = () => {
+        const routerIdCode = `MYR-${router.id.padStart(3, '0')}VBHBC`;
+        const safeRouterName = sanitizeMikroTikName(router.name);
+
+        const publicApiBase = getPublicApiBase();
+        const apiHost = publicApiBase.startsWith('http')
+            ? new URL(publicApiBase).hostname
+            : window.location.hostname;
+
+        const script = generateMikrotikScript({
+            routerName: router.name,
+            routerUsername: router.username,
+            routerPassword: router.password,
+            routerId: routerIdCode,
+            apiHost,
+            publicApiBase,
+            isWireGuard: false
+        });
+        const blob = new Blob([script], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `mikrotik-script-${safeRouterName}.rsc`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
     };
     if (showWireGuard) {
         return <WireGuardConfigModal router={router} onClose={() => setShowWireGuard(false)} />;
@@ -124,8 +137,8 @@ export default function RouterDetailModal({ router, onClose, onDelete, onOpenWiz
                             <button className="btn" style={{
                                 background: '#eef2ff', color: '#4338ca', fontWeight: 600, border: '1px solid #c7d2fe',
                                 padding: '10px 16px', borderRadius: 'var(--radius-sm)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                            }} onClick={openWizard}>
-                                <SettingsIcon fontSize="small" /> Setup Wizard / Script
+                            }} onClick={downloadScript}>
+                                <DownloadIcon fontSize="small" /> Download Script
                             </button>
                         </div>
                     </div>

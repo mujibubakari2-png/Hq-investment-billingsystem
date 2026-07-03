@@ -195,11 +195,9 @@ export default function RouterDetailModal({ router, onClose, onDelete }: RouterD
                                         {[
                                             { label: 'Router Tunnel IP', value: wgStatus.routerTunnelIp || '—', mono: true },
                                             { label: 'Server Tunnel IP', value: wgStatus.serverTunnelIp || '—', mono: true },
-                                            {
-                                                label: 'Status', value: wgStatus.tunnelActive && wgStatus.lastHandshakeSeconds != null
-                                                    ? `Handshake ${wgStatus.lastHandshakeSeconds}s ago`
-                                                    : wgStatus.tunnelStatusMessage?.slice(0, 48) || '—', mono: false
-                                            },
+                                            { label: 'Status', value: wgStatus.tunnelActive && wgStatus.lastHandshakeSeconds != null
+                                                ? `Handshake ${wgStatus.lastHandshakeSeconds}s ago`
+                                                : wgStatus.tunnelStatusMessage?.slice(0, 48) || '—', mono: false },
                                         ].map(row => (
                                             <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #f1f5f9', fontSize: '0.8rem', gap: 8 }}>
                                                 <span style={{ color: 'var(--text-secondary)', flexShrink: 0 }}>{row.label}</span>
