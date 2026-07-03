@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { generateMikrotikScript } from '../utils/mikrotikScriptGenerator';
 import { sanitizeMikroTikName } from '../utils/mikrotikUtils';
 import CloseIcon from '@mui/icons-material/Close';
@@ -6,6 +7,7 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import DownloadIcon from '@mui/icons-material/Download';
 import DescriptionIcon from '@mui/icons-material/Description';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import { getPublicApiBase } from '../utils/config';
 import type { Router } from '../types';
 
@@ -14,7 +16,15 @@ interface MikrotikScriptModalProps {
     onClose: () => void;
 }
 
+// NOTE: as of this fix, this modal is not referenced anywhere in the app
+// (Mikrotiks.tsx / RouterDetailModal.tsx use the Router Setup Wizard
+// instead, which is the only place that safely collects the fields this
+// generator requires). Kept for backward compatibility in case something
+// still imports it directly, but it no longer crashes when required fields
+// are missing — it shows a clear message and points to the Setup Wizard
+// instead of throwing during render (SEC-ROUTER-001 parity fix).
 export default function MikrotikScriptModal({ router, onClose }: MikrotikScriptModalProps) {
+    const navigate = useNavigate();
     const [copied, setCopied] = useState(false);
 
     // Generate router ID code - handle both numeric IDs and UUIDs
@@ -38,15 +48,21 @@ export default function MikrotikScriptModal({ router, onClose }: MikrotikScriptM
         ? new URL(publicApiBase).hostname
         : window.location.hostname;
 
-    const mikrotikScript = generateMikrotikScript({
-        routerName: router.name,
-        routerUsername: router.username,
-        routerPassword: router.password,
-        routerId: routerIdCode,
-        apiHost,
-        publicApiBase,
-        isWireGuard: false
-    });
+    let mikrotikScript = '';
+    let generationError: string | null = null;
+    try {
+        mikrotikScript = generateMikrotikScript({
+            routerName: router.name,
+            routerUsername: router.username,
+            routerPassword: router.password,
+            routerId: routerIdCode,
+            apiHost,
+            publicApiBase,
+            isWireGuard: false
+        });
+    } catch (err: any) {
+        generationError = err?.message || 'Missing required router configuration.';
+    }
 
     const handleCopy = () => {
         navigator.clipboard.writeText(mikrotikScript);
@@ -85,24 +101,40 @@ export default function MikrotikScriptModal({ router, onClose }: MikrotikScriptM
 
                 {/* Info Banner */}
                 <div style={{
-                    background: '#eef2ff', padding: '10px 16px', fontSize: '0.82rem', color: '#4338ca',
-                    display: 'flex', alignItems: 'flex-start', gap: 8, borderBottom: '1px solid #c7d2fe', flexWrap: 'wrap',
+                    background: generationError ? '#fef2f2' : '#eef2ff', padding: '10px 16px', fontSize: '0.82rem', color: generationError ? '#dc2626' : '#4338ca',
+                    display: 'flex', alignItems: 'flex-start', gap: 8, borderBottom: generationError ? '1px solid #fecaca' : '1px solid #c7d2fe', flexWrap: 'wrap',
                 }}>
-                    <CheckCircleIcon style={{ fontSize: 16, flexShrink: 0, marginTop: 2 }} />
-                    <span>This script auto-configures your MikroTik router for HQInvestment ISP billing. Paste into <strong>Terminal</strong> or upload as <strong>.rsc</strong> file.</span>
+                    {generationError ? <WarningAmberIcon style={{ fontSize: 16, flexShrink: 0, marginTop: 2 }} /> : <CheckCircleIcon style={{ fontSize: 16, flexShrink: 0, marginTop: 2 }} />}
+                    <span>{generationError ? `Haiwezekani kuzalisha script: ${generationError} Tumia Setup Wizard badala yake, ambayo inakusanya taarifa zote zinazohitajika kwa usalama.` : <>This script auto-configures your MikroTik router for HQInvestment ISP billing. Paste into <strong>Terminal</strong> or upload as <strong>.rsc</strong> file.</>}</span>
                 </div>
 
                 {/* Script Content */}
                 <div className="modal-body" style={{ flex: 1, overflow: 'auto', padding: '0 24px 16px' }}>
-                    <pre style={{
-                        background: '#1e1e2e', color: '#cdd6f4',
-                        padding: 20, borderRadius: 10, fontSize: '0.78rem',
-                        lineHeight: 1.6, fontFamily: "'Fira Code', 'Consolas', monospace",
-                        overflow: 'auto', marginTop: 16, whiteSpace: 'pre-wrap',
-                        border: '1px solid #313244',
-                    }}>
-                        {mikrotikScript}
-                    </pre>
+                    {generationError ? (
+                        <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+                            <WarningAmberIcon style={{ fontSize: 48, color: '#dc2626', marginBottom: 12 }} />
+                            <p style={{ color: 'var(--text-secondary)', marginBottom: 20 }}>
+                                Router hii haina taarifa zote zinazohitajika (LAN IP, DNS, IP pools, RADIUS secret).
+                            </p>
+                            <button
+                                className="btn"
+                                style={{ background: '#4338ca', color: '#fff', fontWeight: 600 }}
+                                onClick={() => { onClose(); navigate(`/router-setup/${router.id}`); }}
+                            >
+                                Fungua Setup Wizard
+                            </button>
+                        </div>
+                    ) : (
+                        <pre style={{
+                            background: '#1e1e2e', color: '#cdd6f4',
+                            padding: 20, borderRadius: 10, fontSize: '0.78rem',
+                            lineHeight: 1.6, fontFamily: "'Fira Code', 'Consolas', monospace",
+                            overflow: 'auto', marginTop: 16, whiteSpace: 'pre-wrap',
+                            border: '1px solid #313244',
+                        }}>
+                            {mikrotikScript}
+                        </pre>
+                    )}
                 </div>
 
                 {/* Footer */}
@@ -110,15 +142,17 @@ export default function MikrotikScriptModal({ router, onClose }: MikrotikScriptM
                     <div className="modal-footer-left" style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                         💡 Run in MikroTik → System → Terminal
                     </div>
-                    <div className="modal-footer-right modal-footer--wrap">
-                        <button className="btn btn-secondary" onClick={handleCopy} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            {copied ? <CheckCircleIcon style={{ fontSize: 16, color: '#16a34a' }} /> : <ContentCopyIcon style={{ fontSize: 16 }} />}
-                            {copied ? 'Copied!' : 'Copy Script'}
-                        </button>
-                        <button className="btn" style={{ background: '#4338ca', color: '#fff', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }} onClick={handleDownload}>
-                            <DownloadIcon style={{ fontSize: 16 }} /> Download .rsc
-                        </button>
-                    </div>
+                    {!generationError && (
+                        <div className="modal-footer-right modal-footer--wrap">
+                            <button className="btn btn-secondary" onClick={handleCopy} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                {copied ? <CheckCircleIcon style={{ fontSize: 16, color: '#16a34a' }} /> : <ContentCopyIcon style={{ fontSize: 16 }} />}
+                                {copied ? 'Copied!' : 'Copy Script'}
+                            </button>
+                            <button className="btn" style={{ background: '#4338ca', color: '#fff', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }} onClick={handleDownload}>
+                                <DownloadIcon style={{ fontSize: 16 }} /> Download .rsc
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

@@ -5,7 +5,6 @@ const config: Config = {
     testEnvironment: 'node',
     setupFiles: ['<rootDir>/jest.setup.ts'],
     setupFilesAfterEnv: ['<rootDir>/jest.setupAfterEnv.ts'],
-    globalTeardown: '<rootDir>/jest.globalTeardown.ts',
     roots: ['<rootDir>/src/__tests__'],
     testMatch: ['**/*.test.ts'],
     transform: {
@@ -31,9 +30,9 @@ const config: Config = {
     coverageThreshold: {
         global: {
             statements: 70,
-            branches:   60,
-            functions:  70,
-            lines:      70,
+            branches: 60,
+            functions: 70,
+            lines: 70,
         },
     },
 };

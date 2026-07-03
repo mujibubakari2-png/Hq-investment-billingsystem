@@ -215,7 +215,14 @@ export default function Mikrotiks() {
         <div>
             {showAddModal && <AddRouterModal onClose={() => setShowAddModal(false)} onSave={handleAddRouter} />}
             {selectedRouterToEdit && <AddRouterModal onClose={() => setSelectedRouterToEdit(null)} onSave={handleEditRouter} initialData={selectedRouterToEdit} />}
-            {selectedRouter && <RouterDetailModal router={selectedRouter} onClose={() => setSelectedRouter(null)} onDelete={(r) => { setSelectedRouter(null); setDeleteRouter(r); }} />}
+            {selectedRouter && (
+                <RouterDetailModal
+                    router={selectedRouter}
+                    onClose={() => setSelectedRouter(null)}
+                    onDelete={(r) => { setSelectedRouter(null); setDeleteRouter(r); }}
+                    onOpenWizard={(r) => { setSelectedRouter(null); setWizardRouter(r); }}
+                />
+            )}
             {deleteRouter && (
                 <ConfirmDeleteModal
                     title="Delete Router"
