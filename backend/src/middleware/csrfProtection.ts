@@ -19,7 +19,6 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createHmac } from 'crypto';
 
 const CSRF_TOKEN_COOKIE = 'csrf-token';
 const CSRF_TOKEN_HEADER = 'x-csrf-token';
@@ -37,8 +36,9 @@ const CSRF_TOKEN_HEADER = 'x-csrf-token';
  *   - It carries no private payload of its own.
  */
 export function generateCsrfToken(sessionId: string): string {
-    const secret = process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET || 'csrf-fallback-secret';
-    return createHmac('sha256', secret).update(sessionId).digest('hex');
+    // Generate a secure random token using the Web Crypto API
+    // This is fully synchronous and 100% compatible with the Edge Runtime.
+    return globalThis.crypto.randomUUID().replace(/-/g, '');
 }
 
 /**
@@ -80,7 +80,7 @@ export function verifyCsrfToken(request: NextRequest): boolean {
 
     if (!cookieToken || !headerToken) return false;
 
-    // Constant-time compare — both values are 64-char hex strings
+    // Constant-time compare — both values are 32-char hex strings
     return safeCompare(cookieToken, headerToken);
 }
 

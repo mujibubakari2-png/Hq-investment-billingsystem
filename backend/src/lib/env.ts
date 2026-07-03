@@ -92,6 +92,19 @@ const envSchema = z.object({
   MIKROTIK_INSECURE: z.string().default("false").transform((v) => v === "true"),
 });
 
+function isNextBuild(): boolean {
+  return (
+    process.env.NEXT_PHASE?.includes("phase-production-build") ||
+    process.env.NEXT_BUILD_WORKER === "1" ||
+    process.argv.includes("build")
+  );
+}
+
+if (isNextBuild()) {
+  process.env.JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET || "dummy-access-secret-for-build-phase-min-32-chars";
+  process.env.JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || "dummy-refresh-secret-for-build-phase-min-32-chars";
+}
+
 // Since Next.js might bundle this for Edge/Client sometimes, we fallback gracefully
 const parsedEnv = envSchema.safeParse(process.env);
 
