@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { isRateLimited, resetRateLimit, cleanupRateLimitStore } from "../middleware/rateLimiter";
+import { isRateLimited, resetRateLimit, cleanupRateLimitStore } from "@/lib/rateLimiter";
 
 // Mock auth-edge to simulate anonymous vs authenticated users
 jest.mock("@/lib/auth-edge", () => ({
@@ -12,7 +12,7 @@ describe("Rate Limiter - Multi-Tenant Isolation", () => {
         cleanupRateLimitStore();
     });
 
-    const createRequest = (url: string, ip: string, body: any) => {
+    const createRequest = (url: string, ip: string, body: Record<string, unknown>): NextRequest => {
         return new NextRequest(url, {
             method: 'POST',
             headers: new Headers({

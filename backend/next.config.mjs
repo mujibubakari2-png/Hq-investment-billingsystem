@@ -1,15 +1,15 @@
 // CORS is handled by src/proxy.ts (the single source of truth).
 // Do not add CORS headers here to avoid conflicting/duplicate headers.
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
 const nextConfig = {
     distDir: process.env.BUILD_DIR || '.next',
     // Prisma and bcryptjs must not be bundled by webpack — they use native bindings
-    serverExternalPackages: ['@prisma/client', 'bcryptjs', 'ioredis'],
+    serverExternalPackages: ['@prisma/client', 'bcryptjs', 'ioredis', 'bullmq'],
 
-    // MEDIUM-O-003 FIX: Enable the instrumentation hook so src/instrumentation.ts
-    // runs at startup and redirects console.* to the structured logger.
-    experimental: {
-        instrumentationHook: true,
-    },
+    // MEDIUM-O-003 FIX: instrumentation.ts runs at startup automatically in Next.js 15+.
+    // instrumentationHook is no longer needed (removed to prevent build warnings).
+    experimental: {},
 
     eslint: {
         ignoreDuringBuilds: true,

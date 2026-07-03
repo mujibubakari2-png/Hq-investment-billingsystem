@@ -14,7 +14,7 @@
  */
 
 import IORedis from 'ioredis';
-import { getRedisConnection } from '@/lib/queue';
+import { getRedisConnection } from '@/lib/redis';
 import logger from '@/lib/logger';
 
 // ── TTL constants (seconds) ───────────────────────────────────────────────────

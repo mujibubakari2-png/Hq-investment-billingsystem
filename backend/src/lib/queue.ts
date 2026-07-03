@@ -12,35 +12,10 @@
 
 import { Queue, Job } from 'bullmq';
 import logger from '@/lib/logger';
+import { getRedisConnection } from '@/lib/redis';
 
-// ── Redis Connection Options ──────────────────────────────────────────────────
-// BullMQ accepts a plain connection options object — this avoids the dual-ioredis
-// version conflict that arises when passing an IORedis instance.
-
-function parseRedisUrl(url: string): { host: string; port: number; password?: string; tls?: object } {
-  try {
-    const u = new URL(url);
-    const opts: { host: string; port: number; password?: string; tls?: object } = {
-      host: u.hostname,
-      port: parseInt(u.port || '6379', 10),
-    };
-    if (u.password) opts.password = decodeURIComponent(u.password);
-    if (u.protocol === 'rediss:') opts.tls = {};
-    return opts;
-  } catch {
-    return { host: '127.0.0.1', port: 6379 };
-  }
-}
-
-export function getRedisConnection() {
-  const url = process.env.REDIS_URL ?? 'redis://127.0.0.1:6379';
-  return {
-    ...parseRedisUrl(url),
-    maxRetriesPerRequest: null as null, // Required by BullMQ
-    enableReadyCheck: false,
-    lazyConnect: true,
-  };
-}
+// Re-export so callers that previously imported from queue.ts still work.
+export { getRedisConnection } from '@/lib/redis';
 
 // ── Job Types ─────────────────────────────────────────────────────────────────
 
