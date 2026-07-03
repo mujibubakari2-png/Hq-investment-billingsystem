@@ -5,6 +5,12 @@ const nextConfig = {
     // Prisma and bcryptjs must not be bundled by webpack — they use native bindings
     serverExternalPackages: ['@prisma/client', 'bcryptjs', 'ioredis'],
 
+    // MEDIUM-O-003 FIX: Enable the instrumentation hook so src/instrumentation.ts
+    // runs at startup and redirects console.* to the structured logger.
+    experimental: {
+        instrumentationHook: true,
+    },
+
     eslint: {
         ignoreDuringBuilds: true,
     },
@@ -38,11 +44,10 @@ const nextConfig = {
 
     // Build optimizations for production deployment
     compiler: {
-        // Only strip debug-noise consoles in production.
-        // NEVER strip 'error' or 'warn' — crash details must survive to PM2 logs.
-        removeConsole: process.env.NODE_ENV === "production"
-            ? { exclude: ["error", "warn"] }
-            : false,
+        // MEDIUM-O-003: removeConsole is intentionally NOT set.
+        // The instrumentation hook in src/instrumentation.ts redirects console.*
+        // to the structured logger at runtime. If we also strip console calls at
+        // build time, the redirection becomes a no-op and nothing gets logged.
     },
     // Optimize images
     images: {

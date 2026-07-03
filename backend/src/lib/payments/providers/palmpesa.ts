@@ -11,13 +11,13 @@
  *
  * ENDPOINTS USED (as per official docs):
  *
- *   [Endpoint 02 – Webhook Payment using phone number]  ← STK/USSD push
+ *   [Endpoint 02 â€“ Webhook Payment using phone number]  â† STK/USSD push
  *   POST /api/palmpesa/initiate
  *   Required fields: name, email, phone, amount, transaction_id, address, postcode, callback_url
  *   Response: { message, order_id }
  *   Callback:  { order_id, payment_status }   // payment_status: COMPLETED | FAILED | PENDING
  *
- *   [Endpoint 04 – Get Order Status]
+ *   [Endpoint 04 â€“ Get Order Status]
  *   POST /api/order-status
  *   Body: { order_id }
  *   Response: { reference, resultcode, result, message, data[{ order_id, amount, payment_status, transid, channel, msisdn }] }
@@ -37,6 +37,7 @@ import {
   ParsedWebhookPayload,
   ProviderConfig,
 } from "@/lib/payments/types";
+import logger from "@/lib/logger";
 import {
   timingSafeEqual,
   httpPost,
@@ -68,20 +69,20 @@ export class PalmPesaProvider implements PaymentProvider {
     };
   }
 
-  // ─── Initiate Payment ──────────────────────────────────────────────────────
+  // â”€â”€â”€ Initiate Payment â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // FIX-PP-002: Use Endpoint 02 (/api/palmpesa/initiate) for direct USSD push.
   // Docs: https://documentation.palmpesa.co.tz/#webhook
   // Fields: name, email, phone, amount, transaction_id, address, postcode, callback_url
   // The phone field accepts local format (07XXXXXXXX) per docs example.
 
   async initiatePayment(request: PaymentRequest): Promise<PaymentResponse> {
-    console.log("[TRACE][PalmPesaProvider.initiatePayment] ENTER", { request });
+    logger.info("[TRACE][PalmPesaProvider.initiatePayment] ENTER", { request });
 
     // Docs example shows local format: "0693662424"
     const rawPhone = request.phone.replace(/\D/g, "");
     let phone: string;
     if (rawPhone.startsWith("255") && rawPhone.length === 12) {
-      // Convert E.164 255XXXXXXXXX → 07XXXXXXXXX
+      // Convert E.164 255XXXXXXXXX â†’ 07XXXXXXXXX
       phone = "0" + rawPhone.slice(3);
     } else if (rawPhone.startsWith("0") && rawPhone.length === 10) {
       phone = rawPhone;
@@ -106,7 +107,7 @@ export class PalmPesaProvider implements PaymentProvider {
       ...this.headers,
       Authorization: "Bearer [REDACTED]",
     };
-    console.log("===== PALMPESA REQUEST =====", {
+    logger.info("===== PALMPESA REQUEST =====", {
       method: "POST",
       url: requestUrl,
       headers: maskedHeaders,
@@ -125,7 +126,7 @@ export class PalmPesaProvider implements PaymentProvider {
           ? safeJsonParse<Record<string, unknown>>(rawData, {})
           : (rawData as Record<string, unknown>) ?? {};
 
-      console.log("===== PALMPESA RESPONSE =====", {
+      logger.info("===== PALMPESA RESPONSE =====", {
         httpStatus: result.status,
         rawBody: rawData,
         parsedBody: data,
@@ -136,7 +137,7 @@ export class PalmPesaProvider implements PaymentProvider {
       const message = (data?.message as string | undefined) ?? "";
 
       if (result.ok && orderId) {
-        console.log("[TRACE][PalmPesaProvider.initiatePayment] EXIT_SUCCESS", { orderId, message });
+        logger.info("[TRACE][PalmPesaProvider.initiatePayment] EXIT_SUCCESS", { orderId, message });
         return {
           success: true,
           providerRef: orderId,
@@ -159,12 +160,12 @@ export class PalmPesaProvider implements PaymentProvider {
       };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Network error";
-      console.error("[TRACE][PalmPesaProvider.initiatePayment] EXCEPTION", { message: msg });
+      logger.error("[TRACE][PalmPesaProvider.initiatePayment] EXCEPTION", { message: msg });
       return { success: false, message: `PalmPesa error: ${msg}` };
     }
   }
 
-  // ─── Check Transaction Status ──────────────────────────────────────────────
+  // â”€â”€â”€ Check Transaction Status â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // FIX-PP-001 (retained): POST /api/order-status with body { order_id }.
   // Response: data[0].payment_status = COMPLETED | PENDING | FAILED
 
@@ -208,12 +209,12 @@ export class PalmPesaProvider implements PaymentProvider {
       };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Unknown error";
-      console.error(`[PALMPESA] checkStatus error: ${msg}`);
+      logger.error(`[PALMPESA] checkStatus error: ${msg}`);
       return { status: "PENDING" };
     }
   }
 
-  // ─── Webhook Verification ──────────────────────────────────────────────────
+  // â”€â”€â”€ Webhook Verification â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // PalmPesa does not document a webhook signature scheme.
   // We verify using a shared secret in x-webhook-secret or x-palmpesa-signature.
 
@@ -222,8 +223,8 @@ export class PalmPesaProvider implements PaymentProvider {
     _rawBody: string
   ): Promise<WebhookVerification> {
     if (!this.webhookSecret) {
-      console.error(
-        "[PALMPESA] Webhook secret not configured — rejecting webhook. " +
+      logger.error(
+        "[PALMPESA] Webhook secret not configured â€” rejecting webhook. " +
         "Set webhookSecret on the PaymentChannel record."
       );
       return { verified: false, reason: "Webhook secret not configured" };
@@ -245,7 +246,7 @@ export class PalmPesaProvider implements PaymentProvider {
     };
   }
 
-  // ─── Parse Webhook Payload ─────────────────────────────────────────────────
+  // â”€â”€â”€ Parse Webhook Payload â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Endpoint 02 callback (official docs):
   //   { order_id: "PALMPESA17683440586334", payment_status: "COMPLETED" | "FAILED" | "PENDING" }
   //
@@ -253,7 +254,7 @@ export class PalmPesaProvider implements PaymentProvider {
   // Our transaction_id was sent as transaction_id during initiation.
   // The order_id returned by PalmPesa must be stored as providerRef so we can
   // match it here. Our internal reference (transaction_id) is NOT echoed back
-  // in the Endpoint 02 callback — we match via providerRef stored at initiation.
+  // in the Endpoint 02 callback â€” we match via providerRef stored at initiation.
 
   parseWebhookPayload(body: unknown): ParsedWebhookPayload {
     const b =

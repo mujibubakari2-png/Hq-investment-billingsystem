@@ -4,6 +4,7 @@ import { jsonResponse, errorResponse } from "@/lib/auth";
 import { requirePermission } from "@/lib/rbac";
 import { getTenantFilter } from "@/lib/tenant";
 import { toISOSafe, toTimestampSafe, getStartOfTodayTZ, getStartOfMonthTZ, getEndOfMonthTZ } from "@/lib/dateUtils";
+import logger from "@/lib/logger";
 
 function formatTransactionStatus(status: unknown) {
     const raw = typeof status === "string" && status.trim() ? status.trim().toUpperCase() : "PENDING";
@@ -127,7 +128,7 @@ export async function GET(req: NextRequest) {
             activeGateways: activeGws
         });
     } catch (e) {
-        console.error(e);
+        logger.error("[route] error", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }

@@ -3,7 +3,16 @@ import { getTenantClient } from "@/lib/tenantPrisma";
 import { errorResponse } from "@/lib/auth";
 import { requirePermission } from "@/lib/rbac";
 import { canAccessTenant } from "@/lib/tenant";
-import { decryptRouterFields } from "@/lib/encryption";
+import { decryptRouterFields, encrypt } from "@/lib/encryption";
+import crypto from "crypto";
+import logger from "@/lib/logger";
+
+function generateSecureRandomString(length: number = 24): string {
+    return crypto.randomBytes(length)
+        .toString("base64")
+        .replace(/[^a-zA-Z0-9]/g, "")
+        .substring(0, length);
+}
 
 /**
  * GET /api/routers/[id]/script
@@ -26,12 +35,63 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
             return errorResponse("Unauthorized", 403);
         }
 
+        // P0 Validation layer: Validate required LAN/Subnet/DNS fields
+        const missingFields: string[] = [];
+        if (!routerRaw.lanIp) missingFields.push("lanIp");
+        if (!routerRaw.lanGateway) missingFields.push("lanGateway");
+        if (!routerRaw.hotspotPoolRange) missingFields.push("hotspotPoolRange");
+        if (!routerRaw.pppoePoolRange) missingFields.push("pppoePoolRange");
+        if (!routerRaw.dns) missingFields.push("dns");
+
+        if (missingFields.length > 0) {
+            return errorResponse(`Kupitisha script kumeshindwa kwa sababu router haina taarifa zifuatazo: ${missingFields.join(", ")}`, 400);
+        }
+
+        // Auto-generate credentials if missing (P1 & P2)
+        let needsUpdate = false;
+        let updatedPassword = routerRaw.password;
+        let updatedRadiusSecret = routerRaw.radiusSecret;
+        let updatedUsername = routerRaw.username;
+
+        if (!routerRaw.password) {
+            updatedPassword = encrypt(generateSecureRandomString(24));
+            needsUpdate = true;
+        }
+        if (!routerRaw.radiusSecret) {
+            updatedRadiusSecret = encrypt(generateSecureRandomString(24));
+            needsUpdate = true;
+        }
+        if (!routerRaw.username || routerRaw.username === "admin") {
+            updatedUsername = `hq_admin_${routerRaw.id.substring(0, 8).toLowerCase()}`;
+            needsUpdate = true;
+        }
+
+        if (needsUpdate) {
+            await db.router.update({
+                where: { id },
+                data: {
+                    password: updatedPassword,
+                    radiusSecret: updatedRadiusSecret,
+                    username: updatedUsername,
+                }
+            });
+            // Update local object fields
+            routerRaw.password = updatedPassword;
+            routerRaw.radiusSecret = updatedRadiusSecret;
+            routerRaw.username = updatedUsername;
+        }
+
         const router = decryptRouterFields(routerRaw);
 
         const apiPort = router.apiPort || 80;
         const serverUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || "";
 
         const cleanName = router.name.trim().replace(/^-+|-+$/g, '');
+
+        // Resolve VPN Subnet and VPN IP based on actual WireGuard Tunnel IP to prevent multi-tenant conflicts
+        const subnetPrefix = router.wgTunnelIp ? router.wgTunnelIp.split('.').slice(0, 3).join('.') : "10.200.0";
+        const vpnSubnet = `${subnetPrefix}.0/24`;
+        const vpnIp = `${subnetPrefix}.1`;
 
         let script = `# HQInvestment ISP Billing System - Router Setup Script
 # Generated for: ${cleanName}
@@ -53,11 +113,15 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 /ip service set www disabled=no port=${apiPort}
 /log info "REST API services enabled on port 443 and ${apiPort}"
 
-# 3. Create Management User (if not exists)
-:if ([:len [/user find name="admin"]] = 0) do={
-    /user add name="admin" password="${router.password || ''}" group=full comment="HQInvestment Admin"
+# 3. Create Management User (TATIZO 4 fix: rename default admin account to unique username)
+:if ([:len [/user find name="admin"]] > 0) do={
+    /user set [find name="admin"] name="${router.username}" password="${router.password || ''}"
 } else={
-    /user set [find name="admin"] password="${router.password || ''}" group=full
+    :if ([:len [/user find name="${router.username}"]] = 0) do={
+        /user add name="${router.username}" password="${router.password || ''}" group=full comment="hqinvestment Admin"
+    } else={
+        /user set [find name="${router.username}"] password="${router.password || ''}" group=full
+    }
 }
 
 # 4. Keep Winbox MAC and neighbor discovery reachable
@@ -66,27 +130,25 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 /ip neighbor discovery-settings set discover-interface-list=all
 
 # 5. DNS and NTP (Critical for handshakes)
-/ip dns set servers=8.8.8.8,8.8.4.4 allow-remote-requests=yes
+/ip dns set servers=${router.dns} allow-remote-requests=yes
 /system ntp client set enabled=yes
 :if ([:len [/system ntp client servers find where address="pool.ntp.org"]] = 0) do={
     /system ntp client servers add address=pool.ntp.org
 }
 
-# 6. Firewall Rules (idempotent)
+# 6. Firewall Rules (TATIZO 2 fix: Enforce vpnSubnet src-address restriction for management ports)
 :if ([:len [/ip firewall filter find where comment="Allow HQInvestment API Access"]] = 0) do={
-    /ip firewall filter add chain=input action=accept protocol=tcp dst-port=${apiPort},443,8291 comment="Allow HQInvestment API Access"
+    /ip firewall filter add chain=input action=accept protocol=tcp dst-port=${apiPort},443,8291 src-address=${vpnSubnet} comment="Allow HQInvestment API Access"
 }
 :if ([:len [/ip firewall filter find where comment="Allow WireGuard VPN"]] = 0) do={
     /ip firewall filter add chain=input action=accept protocol=udp dst-port=51820 comment="Allow WireGuard VPN"
 }
 :if ([:len [/ip firewall filter find where comment="Allow RADIUS CoA"]] = 0) do={
-    /ip firewall filter add chain=input action=accept protocol=udp dst-port=3799 src-address=10.0.0.1 comment="Allow RADIUS CoA"
+    /ip firewall filter add chain=input action=accept protocol=udp dst-port=3799 src-address=${vpnIp} comment="Allow RADIUS CoA"
 }
 `;
 
         if (router.wgPrivateKey && router.wgPeerPublicKey && router.wgTunnelIp) {
-            const subnetPrefix = "10.0.0"; // Fallback, normally should be fetched from wgServerIp
-
             // Try to resolve server endpoint from APP_URL if not explicitly set
             let resolvedEndpoint = router.wgServerEndpoint;
             if (!resolvedEndpoint && serverUrl) {
@@ -124,7 +186,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         }
 
         // 11. RADIUS Configuration (Managed via VPN or Public IP)
-        const vpnIp = "10.0.0.1";
         let publicIp = "";
 
         try {
@@ -133,7 +194,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
                 publicIp = url.hostname;
             }
         } catch (e) {
-            console.error("Failed to parse APP_URL for RADIUS address:", e);
+            logger.warn('[Script] Failed to parse APP_URL for RADIUS address', {
+                error: e instanceof Error ? e.message : String(e),
+            });
         }
 
         const requestHost = process.env.SERVER_PUBLIC_IP || req.nextUrl.hostname;
@@ -146,18 +209,18 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
             script += `
 # 11. RADIUS Configuration
 :if ([:len [/radius find where comment="HQInvestment RADIUS"]] = 0) do={
-    /radius add address=${radiusAddr} secret="${router.password || 'hqsecret'}" service=hotspot,ppp timeout=3000ms ${srcAddrPart} comment="HQInvestment RADIUS"
+    /radius add address=${radiusAddr} secret="${router.radiusSecret || 'hqsecret'}" service=hotspot,ppp timeout=3000ms ${srcAddrPart} comment="HQInvestment RADIUS"
 } else={
-    /radius set [find comment="HQInvestment RADIUS"] address=${radiusAddr} secret="${router.password || 'hqsecret'}" ${srcAddrPart}
+    /radius set [find comment="HQInvestment RADIUS"] address=${radiusAddr} secret="${router.radiusSecret || 'hqsecret'}" ${srcAddrPart}
 }
 :if ([:len [/radius incoming find]] = 0) do={
     /radius incoming set accept=yes port=3799
 }
 
-# 12. Enable RADIUS for Hotspot and PPP Services
-/ip hotspot profile set [find default=yes] use-radius=yes
+# 12. Enable RADIUS & SSL/TLS for Hotspot and PPP Services (TATIZO 3 Hotspot SSL fix)
+/ip hotspot profile set [find default=yes] use-radius=yes ssl-certificate=auto login-by=http-chap,http-pap,https,cookie
 /ppp profile set [find name=default] use-radius=yes
-/log info "RADIUS services enabled for Hotspot and PPP"
+/log info "RADIUS & SSL services enabled for Hotspot and PPP"
 
 # 13. Success Notification
 /log info "HQInvestment Configuration completed successfully!"
@@ -169,12 +232,31 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 # Your account doesn't have permission to view router credentials. Contact a Super Admin to obtain a full setup script.
 # To manually configure RADIUS, add a NAS entry on the billing server with this router's IP and shared secret.
 
-# 12. Enable RADIUS for Hotspot and PPP Services (no secret embedded)
-/ip hotspot profile set [find default=yes] use-radius=yes
+# 12. Enable RADIUS & SSL/TLS for Hotspot and PPP Services (no secret embedded)
+/ip hotspot profile set [find default=yes] use-radius=yes ssl-certificate=auto login-by=http-chap,http-pap,https,cookie
 /ppp profile set [find name=default] use-radius=yes
 # 13. Success Notification
 /log info "HQInvestment Configuration completed (credentials redacted)."
 `;
+        }
+
+        // Security Linter Check (P0): Ensure no accept rule for management ports runs without src-address constraint
+        const lines = script.split("\n");
+        for (const line of lines) {
+            const trimmed = line.trim();
+            if (trimmed.startsWith("#") || trimmed === "") continue;
+            if (trimmed.includes("action=accept") &&
+                (trimmed.includes("dst-port=8291") ||
+                    trimmed.includes("dst-port=80") ||
+                    trimmed.includes("dst-port=443") ||
+                    trimmed.includes("dst-port=8728") ||
+                    trimmed.includes("dst-port=8729") ||
+                    trimmed.includes("dst-port=" + apiPort))) {
+
+                if (!trimmed.includes("src-address=")) {
+                    return errorResponse(`Security Linter Reject: Rule lacks mandatory src-address restriction: ${trimmed}`, 500);
+                }
+            }
         }
 
         const safeFilename = router.name
@@ -189,7 +271,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
             },
         });
     } catch (e: any) {
-        console.error("[SCRIPT ERROR]:", e);
+        logger.error('[Script] Failed to generate router setup script', {
+            error: e instanceof Error ? e.message : String(e),
+        });
         return errorResponse("Failed to generate script", 500);
     }
 }

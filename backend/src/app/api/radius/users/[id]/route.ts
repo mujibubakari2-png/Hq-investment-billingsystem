@@ -3,6 +3,7 @@ import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 import { requirePermission } from "@/lib/rbac";
 import { canAccessTenant } from "@/lib/tenant";
+import logger from "@/lib/logger";
 
 // DELETE /api/radius/users/[id]
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -20,7 +21,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
         await db.radiusUser.delete({ where: { id } });
         return jsonResponse({ message: "RADIUS user deleted" });
     } catch (e) {
-        console.error("RADIUS user delete error:", e);
+        logger.error("RADIUS user delete error:", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }

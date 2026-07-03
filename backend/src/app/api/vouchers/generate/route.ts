@@ -2,6 +2,8 @@ import { NextRequest } from "next/server";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 import { requireRole } from "@/lib/rbac";
 import { getTenantClient } from "@/lib/tenantPrisma";
+import crypto from "crypto";
+import logger from "@/lib/logger";
 
 // POST /api/vouchers/generate - Bulk generate vouchers
 export async function POST(req: NextRequest) {
@@ -73,17 +75,25 @@ export async function POST(req: NextRequest) {
 
         const actualPackageId = pkg.id;
 
-        // Code generation based on format
+        // HIGH-SEC FIX: Use crypto.randomBytes() instead of Math.random().
+        // Math.random() is NOT a CSPRNG — voucher codes would be predictable and
+        // could be brute-forced or pre-computed by an attacker.
         const generateCode = (length: number, format: string): string => {
             let chars = '';
-            if (format === 'alphanumeric-upper') chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+            if (format === 'alphanumeric-upper')      chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
             else if (format === 'alphanumeric-lower') chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-            else chars = '0123456789'; // numeric
-            let result = '';
-            for (let j = 0; j < length; j++) {
-                result += chars.charAt(Math.floor(Math.random() * chars.length));
+            else                                      chars = '0123456789';
+
+            // Use rejection sampling to avoid modulo bias
+            const result: string[] = [];
+            const max = 256 - (256 % chars.length); // Reject bytes above this
+            while (result.length < length) {
+                const buf = crypto.randomBytes(length * 2);
+                for (let i = 0; i < buf.length && result.length < length; i++) {
+                    if (buf[i] < max) result.push(chars[buf[i] % chars.length]);
+                }
             }
-            return result;
+            return result.join('');
         };
 
         // Generate codes in-memory then insert efficiently
@@ -124,7 +134,9 @@ export async function POST(req: NextRequest) {
             vouchers
         }, 201);
     } catch (e: any) {
-        console.error("VOUCHER GENERATION ERROR:", e);
+        logger.error('[Vouchers] Generation error', {
+            error: e instanceof Error ? e.message : String(e),
+        });
         return errorResponse("Internal server error", 500);
     }
 }

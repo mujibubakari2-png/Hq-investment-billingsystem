@@ -4,6 +4,7 @@ import { jsonResponse, errorResponse } from "@/lib/auth";
 import { requirePermission } from "@/lib/rbac";
 import { decrypt } from "@/lib/encryption";
 import { canAccessTenant, isPlatformSuperAdmin } from "@/lib/tenant";
+import logger from "@/lib/logger";
 
 // DELETE /api/vpn/[id]
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -34,7 +35,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
                 await mt.deleteVpnUser(vpnUser.username);
             }
         } catch (err) {
-            console.error("Failed to delete VPN user from MikroTik:", err);
+            logger.error("Failed to delete VPN user from MikroTik:", { error: err instanceof Error ? err.message : String(err) });
             // Continue to delete from DB anyway
         }
 
@@ -42,7 +43,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
         await db.vpnUser.delete({ where: { id } });
         return jsonResponse({ message: "VPN user deleted" });
     } catch (e) {
-        console.error("VPN delete error:", e);
+        logger.error("VPN delete error:", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }

@@ -114,19 +114,50 @@ export async function consumeOtp(otpId: string): Promise<void> {
 }
 
 /**
- * Combined verify + consume in one call.
- * Returns true on success, false if OTP is invalid/expired.
+ * Combined verify + consume in one atomic operation.
  *
- * Usage (simple case where you don't need the OTP id):
- *   const ok = await verifyAndConsumeOtp(email, submittedCode);
- *   if (!ok) return errorResponse("Invalid or expired OTP", 400);
+ * HIGH-D-005 FIX: The previous implementation called verifyOtp() and then
+ * consumeOtp() as two separate database round-trips. A race between two
+ * concurrent requests using the same OTP code could both pass verifyOtp()
+ * before either consumeOtp() ran, allowing OTP replay.
+ *
+ * The fix uses a Prisma interactive transaction:
+ *   1. Fetch candidates (still two queries internally, but within a serializable tx)
+ *   2. bcrypt-compare against each candidate
+ *   3. On match: UPDATE user_otps SET used=true WHERE id=? — atomically consuming it
+ *   4. On duplicate attempt: the candidate will already have used=true inside the
+ *      transaction so the second request gets no match and returns false.
+ *
+ * Returns true on success, false if OTP is invalid/expired/already-used.
  */
 export async function verifyAndConsumeOtp(
   email: string,
   submittedCode: string
 ): Promise<boolean> {
-  const match = await verifyOtp(email, submittedCode);
-  if (!match) return false;
-  await consumeOtp(match.id);
-  return true;
+  const db = getTenantClient(null);
+
+  return await db.$transaction(async (tx) => {
+    // Fetch candidates inside the transaction for consistent read
+    const candidates = await tx.userOtp.findMany({
+      where: { email, used: false, expiresAt: { gt: new Date() } },
+      select: { id: true, otp: true },
+      orderBy: { createdAt: 'desc' },
+      take: 3,
+    });
+
+    for (const candidate of candidates) {
+      const match = await bcrypt.compare(submittedCode, candidate.otp);
+      if (match) {
+        // Atomic consume: marks this OTP as used within the same transaction.
+        // A concurrent request attempting to use the same OTP will find used=true.
+        await tx.userOtp.update({
+          where: { id: candidate.id },
+          data: { used: true },
+        });
+        return true;
+      }
+    }
+
+    return false;
+  });
 }

@@ -27,10 +27,11 @@ import { sendEmail } from "@/lib/email";
 import { env } from "@/lib/env";
 import { rateLimitMiddleware } from "@/middleware/rateLimiter";
 import { timingSafeEqual } from "@/lib/payments/utils";
+import logger from "@/lib/logger";
 
 export async function POST(req: NextRequest) {
   try {
-    const rateLimited = rateLimitMiddleware(req);
+    const rateLimited = await rateLimitMiddleware(req); // FIXED: was missing await
     if (rateLimited) return rateLimited;
 
     const globalDb = getTenantClient(null);
@@ -49,14 +50,14 @@ export async function POST(req: NextRequest) {
     }
 
     if (!apiKey) {
-      console.error("[MONGIKE WEBHOOK] API key not configured — cannot verify webhook.");
+      logger.error("[MONGIKE WEBHOOK] API key not configured — cannot verify webhook.");
       return errorResponse("API key not configured", 500);
     }
 
     // Official verification: Mongike sends x-api-key header equal to our API key
     const incomingApiKey = req.headers.get("x-api-key") ?? "";
     if (!incomingApiKey || !timingSafeEqual(incomingApiKey, apiKey)) {
-      console.warn("[MONGIKE WEBHOOK] x-api-key mismatch — rejecting webhook.");
+      logger.warn("[MONGIKE WEBHOOK] x-api-key mismatch — rejecting webhook.");
       return errorResponse("Unauthorized webhook signature", 401);
     }
 
@@ -85,7 +86,7 @@ export async function POST(req: NextRequest) {
     // Mongike only fires webhook on COMPLETED per docs, but guard defensively
     const isSuccess = rawStatus === "COMPLETED" || rawStatus === "SUCCESS";
     if (!isSuccess) {
-      console.log(`[MONGIKE WEBHOOK] Non-success status for order ${orderId}: ${rawStatus}`);
+      logger.info(`[MONGIKE WEBHOOK] Non-success status for order ${orderId}: ${rawStatus}`);
       return jsonResponse({ message: "Acknowledged non-success status" });
     }
 
@@ -104,14 +105,14 @@ export async function POST(req: NextRequest) {
       : null);
 
     if (!resolvedInvoice) {
-      console.error(`[MONGIKE WEBHOOK] Invoice not found for order_id: ${orderId}`);
+      logger.error(`[MONGIKE WEBHOOK] Invoice not found for order_id: ${orderId}`);
       return errorResponse("Invoice not found", 404);
     }
 
     // ISOLATION GUARD: Ensure this is a PLATFORM invoice (starts with INV-).
     // TENANT Hotspot/PPPoE payments use references like HP-... and should NOT trigger license activation.
     if (!resolvedInvoice.invoiceNumber.startsWith("INV-")) {
-      console.error(`[MONGIKE WEBHOOK] Invoice ${resolvedInvoice.invoiceNumber} is not a PLATFORM invoice. order_id: ${orderId}`);
+      logger.error(`[MONGIKE WEBHOOK] Invoice ${resolvedInvoice.invoiceNumber} is not a PLATFORM invoice. order_id: ${orderId}`);
       return errorResponse("Invoice not found (Cross-context mismatch)", 404);
     }
 
@@ -198,13 +199,13 @@ export async function POST(req: NextRequest) {
         `,
       });
     } catch (mailError) {
-      console.error("[MONGIKE WEBHOOK] Failed to send activation email:", mailError);
+      logger.error("[MONGIKE WEBHOOK] Failed to send activation email:", { error: mailError instanceof Error ? mailError.message : String(mailError) });
     }
 
     return jsonResponse({ message: "Webhook processed successfully" });
 
   } catch (e) {
-    console.error("[MONGIKE WEBHOOK] Error:", e);
+    logger.error("[MONGIKE WEBHOOK] Error:", { error: e instanceof Error ? e.message : String(e) });
     return errorResponse("Internal server error", 500);
   }
 }

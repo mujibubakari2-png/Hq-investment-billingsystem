@@ -5,6 +5,7 @@ import { requirePermission } from "@/lib/rbac";
 import { canAccessTenant } from "@/lib/tenant";
 import { parseOptionalDate } from "@/lib/dateUtils";
 import { ExpenseUpdateSchema } from "@/lib/validators";
+import logger from "@/lib/logger";
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
@@ -56,7 +57,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         const expense = await db.expense.update({ where: { id }, data: dataToUpdate });
         return jsonResponse(expense);
     } catch (err) {
-        console.error(err);
+        logger.error("[route] error", { error: err instanceof Error ? err.message : String(err) });
         return errorResponse("Internal server error", 500);
     }
 }
@@ -76,7 +77,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
         await db.expense.delete({ where: { id } });
         return jsonResponse({ message: "Expense deleted" });
     } catch (err) {
-        console.error(err);
+        logger.error("[route] error", { error: err instanceof Error ? err.message : String(err) });
         return errorResponse("Internal server error", 500);
     }
 }

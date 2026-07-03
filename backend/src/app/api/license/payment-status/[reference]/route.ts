@@ -28,6 +28,7 @@ import { getTenantClient } from "@/lib/tenantPrisma";
 import { getJwtTenantId, isPlatformSuperAdmin } from "@/lib/tenant";
 import { paymentService } from "@/lib/payments/service";
 import { isSupportedProvider } from "@/lib/payments/registry";
+import logger from "@/lib/logger";
 
 /** Map DB status → frontend poll state */
 const STATUS_MAP: Record<string, string> = {
@@ -145,7 +146,7 @@ export async function GET(
         }
         // else: still PENDING — do nothing
       } catch (pollErr) {
-        console.warn("[LICENSE/PAYMENT-STATUS] Live provider poll failed:", pollErr);
+        logger.warn("[LICENSE/PAYMENT-STATUS] Live provider poll failed:", { error: pollErr instanceof Error ? pollErr.message : String(pollErr) });
       }
     }
 
@@ -167,7 +168,7 @@ export async function GET(
     });
 
   } catch (e) {
-    console.error("[LICENSE/PAYMENT-STATUS] Error:", e);
+    logger.error("[LICENSE/PAYMENT-STATUS] Error:", { error: e instanceof Error ? e.message : String(e) });
     return errorResponse("Internal server error", 500);
   }
 }

@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 import { getMikroTikService } from "@/lib/mikrotik";
 import { requirePermission } from "@/lib/rbac";
+import logger from "@/lib/logger";
 
 
 export async function GET(
@@ -19,7 +20,7 @@ export async function GET(
 
         return jsonResponse(interfaces);
     } catch (e: any) {
-        console.error("[INTERFACES GET ERROR]:", e);
+        logger.error("[INTERFACES GET ERROR]:", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Failed to fetch interfaces", 500);
     }
 }

@@ -1,21 +1,21 @@
 /**
  * POST /api/webhooks/palmpesa
- * PalmPesa payment callback handler.
+ * PalmPesa payment callback handler (tenant hotspot/PPPoE payments).
+ *
+ * CRIT-BUG FIX: rateLimitMiddleware is now properly awaited.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { paymentService } from "@/lib/payments/service";
 import { rateLimitMiddleware } from "@/middleware/rateLimiter";
+import logger from "@/lib/logger";
 
 export async function POST(req: NextRequest) {
-  // Rate limiting
-  const limited = rateLimitMiddleware(req);
+  const limited = await rateLimitMiddleware(req);
   if (limited) return limited;
 
   try {
     const rawBody = await req.text();
-
-    // Convert headers to plain object with lowercase keys for consistent provider verification
     const headers: Record<string, string> = {};
     req.headers.forEach((value, key) => { headers[key.toLowerCase()] = value; });
 
@@ -34,7 +34,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ message: result.message, status: result.status }, { status: 200 });
 
   } catch (e) {
-    console.error("[WEBHOOK/PALMPESA] Error:", e);
+    logger.error("[WEBHOOK/PALMPESA] Unhandled error", {
+      error: e instanceof Error ? e.message : String(e),
+    });
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

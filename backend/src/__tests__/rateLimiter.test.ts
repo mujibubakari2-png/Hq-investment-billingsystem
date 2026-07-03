@@ -8,6 +8,7 @@ jest.mock("@/lib/auth-edge", () => ({
 
 describe("Rate Limiter - Multi-Tenant Isolation", () => {
     beforeEach(() => {
+        jest.clearAllMocks();
         cleanupRateLimitStore();
     });
 
@@ -23,8 +24,10 @@ describe("Rate Limiter - Multi-Tenant Isolation", () => {
     };
 
     it("should allow Tenant B to login even if Tenant A is rate limited on the same IP", async () => {
-        const url = "https://api.yourdomain.com/api/auth/login";
-        const sharedIp = "203.0.113.50";
+        // We use a unique IP for this test to ensure it starts fresh across runs
+        const randomSuffix = Math.floor(Math.random() * 255);
+        const sharedIp = `192.168.1.${randomSuffix}`;
+        const url = "http://localhost/api/auth/login";
 
         // Spam Tenant A
         for (let i = 0; i < 5; i++) {

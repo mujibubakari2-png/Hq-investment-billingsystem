@@ -47,13 +47,23 @@ export interface MfaSetupResult {
 /**
  * Generate 8 one-time backup codes (in case authenticator is lost).
  * Format: XXXX-XXXX (easy to read and type). Returns plaintext — caller hashes before storage.
+ *
+ * HIGH-D-003 FIX: Uses crypto.randomBytes() instead of Math.random().
+ * Math.random() is NOT cryptographically secure — backup codes derived from
+ * it can be predicted. crypto.randomBytes() is CSPRNG-backed and safe.
  */
 function generateBackupCodes(count = 8): string[] {
+  const CHARSET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // unambiguous chars (no 0/O, 1/I)
   const codes: string[] = [];
   for (let i = 0; i < count; i++) {
-    const part1 = Math.random().toString(36).slice(2, 6).toUpperCase();
-    const part2 = Math.random().toString(36).slice(2, 6).toUpperCase();
-    codes.push(`${part1}-${part2}`);
+    // 4 random chars per segment × 2 segments = 8 chars of entropy per code
+    const segment = (len: number) => {
+      const bytes = require('crypto').randomBytes(len);
+      return Array.from(bytes as Buffer)
+        .map((b: number) => CHARSET[b % CHARSET.length])
+        .join('');
+    };
+    codes.push(`${segment(4)}-${segment(4)}`);
   }
   return codes;
 }

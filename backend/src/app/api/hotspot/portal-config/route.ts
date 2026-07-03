@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 import { env } from "@/lib/env";
+import logger from "@/lib/logger";
 
 /**
  * GET /api/hotspot/portal-config?routerId=...
@@ -76,7 +77,7 @@ export async function GET(req: NextRequest) {
       settings: settings ?? {},
     });
   } catch (e) {
-    console.error("[HOTSPOT PORTAL CONFIG] Error:", e);
+    logger.error("[HOTSPOT PORTAL CONFIG] Error:", { error: e instanceof Error ? e.message : String(e) });
     return errorResponse("Internal server error", 500);
   }
 }

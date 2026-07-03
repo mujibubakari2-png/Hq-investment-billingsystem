@@ -27,10 +27,11 @@ import { sendEmail } from "@/lib/email";
 import { env } from "@/lib/env";
 import { rateLimitMiddleware } from "@/middleware/rateLimiter";
 import { computeHmac, timingSafeEqual } from "@/lib/payments/utils";
+import logger from "@/lib/logger";
 
 export async function POST(req: NextRequest) {
   try {
-    const rateLimited = rateLimitMiddleware(req);
+    const rateLimited = await rateLimitMiddleware(req); // FIXED: was missing await
     if (rateLimited) return rateLimited;
 
     const globalDb = getTenantClient(null);
@@ -91,7 +92,7 @@ export async function POST(req: NextRequest) {
 
     const isSuccess = rawStatus === "completed";
     if (!isSuccess) {
-      console.log(`[HARAKAPAY WEBHOOK] Non-success status for order ${orderId}: ${rawStatus}`);
+      logger.info(`[HARAKAPAY WEBHOOK] Non-success status for order ${orderId}: ${rawStatus}`);
       return jsonResponse({ message: "Acknowledged non-success status" });
     }
 
@@ -102,14 +103,14 @@ export async function POST(req: NextRequest) {
     });
 
     if (!invoice) {
-      console.error(`[HARAKAPAY WEBHOOK] Invoice not found for order_id: ${orderId}`);
+      logger.error(`[HARAKAPAY WEBHOOK] Invoice not found for order_id: ${orderId}`);
       return errorResponse("Invoice not found", 404);
     }
 
     // ISOLATION GUARD: Ensure this is a PLATFORM invoice (starts with INV-).
     // TENANT Hotspot/PPPoE payments use references like HP-... and should NOT trigger license activation.
     if (!invoice.invoiceNumber.startsWith("INV-")) {
-      console.error(`[HARAKAPAY WEBHOOK] Invoice ${invoice.invoiceNumber} is not a PLATFORM invoice. order_id: ${orderId}`);
+      logger.error(`[HARAKAPAY WEBHOOK] Invoice ${invoice.invoiceNumber} is not a PLATFORM invoice. order_id: ${orderId}`);
       return errorResponse("Invoice not found (Cross-context mismatch)", 404);
     }
 
@@ -196,13 +197,13 @@ export async function POST(req: NextRequest) {
         `,
       });
     } catch (mailError) {
-      console.error("[HARAKAPAY WEBHOOK] Failed to send activation email:", mailError);
+      logger.error("[HARAKAPAY WEBHOOK] Failed to send activation email:", { error: mailError instanceof Error ? mailError.message : String(mailError) });
     }
 
     return jsonResponse({ message: "Webhook processed successfully" });
 
   } catch (e) {
-    console.error("[HARAKAPAY WEBHOOK] Error:", e);
+    logger.error("[HARAKAPAY WEBHOOK] Error:", { error: e instanceof Error ? e.message : String(e) });
     return errorResponse("Internal server error", 500);
   }
 }

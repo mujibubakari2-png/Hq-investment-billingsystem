@@ -6,6 +6,7 @@ import { requirePermission } from "@/lib/rbac";
 import { toISOSafe } from "@/lib/dateUtils";
 import { getJwtTenantId, isPlatformSuperAdmin } from "@/lib/tenant";
 import { getSubUserLimitForPlan } from "@/lib/userLimits";
+import logger from "@/lib/logger";
 
 export async function GET(req: NextRequest) {
     try {
@@ -188,7 +189,7 @@ export async function GET(req: NextRequest) {
 
         return jsonResponse(payload);
     } catch (e) {
-        console.error("License API Error:", e);
+        logger.error("License API Error:", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }

@@ -24,6 +24,7 @@ import { jsonResponse, errorResponse } from "@/lib/auth";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import { paymentService } from "@/lib/payments/service";
 import { isSupportedProvider } from "@/lib/payments/registry";
+import logger from "@/lib/logger";
 
 export async function GET(
   req: NextRequest,
@@ -149,7 +150,7 @@ export async function GET(
             baseResponse.message = "Payment failed. Please try again.";
           }
         } catch (pollErr) {
-          console.warn("[PAYMENTS/STATUS] Live poll failed:", pollErr);
+          logger.warn("[PAYMENTS/STATUS] Live poll failed:", { error: pollErr instanceof Error ? pollErr.message : String(pollErr) });
           // Non-fatal — just don't set liveStatus
         }
       }
@@ -158,7 +159,7 @@ export async function GET(
     return jsonResponse(baseResponse);
 
   } catch (e) {
-    console.error("[PAYMENTS/STATUS] Error:", e);
+    logger.error("[PAYMENTS/STATUS] Error:", { error: e instanceof Error ? e.message : String(e) });
     return errorResponse("Internal server error", 500);
   }
 }

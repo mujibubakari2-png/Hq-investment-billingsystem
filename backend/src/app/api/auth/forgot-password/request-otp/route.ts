@@ -3,6 +3,7 @@ import { getTenantClient } from "@/lib/tenantPrisma";
 import { errorResponse, jsonResponse } from "@/lib/auth";
 import { sendOtpEmail } from "@/lib/email";
 import { generateAndStoreOtp } from "@/lib/otp";
+import logger from "@/lib/logger";
 
 export async function POST(req: NextRequest) {
     try {
@@ -36,7 +37,8 @@ export async function POST(req: NextRequest) {
         const emailResult = await sendOtpEmail(email, code, 'password-reset');
 
         if (!emailResult.success) {
-            console.error(`[AUTH] Failed to send password reset OTP to ${email}:`, emailResult.error);
+            // emailResult.error is already a string — no instanceof needed
+            logger.error("[AUTH] Failed to send password reset OTP", { error: String(emailResult.error) });
             return errorResponse(
                 `Email error: ${emailResult.error}. Please check your SMTP settings.`,
                 500
@@ -47,7 +49,7 @@ export async function POST(req: NextRequest) {
             message: "If an account exists, a password reset OTP has been sent.",
         });
     } catch (e) {
-        console.error("FORGOT PASSWORD OTP ERROR:", e);
+        logger.error("[AUTH] Forgot-password OTP error", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }

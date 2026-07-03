@@ -5,6 +5,7 @@ import { jsonResponse, errorResponse } from "@/lib/auth";
 import { requireRole } from "@/lib/rbac";
 import { toISOSafe, parseSafeDate } from "@/lib/dateUtils";
 import { InvoiceCreateSchema } from "@/lib/validators";
+import logger from "@/lib/logger";
 
 // GET /api/invoices
 export async function GET(req: NextRequest) {
@@ -48,7 +49,7 @@ export async function GET(req: NextRequest) {
 
         return jsonResponse(mapped);
     } catch (e) {
-        console.error(e);
+        logger.error("[route] error", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }
@@ -121,7 +122,7 @@ export async function POST(req: NextRequest) {
 
         return jsonResponse(invoice, 201);
     } catch (e) {
-        console.error(e);
+        logger.error("[route] error", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }

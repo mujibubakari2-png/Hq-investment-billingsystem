@@ -5,6 +5,7 @@ import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { encryptPaymentChannelFields, decryptPaymentChannelFields } from "@/lib/encryption";
 import { getJwtTenantId, getTenantFilter, isPlatformSuperAdmin } from "@/lib/tenant";
 import { requirePermission } from "@/lib/rbac";
+import logger from "@/lib/logger";
 
 // ── Validation schema (API-001) ───────────────────────────────────────────────
 const PROVIDERS = ["PALMPESA", "ZENOPAY", "MONGIKE", "HARAKAPAY", "CASH", "BANK_TRANSFER", "OTHER"] as const;
@@ -75,7 +76,7 @@ export async function GET(req: NextRequest) {
 
         return jsonResponse(mapped);
     } catch (e) {
-        console.error(e);
+        logger.error("[route] error", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }
@@ -175,7 +176,7 @@ export async function POST(req: NextRequest) {
             hasWebhookSecret: !!channel.webhookSecret,
         }, 201);
     } catch (e) {
-        console.error(e);
+        logger.error("[route] error", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }

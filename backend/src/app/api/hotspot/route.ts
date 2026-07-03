@@ -3,6 +3,7 @@ import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 import { requirePermission } from "@/lib/rbac";
 import { getTenantFilter } from "@/lib/tenant";
+import logger from "@/lib/logger";
 
 
 // GET /api/hotspot - list all hotspot subscribers for the tenant
@@ -78,7 +79,7 @@ export async function GET(req: NextRequest) {
         });
 
     } catch (e) {
-        console.error("Hotspot subscribers GET error:", e);
+        logger.error("Hotspot subscribers GET error:", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }

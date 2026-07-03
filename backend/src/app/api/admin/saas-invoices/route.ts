@@ -4,6 +4,7 @@ import { jsonResponse, errorResponse } from "@/lib/auth";
 import { requireRole } from "@/lib/rbac";
 import { toISOSafe } from "@/lib/dateUtils";
 import { isPlatformSuperAdmin } from "@/lib/tenant";
+import logger from "@/lib/logger";
 
 
 // GET /api/admin/saas-invoices - list all SaaS licenses as invoices (Paid, Unpaid, Overdue)
@@ -77,7 +78,7 @@ export async function GET(req: NextRequest) {
 
         return jsonResponse(mapped);
     } catch (e) {
-        console.error("ADMIN SAAS INVOICE FETCH ERROR:", e);
+        logger.error("ADMIN SAAS INVOICE FETCH ERROR:", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }
@@ -199,7 +200,7 @@ export async function POST(req: NextRequest) {
         return errorResponse("Invalid action provided", 400);
 
     } catch (e) {
-        console.error("ADMIN SAAS INVOICE ACTION ERROR:", e);
+        logger.error("ADMIN SAAS INVOICE ACTION ERROR:", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }

@@ -45,9 +45,9 @@ describe('finance records routes', () => {
     const body = await res.json();
 
     expect(res.status).toBe(200);
-    expect(body.limit).toBe(999999);
+    expect(body.limit).toBe(1000);
     expect(db.transaction.findMany).toHaveBeenCalledWith(expect.objectContaining({
-      take: 999999,
+      take: 1000,
       where: expect.not.objectContaining({ tenantId: expect.anything() }),
     }));
   });
@@ -129,6 +129,7 @@ describe('finance records routes', () => {
           createdBy: { username: 'admin' },
           tenant: { name: 'Tenant A' },
         }]),
+        count: jest.fn().mockResolvedValue(1),
       },
     };
     mockGetTenantClient.mockReturnValue(db);
@@ -141,7 +142,7 @@ describe('finance records routes', () => {
     expect(db.expense.findMany).toHaveBeenCalledWith(expect.objectContaining({
       where: {},
     }));
-    expect(body[0].tenantName).toBe('Tenant A');
+    expect(body.data[0].tenantName).toBe('Tenant A');
   });
 
   it('invoices POST assigns super-admin-created client invoices to the client tenant', async () => {

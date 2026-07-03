@@ -5,6 +5,7 @@ import { requirePermission } from "@/lib/rbac";
 import { suspendRadiusUser } from "@/lib/radius";
 import { getTenantFilter } from "@/lib/tenant";
 import { toISOSafe } from "@/lib/dateUtils";
+import logger from "@/lib/logger";
 
 /**
  * POST /api/radius/voucher-expire
@@ -75,7 +76,7 @@ export async function POST(req: NextRequest) {
 
                 results.push({ username, status: "expired" });
             } catch (err) {
-                console.error(`[VOUCHER EXPIRE] Failed for ${username}:`, err);
+                logger.error(`[VOUCHER EXPIRE] Failed for ${username}:`, { error: err instanceof Error ? err.message : String(err) });
                 results.push({ username, status: "error", error: String(err) });
             }
         }
@@ -93,7 +94,7 @@ export async function POST(req: NextRequest) {
         });
 
     } catch (e) {
-        console.error("[VOUCHER EXPIRE ERROR]:", e);
+        logger.error("[VOUCHER EXPIRE ERROR]:", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }
@@ -150,7 +151,7 @@ export async function GET(req: NextRequest) {
         });
 
     } catch (e) {
-        console.error("[VOUCHER EXPIRE GET ERROR]:", e);
+        logger.error("[VOUCHER EXPIRE GET ERROR]:", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }

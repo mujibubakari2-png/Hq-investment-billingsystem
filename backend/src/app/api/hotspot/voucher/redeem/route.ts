@@ -4,6 +4,7 @@ import { jsonResponse, errorResponse } from "@/lib/auth";
 import { getMikroTikService, sanitizeMikroTikName } from "@/lib/mikrotik";
 import { syncRadiusUser } from "@/lib/radius";
 import { buildHotspotPortalFeedback } from "@/lib/hotspotFlow";
+import logger from "@/lib/logger";
 
 /**
  * POST /api/hotspot/voucher/redeem
@@ -137,7 +138,7 @@ export async function POST(req: NextRequest) {
             });
             radiusSyncSuccess = true;
         } catch (radErr) {
-            console.error("RADIUS sync error for voucher:", radErr);
+            logger.error("RADIUS sync error for voucher:", { error: radErr instanceof Error ? radErr.message : String(radErr) });
             // We continue anyway as local MikroTik sync might still work
         }
 
@@ -164,7 +165,7 @@ export async function POST(req: NextRequest) {
                     },
                 });
             } catch (logErr: any) {
-                console.error("Router/MikroTik voucher redeem error:", logErr);
+                logger.error("Router/MikroTik voucher redeem error:", { error: logErr instanceof Error ? logErr.message : String(logErr) });
                 finalSyncStatus = "FAILED_SYNC";
             }
         } else {
@@ -223,7 +224,7 @@ export async function POST(req: NextRequest) {
         });
 
     } catch (e) {
-        console.error("VOUCHER REDEEM ERROR:", e);
+        logger.error("VOUCHER REDEEM ERROR:", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }

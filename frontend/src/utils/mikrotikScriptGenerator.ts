@@ -5,7 +5,7 @@ export interface MikrotikScriptParams {
     routerId: string;
     apiHost: string;
     publicApiBase: string;
-    
+
     // WireGuard specific (optional)
     isWireGuard?: boolean;
     listenPort?: number;
@@ -16,43 +16,49 @@ export interface MikrotikScriptParams {
     serverPort?: number;
     routerTunnelIp?: string;
     serverTunnelIp?: string;
+
+    // LAN / Pool / DNS Configuration (Required)
+    lanIp?: string;
+    lanGateway?: string;
+    hotspotPoolRange?: string;
+    pppoePoolRange?: string;
+    dns?: string;
+    radiusSecret?: string;
 }
 
 export function generateMikrotikScript(params: MikrotikScriptParams): string {
     const {
         routerName, routerUsername, routerPassword, routerId, apiHost, publicApiBase,
         isWireGuard, listenPort, routerPrivateKey, serverPubKey, presharedKey,
-        serverEndpoint, serverPort, routerTunnelIp, serverTunnelIp
+        serverEndpoint, serverPort, routerTunnelIp, serverTunnelIp,
+        lanIp, lanGateway, hotspotPoolRange, pppoePoolRange, dns, radiusSecret
     } = params;
 
-    const sanitizeName = (name: string) => 
+    // Strict frontend validation layer (P0)
+    if (!lanIp || !lanGateway || !hotspotPoolRange || !pppoePoolRange || !dns) {
+        throw new Error("Missing required configuration fields for script generation. Please configure LAN, Gateway, Pool ranges, and DNS on this router first.");
+    }
+
+    const sanitizeName = (name: string) =>
         name.trim().replace(/\s+/g, '-').replace(/[^a-zA-Z0-9\-]/g, '').replace(/-+/g, '-').replace(/^-+|-+$/g, '');
-    
+
     const safeRouterName = sanitizeName(routerName);
     const safeRouterNameLower = safeRouterName.toLowerCase();
-    
+
     // subnetAddress: the VPN management subnet (used for firewall src-address restrictions)
-    const subnetAddress = isWireGuard && routerTunnelIp ? `${routerTunnelIp.split('.').slice(0, 3).join('.')}.0/24` : '';
-    // serverSubnet: the server-side VPN subnet — WireGuard peer allowed-address should be this,
-    // NOT the router's LAN subnet. Allowing 0.0.0.0/0 would route all client traffic through the VPN.
-    const serverSubnet  = isWireGuard && serverTunnelIp ? `${serverTunnelIp.split('.').slice(0, 3).join('.')}.0/24` : (subnetAddress || '0.0.0.0/0');
+    const subnetAddress = routerTunnelIp ? `${routerTunnelIp.split('.').slice(0, 3).join('.')}.0/24` : '10.200.0.0/24';
+    // serverSubnet: the server-side VPN subnet
+    const serverSubnet = isWireGuard && serverTunnelIp ? `${serverTunnelIp.split('.').slice(0, 3).join('.')}.0/24` : (subnetAddress || '0.0.0.0/0');
     const radiusAddress = isWireGuard && serverTunnelIp ? serverTunnelIp : apiHost;
 
-    // IMPORTANT: LAN gateway MUST NOT overlap with the VPN tunnel IP.
-    // If VPN is 10.0.0.x, LAN should be 10.10.0.1.
-    let lanGateway = '';
-    if (routerTunnelIp) {
-        const parts = routerTunnelIp.split('.');
-        lanGateway = `${parts[0]}.10.${parts[2] || '0'}.1`;
-    }
-    const lanPrefix     = lanGateway ? lanGateway.split('.').slice(0, 3).join('.') : '';  // e.g. "10.10.0"
-    const lanCidr       = lanGateway ? `${lanGateway}/24`  : '';        // e.g. "10.10.0.1/24"
-    const lanNetwork    = lanPrefix  ? `${lanPrefix}.0/24` : '';        // e.g. "10.10.0.0/24"
-    // Separate pools: Hotspot .10-.149 | PPPoE .150-.250 (prevents IP collision)
-    const hsPoolStart   = lanPrefix  ? `${lanPrefix}.10`   : '';
-    const hsPoolEnd     = lanPrefix  ? `${lanPrefix}.149`  : '';
-    const ppoePoolStart = lanPrefix  ? `${lanPrefix}.150`  : '';
-    const ppoePoolEnd   = lanPrefix  ? `${lanPrefix}.250`  : '';
+    // LAN variables
+    const cleanLanIp = lanIp.includes('/') ? lanIp.split('/')[0] : lanIp;
+    const lanCidr = lanIp.includes('/') ? lanIp : `${cleanLanIp}/24`;
+    const parts = cleanLanIp.split('.');
+    const lanNetwork = parts.length === 4 ? `${parts[0]}.${parts[1]}.${parts[2]}.0/24` : '';
+
+    const dnsServers = dns;
+    const radSecret = radiusSecret || '';
 
     const script = `# ═══════════════════════════════════════════════════════════════
 # HQINVESTMENT ISP Billing - MikroTik Auto-Configuration Script
@@ -69,11 +75,13 @@ ${isWireGuard ? `# VPN IP: ${routerTunnelIp}\n` : ''}# Generated: ${new Date().t
 :if ([:len [/user find name="admin"]] > 0) do={
     /user set [find name="admin"] name="${routerUsername || 'admin'}" password="${routerPassword || ''}"
 } else={
-    :if ([:len [/user find name="${routerUsername || 'admin'}"]] > 0) do={
-        /user set [find name="${routerUsername || 'admin'}"] password="${routerPassword || ''}"
+    :if ([:len [/user find name="${routerUsername || 'admin'}"]] = 0) do={
+        /user add name="${routerUsername || 'admin'}" password="${routerPassword || ''}" group=full comment="HQInvestment Admin"
+    } else={
+        /user set [find name="${routerUsername || 'admin'}"] password="${routerPassword || ''}" group=full
     }
 }
-/ip dns set servers=8.8.8.8,1.1.1.1 allow-remote-requests=yes
+/ip dns set servers=${dnsServers} allow-remote-requests=yes
 /system ntp client set enabled=yes
 :if ([:len [/system ntp client servers find where address="pool.ntp.org"]] = 0) do={ /system ntp client servers add address=pool.ntp.org }
 
@@ -112,20 +120,19 @@ ${isWireGuard ? `# VPN IP: ${routerTunnelIp}\n` : ''}# Generated: ${new Date().t
 }
 
 # ── 4. IP Pools ──────────────────────────────────────────────────
-# Hotspot clients: .10-.149  |  PPPoE clients: .150-.250
-# Separate ranges prevent IP collisions between the two services
+# Hotspot clients & PPPoE clients pools (configured from database to prevent conflicts)
 :if ([:len [/ip pool find name="hs-pool-${safeRouterName}"]] = 0) do={
-    /ip pool add name="hs-pool-${safeRouterName}" ranges=${hsPoolStart}-${hsPoolEnd}
+    /ip pool add name="hs-pool-${safeRouterName}" ranges=${hotspotPoolRange}
 }
 :if ([:len [/ip pool find name="pppoe-pool-${safeRouterName}"]] = 0) do={
-    /ip pool add name="pppoe-pool-${safeRouterName}" ranges=${ppoePoolStart}-${ppoePoolEnd}
+    /ip pool add name="pppoe-pool-${safeRouterName}" ranges=${pppoePoolRange}
 }
 
 # ── 5. DHCP Server (Hotspot clients only) ────────────────────────
-# DHCP only serves from the hotspot pool (.10-.149).
+# DHCP only serves from the hotspot pool.
 # PPPoE clients get IPs via PPP negotiation, not DHCP.
 :if ([:len [/ip dhcp-server network find address="${lanNetwork}"]] = 0) do={
-    /ip dhcp-server network add address=${lanNetwork} gateway=${lanGateway} dns-server=8.8.8.8,1.1.1.1
+    /ip dhcp-server network add address=${lanNetwork} gateway=${lanGateway} dns-server=${dnsServers}
 }
 :local existingDhcp [/ip dhcp-server find where interface=$lanBridge];
 :if ([:len $existingDhcp] > 0) do={
@@ -136,17 +143,15 @@ ${isWireGuard ? `# VPN IP: ${routerTunnelIp}\n` : ''}# Generated: ${new Date().t
 
 # ── 6. Hotspot Server ────────────────────────────────────────────
 # IMPORTANT: hotspot is created AFTER IP address is assigned.
-# login-by does NOT include 'mac' — MAC-only login bypasses password auth.
-# SECURITY: login-by does NOT include 'mac' — MAC-only login bypasses password/voucher auth!
-# mac-cookie is kept for session continuity only (requires prior login to set the cookie).
+# login-by includes https and http-chap/http-pap, ssl-certificate=auto for Hotspot TLS/HTTPS
 :if ([:len [/ip hotspot profile find name="hsprof-${safeRouterNameLower}"]] = 0) do={
-    /ip hotspot profile add name="hsprof-${safeRouterNameLower}" hotspot-address=${lanGateway} dns-name="${safeRouterNameLower}.hotspot" html-directory=hotspot login-by=http-chap,http-pap,cookie http-cookie-lifetime=3d use-radius=yes
+    /ip hotspot profile add name="hsprof-${safeRouterNameLower}" hotspot-address=${lanGateway} dns-name="${safeRouterNameLower}.hotspot" html-directory=hotspot login-by=http-chap,http-pap,https,cookie ssl-certificate=auto http-cookie-lifetime=3d use-radius=yes
 } else={
-    /ip hotspot profile set [find name="hsprof-${safeRouterNameLower}"] login-by=http-chap,http-pap,cookie use-radius=yes
+    /ip hotspot profile set [find name="hsprof-${safeRouterNameLower}"] login-by=http-chap,http-pap,https,cookie ssl-certificate=auto use-radius=yes
 }
-# Enforce use-radius=yes AND remove 'mac' from login-by on ALL hotspot profiles (in case old ones exist)
+# Enforce use-radius=yes AND configure SSL on ALL hotspot profiles (in case old ones exist)
 :foreach prof in=[/ip hotspot profile find] do={
-    /ip hotspot profile set $prof use-radius=yes login-by=http-chap,http-pap,cookie
+    /ip hotspot profile set $prof use-radius=yes login-by=http-chap,http-pap,https,cookie ssl-certificate=auto
 }
 :if ([:len [/ip hotspot find name="hotspot-${safeRouterName}"]] = 0) do={
     :if ([:len [/ip hotspot find interface=$lanBridge]] = 0) do={
@@ -157,10 +162,10 @@ ${isWireGuard ? `# VPN IP: ${routerTunnelIp}\n` : ''}# Generated: ${new Date().t
 }
 
 # ── 7. PPPoE Server ──────────────────────────────────────────────
-# PPPoE runs on the SAME bridge but uses its own IP pool (.150-.250).
+# PPPoE runs on the SAME bridge but uses its own IP pool.
 # one-session-per-host prevents a single MAC from opening multiple sessions.
 :if ([:len [/ppp profile find name="pppoe-profile-${safeRouterName}"]] = 0) do={
-    /ppp profile add name="pppoe-profile-${safeRouterName}" local-address=${lanGateway} remote-address="pppoe-pool-${safeRouterName}" dns-server=8.8.8.8,1.1.1.1 use-encryption=yes
+    /ppp profile add name="pppoe-profile-${safeRouterName}" local-address=${lanGateway} remote-address="pppoe-pool-${safeRouterName}" dns-server=${dnsServers} use-encryption=yes
 }
 :if ([:len [/interface pppoe-server server find service-name="pppoe-svc-${safeRouterName}"]] = 0) do={
     /interface pppoe-server server add service-name="pppoe-svc-${safeRouterName}" interface=$lanBridge default-profile="pppoe-profile-${safeRouterName}" authentication=pap,chap,mschap1,mschap2 one-session-per-host=yes disabled=no
@@ -175,8 +180,6 @@ ${isWireGuard ? `# ── 8. WireGuard VPN Configuration ───────�
     /interface wireguard set [find name="wg-hq"] listen-port=${listenPort} private-key="${routerPrivateKey}"
 }
 # SECURITY: allowed-address = server VPN subnet ONLY (not 0.0.0.0/0 and not the router's LAN subnet).
-# Using 0.0.0.0/0 would route ALL client traffic through the VPN tunnel — breaking internet access.
-# Using the LAN subnet would cause routing loops. Only the server's management subnet is needed.
 :if ([:len [/interface wireguard peers find interface="wg-hq" public-key="${serverPubKey}"]] = 0) do={
     /interface wireguard peers add interface="wg-hq" public-key="${serverPubKey}" ${presharedKey ? `preshared-key="${presharedKey}" ` : ''}endpoint-address=${serverEndpoint} endpoint-port=${serverPort} allowed-address=${serverSubnet} persistent-keepalive=25s comment="HQInvestment ISP Server"
 } else={
@@ -197,14 +200,15 @@ ${isWireGuard ? `# ── 8. WireGuard VPN Configuration ───────�
     /ip firewall filter add chain=input action=passthrough comment="Dummy HQ Rule"
 }
 
+# SECURITY: Allow Winbox, Web, and API accept rules are restricted strictly to subnetAddress (TATIZO 2 fix)
 :if ([:len [/ip firewall filter find where comment="Allow Winbox"]] = 0) do={
-    /ip firewall filter add place-before=0 chain=input protocol=tcp dst-port=8291 ${isWireGuard ? `src-address=${subnetAddress} ` : ''}action=accept comment="Allow Winbox"
+    /ip firewall filter add place-before=0 chain=input protocol=tcp dst-port=8291 src-address=${subnetAddress} action=accept comment="Allow Winbox"
 }
 :if ([:len [/ip firewall filter find where comment="Allow Web"]] = 0) do={
-    /ip firewall filter add place-before=0 chain=input protocol=tcp dst-port=80,443 ${isWireGuard ? `src-address=${subnetAddress} ` : ''}action=accept comment="Allow Web"
+    /ip firewall filter add place-before=0 chain=input protocol=tcp dst-port=80,443 src-address=${subnetAddress} action=accept comment="Allow Web"
 }
 :if ([:len [/ip firewall filter find where comment="Allow API"]] = 0) do={
-    /ip firewall filter add place-before=0 chain=input protocol=tcp dst-port=8728,8729 ${isWireGuard ? `src-address=${subnetAddress} ` : ''}action=accept comment="Allow API"
+    /ip firewall filter add place-before=0 chain=input protocol=tcp dst-port=8728,8729 src-address=${subnetAddress} action=accept comment="Allow API"
 }
 :if ([:len [/ip firewall filter find where comment="Allow DNS & DHCP"]] = 0) do={
     /ip firewall filter add place-before=0 chain=input in-interface=$lanBridge protocol=udp dst-port=53,67 action=accept comment="Allow DNS & DHCP"
@@ -233,7 +237,6 @@ ${isWireGuard ? `:if ([:len [/ip firewall filter find where comment="Allow WireG
 }
 
 # SECURITY: Remove any legacy "Allow LAN to WAN" or "Allow all forward" rules that bypass Hotspot auth.
-# These rules are the #1 cause of unauthenticated internet access on misconfigured routers.
 :foreach r in=[/ip firewall filter find where (comment="Allow LAN to WAN" or comment="Allow LAN-WAN" or comment="allow lan to wan" or comment~"bypass")] do={
     /ip firewall filter remove $r
 }
@@ -246,35 +249,27 @@ ${isWireGuard ? `:if ([:len [/ip firewall filter find where comment="Allow WireG
 }
 
 # SECURITY: Block unauthenticated LAN/bridge clients from bypassing Hotspot portal.
-# The Hotspot engine intercepts HTTP and redirects to the login page for unauthenticated clients.
-# However, non-HTTP traffic (DNS queries to external servers, direct IP access) must also be blocked.
-# This forward drop rule ensures that ONLY traffic explicitly accepted above passes through.
 :if ([:len [/ip firewall filter find where comment="Drop unauthenticated LAN forward - HQInvestment"]] = 0) do={
     /ip firewall filter add chain=forward in-interface=$lanBridge out-interface=$wanInterface action=drop comment="Drop unauthenticated LAN forward - HQInvestment"
 }
-# NOTE: Hotspot and PPPoE authenticated sessions create dynamic accept rules automatically in RouterOS.
-# The hotspot engine adds entries to /ip firewall filter (dynamic) for authenticated users.
-# PPPoE sessions create virtual ppp interfaces (all-ppp) which are allowed by the rule above.
 
 # ── 8. RADIUS & Walled Garden ──────────────────────────────────
+# Configure per-router/tenant RADIUS secret (TATIZO 3 RADIUS secret fix)
 :if ([:len [/radius find address="${radiusAddress}"]] = 0) do={
-    /radius add service=hotspot,ppp address="${radiusAddress}" secret="${routerPassword || 'hqinvestment_radius_secret'}" authentication-port=1812 accounting-port=1813 timeout=3s ${isWireGuard ? `src-address=${routerTunnelIp} ` : ''}comment="HQInvestment RADIUS"
+    /radius add service=hotspot,ppp address="${radiusAddress}" secret="${radSecret}" authentication-port=1812 accounting-port=1813 timeout=3s ${routerTunnelIp ? `src-address=${routerTunnelIp} ` : ''}comment="HQInvestment RADIUS"
 } else={
-    /radius set [find address="${radiusAddress}"] secret="${routerPassword || 'hqinvestment_radius_secret'}" service=hotspot,ppp ${isWireGuard ? `src-address=${routerTunnelIp} ` : ''}comment="HQInvestment RADIUS"
+    /radius set [find address="${radiusAddress}"] secret="${radSecret}" service=hotspot,ppp ${routerTunnelIp ? `src-address=${routerTunnelIp} ` : ''}comment="HQInvestment RADIUS"
 }
 /radius incoming set accept=yes port=3799
 /ppp aaa set use-radius=yes accounting=yes
 
 # Walled Garden - allow billing portal (DNS-based and IP-based)
-# DNS entry: unauthenticated clients can reach billing portal by hostname
 :if ([:len [/ip hotspot walled-garden find dst-host="${apiHost}"]] = 0) do={
     /ip hotspot walled-garden add dst-host="${apiHost}" action=allow comment="Billing Portal"
 }
-# IP entry: uses actual server IP so portal works even if DNS is not set up
 :if ([:len [/ip hotspot walled-garden ip find dst-address="${radiusAddress}"]] = 0) do={
     /ip hotspot walled-garden ip add dst-address="${radiusAddress}" action=accept comment="Billing Portal IP"
 }
-# VPN subnet entry: RADIUS auth traffic must flow even before login
 ${subnetAddress ? `:if ([:len [/ip hotspot walled-garden ip find dst-address="${subnetAddress}"]] = 0) do={
     /ip hotspot walled-garden ip add dst-address="${subnetAddress}" action=accept comment="VPN Subnet - HQInvestment"
 }` : ''}

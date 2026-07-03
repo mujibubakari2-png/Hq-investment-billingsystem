@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse, hashPassword } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/rateLimiter";
+import logger from "@/lib/logger";
 
 
 export async function GET(req: NextRequest) {
@@ -48,7 +49,7 @@ export async function GET(req: NextRequest) {
 
         return jsonResponse({ message: `User ${result.email} is now SUPER_ADMIN` });
     } catch (error: any) {
-        console.error("[FORCE RESET ERROR]:", error);
+        logger.error("[FORCE RESET ERROR]:", { error: error instanceof Error ? error.message : String(error) });
         return errorResponse("Error resetting user", 500);
     }
 }

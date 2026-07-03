@@ -3,6 +3,7 @@ import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { requirePermission } from "@/lib/rbac";
 import { getTenantFilter, getAssignTenantId } from "@/lib/tenant";
+import logger from "@/lib/logger";
 
 // GET /api/sms
 export async function GET(req: NextRequest) {
@@ -61,7 +62,7 @@ export async function GET(req: NextRequest) {
             summaries: { total: totalAll, sent: totalSent, failed: totalFailed, pending: totalPending },
         });
     } catch (e) {
-        console.error(e);
+        logger.error("[route] error", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }
@@ -94,7 +95,7 @@ export async function POST(req: NextRequest) {
 
         return jsonResponse(sms, 201);
     } catch (e) {
-        console.error(e);
+        logger.error("[route] error", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }

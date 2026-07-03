@@ -4,6 +4,7 @@ import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { requirePermission } from "@/lib/rbac";
 import { getJwtTenantId } from "@/lib/tenant";
 import { toISOSafe } from "@/lib/dateUtils";
+import logger from "@/lib/logger";
 
 /**
  * GET /api/audit-logs
@@ -84,7 +85,7 @@ export async function GET(req: NextRequest) {
             },
         });
     } catch (e) {
-        console.error("[AUDIT-LOGS] GET error:", e);
+        logger.error("[AUDIT-LOGS] GET error:", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }

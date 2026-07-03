@@ -1,14 +1,17 @@
 /**
  * POST /api/webhooks/harakapay
- * HarakaPay payment callback handler.
+ * HarakaPay payment callback handler (tenant hotspot/PPPoE payments).
+ *
+ * CRIT-BUG FIX: rateLimitMiddleware is now properly awaited.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { paymentService } from "@/lib/payments/service";
 import { rateLimitMiddleware } from "@/middleware/rateLimiter";
+import logger from "@/lib/logger";
 
 export async function POST(req: NextRequest) {
-  const limited = rateLimitMiddleware(req);
+  const limited = await rateLimitMiddleware(req);
   if (limited) return limited;
 
   try {
@@ -25,7 +28,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ message: result.message, status: result.status }, { status: 200 });
 
   } catch (e) {
-    console.error("[WEBHOOK/HARAKAPAY] Error:", e);
+    logger.error("[WEBHOOK/HARAKAPAY] Unhandled error", {
+      error: e instanceof Error ? e.message : String(e),
+    });
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

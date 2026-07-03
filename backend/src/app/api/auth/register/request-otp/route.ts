@@ -3,6 +3,7 @@ import { errorResponse, jsonResponse } from "@/lib/auth";
 import { sendOtpEmail } from "@/lib/email";
 import { generateAndStoreOtp } from "@/lib/otp";
 import { getTenantClient } from "@/lib/tenantPrisma";
+import logger from "@/lib/logger";
 
 export async function POST(req: NextRequest) {
     try {
@@ -24,7 +25,8 @@ export async function POST(req: NextRequest) {
         const emailResult = await sendOtpEmail(email, code, 'registration');
 
         if (!emailResult.success) {
-            console.error(`[AUTH] Failed to send registration OTP to ${email}:`, emailResult.error);
+            // emailResult.error is already a string — no instanceof needed
+            logger.error("[AUTH] Failed to send registration OTP", { error: String(emailResult.error) });
             return errorResponse(
                 `Email error: ${emailResult.error}. Please check your SMTP settings in your .env file.`,
                 500
@@ -35,7 +37,7 @@ export async function POST(req: NextRequest) {
             message: "Verification code sent to your email.",
         });
     } catch (e: any) {
-        console.error("REGISTER OTP ERROR:", e);
+        logger.error("[AUTH] Register OTP error", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }

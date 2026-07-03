@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 import { requirePermission } from "@/lib/rbac";
+import logger from "@/lib/logger";
 
 /**
  * Provider connectivity test metadata.
@@ -30,45 +31,45 @@ import { requirePermission } from "@/lib/rbac";
 const PROVIDER_DEFAULTS: Record<
   string,
   {
-    envKey:            string;
-    defaultUrl:        string;
-    testPath:          string;
-    testMethod:        string;
+    envKey: string;
+    defaultUrl: string;
+    testPath: string;
+    testMethod: string;
     allow404AsReachable: boolean;
     allow401AsReachable: boolean;
   }
 > = {
   PALMPESA: {
-    envKey:              "PALMPESA_API_URL",
-    defaultUrl:          "https://palmpesa.drmlelwa.co.tz",
-    testPath:            "/api/order-status",
-    testMethod:          "POST",
+    envKey: "PALMPESA_API_URL",
+    defaultUrl: "https://palmpesa.drmlelwa.co.tz",
+    testPath: "/api/order-status",
+    testMethod: "POST",
     allow404AsReachable: true,
     allow401AsReachable: true,
   },
   ZENOPAY: {
-    envKey:              "ZENOPAY_API_URL",
-    defaultUrl:          "https://zenoapi.com/api/payments",
-    testPath:            "/order-status?order_id=test-ping",
-    testMethod:          "GET",
+    envKey: "ZENOPAY_API_URL",
+    defaultUrl: "https://zenoapi.com/api/payments",
+    testPath: "/order-status?order_id=test-ping",
+    testMethod: "GET",
     allow404AsReachable: true,
     allow401AsReachable: true,
   },
   MONGIKE: {
-    envKey:              "MONGIKE_API_URL",
-    defaultUrl:          "https://mongike.com/api/v1",
+    envKey: "MONGIKE_API_URL",
+    defaultUrl: "https://mongike.com/api/v1",
     // /wallet/history requires Authorization: Bearer token (different from x-api-key).
     // A 401 here confirms the server is alive; credentials are the separate payment apiKey.
-    testPath:            "/wallet/history",
-    testMethod:          "GET",
+    testPath: "/wallet/history",
+    testMethod: "GET",
     allow404AsReachable: false,
     allow401AsReachable: true,   // 401 expected — different auth scheme for wallet endpoints
   },
   HARAKAPAY: {
-    envKey:              "HARAKAPAY_API_URL",
-    defaultUrl:          "https://harakapay.net",
-    testPath:            "/api/v1/balance",
-    testMethod:          "GET",
+    envKey: "HARAKAPAY_API_URL",
+    defaultUrl: "https://harakapay.net",
+    testPath: "/api/v1/balance",
+    testMethod: "GET",
     allow404AsReachable: false,
     allow401AsReachable: true,
   },
@@ -93,10 +94,10 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
     const { provider, apiKey, apiUrl } = body as {
-      provider:    string;
-      apiKey:      string;
-      apiUrl?:     string;
-      apiSecret?:  string;
+      provider: string;
+      apiKey: string;
+      apiUrl?: string;
+      apiSecret?: string;
     };
 
     if (!provider || !apiKey) {
@@ -115,7 +116,7 @@ export async function POST(req: NextRequest) {
     // Build auth headers strictly per official docs — no undocumented headers
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
-      "Accept":       "application/json",
+      "Accept": "application/json",
     };
 
     switch (providerUpper) {
@@ -150,9 +151,9 @@ export async function POST(req: NextRequest) {
       timeoutHandle = setTimeout(() => controller.abort(), 10_000);
 
       const fetchOpts: RequestInit = {
-        method:  meta.testMethod,
+        method: meta.testMethod,
         headers,
-        signal:  controller.signal,
+        signal: controller.signal,
       };
 
       // PalmPesa order-status is a POST — send minimal body with dummy order_id
@@ -173,74 +174,74 @@ export async function POST(req: NextRequest) {
         responseMessage = text.slice(0, 200);
       }
 
-      const isSuccess      = statusCode >= 200 && statusCode < 300;
-      const isAuthIssue    = statusCode === 401 || statusCode === 403;
-      const isNotFound     = statusCode === 404;
+      const isSuccess = statusCode >= 200 && statusCode < 300;
+      const isAuthIssue = statusCode === 401 || statusCode === 403;
+      const isNotFound = statusCode === 404;
 
       if (isSuccess) {
         return jsonResponse({
-          success:   true,
+          success: true,
           reachable: true,
           statusCode,
-          provider:  providerUpper,
+          provider: providerUpper,
           baseUrl,
           testedUrl: testUrl,
-          message:   `✅ ${providerUpper} API is reachable and responding at ${testUrl} (HTTP ${statusCode}).${responseMessage ? ` ${responseMessage}` : ""}`,
+          message: `✅ ${providerUpper} API is reachable and responding at ${testUrl} (HTTP ${statusCode}).${responseMessage ? ` ${responseMessage}` : ""}`,
         });
       }
 
       if (isAuthIssue && meta.allow401AsReachable) {
         return jsonResponse({
-          success:   true,
+          success: true,
           reachable: true,
           statusCode,
-          provider:  providerUpper,
+          provider: providerUpper,
           baseUrl,
           testedUrl: testUrl,
-          message:   `✅ ${providerUpper} server is reachable at ${testUrl} (HTTP ${statusCode} — server alive, verify your API credentials in the dashboard).`,
+          message: `✅ ${providerUpper} server is reachable at ${testUrl} (HTTP ${statusCode} — server alive, verify your API credentials in the dashboard).`,
         });
       }
 
       if (isNotFound && meta.allow404AsReachable) {
         return jsonResponse({
-          success:   true,
+          success: true,
           reachable: true,
           statusCode,
-          provider:  providerUpper,
+          provider: providerUpper,
           baseUrl,
           testedUrl: testUrl,
-          message:   `✅ ${providerUpper} API is reachable at ${testUrl} — HTTP 404 for test reference is expected (connectivity confirmed).`,
+          message: `✅ ${providerUpper} API is reachable at ${testUrl} — HTTP 404 for test reference is expected (connectivity confirmed).`,
         });
       }
 
       return jsonResponse({
-        success:   false,
+        success: false,
         reachable: statusCode < 600,
         statusCode,
-        provider:  providerUpper,
+        provider: providerUpper,
         baseUrl,
         testedUrl: testUrl,
-        message:   `⚠️ ${providerUpper} responded with HTTP ${statusCode}. ${responseMessage || "Please check your API key or URL."}`,
+        message: `⚠️ ${providerUpper} responded with HTTP ${statusCode}. ${responseMessage || "Please check your API key or URL."}`,
       });
 
     } catch (fetchErr: any) {
       if (timeoutHandle) clearTimeout(timeoutHandle);
       const isTimeout = fetchErr?.name === "AbortError";
       return jsonResponse({
-        success:   false,
+        success: false,
         reachable: false,
         statusCode: 0,
-        provider:  providerUpper,
+        provider: providerUpper,
         baseUrl,
         testedUrl: testUrl,
-        message:   isTimeout
+        message: isTimeout
           ? `⏱️ Request timed out (10s) checking ${testUrl}. Verify ${baseUrl} is publicly reachable from this server.`
           : `❌ Cannot reach ${testUrl}: ${fetchErr?.message ?? "Network error"}. Please verify the Base URL.`,
       });
     }
 
   } catch (e: any) {
-    console.error("[test-api] Error:", e);
+    logger.error("[test-api] Error:", { error: e instanceof Error ? e.message : String(e) });
     return errorResponse("Internal server error", 500);
   }
 }

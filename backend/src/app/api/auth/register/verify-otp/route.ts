@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { errorResponse, jsonResponse } from "@/lib/auth";
 import { verifyAndConsumeOtp } from "@/lib/otp";
+import logger from "@/lib/logger";
 
 export async function POST(req: NextRequest) {
     try {
@@ -20,7 +21,7 @@ export async function POST(req: NextRequest) {
 
         return jsonResponse({ message: "OTP verified successfully" });
     } catch (e: any) {
-        console.error("VERIFY OTP ERROR:", e);
+        logger.error("VERIFY OTP ERROR:", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }

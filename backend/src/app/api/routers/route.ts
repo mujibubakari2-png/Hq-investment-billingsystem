@@ -3,7 +3,38 @@ import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { requirePermission } from "@/lib/rbac";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import { toISOSafe } from "@/lib/dateUtils";
-import { encryptRouterFields } from "@/lib/encryption";
+import { encrypt, decrypt, encryptRouterFields } from "@/lib/encryption";
+import { generateRadiusSecret, generateAdminUsername } from "@/lib/routerProvisioning";
+import logger from "@/lib/logger";
+
+// Safe projection: omit password, wgPrivateKey, wgPresharedKey, radiusSecret
+function mapRouter(r: any) {
+    return {
+        id: r.id,
+        router_id: r.id,
+        name: r.name,
+        host: r.host,
+        ip: r.host,
+        username: r.username,
+        port: r.port,
+        apiPort: r.apiPort,
+        type: r.type,
+        vpnMode: r.vpnMode,
+        description: r.description,
+        status: r.status === "ONLINE" ? "Online" : "Offline",
+        activeUsers: r.activeUsers,
+        cpuLoad: r.cpuLoad,
+        memoryUsed: r.memoryUsed,
+        uptime: r.uptime || "",
+        lastSeen: toISOSafe(r.lastSeen) || "Never",
+        accountingEnabled: r.accountingEnabled,
+        packageCount: r._count?.packages ?? 0,
+        subscriberCount: r._count?.subscriptions ?? 0,
+        tenant_id: r.tenantId,
+        createdAt: toISOSafe(r.createdAt),
+        updatedAt: toISOSafe(r.updatedAt),
+    };
+}
 
 // GET /api/routers
 export async function GET(req: NextRequest) {
@@ -20,59 +51,50 @@ export async function GET(req: NextRequest) {
         const search = searchParams.get("search")?.toLowerCase() || "";
         const isPaginated = searchParams.has("page");
 
+        if (isPaginated) {
+            // MEDIUM-PERF FIX: Paginate at the DB level, not in JS.
+            // Previously ALL routers were loaded then sliced — unsafe at scale.
+            const page  = Math.max(1, parseInt(searchParams.get("page") || "1"));
+            // Cap limit to 500; ignore "All" string (caller should use page/count loop instead)
+            const rawLimit = searchParams.get("limit");
+            const limit = rawLimit === "All" ? 500 : Math.min(500, Math.max(1, parseInt(rawLimit || "25")));
+            const skip  = (page - 1) * limit;
+
+            const where: any = {
+                ...tenantFilter,
+                ...(search ? {
+                    OR: [
+                        { name: { contains: search, mode: 'insensitive' } },
+                        { host: { contains: search, mode: 'insensitive' } },
+                    ],
+                } : {}),
+            };
+
+            const [routers, total] = await Promise.all([
+                db.router.findMany({
+                    where,
+                    include: { _count: { select: { packages: true, subscriptions: true, logs: true } } },
+                    orderBy: { createdAt: "desc" },
+                    skip,
+                    take: limit,
+                }),
+                db.router.count({ where }),
+            ]);
+
+            const data = routers.map((r: any) => mapRouter(r));
+            return jsonResponse({ data, total });
+        }
+
+        // Non-paginated: return all (for dropdowns etc.) — select only safe fields
         const routers = await db.router.findMany({
             where: { ...tenantFilter },
-            include: {
-                _count: { select: { packages: true, subscriptions: true, logs: true } },
-            },
+            include: { _count: { select: { packages: true, subscriptions: true, logs: true } } },
             orderBy: { createdAt: "desc" },
         });
 
-        let mapped = routers.map((r: any) => ({
-            id: r.id,
-            router_id: r.id, // Alias
-            name: r.name,
-            host: r.host,
-            ip: r.host, // Alias
-            username: r.username,
-            // password omitted for security
-            port: r.port,
-            apiPort: r.apiPort,
-            type: r.type,
-            vpnMode: r.vpnMode,
-            description: r.description,
-            status: r.status === "ONLINE" ? "Online" : "Offline",
-            activeUsers: r.activeUsers,
-            cpuLoad: r.cpuLoad,
-            memoryUsed: r.memoryUsed,
-            uptime: r.uptime || "",
-            lastSeen: toISOSafe(r.lastSeen) || "Never",
-            accountingEnabled: r.accountingEnabled,
-            packageCount: r._count.packages,
-            subscriberCount: r._count.subscriptions,
-            tenant_id: r.tenantId, // Alias for tests
-            createdAt: toISOSafe(r.createdAt),
-            updatedAt: toISOSafe(r.updatedAt),
-        }));
-
-        if (isPaginated) {
-            if (search) {
-                mapped = mapped.filter((r: any) =>
-                    r.name.toLowerCase().includes(search) ||
-                    r.host.toLowerCase().includes(search)
-                );
-            }
-            const page = parseInt(searchParams.get("page") || "1");
-            const limitVal = searchParams.get("limit");
-            const limit = limitVal === "All" ? 999999 : parseInt(limitVal || "25");
-            const total = mapped.length;
-            const paginated = mapped.slice((page - 1) * limit, page * limit);
-            return jsonResponse({ data: paginated, total });
-        }
-
-        return jsonResponse(mapped);
+        return jsonResponse(routers.map((r: any) => mapRouter(r)));
     } catch (e: any) {
-        console.error("[ROUTER GET ERROR]:", e);
+        logger.error('[Routers] GET failed', { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Failed to fetch routers", 500);
     }
 }
@@ -139,6 +161,10 @@ export async function POST(req: NextRequest) {
             }
         }
 
+        // SEC-ROUTER-003/004 FIX: generate a dedicated RADIUS secret (never the
+        // same value as the admin password) and a unique admin username for
+        // every NEW router. Existing routers keep their current values on
+        // update (only backfilled by scripts/rotateRouterSecrets.ts).
         const routerData: any = {
             name,
             host,
@@ -151,7 +177,11 @@ export async function POST(req: NextRequest) {
             description: body.description || "",
             status: body.status || "OFFLINE",
             accountingEnabled: body.accountingEnabled ?? true,
-            tenantId: tenantIdValue
+            tenantId: tenantIdValue,
+            ...(!existing && {
+                radiusSecret: generateRadiusSecret(),
+                adminUsername: generateAdminUsername(name),
+            }),
         };
 
         // WireGuard configuration fields
@@ -171,15 +201,30 @@ export async function POST(req: NextRequest) {
             where: { tenantId: tenantIdValue, nasName: nasIp }
         });
 
+        // SEC-ROUTER-003 FIX: RADIUS NAS secret now comes from the router's
+        // DEDICATED radiusSecret field (decrypted), never from the admin
+        // `password`, and never falls back to a static "hqsecret" string —
+        // every router/tenant gets its own unique secret generated above.
         // RADIUS NAS secret MUST be stored in plaintext because the FreeRADIUS daemon
         // reads the database directly and does not support application-level AES-256-GCM.
         // However, the API automatically masks this field for non-admins to prevent leaks.
+        const decryptedRadiusSecret = decrypt(router.radiusSecret) || generateRadiusSecret();
+        // Guard: if the router record still had no radiusSecret (legacy row not yet
+        // migrated), persist the freshly generated one now instead of silently
+        // reusing a fallback each time.
+        if (!router.radiusSecret) {
+            await db.router.update({
+                where: { id: router.id },
+                data: { radiusSecret: encrypt(decryptedRadiusSecret) },
+            });
+        }
+
         if (existingNas) {
             await db.radiusNas.update({
                 where: { id: existingNas.id },
                 data: { 
                     shortName: router.name,
-                    secret: password || process.env.RADIUS_NAS_SECRET || "hqsecret"
+                    secret: decryptedRadiusSecret
                 }
             });
         } else {
@@ -193,7 +238,7 @@ export async function POST(req: NextRequest) {
                 data: {
                     nasName: nasIp,
                     shortName: router.name,
-                    secret: password || process.env.RADIUS_NAS_SECRET || "hqsecret",
+                    secret: decryptedRadiusSecret,
                     type: "other",
                     tenantId: tenantIdValue,
                     description: "Auto-synced from Router"
@@ -228,7 +273,7 @@ export async function POST(req: NextRequest) {
             }
         }, 201);
     } catch (e: any) {
-        console.error("[ROUTER CREATE ERROR]:", e);
+        logger.error("[ROUTER CREATE ERROR]:", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Failed to create router", 500);
     }
 }

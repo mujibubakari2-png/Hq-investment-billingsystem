@@ -8,6 +8,7 @@ import { wireguardManager } from "@/lib/wireguard";
 import { encryptRouterFields, decryptRouterFields } from "@/lib/encryption";
 import { exec } from "child_process";
 import { promisify } from "util";
+import logger from "@/lib/logger";
 const execAsync = promisify(exec);
 
 async function getRouterWgFields(db: ReturnType<typeof getTenantClient>, routerId: string) {
@@ -100,7 +101,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
                 wgPeerPublicKey = configuredServerPublicKey || await wireguardManager.getServerPublicKey();
                 wgPresharedKey = await wireguardManager.generatePrivateKey(); // Preshared keys use the same 32-byte format
             } catch (err) {
-                console.error("Failed to generate WireGuard keys", err);
+                logger.error("Failed to generate WireGuard keys", { error: err instanceof Error ? err.message : String(err) });
                 return errorResponse("Failed to generate WireGuard keys", 500);
             }
 
@@ -180,7 +181,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
                     : `WireGuard not yet activated`,
         });
     } catch (err: any) {
-        console.error("WireGuard config error:", err);
+        logger.error("WireGuard config error:", { error: err instanceof Error ? err.message : String(err) });
         return errorResponse("Failed to get WireGuard config", 500);
     }
 }
@@ -211,7 +212,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                     await wireguardManager.removePeer(router.wgPublicKey);
                 }
             } catch (err) {
-                console.error("Failed to remove wireguard peer:", err);
+                logger.error("Failed to remove wireguard peer:", { error: err instanceof Error ? err.message : String(err) });
             }
 
             await updateRouterWgFields(db, id, { wgEnabled: false });
@@ -288,7 +289,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 // ──────────────────────────────────────────────────────────
                 // STEP 0: CLEANUP OLD HQINVESTMENT RULES & CONFIGS (NO DUPLICATES!)
                 // ──────────────────────────────────────────────────────────
-                console.log("[PUSH-CONFIG] Cleaning up old HQInvestment configs...");
+                logger.info("[PUSH-CONFIG] Cleaning up old HQInvestment configs...");
 
                 try {
                     const oldFilterRules = await service.apiRequestPublic("/ip/firewall/filter");
@@ -365,30 +366,30 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                             });
                         }
                     }
-                } catch (e: any) { if (!e.message?.includes("already")) console.warn("User note:", e.message); }
+                } catch (e: any) { if (!e.message?.includes("already")) logger.warn("User note:", { error: e.message instanceof Error ? e.message.message : String(e.message) }); }
 
                 try {
                     await service.apiRequestPublic("/system/identity", "PATCH", { name: router.name });
-                } catch (e: any) { console.warn("Identity note:", e.message); }
+                } catch (e: any) { logger.warn("Identity note:", { error: e.message instanceof Error ? e.message.message : String(e.message) }); }
 
                 try {
                     await service.apiRequestPublic("/ip/dns", "PATCH", {
                         servers: "8.8.8.8,8.8.4.4",
                         "allow-remote-requests": "yes"
                     });
-                } catch (e: any) { console.warn("DNS note:", e.message); }
+                } catch (e: any) { logger.warn("DNS note:", { error: e.message instanceof Error ? e.message.message : String(e.message) }); }
 
                 try {
                     await service.apiRequestPublic("/system/ntp/client", "PATCH", {
                         enabled: "yes",
                         servers: "pool.ntp.org"
                     });
-                } catch (e: any) { console.warn("NTP note:", e.message); }
+                } catch (e: any) { logger.warn("NTP note:", { error: e.message instanceof Error ? e.message.message : String(e.message) }); }
 
                 // ──────────────────────────────────────────────────────────
                 // STEP 2: BRIDGE + HOTSPOT + PPPOE + DHCP
                 // ──────────────────────────────────────────────────────────
-                console.log("[PUSH-CONFIG] Setting up Bridge, Hotspot & PPPoE...");
+                logger.info("[PUSH-CONFIG] Setting up Bridge, Hotspot & PPPoE...");
 
                 let lanBridgeName = "bridge-lan";
                 let bridgeExists = false;
@@ -406,11 +407,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                         if (lanBridge) {
                             lanBridgeName = lanBridge.name;
                             bridgeExists = true;
-                            console.log(`[PUSH-CONFIG] Found existing LAN bridge: ${lanBridgeName}`);
+                            logger.info(`[PUSH-CONFIG] Found existing LAN bridge: ${lanBridgeName}`);
                         }
                     }
                 } catch (e: any) {
-                    console.warn("Failed to get bridges, will use bridge-lan");
+                    logger.warn("Failed to get bridges, will use bridge-lan");
                 }
 
                 if (!bridgeExists) {
@@ -422,7 +423,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                             "protocol-mode": "none",
                             comment: "HQInvestment LAN Bridge - Hotspot & PPPoE"
                         });
-                    } catch (e: any) { if (!e.message?.includes("already")) console.warn("Bridge note:", e.message); }
+                    } catch (e: any) { if (!e.message?.includes("already")) logger.warn("Bridge note:", { error: e.message instanceof Error ? e.message.message : String(e.message) }); }
                 } else {
                     // Disable STP on existing bridge too
                     try {
@@ -455,7 +456,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                         "http-cookie-lifetime": "3d",
                         "use-radius": "yes"
                     });
-                } catch (e: any) { if (!e.message?.includes("already")) console.warn("Hotspot profile note:", e.message); }
+                } catch (e: any) { if (!e.message?.includes("already")) logger.warn("Hotspot profile note:", { error: e.message instanceof Error ? e.message.message : String(e.message) }); }
 
                 // Add static DNS entry for the Hotspot login page
                 try {
@@ -464,7 +465,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                         address: lanGateway,
                         comment: "HQInvestment Hotspot DNS"
                     });
-                } catch (e: any) { if (!e.message?.includes("already")) console.warn("Static DNS note:", e.message); }
+                } catch (e: any) { if (!e.message?.includes("already")) logger.warn("Static DNS note:", { error: e.message instanceof Error ? e.message.message : String(e.message) }); }
 
                 // SECURITY: Enforce use-radius=yes AND remove 'mac' from login-by on ALL existing profiles.
                 // A previously misconfigured profile with login-by=mac allows unauthenticated internet access.
@@ -480,11 +481,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                                     "use-radius": "yes",
                                     "login-by": "http-chap,http-pap,cookie"
                                 });
-                                console.log(`[PUSH-CONFIG] Secured hotspot profile: ${prof.name} (use-radius=yes, removed mac login-by)`);
+                                logger.info(`[PUSH-CONFIG] Secured hotspot profile: ${prof.name} (use-radius=yes, removed mac login-by)`);
                             }
                         }
                     }
-                } catch (e: any) { console.warn("Hotspot profile security enforce note:", e.message); }
+                } catch (e: any) { logger.warn("Hotspot profile security enforce note:", { error: e.message instanceof Error ? e.message.message : String(e.message) }); }
 
                 // Use separate pool ranges for Hotspot and PPPoE to prevent IP collisions
                 // Hotspot clients: .10 – .149  |  PPPoE clients: .150 – .250
@@ -498,14 +499,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                         name: `hs-pool-${safeRouterName}`,
                         ranges: `${hsPoolStart}-${hsPoolEnd}`
                     });
-                } catch (e: any) { if (!e.message?.includes("already")) console.warn("HS pool note:", e.message); }
+                } catch (e: any) { if (!e.message?.includes("already")) logger.warn("HS pool note:", { error: e.message instanceof Error ? e.message.message : String(e.message) }); }
 
                 try {
                     await service.apiRequestPublic("/ip/pool", "PUT", {
                         name: `pppoe-pool-${safeRouterName}`,
                         ranges: `${ppoePoolStart}-${ppoePoolEnd}`
                     });
-                } catch (e: any) { if (!e.message?.includes("already")) console.warn("PPPoE pool note:", e.message); }
+                } catch (e: any) { if (!e.message?.includes("already")) logger.warn("PPPoE pool note:", { error: e.message instanceof Error ? e.message.message : String(e.message) }); }
 
                 // STEP 2a: IP address on bridge MUST come before hotspot creation.
                 // RouterOS requires hotspot-address to already exist on the interface.
@@ -515,7 +516,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                         interface: lanBridgeName,
                         comment: "HQInvestment Hotspot LAN"
                     });
-                } catch (e: any) { if (!e.message?.includes("already")) console.warn("HS IP note:", e.message); }
+                } catch (e: any) { if (!e.message?.includes("already")) logger.warn("HS IP note:", { error: e.message instanceof Error ? e.message.message : String(e.message) }); }
 
                 try {
                     await service.apiRequestPublic("/ip/dhcp-server/network", "PUT", {
@@ -523,7 +524,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                         gateway: lanGateway,
                         "dns-server": "8.8.8.8,1.1.1.1"
                     });
-                } catch (e: any) { if (!e.message?.includes("already")) console.warn("DHCP network note:", e.message); }
+                } catch (e: any) { if (!e.message?.includes("already")) logger.warn("DHCP network note:", { error: e.message instanceof Error ? e.message.message : String(e.message) }); }
 
                 try {
                     await service.apiRequestPublic("/ip/dhcp-server", "PUT", {
@@ -533,7 +534,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                         "lease-time": "1h",
                         disabled: "no"
                     });
-                } catch (e: any) { if (!e.message?.includes("already")) console.warn("DHCP server note:", e.message); }
+                } catch (e: any) { if (!e.message?.includes("already")) logger.warn("DHCP server note:", { error: e.message instanceof Error ? e.message.message : String(e.message) }); }
 
                 // Hotspot created AFTER IP address is confirmed on bridge
                 try {
@@ -544,7 +545,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                         profile: hotspotProfileName,
                         disabled: "no"
                     });
-                } catch (e: any) { if (!e.message?.includes("already")) console.warn("Hotspot note:", e.message); }
+                } catch (e: any) { if (!e.message?.includes("already")) logger.warn("Hotspot note:", { error: e.message instanceof Error ? e.message.message : String(e.message) }); }
 
                 try {
                     await service.apiRequestPublic("/ppp/profile", "PUT", {
@@ -554,14 +555,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                         "dns-server": "8.8.8.8,1.1.1.1",
                         "use-encryption": "yes"
                     });
-                } catch (e: any) { if (!e.message?.includes("already")) console.warn("PPPoE profile note:", e.message); }
+                } catch (e: any) { if (!e.message?.includes("already")) logger.warn("PPPoE profile note:", { error: e.message instanceof Error ? e.message.message : String(e.message) }); }
 
                 try {
                     await service.apiRequestPublic("/ppp/aaa", "PATCH", {
                         "use-radius": "yes",
                         "accounting": "yes"
                     });
-                } catch (e: any) { console.warn("PPP AAA note:", e.message); }
+                } catch (e: any) { logger.warn("PPP AAA note:", { error: e.message instanceof Error ? e.message.message : String(e.message) }); }
 
                 try {
                     await service.apiRequestPublic("/interface/pppoe-server/server", "PUT", {
@@ -571,19 +572,19 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                         "one-session-per-host": "yes",
                         disabled: "no"
                     });
-                } catch (e: any) { if (!e.message?.includes("already")) console.warn("PPPoE server note:", e.message); }
+                } catch (e: any) { if (!e.message?.includes("already")) logger.warn("PPPoE server note:", { error: e.message instanceof Error ? e.message.message : String(e.message) }); }
 
                 // ──────────────────────────────────────────────────────────
                 // STEP 3: WIREGUARD VPN
                 // ──────────────────────────────────────────────────────────
-                console.log("[PUSH-CONFIG] Setting up WireGuard...");
+                logger.info("[PUSH-CONFIG] Setting up WireGuard...");
 
                 // Add peer to the Server's WireGuard interface FIRST to avoid race condition
                 // (If Mikrotik tries to connect before the server expects it, handshake fails)
                 try {
                     await wireguardManager.addPeer(router.wgPublicKey, tunnelIp, router.wgPresharedKey || undefined);
                 } catch (e: any) {
-                    console.error("Failed to add peer to wg0:", e.message);
+                    logger.error("Failed to add peer to wg0:", { error: e.message instanceof Error ? e.message.message : String(e.message) });
                 }
 
 
@@ -621,7 +622,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                         network: `${subnetPrefix}.0`,
                         comment: "HQInvestment VPN Address"
                     });
-                } catch (e: any) { if (!e.message?.includes("already")) console.warn("WG IP note:", e.message); }
+                } catch (e: any) { if (!e.message?.includes("already")) logger.warn("WG IP note:", { error: e.message instanceof Error ? e.message.message : String(e.message) }); }
 
                 try {
                     const oldPeers = await service.apiRequestPublic("/interface/wireguard/peers");
@@ -651,12 +652,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                         "persistent-keepalive": "25s",
                         comment: "HQInvestment ISP Server",
                     });
-                } catch (e: any) { console.warn("Peer note:", e.message); }
+                } catch (e: any) { logger.warn("Peer note:", { error: e.message instanceof Error ? e.message.message : String(e.message) }); }
 
                 // ──────────────────────────────────────────────────────────
                 // STEP 4: FIREWALL RULES (COMPLETE HOTSPOT PROTECTION!)
                 // ──────────────────────────────────────────────────────────
-                console.log("[PUSH-CONFIG] Setting up Firewall...");
+                logger.info("[PUSH-CONFIG] Setting up Firewall...");
 
                 const restPort = router.apiPort || (router.port === 8728 || router.port === 8729 ? 80 : router.port) || 80;
 
@@ -702,20 +703,20 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 for (const rule of reversedRules) {
                     try {
                         await service.apiRequestPublic("/ip/firewall/filter", "PUT", { ...rule, "place-before": "0" });
-                    } catch (e: any) { console.warn("FW note:", e.message); }
+                    } catch (e: any) { logger.warn("FW note:", { error: e.message instanceof Error ? e.message.message : String(e.message) }); }
                 }
 
                 // ──────────────────────────────────────────────────────────
                 // STEP 5: NAT (FIXED CONFLICT! - ONLY ETHER1!)
                 // ──────────────────────────────────────────────────────────
-                console.log("[PUSH-CONFIG] Setting up NAT...");
+                logger.info("[PUSH-CONFIG] Setting up NAT...");
 
                 try {
                     await service.apiRequestPublic("/ip/firewall/nat", "PUT", {
                         chain: "srcnat",
                         action: "masquerade", comment: "NAT for Internet - HQInvestment", "place-before": "0"
                     });
-                } catch (e: any) { console.warn("NAT note:", e.message); }
+                } catch (e: any) { logger.warn("NAT note:", { error: e.message instanceof Error ? e.message.message : String(e.message) }); }
 
                 // ──────────────────────────────────────────────────────────
                 // STEP 6: ROUTE
@@ -725,12 +726,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                         "dst-address": `${subnetPrefix}.0/24`, gateway: "wg-hq",
                         comment: "WireGuard route - HQInvestment"
                     });
-                } catch (e: any) { console.warn("Route note:", e.message); }
+                } catch (e: any) { logger.warn("Route note:", { error: e.message instanceof Error ? e.message.message : String(e.message) }); }
 
                 // ──────────────────────────────────────────────────────────
                 // STEP 7: RADIUS & CoA
                 // ──────────────────────────────────────────────────────────
-                console.log("[PUSH-CONFIG] Setting up RADIUS...");
+                logger.info("[PUSH-CONFIG] Setting up RADIUS...");
                 try {
                     // Remove old radius configs matching old server IPs
                     const oldRadius = await service.apiRequestPublic("/radius");
@@ -754,21 +755,21 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                         "src-address": tunnelIp,
                         comment: "HQInvestment RADIUS"
                     });
-                } catch (e: any) { console.warn("Radius note:", e.message); }
+                } catch (e: any) { logger.warn("Radius note:", { error: e.message instanceof Error ? e.message.message : String(e.message) }); }
 
                 try {
                     await service.apiRequestPublic("/radius/incoming", "PATCH", {
                         accept: "yes",
                         port: "3799"
                     });
-                } catch (e: any) { console.warn("Radius incoming note:", e.message); }
+                } catch (e: any) { logger.warn("Radius incoming note:", { error: e.message instanceof Error ? e.message.message : String(e.message) }); }
 
                 // ──────────────────────────────────────────────────────────
                 // STEP 7b: WALLED GARDEN — allow billing portal BEFORE login
                 // Without this, clients cannot reach the payment page to buy
                 // a voucher or pay via mobile money.
                 // ──────────────────────────────────────────────────────────
-                console.log("[PUSH-CONFIG] Setting up Walled Garden...");
+                logger.info("[PUSH-CONFIG] Setting up Walled Garden...");
                 const billingHost = process.env.WG_SERVER_ENDPOINT || process.env.NEXT_PUBLIC_API_URL?.replace(/^https?:\/\//, '') || wgServerIp;
                 const billingHostClean = billingHost.split(':')[0]; // strip port if any
 
@@ -802,7 +803,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                         action: "allow",
                         comment: "Billing Portal - HQInvestment"
                     });
-                } catch (e: any) { if (!e.message?.includes("already")) console.warn("Walled garden DNS note:", e.message); }
+                } catch (e: any) { if (!e.message?.includes("already")) logger.warn("Walled garden DNS note:", { error: e.message instanceof Error ? e.message.message : String(e.message) }); }
 
                 // Allow billing portal IP (IP-based) - ensures portal works even if DNS fails
                 try {
@@ -811,7 +812,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                         action: "accept",
                         comment: "Billing Portal IP - HQInvestment"
                     });
-                } catch (e: any) { if (!e.message?.includes("already")) console.warn("Walled garden IP note:", e.message); }
+                } catch (e: any) { if (!e.message?.includes("already")) logger.warn("Walled garden IP note:", { error: e.message instanceof Error ? e.message.message : String(e.message) }); }
 
                 // Allow VPN subnet access from unauthenticated clients (needed for RADIUS)
                 try {
@@ -820,7 +821,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                         action: "accept",
                         comment: "VPN Subnet - HQInvestment"
                     });
-                } catch (e: any) { if (!e.message?.includes("already")) console.warn("Walled garden VPN note:", e.message); }
+                } catch (e: any) { if (!e.message?.includes("already")) logger.warn("Walled garden VPN note:", { error: e.message instanceof Error ? e.message.message : String(e.message) }); }
 
                 // Verification Step: Wait for tunnel to establish, then check real handshake
                 // We wait up to 15 seconds to allow Mikrotik to retry handshake if needed
@@ -836,7 +837,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 if (tunnelVerified) {
                     updateData.host = tunnelIp;
                 } else {
-                    console.warn(`[WireGuard] Peer ${tunnelIp} has not completed handshake yet. Keeping current host IP.`);
+                    logger.warn(`[WireGuard] Peer ${tunnelIp} has not completed handshake yet. Keeping current host IP.`);
                 }
                 await updateRouterWgFields(db, id, updateData);
 
@@ -895,7 +896,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
             await wireguardManager.addPeer(router.wgPublicKey, tunnelIp, router.wgPresharedKey || undefined);
         } catch (err: any) {
-            console.error("Failed to add peer:", err);
+            logger.error("Failed to add peer:", { error: err instanceof Error ? err.message : String(err) });
             return errorResponse("Failed to add peer to server", 500);
         }
 
@@ -921,10 +922,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 pingResult = err.message || "Ping failed";
             }
             responseMessage = `WireGuard tunnel established! Router is now accessible via tunnel IP ${tunnelIp}. Ping result:\n${pingResult.substring(0, 150)}`;
-            console.log(`[WireGuard] Activate: peer ${tunnelIp} connected. Switching host to tunnel IP.`);
+            logger.info(`[WireGuard] Activate: peer ${tunnelIp} connected. Switching host to tunnel IP.`);
         } else {
             // Handshake not confirmed — keep original host to preserve connectivity
-            console.warn(`[WireGuard] Activate: peer ${tunnelIp} has NOT completed a WireGuard handshake. Keeping original host IP to preserve connectivity.`);
+            logger.warn(`[WireGuard] Activate: peer ${tunnelIp} has NOT completed a WireGuard handshake. Keeping original host IP to preserve connectivity.`);
             responseMessage = `WireGuard peer registered on server, but MikroTik has NOT connected yet (no handshake).\n\nTo fix:\n1. Verify the config was pasted correctly on MikroTik.\n2. Check UDP port ${listenPort} is open on MikroTik (firewall rule must be above any DROP rule).\n3. Run on Droplet: sudo wg show wg0\n4. Once the MikroTik peer appears with a handshake, click Activate again.`;
         }
 
@@ -945,7 +946,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             message: responseMessage,
         });
     } catch (err: any) {
-        console.error("WireGuard activate error:", err);
+        logger.error("WireGuard activate error:", { error: err instanceof Error ? err.message : String(err) });
         return errorResponse("Failed to activate WireGuard", 500);
     }
 }

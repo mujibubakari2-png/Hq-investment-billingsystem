@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import { getMikroTikService } from "@/lib/mikrotik";
 import { suspendRadiusUser } from "@/lib/radius";
+import logger from "@/lib/logger";
 
 function unauthorized() {
   return new NextResponse("Unauthorized", { status: 401 });
@@ -125,7 +126,7 @@ export async function GET(req: Request) {
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error("[CRON/EXPIRE-SUBSCRIPTIONS] Error:", err);
+    logger.error("[CRON/EXPIRE-SUBSCRIPTIONS] Error:", { error: err instanceof Error ? err.message : String(err) });
     return NextResponse.json({ success: false, message }, { status: 500 });
   }
 }

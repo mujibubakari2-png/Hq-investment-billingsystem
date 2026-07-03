@@ -28,6 +28,24 @@ import { Step0Download, Step1Connection } from '../components/wizard/WizardSteps
 import { Step2Services, Step3Vpn }         from '../components/wizard/WizardSteps23';
 import { Step4Interfaces, Step5Generate, Step6Verify } from '../components/wizard/WizardSteps456';
 
+// SEC-ROUTER-003 FIX: the wizard previously shipped with hardcoded, static
+// default secrets (`hqinvestment_radius_secret`, `MyISPVpnKey2024!`) that
+// were identical across every tenant/router unless an operator remembered to
+// overwrite them by hand. Generate a cryptographically random secret in the
+// browser instead (Web Crypto, not Math.random) so every router gets a
+// unique value out of the box.
+const SECRET_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+function generateClientSecureSecret(length = 24): string {
+    const bytes = new Uint8Array(length);
+    (window.crypto || (window as any).msCrypto).getRandomValues(bytes);
+    let out = '';
+    for (let i = 0; i < length; i++) out += SECRET_ALPHABET[bytes[i] % SECRET_ALPHABET.length];
+    return out;
+}
+// Legacy static defaults that must never be trusted/kept if found in saved
+// state or a stale draft — these are known, guessable, cross-tenant values.
+const KNOWN_INSECURE_SECRETS = new Set(['hqinvestment_radius_secret', 'MyISPVpnKey2024!']);
+
 interface RouterSetupWizardProps {
     router?: any;
     onClose?: () => void;
@@ -55,7 +73,11 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
     const [hotspotPoolStart, setHotspotPoolStart]       = useState('');
     const [hotspotPoolEnd, setHotspotPoolEnd]           = useState('');
     const [radiusAddress, setRadiusAddress] = useState('');
-    const [radiusSecret, setRadiusSecret]   = useState('hqinvestment_radius_secret');
+    // SEC-ROUTER-003 FIX: no static default — generated below once (see
+    // effect further down), or pulled from the router's real, already-
+    // provisioned radiusSecret when available so it matches the RADIUS NAS
+    // entry the backend already created for this router.
+    const [radiusSecret, setRadiusSecret]   = useState('');
 
     // Step 3: VPN
     const [vpnEnabled, setVpnEnabled]       = useState(true);
@@ -64,7 +86,7 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
     const [vpnPoolStart, setVpnPoolStart]   = useState('10.0.0.2');
     const [vpnPoolEnd, setVpnPoolEnd]       = useState('10.0.0.254');
     const [vpnDns, setVpnDns]               = useState('8.8.8.8');
-    const [ipsecSecret, setIpsecSecret]     = useState('MyISPVpnKey2024!');
+    const [ipsecSecret, setIpsecSecret]     = useState(() => generateClientSecureSecret(24));
     const [vpnSecrets, setVpnSecrets]       = useState<VpnSecret[]>([]);
     const [showAddVpnSecret, setShowAddVpnSecret] = useState(false);
     const [vpnForm, setVpnForm]             = useState<VpnSecret>({ username: '', password: '', protocol: 'L2TP', profile: 'default', localAddress: '', remoteAddress: '' });
@@ -94,6 +116,26 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
             routersApi.get(routerId).then(setRouterData).catch(console.error);
         }
     }, [routerId]);
+
+    // SEC-ROUTER-003 FIX: once the router record loads, prefer its REAL
+    // radiusSecret (already generated + synced to the RADIUS NAS table by
+    // the backend when the router was created) over any placeholder — using
+    // a different value here would silently break RADIUS auth because it
+    // would no longer match the NAS entry. Masked values ("****1234",
+    // returned to non-super-admin roles) and known legacy static defaults
+    // are never trusted as a real secret; in that case we generate a random
+    // one client-side instead of falling back to a static string.
+    // Runs once per routerData load (guarded so it never overwrites a value
+    // the operator has since edited by hand).
+    useEffect(() => {
+        if (!routerData) return;
+        setRadiusSecret(prev => {
+            if (prev) return prev; // already set (from backend or a previous run) — don't clobber operator edits
+            const real = routerData.radiusSecret as string | undefined;
+            const usable = real && !real.startsWith('****') && !KNOWN_INSECURE_SECRETS.has(real);
+            return usable ? (real as string) : generateClientSecureSecret(32);
+        });
+    }, [routerData]);
 
     // Fetch WireGuard config → derive LAN IPs
     useEffect(() => {
@@ -167,9 +209,33 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
 
     const toggleInterface = (name: string) => setSelectedInterfaces(prev => prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name]);
 
+    // SEC-ROUTER-002 FIX (parity with backend /api/routers/[id]/script):
+    // derive the VPN /24 management subnet from the WireGuard tunnel IP, so
+    // Winbox/Web/API firewall rules can be scoped to it instead of the WAN.
+    const vpnManagementSubnet: string | null = wgConfig?.routerTunnelIp
+        ? `${(wgConfig.routerTunnelIp as string).split('.').slice(0, 3).join('.')}.0/24`
+        : null;
+    const certName = 'hq-hotspot-cert';
+
     const getGeneratedScript = (): string => {
         if (!hotspotLocalAddress || !pppoeLocalAddress) {
             alert('VPN IP not loaded yet. Please wait for WireGuard config to load, then try again.');
+            return '';
+        }
+        // SEC-ROUTER-001/003 FIX: block generation (same as the backend
+        // validation layer) if required secrets are missing or still match a
+        // known-insecure legacy static default, instead of silently shipping
+        // an empty/guessable value to the router.
+        if (!radiusSecret || KNOWN_INSECURE_SECRETS.has(radiusSecret)) {
+            alert('RADIUS shared secret haipo au si salama. Tafadhali subiri ipakiwe kiotomatiki au weka secret yako kwenye Hatua 2.');
+            return '';
+        }
+        if (vpnEnabled && (vpnProtocol === 'L2TP' || vpnMode === 'hybrid') && (!ipsecSecret || KNOWN_INSECURE_SECRETS.has(ipsecSecret))) {
+            alert('IPsec Pre-Shared Key haipo au si salama. Tafadhali weka key yenye nguvu kwenye Hatua 3.');
+            return '';
+        }
+        if (vpnSecrets.some(s => !s.password || s.password.length < 8)) {
+            alert('Baadhi ya VPN secrets zina password dhaifu (chini ya herufi 8). Rekebisha kwenye Hatua 3 kabla ya kuendelea.');
             return '';
         }
         const hotspotPrefix  = hotspotLocalAddress.split('.').slice(0, 3).join('.');
@@ -184,6 +250,30 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
             '/tool mac-server set allowed-interface-list=all',
             '/tool mac-server mac-winbox set allowed-interface-list=all',
             '/ip neighbor discovery-settings set discover-interface-list=all',
+            '', '# ===== TLS Certificate (SEC-ROUTER-005 FIX) =====',
+            `:if ([:len [/certificate find name="${certName}"]] = 0) do={`,
+            `    /certificate add name="${certName}" common-name="${sanitizeMikroTikName(routerName)}.hqinvestment.local" days-valid=3650 key-size=2048 key-usage=tls-server`,
+            `    /certificate sign [find name="${certName}"]`,
+            '}',
+            `/ip service set www-ssl disabled=no certificate="${certName}"`,
+            '', '# ===== Firewall: Management Ports (SEC-ROUTER-002 FIX) =====',
+            '# Winbox/Web/API must never be reachable from the open WAN.',
+            ...(vpnManagementSubnet ? [
+                `:if ([:len [/ip firewall filter find where comment="Allow HQInvestment API Access (VPN only)"]] = 0) do={`,
+                `    /ip firewall filter add chain=input action=accept protocol=tcp dst-port=80,443,8291 src-address=${vpnManagementSubnet} comment="Allow HQInvestment API Access (VPN only)"`,
+                '}',
+                `:if ([:len [/ip firewall filter find where comment="Block HQInvestment Management Ports (non-VPN)"]] = 0) do={`,
+                `    /ip firewall filter add chain=input action=drop protocol=tcp dst-port=80,443,8291 comment="Block HQInvestment Management Ports (non-VPN)"`,
+                '}',
+            ] : [
+                '# No WireGuard tunnel IP detected yet — management ports are fully',
+                '# blocked from every source until VPN is set up and this script is',
+                '# regenerated.',
+                `:if ([:len [/ip firewall filter find where comment="Block HQInvestment Management Ports (no VPN yet)"]] = 0) do={`,
+                `    /ip firewall filter add chain=input action=drop protocol=tcp dst-port=80,443,8291 comment="Block HQInvestment Management Ports (no VPN yet)"`,
+                '}',
+                '/log warning "HQInvestment: Router HAINA WireGuard VPN -- Winbox/Web/API zimefungwa. Sanidi VPN kisha zalisha script upya."',
+            ]),
             '', '# ===== Bridge Setup =====',
         ];
         if (selectedInterfaces.length > 0) {
@@ -211,8 +301,8 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                 `:if ([:len [/ip pool find where name="hs-pool"]] = 0) do={ /ip pool add name="hs-pool" ranges=${hotspotPoolStart}-${hotspotPoolEnd} }`,
                 `:if ([:len [/ip address find where interface=$targetBridge]] = 0) do={ /ip address add address=${hotspotCidr} interface=$targetBridge }`,
                 `:if ([:len [/ip hotspot find where interface=$targetBridge]] = 0) do={ /ip hotspot add name="hq-hotspot" interface=$targetBridge address-pool="hs-pool" profile="hq-hotspot" }`,
-                `/ip hotspot profile set [/ip hotspot profile find where name="default"] hotspot-address=${hotspotLocalAddress} html-directory=hotspot`,
-                `/ip hotspot profile add name="hq-hotspot" hotspot-address=${hotspotLocalAddress} html-directory=hotspot login-by=mac-cookie,http-chap use-radius=yes`,
+                `/ip hotspot profile set [/ip hotspot profile find where name="default"] hotspot-address=${hotspotLocalAddress} html-directory=hotspot ssl-certificate="${certName}"`,
+                `/ip hotspot profile add name="hq-hotspot" hotspot-address=${hotspotLocalAddress} html-directory=hotspot login-by=mac-cookie,http-chap use-radius=yes ssl-certificate="${certName}"`,
                 `/ip dhcp-server network add address=${hotspotNetwork} gateway=${hotspotLocalAddress} dns-server=8.8.8.8,8.8.4.4`,
             );
         }

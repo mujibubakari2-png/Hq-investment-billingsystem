@@ -1,54 +1,18 @@
 import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
-import { withCache, invalidateNamespace, buildKey, TTL } from "@/lib/cache";
+import { withCache, invalidateNamespace, buildKey, TTL, getRedisClient } from "@/lib/cache";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { requirePermission } from "@/lib/rbac";
 import { isPlatformSuperAdmin } from "@/lib/tenant";
 import { toISOSafe, toTimestampSafe, getStartOfTodayTZ, getStartOfMonthTZ } from "@/lib/dateUtils";
-import { Redis } from 'ioredis';
 import logger from "@/lib/logger";
-import { backfillRadiusAccountingTenants } from "@/lib/radiusTenant";
+import { writeAuditLog, getIpFromRequest } from "@/lib/auditLog";
 
-// Connection-related error codes that should be suppressed (Redis not available)
-const REDIS_CONN_ERRORS = new Set(['ECONNREFUSED', 'ENOENT', 'ENOTFOUND', 'ETIMEDOUT', 'ECONNRESET', 'EPIPE']);
-
-let redis: Redis | null = null;
-let _redisFailures = 0;
-try {
-    redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
-        lazyConnect: true,
-        enableReadyCheck: false,
-        maxRetriesPerRequest: 1,
-        connectTimeout: 2000,
-        commandTimeout: 2000,
-        // Stop retrying after 3 consecutive failures to avoid spamming logs
-        retryStrategy: (times: number) => {
-            if (times > 3) {
-                // Give up – set redis to null so the app runs without it
-                redis = null;
-                return null; // null = stop retrying
-            }
-            return Math.min(times * 500, 2000); // backoff in ms
-        },
-    });
-    redis.on('error', (err: NodeJS.ErrnoException) => {
-        _redisFailures++;
-        const code = err.code || '';
-        const message = err.message || String(err);
-        // Suppress well-known connection errors – they are not actionable
-        if (!REDIS_CONN_ERRORS.has(code) && !message.includes('ECONNREFUSED')) {
-            console.error('[Redis Error in dashboard route]:', message);
-        }
-    });
-    redis.on('ready', () => {
-        _redisFailures = 0; // reset on successful connection
-    });
-} catch {
-    redis = null;
-}
-
-// Bug #5 FIX: Throttle RADIUS sync to at most once per 60 seconds across all PM2 instances
-const RADIUS_SYNC_INTERVAL_MS = 60_000;
+// HIGH-R-003 FIX: RADIUS sync removed from GET /api/dashboard.
+// It now runs as a BullMQ repeatable job (src/jobs/radiusSyncWorker.ts)
+// every 60 s, independent of page loads. This eliminates write-amplification
+// where every 30-second dashboard refresh triggered subscription.updateMany
+// for every active tenant.
 
 // GET /api/dashboard - aggregate stats
 export async function GET(req: NextRequest) {
@@ -75,6 +39,16 @@ export async function GET(req: NextRequest) {
         if (isPlatformAdmin) {
             if (targetTenantId) {
                 tenantFilter.tenantId = targetTenantId;
+                // HIGH-MT-002 FIX: Audit platform admin cross-tenant dashboard reads.
+                // Previously these were completely invisible in audit logs.
+                writeAuditLog({
+                    tenantId: targetTenantId,
+                    userId: userPayload.userId,
+                    action: 'CROSS_TENANT_DASHBOARD_READ',
+                    resource: 'Dashboard',
+                    details: { targetTenantId, routerId: routerId ?? undefined },
+                    ipAddress: getIpFromRequest(req),
+                }).catch(() => { /* non-blocking */ });
             }
         } else {
             tenantFilter.tenantId = userPayload.tenantId;
@@ -88,110 +62,35 @@ export async function GET(req: NextRequest) {
 
         const statsDb = isPlatformAdmin && !targetTenantId ? globalDb : db;
 
-        // ── RADIUS Accounting Cleanup (Multi-tenancy fix) ──
-        // Bug #5 FIX: Throttle sync operations to run at most once per 60 seconds
-        // using a Redis mutex to prevent simultaneous syncs across PM2 processes.
-        const syncLockKey = `dashboard:radius:sync_lock:${userPayload.tenantId || 'global'}`;
-        let shouldSync = true; // Default to true when Redis is unavailable
-        if (redis) {
-            try {
-                const lockAcquired = await redis.set(syncLockKey, "1", "PX", RADIUS_SYNC_INTERVAL_MS, "NX");
-                shouldSync = lockAcquired === "OK";
-            } catch {
-                // Redis unavailable — allow sync to proceed (no throttle)
-                shouldSync = true;
-            }
-        }
+        // ── Dashboard Cache (HIGH-S-001) ───────────────────────────────────────
+        // All 28+ queries are wrapped in a single withCache() call.
+        // Key is scoped to tenantId + optional routerId so different router
+        // filters produce independent cache entries.
+        // TTL = 60 s — tolerable staleness for a monitoring dashboard.
+        // The RADIUS sync worker (radiusSyncWorker.ts) calls invalidateNamespace()
+        // after every sync, so the cache self-invalidates within seconds of a
+        // status change rather than waiting the full 60-second TTL.
+        const cacheKey = buildKey(
+            userPayload.tenantId ?? (targetTenantId || null),
+            'dashboard',
+            `stats:${routerId || 'all'}`,
+        );
 
-        if (shouldSync) {
+        const response = await withCache(
+            cacheKey,
+            TTL.DASHBOARD, // 60 s
+            async () => {
+        // HIGH-S-001: All 28 queries run inside the withCache fetcher.
+        // On cache hit this entire block is skipped — response time drops to <5ms.
 
-            // Ensure radacct rows have tenantId by mapping nasipaddress to Router and RADIUS NAS tables.
-            try {
-                await backfillRadiusAccountingTenants(globalDb);
-            } catch (e) {
-                logger.error("[DASHBOARD SYNC ERROR]: Failed to map RADIUS sessions to tenants", {
-                    endpoint: "GET /api/dashboard",
-                    userId: _userId,
-                    tenantId: _tenantId,
-                    error: e instanceof Error ? e.message : String(e),
-                    stack: e instanceof Error ? e.stack : undefined,
-                });
-            }
-        }
-
-        // ── RADIUS Online Status Sync ──
-        // Sync subscription onlineStatus from live RADIUS accounting sessions.
-        // Users with an open radacct record (acctstoptime IS NULL) are ONLINE.
-        // Bug #5 FIX: Also throttled to avoid heavy DB writes on every 30s refresh.
-        if (shouldSync) {
-            try {
-                const activeRadiusSessions = await db.radAcct.findMany({
-                    where: { acctstoptime: null, ...tenantFilter },
-                    select: { username: true },
-                    distinct: ["username"],
-                });
-
-                const onlineUsernames = new Set(activeRadiusSessions.map((s) => s.username));
-
-                // Get all active subscriptions with their client usernames
-                const activeSubscriptions = await db.subscription.findMany({
-                    where: { status: "ACTIVE", ...tenantFilter },
-                    select: {
-                        id: true,
-                        onlineStatus: true,
-                        client: { select: { username: true } },
-                    },
-                });
-
-                // Batch update online status based on RADIUS sessions
-                const toSetOnline: string[] = [];
-                const toSetOffline: string[] = [];
-
-                for (const sub of activeSubscriptions as any[]) {
-                    const username = sub.client?.username;
-                    if (!username) continue;
-                    if (onlineUsernames.has(username) && sub.onlineStatus !== "ONLINE") {
-                        toSetOnline.push(sub.id);
-                    } else if (!onlineUsernames.has(username) && sub.onlineStatus !== "OFFLINE") {
-                        toSetOffline.push(sub.id);
-                    }
-                }
-
-                if (toSetOnline.length > 0) {
-                    await db.subscription.updateMany({
-                        where: { id: { in: toSetOnline } },
-                        data: { onlineStatus: "ONLINE" },
-                    });
-                }
-                if (toSetOffline.length > 0) {
-                    await db.subscription.updateMany({
-                        where: { id: { in: toSetOffline } },
-                        data: { onlineStatus: "OFFLINE" },
-                    });
-                }
-            } catch (e) {
-                logger.error("[DASHBOARD RADIUS SYNC ERROR]: Failed to sync online status from RADIUS", {
-                    endpoint: "GET /api/dashboard",
-                    userId: _userId,
-                    tenantId: _tenantId,
-                    error: e instanceof Error ? e.message : String(e),
-                    stack: e instanceof Error ? e.stack : undefined,
-                });
-            }
-        }
-
-        // Fixed: Use timezone-aware boundaries (Africa/Dar_es_Salaam) to match frontend display
-        const todayStart = new Date(getStartOfTodayTZ());
-        const monthStart = new Date(getStartOfMonthTZ());
-
+        // Date boundaries (computed fresh inside the fetcher on every cache miss)
+        const todayStart    = new Date(getStartOfTodayTZ());
+        const monthStart    = new Date(getStartOfMonthTZ());
         const lastMonthStart = new Date(monthStart);
         lastMonthStart.setMonth(lastMonthStart.getMonth() - 1);
         const lastMonthEnd = new Date(monthStart);
-
-        // Yesterday's boundaries (Africa/Dar_es_Salaam) — used for today-vs-yesterday trend badges
         const yesterdayStart = new Date(todayStart);
         yesterdayStart.setDate(yesterdayStart.getDate() - 1);
-
         const lastYear = new Date();
         lastYear.setFullYear(lastYear.getFullYear() - 1);
 
@@ -540,7 +439,7 @@ export async function GET(req: NextRequest) {
             canceled: 0, // Note: TransactionStatus enum has no CANCELED variant; use FAILED for failed payments
         };
 
-        const response = {
+        const payload = {
             totalClients,
             newCustomersThisMonth,
             activeSubscribers,
@@ -610,6 +509,10 @@ export async function GET(req: NextRequest) {
                 expiresAt: toISOSafe(s.expiresAt),
             })),
         };
+
+        // Return the payload from inside the withCache fetcher
+        return payload;
+        }); // end withCache — result assigned to `response`
 
         return jsonResponse(response);
     } catch (e) {

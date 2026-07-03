@@ -4,6 +4,7 @@ import { jsonResponse, errorResponse } from "@/lib/auth";
 import { getTenantFilter } from "@/lib/tenant";
 import { requirePermission } from "@/lib/rbac";
 import { backfillRadiusAccountingTenants } from "@/lib/radiusTenant";
+import logger from "@/lib/logger";
 
 // GET /api/radius/sessions – list RADIUS accounting sessions (tenant-isolated)
 export async function GET(req: NextRequest) {
@@ -132,7 +133,7 @@ export async function GET(req: NextRequest) {
             summary,
         });
     } catch (e) {
-        console.error("RADIUS sessions error:", e);
+        logger.error("RADIUS sessions error:", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }

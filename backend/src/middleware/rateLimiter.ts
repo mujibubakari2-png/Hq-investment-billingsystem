@@ -1,218 +1,24 @@
 /**
- * Rate Limiting Middleware
- * Implements tiered rate limiting based on user role and endpoint
+ * Rate Limiting Middleware (thin adapter)
+ *
+ * MEDIUM-SEC-008 FIX:
+ * This middleware file was a duplicate of src/lib/rateLimiter.ts with its own
+ * independent in-process Map. That meant PM2 worker #1 and worker #2 had
+ * separate counters — any user could bypass the limit by having requests
+ * distributed across workers.
+ *
+ * This file is now a THIN ADAPTER that re-exports from lib/rateLimiter.ts,
+ * which uses Redis INCR+EXPIRE (shared across all workers).
+ *
+ * Edge Runtime note: On self-hosted PM2 deployments, Next.js middleware runs
+ * in Node.js, so ioredis imports are safe. If you ever deploy to Vercel Edge,
+ * replace the lib/rateLimiter.ts import with @upstash/ratelimit (fetch-based).
  */
 
-import { NextRequest, NextResponse } from 'next/server';
-// Import from auth-edge, NOT auth — auth.ts imports cache.ts → ioredis which
-// cannot run in the Next.js Edge Runtime (V8 isolate, no Node.js APIs).
-import { getUserFromRequest } from '@/lib/auth-edge';
-
-interface RateLimitConfig {
-    windowMs: number; // Time window in milliseconds
-    maxRequests: number; // Max requests per window
-    message?: string; // Custom message
-}
-
-interface UserRateLimitConfig {
-    anonymous: RateLimitConfig;
-    user: RateLimitConfig;
-    admin: RateLimitConfig;
-}
-
-// Store for tracking requests by IP/User
-const requestStore = new Map<string, { count: number; resetTime: number }>();
-
-// Endpoint-specific rate limits
-const endpointLimits: Record<string, UserRateLimitConfig> = {
-    // Authentication endpoints - stricter limits
-    '/api/auth/login': {
-        anonymous: { windowMs: 5 * 60 * 1000, maxRequests: 5, message: 'Too many login attempts, try again later' },
-        user: { windowMs: 5 * 60 * 1000, maxRequests: 20 },
-        admin: { windowMs: 5 * 60 * 1000, maxRequests: 50 },
-    },
-    '/api/auth/register': {
-        anonymous: { windowMs: 60 * 60 * 1000, maxRequests: 3, message: 'Registration limit exceeded, try later' },
-        user: { windowMs: 60 * 60 * 1000, maxRequests: 5 },
-        admin: { windowMs: 60 * 60 * 1000, maxRequests: 10 },
-    },
-    '/api/auth/forgot-password': {
-        anonymous: { windowMs: 15 * 60 * 1000, maxRequests: 3, message: 'Too many password reset attempts' },
-        user: { windowMs: 15 * 60 * 1000, maxRequests: 10 },
-        admin: { windowMs: 15 * 60 * 1000, maxRequests: 20 },
-    },
-
-    // API endpoints - moderate limits
-    '/api/default': {
-        anonymous: { windowMs: 60 * 1000, maxRequests: 10 },
-        user: { windowMs: 60 * 1000, maxRequests: 60 },
-        admin: { windowMs: 60 * 1000, maxRequests: 300 },
-    },
-
-    // File upload endpoints - stricter limits
-    '/api/upload': {
-        anonymous: { windowMs: 60 * 60 * 1000, maxRequests: 0, message: 'Anonymous users cannot upload' },
-        user: { windowMs: 60 * 60 * 1000, maxRequests: 10 },
-        admin: { windowMs: 60 * 60 * 1000, maxRequests: 50 },
-    },
-
-    // Export endpoints - moderate limits
-    '/api/export': {
-        anonymous: { windowMs: 60 * 60 * 1000, maxRequests: 0, message: 'Anonymous users cannot export' },
-        user: { windowMs: 60 * 1000, maxRequests: 5 },
-        admin: { windowMs: 60 * 1000, maxRequests: 20 },
-    },
-};
-
-// Default limit
-const defaultLimit: UserRateLimitConfig = {
-    anonymous: { windowMs: 60 * 1000, maxRequests: 30 },
-    user: { windowMs: 60 * 1000, maxRequests: 100 },
-    admin: { windowMs: 60 * 1000, maxRequests: 500 },
-};
-
-function getRateLimitKey(request: NextRequest, body: any, userId?: string): string {
-    const origin = request.headers.get('origin') || request.headers.get('host') || 'global';
-
-    const ip = request.headers.get('x-forwarded-for')?.split(',')[0].trim() ||
-        request.headers.get('x-real-ip') ||
-        'unknown';
-        
-    let tenantId = body?.tenantId || 'global';
-    let userIdentifier = userId || body?.username || body?.email || 'anonymous';
-        
-    return `${tenantId}:${userIdentifier}:${ip}`;
-}
-
-/**
- * Derive role from verified JWT to prevent header spoofing.
- */
-async function getUserRole(request: NextRequest): Promise<'admin' | 'user' | 'anonymous'> {
-    try {
-        const payload = await getUserFromRequest(request);
-        if (!payload) return 'anonymous';
-        if (payload.role === 'ADMIN' || payload.role === 'SUPER_ADMIN') return 'admin';
-        return 'user';
-    } catch {
-        return 'anonymous';
-    }
-}
-
-/**
- * Get rate limit config for endpoint
- */
-function getRateLimitConfig(path: string, role: 'admin' | 'user' | 'anonymous'): RateLimitConfig {
-    // Check for exact match
-    if (endpointLimits[path]) {
-        return endpointLimits[path][role];
-    }
-
-    // Check for pattern match
-    for (const [pattern, config] of Object.entries(endpointLimits)) {
-        if (pattern.includes('*')) {
-            const regex = new RegExp('^' + pattern.replace(/\*/g, '.*') + '$');
-            if (regex.test(path)) {
-                return config[role];
-            }
-        }
-    }
-
-    // Use default
-    return defaultLimit[role];
-}
-
-/**
- * Check if request should be rate limited
- */
-export async function isRateLimited(request: NextRequest, userId?: string): Promise<{ limited: boolean; message: string; retryAfter?: number }> {
-    const resolvedUser = await getUserFromRequest(request);
-    
-    let body = null;
-    if (request.method === 'POST' || request.method === 'PUT') {
-        try {
-            body = await request.clone().json();
-        } catch { }
-    }
-
-    const key = getRateLimitKey(request, body, userId || resolvedUser?.userId);
-    const role = await getUserRole(request);
-    const path = new URL(request.url).pathname;
-    const config = getRateLimitConfig(path, role);
-
-    const now = Date.now();
-    const record = requestStore.get(key);
-
-    if (!record || now > record.resetTime) {
-        // Initialize new record
-        requestStore.set(key, { count: 1, resetTime: now + config.windowMs });
-        return { limited: false, message: '' };
-    }
-
-    if (record.count >= config.maxRequests) {
-        const retryAfter = Math.ceil((record.resetTime - now) / 1000);
-        const message = config.message || `Rate limit exceeded. Try again in ${retryAfter} seconds`;
-        return {
-            limited: true,
-            message,
-            retryAfter,
-        };
-    }
-
-    record.count++;
-    return { limited: false, message: '' };
-}
-
-/**
- * Rate limiting middleware for Next.js
- */
-export async function rateLimitMiddleware(request: NextRequest): Promise<NextResponse | null> {
-    const result = await isRateLimited(request);
-
-    if (result.limited) {
-        return NextResponse.json(
-            { error: result.message, code: 'RATE_LIMIT_EXCEEDED' },
-            {
-                status: 429,
-                headers: {
-                    'Retry-After': String(result.retryAfter || 60),
-                    'X-RateLimit-Limit': '100',
-                    'X-RateLimit-Remaining': '0',
-                    'X-RateLimit-Reset': String(Math.ceil(Date.now() / 1000) + (result.retryAfter || 60)),
-                },
-            }
-        );
-    }
-
-    return null;
-}
-
-/**
- * Clean up old records periodically (call this in a cron job)
- */
-export function cleanupRateLimitStore(): void {
-    const now = Date.now();
-    for (const [key, record] of requestStore.entries()) {
-        if (now > record.resetTime) {
-            requestStore.delete(key);
-        }
-    }
-}
-
-/**
- * Reset rate limit for specific user (admin action)
- */
-export function resetRateLimit(identifier: string): void {
-    requestStore.delete(identifier);
-}
-
-/**
- * Get rate limit stats for monitoring
- */
-export function getRateLimitStats() {
-    return {
-        totalKeys: requestStore.size,
-        activeKeys: Array.from(requestStore.entries())
-            .filter(([_, record]) => Date.now() <= record.resetTime)
-            .length,
-    };
-}
+export {
+    rateLimitMiddleware,
+    isRateLimited,
+    resetRateLimit,
+    cleanupRateLimitStore,
+    getRateLimitStats,
+} from '@/lib/rateLimiter';

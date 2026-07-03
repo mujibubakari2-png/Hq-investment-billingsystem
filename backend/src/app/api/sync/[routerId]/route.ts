@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
+import logger from "@/lib/logger";
 
 export async function GET(
     request: Request,
@@ -13,7 +14,7 @@ export async function GET(
         return NextResponse.json({ status: "error", message: "Unauthorized router sync" }, { status: 401 });
     }
 
-    console.log(`[SYNC] Sync request received for router: ${routerId}`);
+    logger.info(`[SYNC] Sync request received for router: ${routerId}`);
 
     try {
         const db = getTenantClient(null);
@@ -27,7 +28,7 @@ export async function GET(
         });
 
         if (!router) {
-            console.warn(`[SYNC] Router not found: ${routerId}`);
+            logger.warn(`[SYNC] Router not found: ${routerId}`);
             return NextResponse.json(
                 {
                     status: "error",
@@ -45,7 +46,7 @@ export async function GET(
             }
         });
 
-        console.log(`[SYNC] Router ${router.name} (${router.id}) synced successfully`);
+        logger.info(`[SYNC] Router ${router.name} (${router.id}) synced successfully`);
 
         return NextResponse.json(
             {
@@ -58,7 +59,7 @@ export async function GET(
             { status: 200 }
         );
     } catch (error) {
-        console.error(`[SYNC] Sync failed for router ${routerId}:`, error);
+        logger.error(`[SYNC] Sync failed for router ${routerId}:`, { error: error instanceof Error ? error.message : String(error) });
         return NextResponse.json(
             {
                 status: "error",

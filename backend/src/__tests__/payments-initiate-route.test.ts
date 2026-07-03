@@ -55,6 +55,7 @@ describe('payments initiate route', () => {
     const db = {
       transaction: {
         findFirst: jest.fn().mockResolvedValue(null),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
         update: jest.fn(),
       },
     };
@@ -81,7 +82,8 @@ describe('payments initiate route', () => {
   it('stores providerRef on the existing pending transaction after initiation', async () => {
     const db = {
       transaction: {
-        findFirst: jest.fn().mockResolvedValue({ id: 'tx-1', amount: 1000 }),
+        findFirst: jest.fn().mockResolvedValue({ id: 'tx-1', amount: 1000, status: 'INITIATING' }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         update: jest.fn().mockResolvedValue({}),
       },
     };
@@ -114,7 +116,7 @@ describe('payments initiate route', () => {
     }));
     expect(db.transaction.update).toHaveBeenCalledWith({
       where: { id: 'tx-1' },
-      data: { providerRef: 'PALM-ORDER-1', method: 'PALMPESA' },
+      data: { providerRef: 'PALM-ORDER-1', method: 'PALMPESA', status: 'PENDING' },
     });
     expect(body.providerRef).toBe('PALM-ORDER-1');
   });

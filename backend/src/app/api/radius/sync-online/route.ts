@@ -4,6 +4,7 @@ import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { requirePermission } from "@/lib/rbac";
 import { getTenantFilter } from "@/lib/tenant";
 import { backfillRadiusAccountingTenants } from "@/lib/radiusTenant";
+import logger from "@/lib/logger";
 
 /**
  * POST /api/radius/sync-online
@@ -86,7 +87,7 @@ export async function POST(req: NextRequest) {
         });
 
     } catch (e) {
-        console.error("[RADIUS SYNC ONLINE ERROR]:", e);
+        logger.error("[RADIUS SYNC ONLINE ERROR]:", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }
@@ -145,7 +146,7 @@ export async function GET(req: NextRequest) {
         });
 
     } catch (e) {
-        console.error("[RADIUS SYNC ONLINE GET ERROR]:", e);
+        logger.error("[RADIUS SYNC ONLINE GET ERROR]:", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }

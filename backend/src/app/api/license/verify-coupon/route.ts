@@ -4,6 +4,7 @@ import { requirePermission } from "@/lib/rbac";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import { paymentService } from "@/lib/payments/service";
 import { getJwtTenantId } from "@/lib/tenant";
+import logger from "@/lib/logger";
 
 export async function POST(req: NextRequest) {
     try {
@@ -84,7 +85,7 @@ export async function POST(req: NextRequest) {
                     
                     return errorResponse(`Payment status is currently: ${raw}. Please try again later or contact support.`, 400);
                 } catch (pollErr) {
-                    console.warn("[LICENSE/VERIFY-COUPON] Live provider poll failed:", pollErr);
+                    logger.warn("[LICENSE/VERIFY-COUPON] Live provider poll failed:", { error: pollErr instanceof Error ? pollErr.message : String(pollErr) });
                     return errorResponse("Failed to verify payment with provider. Please try again.", 502);
                 }
             } else {
@@ -96,7 +97,7 @@ export async function POST(req: NextRequest) {
         return errorResponse("Invalid Reference or Coupon Code.", 400);
 
     } catch (error) {
-        console.error("Verify Coupon/Reference Error:", error);
+        logger.error("Verify Coupon/Reference Error:", { error: error instanceof Error ? error.message : String(error) });
         return errorResponse("Internal server error", 500);
     }
 }

@@ -4,6 +4,7 @@ import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 import { paymentService } from "@/lib/payments/service";
 import { formatPhoneTZ } from "@/lib/payments/utils";
+import logger from "@/lib/logger";
 
 /**
  * POST /api/pppoe/purchase
@@ -187,14 +188,14 @@ export async function POST(req: NextRequest) {
           });
         }
       } else {
-        console.warn(`[PPPOE PURCHASE] Payment initiation failed: ${result.message}`);
+        logger.warn(`[PPPOE PURCHASE] Payment initiation failed: ${result.message}`);
       }
     } catch (payErr) {
-      console.error("[PPPOE PURCHASE] PaymentService error:", payErr);
+      logger.error("[PPPOE PURCHASE] PaymentService error:", { error: payErr instanceof Error ? payErr.message : String(payErr) });
     }
 
     if (!paymentInitiated) {
-      console.warn(`[PPPOE PURCHASE] No payment provider configured for tenant ${pkg.tenantId}. Transaction stays PENDING.`);
+      logger.warn(`[PPPOE PURCHASE] No payment provider configured for tenant ${pkg.tenantId}. Transaction stays PENDING.`);
     }
 
     return jsonResponse({
@@ -215,7 +216,7 @@ export async function POST(req: NextRequest) {
     });
 
   } catch (e) {
-    console.error("[PPPOE PURCHASE] Error:", e);
+    logger.error("[PPPOE PURCHASE] Error:", { error: e instanceof Error ? e.message : String(e) });
     return errorResponse("Internal server error", 500);
   }
 }

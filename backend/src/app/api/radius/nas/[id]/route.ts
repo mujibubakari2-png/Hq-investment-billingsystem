@@ -3,6 +3,7 @@ import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 import { requirePermission } from "@/lib/rbac";
 import { canAccessTenant } from "@/lib/tenant";
+import logger from "@/lib/logger";
 
 // DELETE /api/radius/nas/[id]
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -20,7 +21,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
         await db.radiusNas.delete({ where: { id } });
         return jsonResponse({ message: "NAS client deleted" });
     } catch (e) {
-        console.error("NAS delete error:", e);
+        logger.error("NAS delete error:", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }

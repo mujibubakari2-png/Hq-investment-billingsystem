@@ -5,7 +5,7 @@ describe("CSRF Protection - Complete End-to-End Audit Tests", () => {
     let validToken: string;
 
     beforeEach(() => {
-        validToken = generateCsrfToken();
+        validToken = generateCsrfToken('test-session-id');
     });
 
     const createRequest = (method: string, headers: Record<string, string>, cookies: Record<string, string>) => {

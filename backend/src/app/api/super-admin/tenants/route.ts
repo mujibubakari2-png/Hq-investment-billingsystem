@@ -3,6 +3,7 @@ import { getTenantClient } from "@/lib/tenantPrisma";
 import { errorResponse, jsonResponse } from "@/lib/auth";
 import { requireRole } from "@/lib/rbac";
 import { sendAccountApprovedNotifications } from "@/lib/accountNotifications";
+import logger from "@/lib/logger";
 
 
 // GET /api/super-admin/tenants — list all tenants
@@ -14,33 +15,57 @@ export async function GET(req: NextRequest) {
         if (userPayload.tenantId) return errorResponse("Unauthorized", 403);
         const db = getTenantClient(null);
 
-        const tenants = await db.tenant.findMany({
-            orderBy: { createdAt: "desc" },
-            include: {
-                users: {
-                    where: { role: "ADMIN" },
-                    select: { email: true, fullName: true, phone: true }
+        const { searchParams } = new URL(req.url);
+        const search = searchParams.get("search") || "";
+        const status = searchParams.get("status") || "";
+        const page   = Math.max(1, parseInt(searchParams.get("page")  || "1"));
+        const limit  = Math.min(200, Math.max(1, parseInt(searchParams.get("limit") || "50")));
+        const skip   = (page - 1) * limit;
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const where: any = {};
+        if (status) where.status = status;
+        if (search) {
+            where.OR = [
+                { name:  { contains: search, mode: "insensitive" } },
+                { email: { contains: search, mode: "insensitive" } },
+            ];
+        }
+
+        // HIGH-PERF FIX: Was fully unbounded — now paginated with skip/take.
+        const [tenants, total] = await Promise.all([
+            db.tenant.findMany({
+                where,
+                orderBy: { createdAt: "desc" },
+                include: {
+                    users: {
+                        where:  { role: "ADMIN" },
+                        select: { email: true, fullName: true, phone: true },
+                    },
+                    plan: { select: { name: true } },
                 },
-                plan: { select: { name: true } }
-            }
-        });
+                skip,
+                take: limit,
+            }),
+            db.tenant.count({ where }),
+        ]);
 
         const mapped = tenants.map(t => ({
-            id: t.id,
-            name: t.name,
-            email: t.email,
-            phone: t.phone,
-            status: t.status,
-            planName: t.plan?.name,
-            createdAt: t.createdAt,
-            trialEnd: t.trialEnd,
+            id:               t.id,
+            name:             t.name,
+            email:            t.email,
+            phone:            t.phone,
+            status:           t.status,
+            planName:         t.plan?.name,
+            createdAt:        t.createdAt,
+            trialEnd:         t.trialEnd,
             licenseExpiresAt: t.licenseExpiresAt,
-            primaryUser: t.users[0]?.fullName || "N/A"
+            primaryUser:      t.users[0]?.fullName || "N/A",
         }));
 
-        return jsonResponse(mapped);
+        return jsonResponse({ data: mapped, total, page, limit });
     } catch (e) {
-        console.error("Super Admin Tenants List Error:", e);
+        logger.error("Super Admin Tenants List Error:", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }
@@ -115,7 +140,7 @@ export async function POST(req: NextRequest) {
         return errorResponse("Unknown action. Use: approve | suspend | reactivate", 400);
 
     } catch (e) {
-        console.error("Super Admin Tenant Action Error:", e);
+        logger.error("Super Admin Tenant Action Error:", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }

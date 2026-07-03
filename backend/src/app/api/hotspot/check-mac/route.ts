@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 import { buildHotspotPortalFeedback } from "@/lib/hotspotFlow";
+import logger from "@/lib/logger";
 
 /**
  * GET /api/hotspot/check-mac?mac=XX:XX:XX:XX:XX:XX
@@ -112,7 +113,7 @@ export async function GET(req: NextRequest) {
         });
 
     } catch (e) {
-        console.error("CHECK MAC ERROR:", e);
+        logger.error("CHECK MAC ERROR:", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }

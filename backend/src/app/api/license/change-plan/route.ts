@@ -3,6 +3,7 @@ import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { requireRole } from "@/lib/rbac";
 import { getJwtTenantId, isPlatformSuperAdmin } from "@/lib/tenant";
+import logger from "@/lib/logger";
 
 // POST /api/license/change-plan
 export async function POST(req: NextRequest) {
@@ -61,7 +62,7 @@ export async function POST(req: NextRequest) {
             },
         });
     } catch (error) {
-        console.error("Change Plan Error:", error);
+        logger.error("Change Plan Error:", { error: error instanceof Error ? error.message : String(error) });
         return errorResponse("Internal server error", 500);
     }
 }

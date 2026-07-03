@@ -32,6 +32,14 @@ export type TtlKey = keyof typeof TTL;
 
 let _client: IORedis | null = null;
 
+/**
+ * Exported singleton accessor — use this in other modules instead of
+ * creating a new `new IORedis(...)` instance.
+ */
+export function getRedisClient(): IORedis | null {
+    return getClient();
+}
+
 function getClient(): IORedis | null {
     if (_client) return _client;
     // Only create a client when REDIS_URL is configured
@@ -68,9 +76,15 @@ function getClient(): IORedis | null {
 /**
  * Build a namespaced Redis key.
  * Format: "hq:{tenantId}:{namespace}:{key}"
+ *
+ * HIGH-MT-003 FIX: null/undefined tenantId maps to 'platform' so that
+ * platform-admin cache entries do not collide under the literal string 'null'.
+ * e.g. two platform admins sharing `hq:null:dashboard:stats` was a bug —
+ * they now each hit `hq:platform:dashboard:stats` which is scoped correctly.
  */
-export function buildKey(tenantId: string, namespace: string, key: string): string {
-    return `hq:${tenantId}:${namespace}:${key}`;
+export function buildKey(tenantId: string | null | undefined, namespace: string, key: string): string {
+    const scope = tenantId ?? 'platform';
+    return `hq:${scope}:${namespace}:${key}`;
 }
 
 // ── Core get / set / del ──────────────────────────────────────────────────────

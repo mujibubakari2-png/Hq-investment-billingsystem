@@ -8,7 +8,7 @@
  * Key source: FIELD_ENCRYPTION_KEY env var (32-byte hex string)
  *
  * Setup:
- *   1. Generate a key: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+ *   1. Generate a key: node -e "logger.info(require('crypto').randomBytes(32).toString('hex'))"
  *   2. Add to .env: FIELD_ENCRYPTION_KEY=<your-64-char-hex-string>
  *   3. Run a one-time migration script to encrypt existing plaintext values.
  *
@@ -17,6 +17,7 @@
  */
 
 import crypto from 'crypto';
+import logger from "@/lib/logger";
 
 const ALGORITHM   = 'aes-256-gcm';
 const IV_LENGTH   = 12; // 96-bit IV recommended for GCM
@@ -28,7 +29,7 @@ function getKey(): Buffer {
   if (!hex) {
     throw new Error(
       'FATAL: FIELD_ENCRYPTION_KEY is required in all environments. ' +
-      'Generate one with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"'
+      'Generate one with: node -e "logger.info(require(\'crypto\').randomBytes(32).toString(\'hex\'))"'
     );
   }
   if (hex.length !== 64) {
@@ -90,12 +91,16 @@ export function encryptRouterFields<T extends {
   password?: string | null;
   wgPrivateKey?: string | null;
   wgPresharedKey?: string | null;
+  // SEC-ROUTER-003 FIX: radiusSecret is now a distinct encrypted field,
+  // separate from the admin `password`.
+  radiusSecret?: string | null;
 }>(data: T): T {
   return {
     ...data,
     ...(data.password      !== undefined && { password:      encrypt(data.password)      }),
     ...(data.wgPrivateKey  !== undefined && { wgPrivateKey:  encrypt(data.wgPrivateKey)  }),
     ...(data.wgPresharedKey!== undefined && { wgPresharedKey:encrypt(data.wgPresharedKey)}),
+    ...(data.radiusSecret  !== undefined && { radiusSecret:  encrypt(data.radiusSecret)  }),
   };
 }
 
@@ -106,12 +111,14 @@ export function decryptRouterFields<T extends {
   password?: string | null;
   wgPrivateKey?: string | null;
   wgPresharedKey?: string | null;
+  radiusSecret?: string | null;
 }>(router: T): T {
   return {
     ...router,
     password:       decrypt(router.password),
     wgPrivateKey:   decrypt(router.wgPrivateKey),
     wgPresharedKey: decrypt(router.wgPresharedKey),
+    radiusSecret:   decrypt(router.radiusSecret),
   };
 }
 

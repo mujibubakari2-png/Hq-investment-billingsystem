@@ -22,11 +22,12 @@ import {
 } from "@/lib/payments/utils";
 import { getMikroTikService } from "@/lib/mikrotik";
 import { syncRadiusUser } from "@/lib/radius";
+import logger from "@/lib/logger";
 
-// ─── Types ─────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /**
- * PAYMENT ARCHITECTURE — CREDENTIAL ISOLATION CONTRACT
+ * PAYMENT ARCHITECTURE â€” CREDENTIAL ISOLATION CONTRACT
  * =====================================================
  * This system operates two completely separate payment contexts:
  *
@@ -34,13 +35,13 @@ import { syncRadiusUser } from "@/lib/radius";
  *   - Used for: License Purchase, License Renewal, SaaS Subscription Payments.
  *   - Credentials: Platform Super Admin's PaymentChannel (tenantId = null).
  *   - Money flows to: Platform Owner only.
- *   - Route: POST /api/license/renew → this service with tenantId = null.
+ *   - Route: POST /api/license/renew â†’ this service with tenantId = null.
  *
  * TENANT context   (paymentContext = "TENANT"):
  *   - Used for: Hotspot customer payments, PPPoE customer payments.
  *   - Credentials: Tenant Super Admin's PaymentChannel (tenantId = <value>).
  *   - Money flows to: That specific tenant only.
- *   - Route: POST /api/payments/initiate → this service with tenantId = <value>.
+ *   - Route: POST /api/payments/initiate â†’ this service with tenantId = <value>.
  *
  * ENFORCEMENT: getChannel() enforces this contract and throws if there is a
  * context mismatch. This prevents any cross-contamination of credentials.
@@ -72,7 +73,7 @@ export interface InitiatePaymentOptions {
   paymentContext?: PaymentContext;
 }
 
-// ─── PaymentService ─────────────────────────────────────────────────────────
+// â”€â”€â”€ PaymentService â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export class PaymentService {
   /**
@@ -83,11 +84,11 @@ export class PaymentService {
     providerName: string,
     paymentContext?: PaymentContext
   ) {
-    console.log("[TRACE][PaymentService.getChannel] ENTER", { tenantId, providerName, paymentContext });
+    logger.info("[TRACE][PaymentService.getChannel] ENTER", { tenantId, providerName, paymentContext });
     const ctx = paymentContext ?? (tenantId === null ? "LICENSE" : "TENANT");
 
     if (ctx === "LICENSE" && tenantId !== null) {
-      console.error("[TRACE][PaymentService.getChannel] EARLY_RETURN", { reason: "LICENSE context requires tenantId=null" });
+      logger.error("[TRACE][PaymentService.getChannel] EARLY_RETURN", { reason: "LICENSE context requires tenantId=null" });
       throw new Error(
         `[PAYMENT ISOLATION VIOLATION] LICENSE context requires tenantId=null (platform channel), ` +
         `but got tenantId="${tenantId}". ` +
@@ -95,7 +96,7 @@ export class PaymentService {
       );
     }
     if (ctx === "TENANT" && !tenantId) {
-      console.error("[TRACE][PaymentService.getChannel] EARLY_RETURN", { reason: "TENANT context requires a tenantId" });
+      logger.error("[TRACE][PaymentService.getChannel] EARLY_RETURN", { reason: "TENANT context requires a tenantId" });
       throw new Error(
         `[PAYMENT ISOLATION VIOLATION] TENANT context requires a non-null tenantId, ` +
         `but got tenantId=null. ` +
@@ -112,29 +113,29 @@ export class PaymentService {
       },
     });
 
-    console.log("[TRACE][PaymentService.getChannel] EXIT", { tenantId, providerName, channel });
+    logger.info("[TRACE][PaymentService.getChannel] EXIT", { tenantId, providerName, channel });
     return channel;
   }
 
-  // ── Initiate Payment ────────────────────────────────────────────────────
+  // â”€â”€ Initiate Payment â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   async initiatePayment(opts: InitiatePaymentOptions): Promise<PaymentResponse & { reference: string }> {
-    console.log("[TRACE][PaymentService.initiatePayment] ENTER", { opts });
+    logger.info("[TRACE][PaymentService.initiatePayment] ENTER", { opts });
     const { tenantId, amount, phone, providerName, description, buyerName, buyerEmail, paymentContext } = opts;
 
     if (!isSupportedProvider(providerName)) {
-      console.error("[TRACE][PaymentService.initiatePayment] EARLY_RETURN", { reason: "unsupported provider", providerName });
+      logger.error("[TRACE][PaymentService.initiatePayment] EARLY_RETURN", { reason: "unsupported provider", providerName });
       return { success: false, message: `Unsupported provider: ${providerName}`, reference: opts.reference ?? "" };
     }
     if (!isValidAmount(amount)) {
-      console.error("[TRACE][PaymentService.initiatePayment] EARLY_RETURN", { reason: "invalid amount", amount });
+      logger.error("[TRACE][PaymentService.initiatePayment] EARLY_RETURN", { reason: "invalid amount", amount });
       return { success: false, message: `Invalid amount: ${amount}. Must be between 100 and 10,000,000 TZS.`, reference: opts.reference ?? "" };
     }
 
     const reference = opts.reference ?? generateReference(providerName.slice(0, 2));
     const cleanPhone = formatPhoneTZ(phone);
     const callbackUrl = opts.callbackUrl ?? buildCallbackUrl(providerName);
-    console.log("[TRACE][PaymentService.initiatePayment] CALLBACK", { providerName, callbackUrl, phone: cleanPhone });
+    logger.info("[TRACE][PaymentService.initiatePayment] CALLBACK", { providerName, callbackUrl, phone: cleanPhone });
 
     const globalDb = getTenantClient(null);
     let db = getTenantClient(tenantId);
@@ -146,15 +147,15 @@ export class PaymentService {
     } catch (error: any) {
       const code = error?.code;
       const message = error?.message || String(error);
-      console.warn("[TRACE][PaymentService.initiatePayment] IDENTITY_CHECK_FAILED", { reference, code, message });
+      logger.warn("[TRACE][PaymentService.initiatePayment] IDENTITY_CHECK_FAILED", { reference, code, message });
       if (code === "P2021" || /table .*transactions.* does not exist/i.test(message)) {
-        console.warn("[TRACE][PaymentService.initiatePayment] CONTINUING_WITHOUT_IDENTITY_CHECK", { reference });
+        logger.warn("[TRACE][PaymentService.initiatePayment] CONTINUING_WITHOUT_IDENTITY_CHECK", { reference });
       } else {
         throw error;
       }
     }
     if (existingTx) {
-      console.log("[TRACE][PaymentService.initiatePayment] EXISTING_TRANSACTION", { reference, status: existingTx.status });
+      logger.info("[TRACE][PaymentService.initiatePayment] EXISTING_TRANSACTION", { reference, status: existingTx.status });
       if (existingTx.status === "COMPLETED") {
         return { success: true, message: "Payment already completed", reference, idempotent: true } as any;
       }
@@ -165,17 +166,17 @@ export class PaymentService {
 
     const channel = await this.getChannel(tenantId, providerName, paymentContext);
     const provider = getPaymentProvider(providerName, channel);
-    console.log("[TRACE][PaymentService.initiatePayment] PROVIDER_SELECTED", { providerName, providerClass: provider.constructor?.name, channel });
+    logger.info("[TRACE][PaymentService.initiatePayment] PROVIDER_SELECTED", { providerName, providerClass: provider.constructor?.name, channel });
 
     const request: PaymentRequest = { amount, phone: cleanPhone, reference, description, callbackUrl, buyerName, buyerEmail };
 
-    console.log("[TRACE][PaymentService.initiatePayment] CALLING_PROVIDER", { providerName, request });
+    logger.info("[TRACE][PaymentService.initiatePayment] CALLING_PROVIDER", { providerName, request });
     const response = await provider.initiatePayment(request);
-    console.log("[TRACE][PaymentService.initiatePayment] EXIT", { providerName, response, reference });
+    logger.info("[TRACE][PaymentService.initiatePayment] EXIT", { providerName, response, reference });
     return { ...response, reference };
   }
 
-  // ── Check Status ────────────────────────────────────────────────────────
+  // â”€â”€ Check Status â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   async checkStatus(
     providerName: string,
@@ -190,34 +191,34 @@ export class PaymentService {
     return provider.checkStatus(providerRef);
   }
 
-  // ── Resolve Webhook Channel ──────────────────────────────────────────────
+  // â”€â”€ Resolve Webhook Channel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   /**
    * MULTI-TENANT WEBHOOK ISOLATION FIX
    * ===================================
    * Provider webhook callback URLs (e.g. /api/webhooks/palmpesa) are SHARED across
-   * every tenant using that provider — the provider has no concept of "tenant" and
+   * every tenant using that provider â€” the provider has no concept of "tenant" and
    * posts to one fixed callback URL per provider. When the webhook arrives we do NOT
-   * yet know which tenant (or the platform) it belongs to — that is only knowable
+   * yet know which tenant (or the platform) it belongs to â€” that is only knowable
    * AFTER the payload is parsed and matched against a transaction/invoice.
    *
    * BUG (pre-fix): processWebhook() always called getChannel(tenantId, providerName)
    * with tenantId fixed at whatever the caller passed in (typically null from the
    * shared /api/webhooks/{provider} routes). Because getChannel() defaults its
    * paymentContext to "LICENSE" whenever tenantId is null, this silently picked the
-   * PLATFORM (tenantId=null) PaymentChannel ONLY — even for webhooks that actually
+   * PLATFORM (tenantId=null) PaymentChannel ONLY â€” even for webhooks that actually
    * belong to a tenant's Hotspot/PPPoE payment. Concretely this meant:
    *   - A tenant's own webhookSecret/apiKey credentials were NEVER used to verify
    *     that tenant's incoming webhook; verification ran against the platform's
    *     credentials instead.
    *   - If a tenant's PaymentChannel secret differs from the platform's (the normal
-   *     case — each tenant configures their own credentials from the frontend),
+   *     case â€” each tenant configures their own credentials from the frontend),
    *     every legitimate tenant webhook would be rejected as "signature mismatch".
    *   - If a tenant's PaymentChannel secret happened to collide with the platform's,
    *     the wrong channel's identity/credentials would silently be used.
    *
    * FIX: when the tenant is not explicitly known, try EVERY ACTIVE PaymentChannel
-   * configured for this provider — the platform's channel AND every tenant's own
-   * channel — and accept the first one whose verifyWebhook() succeeds. Each tenant's
+   * configured for this provider â€” the platform's channel AND every tenant's own
+   * channel â€” and accept the first one whose verifyWebhook() succeeds. Each tenant's
    * credentials are isolated and are only ever compared against that tenant's own
    * channel, never cross-applied to another tenant or to the platform.
    */
@@ -378,12 +379,12 @@ export class PaymentService {
           profileName: pkg.name,
         });
       } catch (radErr) {
-        console.error(`[PAYMENT SERVICE] RADIUS sync failed during status completion:`, radErr);
+        logger.error(`[PAYMENT SERVICE] RADIUS sync failed during status completion:`, { detail: radErr instanceof Error ? radErr.message : String(radErr) });
         if (newSub?.id) {
           await db.subscription.update({
             where: { id: newSub.id },
             data: { syncStatus: "PENDING_RADIUS_SYNC" },
-          }).catch((e) => console.error("[PAYMENT SERVICE] Failed to mark PENDING_RADIUS_SYNC:", e));
+          }).catch((e) => logger.error("[PAYMENT SERVICE] Failed to mark PENDING_RADIUS_SYNC:", { detail: e instanceof Error ? e.message : String(e) }));
         }
       }
     }
@@ -410,7 +411,7 @@ export class PaymentService {
         });
       } catch (mkErr: unknown) {
         const msg = mkErr instanceof Error ? mkErr.message : "Unknown";
-        console.error(`[PAYMENT SERVICE] MikroTik activation failed during status completion:`, msg);
+        logger.error("[PAYMENT SERVICE] MikroTik activation failed during status completion:", { error: msg });
         await db.routerLog.create({
           data: {
             routerId: pkg.routerId,
@@ -543,7 +544,7 @@ export class PaymentService {
       return { channel: channel as any, provider, verification };
     }
 
-    // Caller already knows the tenant explicitly — resolve directly and
+    // Caller already knows the tenant explicitly â€” resolve directly and
     // isolate verification to that one tenant's channel only. Used by routes
     // (e.g. /api/payments/{provider}/webhook) that have already determined
     // this is unambiguously a PLATFORM (tenantId=null) callback path.
@@ -561,8 +562,8 @@ export class PaymentService {
       return { channel: channel as any, provider, verification };
     }
 
-    // Unknown tenant: enumerate every ACTIVE channel for this provider — the
-    // platform's (tenantId=null) channel AND every tenant's own channel — and
+    // Unknown tenant: enumerate every ACTIVE channel for this provider â€” the
+    // platform's (tenantId=null) channel AND every tenant's own channel â€” and
     // verify the incoming signature against each one IN ISOLATION until one
     // matches. No tenant's credentials are ever compared against another
     // tenant's webhook; each candidate is tried independently.
@@ -580,7 +581,7 @@ export class PaymentService {
       const candidateProvider = getPaymentProvider(providerName, candidate as any);
       const verification = await candidateProvider.verifyWebhook(headers, rawBody);
       if (verification.verified) {
-        console.log("[TRACE][PaymentService.resolveWebhookChannel] MATCHED_CHANNEL", {
+        logger.info("[TRACE][PaymentService.resolveWebhookChannel] MATCHED_CHANNEL", {
           providerName,
           channelId: (candidate as any).id,
           tenantId: candidate.tenantId ?? null,
@@ -593,7 +594,7 @@ export class PaymentService {
     return { channel: null, provider: null, verification: { verified: false, reason: lastReason } };
   }
 
-  // ── Process Webhook ─────────────────────────────────────────────────────
+  // â”€â”€ Process Webhook â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   async processWebhook(
     providerName: string,
@@ -629,7 +630,7 @@ export class PaymentService {
 
     if (!resolved.channel || !resolved.provider) {
       // No channel (platform's or any tenant's) could verify this webhook.
-      // Log it unscoped (tenant unknown) for audit, then reject — this is the
+      // Log it unscoped (tenant unknown) for audit, then reject â€” this is the
       // ONLY case where we fall back to an unscoped (tenantId=null) log write,
       // because by definition no tenant or platform identity was established.
       await globalDb.webhookLog.create({
@@ -655,7 +656,7 @@ export class PaymentService {
     const resolvedTenantId: string | null = resolved.channel.tenantId ?? null;
     let db = getTenantClient(resolvedTenantId);
 
-    // 2. Log to webhook_logs — scoped to the tenant whose channel verified this webhook
+    // 2. Log to webhook_logs â€” scoped to the tenant whose channel verified this webhook
     const webhookLog = await globalDb.webhookLog.create({
       data: {
         provider: providerName.toUpperCase(),
@@ -719,7 +720,7 @@ export class PaymentService {
         }) as any;
 
         if (transaction) {
-          console.log("[PAYMENT SERVICE] Resolved transaction via providerRef fallback", {
+          logger.info("[PAYMENT SERVICE] Resolved transaction via providerRef fallback", {
             transactionRef: parsed.transactionRef,
             providerRef: parsed.providerRef,
             transactionId: transaction.id,
@@ -730,12 +731,12 @@ export class PaymentService {
 
     // NOTE: db is already correctly scoped via resolvedTenantId above (set right after
     // channel resolution). We deliberately do NOT re-derive `db` from transaction.tenantId
-    // here — doing so previously allowed a transaction's OWN tenantId to silently override
+    // here â€” doing so previously allowed a transaction's OWN tenantId to silently override
     // the tenant whose credentials verified the webhook, which is the isolation violation
     // this fix closes. If they ever disagree, that is a sign of an integrity issue worth
     // surfacing rather than silently trusting the transaction's tenantId.
     if (transaction?.tenantId && transaction.tenantId !== resolvedTenantId) {
-      console.error("[PAYMENT SERVICE] ISOLATION MISMATCH: webhook channel tenant differs from matched transaction tenant", {
+      logger.error("[PAYMENT SERVICE] ISOLATION MISMATCH: webhook channel tenant differs from matched transaction tenant", {
         resolvedTenantId,
         transactionTenantId: transaction.tenantId,
         transactionRef: parsed.transactionRef,
@@ -751,21 +752,21 @@ export class PaymentService {
       };
     }
 
-    // ── LICENSE PAYMENT FALLBACK ─────────────────────────────────────────────────────
-    // If no hotspot/PPPoE transaction found, check if this is a LICENSE payment —
+    // â”€â”€ LICENSE PAYMENT FALLBACK â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // If no hotspot/PPPoE transaction found, check if this is a LICENSE payment â€”
     // but ONLY when the webhook was verified against the PLATFORM channel
     // (resolvedTenantId === null). A webhook verified against a SPECIFIC TENANT's
-    // channel must never fall through to license invoice processing — that tenant's
+    // channel must never fall through to license invoice processing â€” that tenant's
     // payment credentials must never be able to mark a platform license invoice as paid.
     if (!transaction) {
       if (options?.skipLicense || resolvedTenantId !== null) {
         if (resolvedTenantId !== null) {
-          console.warn("[PAYMENT SERVICE] Tenant-scoped webhook had no matching transaction — refusing license fallback (isolation guard)", {
+          logger.warn("[PAYMENT SERVICE] Tenant-scoped webhook had no matching transaction â€” refusing license fallback (isolation guard)", {
             resolvedTenantId,
             transactionRef: parsed.transactionRef,
           });
         } else {
-          console.error(`[PAYMENT SERVICE] Transaction not found and skipLicense is true. Reference: ${parsed.transactionRef}`);
+          logger.error(`[PAYMENT SERVICE] Transaction not found and skipLicense is true. Reference: ${parsed.transactionRef}`);
         }
         await globalDb.webhookLog.update({
           where: { id: webhookLog.id },
@@ -787,7 +788,7 @@ export class PaymentService {
         return licenseResult;
       }
 
-      // Not a license payment either — genuine 404
+      // Not a license payment either â€” genuine 404
       await globalDb.webhookLog.update({
         where: { id: webhookLog.id },
         data: { status: "FAILED", errorMessage: "Transaction not found (hotspot, PPPoE, or license)" },
@@ -799,7 +800,7 @@ export class PaymentService {
       };
     }
 
-    // Already processed — return early
+    // Already processed â€” return early
     if (transaction.status === "COMPLETED") {
       await globalDb.webhookLog.update({
         where: { id: webhookLog.id },
@@ -941,12 +942,12 @@ export class PaymentService {
           profileName: pkg.name,
         });
       } catch (radErr) {
-        console.error(`[PAYMENT SERVICE] RADIUS sync failed — scheduling retry:`, radErr);
+        logger.error(`[PAYMENT SERVICE] RADIUS sync failed â€” scheduling retry:`, { detail: radErr instanceof Error ? radErr.message : String(radErr) });
         if (newSub?.id) {
           await db.subscription.update({
             where: { id: newSub.id },
             data: { syncStatus: "PENDING_RADIUS_SYNC" },
-          }).catch((e) => console.error("[PAYMENT SERVICE] Failed to mark PENDING_RADIUS_SYNC:", e));
+          }).catch((e) => logger.error("[PAYMENT SERVICE] Failed to mark PENDING_RADIUS_SYNC:", { detail: e instanceof Error ? e.message : String(e) }));
         }
       }
     }
@@ -974,7 +975,7 @@ export class PaymentService {
         });
       } catch (mkErr: unknown) {
         const msg = mkErr instanceof Error ? mkErr.message : "Unknown";
-        console.error(`[PAYMENT SERVICE] MikroTik activation failed:`, msg);
+        logger.error("[PAYMENT SERVICE] MikroTik activation failed:", { error: msg });
         await db.routerLog.create({
           data: {
             routerId: pkg.routerId,
@@ -996,14 +997,14 @@ export class PaymentService {
     return { processed: true, transactionRef: parsed.transactionRef, status: "COMPLETED", message: "Payment processed successfully" };
   }
 
-  // ── LICENSE Webhook Handler ───────────────────────────────────────────────
+  // â”€â”€ LICENSE Webhook Handler â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   /**
    * Handle a webhook where the transactionRef matches a tenantInvoice.invoiceNumber
    * OR a providerRef. This is the LICENSE payment path.
    *
    * Returns:
-   *   WebhookResult  — if the ref matched a license invoice
-   *   null           — if no match (caller handles 404)
+   *   WebhookResult  â€” if the ref matched a license invoice
+   *   null           â€” if no match (caller handles 404)
    */
   private async processLicenseWebhook(
     parsed: import("@/lib/payments/types").ParsedWebhookPayload,
@@ -1037,7 +1038,7 @@ export class PaymentService {
       return null;
     }
 
-    console.log("[LICENSE WEBHOOK] Found invoice", { invoiceId: invoice.id, invoiceNumber: invoice.invoiceNumber, tenantId: invoice.tenantId });
+    logger.info("[LICENSE WEBHOOK] Found invoice", { invoiceId: invoice.id, invoiceNumber: invoice.invoiceNumber, tenantId: invoice.tenantId });
 
     if (invoice.status === "PAID") {
       await globalDb.webhookLog.update({
@@ -1054,7 +1055,7 @@ export class PaymentService {
         await globalDb.tenantPayment.update({
           where: { id: tenantPayment.id },
           data: { status: "FAILED" },
-        }).catch((e: any) => console.error("[LICENSE WEBHOOK] Failed to mark tenantPayment FAILED:", e));
+        }).catch((e: any) => logger.error("[LICENSE WEBHOOK] Failed to mark tenantPayment FAILED:", { detail: e instanceof Error ? e.message : String(e) }));
       }
       await globalDb.webhookLog.update({
         where: { id: webhookLogId },
@@ -1124,7 +1125,7 @@ export class PaymentService {
         data: { status: "COMPLETED", processedAt: new Date(), tenantId: invoice.tenantId },
       });
 
-      console.log("[LICENSE WEBHOOK] License renewed", {
+      logger.info("[LICENSE WEBHOOK] License renewed", {
         tenantId: invoice.tenantId,
         invoiceId: invoice.id,
         packageMonths,
@@ -1133,7 +1134,7 @@ export class PaymentService {
 
       return { processed: true, transactionRef: parsed.transactionRef, status: "COMPLETED", message: "License renewed successfully" };
     } catch (err: any) {
-      console.error("[LICENSE WEBHOOK] Error processing license renewal:", err);
+      logger.error("[LICENSE WEBHOOK] Error processing license renewal:", { detail: err instanceof Error ? err.message : String(err) });
       await globalDb.webhookLog.update({
         where: { id: webhookLogId },
         data: {
@@ -1149,3 +1150,4 @@ export class PaymentService {
 }
 
 export const paymentService = new PaymentService();
+

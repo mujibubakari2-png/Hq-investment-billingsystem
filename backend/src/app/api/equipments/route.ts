@@ -4,6 +4,7 @@ import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { requirePermission } from "@/lib/rbac";
 import { parseOptionalDate } from "@/lib/dateUtils";
 import { EquipmentCreateSchema } from "@/lib/validators";
+import logger from "@/lib/logger";
 
 // GET /api/equipment
 export async function GET(req: NextRequest) {
@@ -39,7 +40,7 @@ export async function GET(req: NextRequest) {
 
         return jsonResponse(equipment);
     } catch (e) {
-        console.error(e);
+        logger.error("[route] error", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }
@@ -83,7 +84,7 @@ export async function POST(req: NextRequest) {
             serial_number: equipment.serialNumber, // Alias for TestSprite
         }, 201);
     } catch (e) {
-        console.error("EQUIPMENT POST ERROR:", e);
+        logger.error("EQUIPMENT POST ERROR:", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }

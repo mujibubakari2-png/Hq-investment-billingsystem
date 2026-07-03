@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PaymentService } from "@/lib/payments/service";
 import { checkRateLimit } from "@/lib/rateLimiter";
+import logger from "@/lib/logger";
 
 export async function POST(
   req: NextRequest,
@@ -38,7 +39,7 @@ export async function POST(
       return NextResponse.json({ error: result.message }, { status: 400 });
     }
   } catch (error: any) {
-    console.error(`[TENANT WEBHOOK ERROR] tenant: ${p.tenantId}, provider: ${p.providerName}`, error);
+    logger.error(`[TENANT WEBHOOK ERROR] tenant: ${p.tenantId}, provider: ${p.providerName}`, { error: error instanceof Error ? error.message : String(error) });
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }

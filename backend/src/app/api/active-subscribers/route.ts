@@ -4,6 +4,7 @@ import { jsonResponse, errorResponse } from "@/lib/auth";
 import { requirePermission } from "@/lib/rbac";
 import { getTenantFilter } from "@/lib/tenant";
 import { toISOSafe } from "@/lib/dateUtils";
+import logger from "@/lib/logger";
 
 
 export async function GET(req: NextRequest) {
@@ -75,7 +76,7 @@ export async function GET(req: NextRequest) {
                 });
             }
         } catch (e) {
-            console.error("[ACTIVE SUBSCRIBERS RADIUS SYNC ERROR]:", e);
+            logger.error("[ACTIVE SUBSCRIBERS RADIUS SYNC ERROR]:", { error: e instanceof Error ? e.message : String(e) });
             // Do NOT block the response — just log and continue with stale data
         }
 
@@ -149,7 +150,7 @@ export async function GET(req: NextRequest) {
         });
 
     } catch (e) {
-        console.error("Active subscribers GET error:", e);
+        logger.error("Active subscribers GET error:", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }

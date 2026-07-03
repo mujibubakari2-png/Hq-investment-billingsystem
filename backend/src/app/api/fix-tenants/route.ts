@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import { requireRole } from "@/lib/rbac";
+import logger from "@/lib/logger";
 
 export const dynamic = 'force-dynamic';
 
@@ -11,7 +12,7 @@ export async function GET(req: NextRequest) {
         const user = guard.user;
         const db = getTenantClient(null);
 
-        console.log("Checking for stuck tenants with PAID invoices...");
+        logger.info("Checking for stuck tenants with PAID invoices...");
 
         const tenants = await db.tenant.findMany({
             include: {
@@ -27,7 +28,7 @@ export async function GET(req: NextRequest) {
                 const hasPaid = tenant.tenantInvoices.some((inv: any) => inv.status === 'PAID');
 
                 if (hasPaid) {
-                    console.log(`Fixing tenant ${tenant.name} (${tenant.id})`);
+                    logger.info(`Fixing tenant ${tenant.name} (${tenant.id})`);
 
                     const now = new Date();
 
@@ -58,7 +59,7 @@ export async function GET(req: NextRequest) {
                 if (paidInvoices.length > 0 && tenant.licenseExpiresAt) {
                     const now = new Date();
                     if (tenant.licenseExpiresAt < now) {
-                        console.log(`Fixing active tenant with expired date but PAID invoices: ${tenant.name}`);
+                        logger.info(`Fixing active tenant with expired date but PAID invoices: ${tenant.name}`);
 
                         let sumMonths = 0;
                         for (const inv of paidInvoices) sumMonths += (inv.packageMonths || 1);
@@ -78,7 +79,7 @@ export async function GET(req: NextRequest) {
 
         return NextResponse.json({ message: `Finished fixing tenants. Total fixed: ${fixedCount}` });
     } catch (e: any) {
-        console.error("FIX TENANT ERROR", e);
+        logger.error("FIX TENANT ERROR", { error: e instanceof Error ? e.message : String(e) });
         return NextResponse.json({ error: e.message }, { status: 500 });
     }
 }

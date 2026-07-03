@@ -4,7 +4,8 @@ import { jsonResponse, errorResponse } from "@/lib/auth";
 import { requirePermission } from "@/lib/rbac";
 import { canAccessTenant } from "@/lib/tenant";
 import { RouterUpdateSchema } from "@/lib/validators";
-import { encryptRouterFields, decryptRouterFields } from "@/lib/encryption";
+import { encrypt, encryptRouterFields, decryptRouterFields } from "@/lib/encryption";
+import { generateRadiusSecret } from "@/lib/routerProvisioning";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
@@ -43,6 +44,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
             password: userPayload.role === "SUPER_ADMIN" ? decryptedRouter.password : mask(decryptedRouter.password),
             wgPrivateKey: userPayload.role === "SUPER_ADMIN" ? decryptedRouter.wgPrivateKey : null,
             wgPresharedKey: userPayload.role === "SUPER_ADMIN" ? decryptedRouter.wgPresharedKey : null,
+            // SEC-ROUTER-003 FIX: radiusSecret is just as sensitive as the admin
+            // password (it authenticates the router to FreeRADIUS) but was
+            // previously returned in plaintext to every role. Mask it the same
+            // way password is masked for non-super-admins.
+            radiusSecret: userPayload.role === "SUPER_ADMIN" ? decryptedRouter.radiusSecret : mask(decryptedRouter.radiusSecret),
         };
 
         return jsonResponse(safeRouter);
@@ -110,8 +116,22 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
             where: { tenantId: existingRouter.tenantId, nasName: nasIp }
         });
 
+        // SEC-ROUTER-003 FIX: the RADIUS NAS secret must stay in sync with the
+        // router's DEDICATED `radiusSecret` field, never the admin `password`
+        // and never a static "hqsecret"/env fallback. Editing a router's name,
+        // host, or VPN mode must NOT silently downgrade its RADIUS secret back
+        // to a shared/guessable value.
         const decryptedExistingRouter = decryptRouterFields(existingRouter);
-        const radiusSecret = password || decryptedExistingRouter.password || process.env.RADIUS_NAS_SECRET || "hqsecret";
+        const radiusSecret = decryptedExistingRouter.radiusSecret || generateRadiusSecret();
+        if (!decryptedExistingRouter.radiusSecret) {
+            // Legacy row that somehow never got a radiusSecret — persist the
+            // freshly generated one now instead of silently regenerating (and
+            // therefore invalidating the NAS entry) on every future edit.
+            await db.router.update({
+                where: { id: router.id },
+                data: { radiusSecret: encrypt(radiusSecret) },
+            });
+        }
 
         if (existingNas) {
             // RADIUS NAS secret MUST be stored in plaintext. FreeRADIUS daemon does not support AES-GCM.

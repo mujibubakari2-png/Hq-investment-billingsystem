@@ -3,6 +3,7 @@ import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 import { requireRole } from "@/lib/rbac";
 import { isPlatformSuperAdmin } from "@/lib/tenant";
+import logger from "@/lib/logger";
 
 
 // GET /api/admin/tenants - list all tenants (Super Admin only)
@@ -44,7 +45,7 @@ export async function GET(req: NextRequest) {
 
         return jsonResponse(mapped);
     } catch (e) {
-        console.error("ADMIN TENANT FETCH ERROR:", e);
+        logger.error("ADMIN TENANT FETCH ERROR:", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }
@@ -81,7 +82,7 @@ export async function POST(req: NextRequest) {
         return errorResponse("Invalid action provided", 400);
 
     } catch (e) {
-        console.error("ADMIN TENANT ACTION ERROR:", e);
+        logger.error("ADMIN TENANT ACTION ERROR:", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }

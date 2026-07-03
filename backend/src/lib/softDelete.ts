@@ -16,10 +16,10 @@
  *   import { softDelete, restore, isSoftDeleted } from '@/lib/softDelete';
  *
  *   // Instead of: await prisma.client.delete({ where: { id } })
- *   await softDelete('client', id);
+ *   await softDelete('client', id, tenantId);
  *
  *   // Restore a soft-deleted record
- *   await restore('client', id);
+ *   await restore('client', id, tenantId);
  */
 
 import { getTenantClient } from '@/lib/tenantPrisma';
@@ -35,15 +35,19 @@ export type SoftDeletableModel =
 /**
  * Soft delete a record by setting deletedAt to now().
  * Returns the updated record or null if not found.
+ *
+ * CRIT-D-001 FIX: tenantId is now REQUIRED. The where clause is always
+ * scoped to the caller's tenant, preventing cross-tenant record manipulation.
  */
 export async function softDelete(
   model: SoftDeletableModel,
-  id: string
+  id: string,
+  tenantId: string   // REQUIRED — never omit; prevents cross-tenant writes
 ): Promise<{ id: string; deletedAt: Date | null } | null> {
   const now = new Date();
 
-  const db = getTenantClient(null);
-  // Prisma's dynamic model access requires type assertion
+  // getTenantClient scopes all queries to this tenantId automatically.
+  const db = getTenantClient({ tenantId } as any);
   const delegate = (db as any)[model];
   if (!delegate?.update) {
     throw new Error(`Soft delete not supported for model: ${model}`);
@@ -51,12 +55,12 @@ export async function softDelete(
 
   try {
     return await delegate.update({
-      where: { id },
+      where: { id, tenantId },   // explicit tenantId enforces tenant isolation
       data: { deletedAt: now },
       select: { id: true, deletedAt: true },
     });
   } catch (err: any) {
-    // P2025 = record not found
+    // P2025 = record not found (wrong tenant or nonexistent)
     if (err?.code === 'P2025') return null;
     throw err;
   }
@@ -64,12 +68,15 @@ export async function softDelete(
 
 /**
  * Restore a soft-deleted record by clearing deletedAt.
+ *
+ * CRIT-D-001 FIX: tenantId is now REQUIRED.
  */
 export async function restore(
   model: SoftDeletableModel,
-  id: string
+  id: string,
+  tenantId: string   // REQUIRED
 ): Promise<{ id: string; deletedAt: Date | null } | null> {
-  const db = getTenantClient(null);
+  const db = getTenantClient({ tenantId } as any);
   const delegate = (db as any)[model];
   if (!delegate?.update) {
     throw new Error(`Restore not supported for model: ${model}`);
@@ -77,7 +84,7 @@ export async function restore(
 
   try {
     return await delegate.update({
-      where: { id },
+      where: { id, tenantId },
       data: { deletedAt: null },
       select: { id: true, deletedAt: true },
     });
@@ -118,19 +125,28 @@ export function onlyDeleted(): { deletedAt: { not: null } } {
  * Permanently purge records that were soft-deleted more than N days ago.
  * Call from a scheduled cron job (e.g., weekly).
  *
- * @param daysOld  Records deleted more than this many days ago will be purged. Default: 90.
+ * HIGH-D-002 FIX: tenantId is now accepted as an optional parameter.
+ * When provided, only that tenant's records are purged. When omitted,
+ * the function purges across all tenants (platform-admin use only).
+ *
+ * @param daysOld   Records deleted more than this many days ago will be purged. Default: 90.
+ * @param tenantId  Optional tenant scope. Omit only from platform-admin cron jobs.
  */
-export async function purgeOldSoftDeleted(daysOld = 90): Promise<Record<string, number>> {
+export async function purgeOldSoftDeleted(
+  daysOld = 90,
+  tenantId?: string
+): Promise<Record<string, number>> {
   const cutoff = new Date(Date.now() - daysOld * 24 * 60 * 60 * 1000);
+  const tenantScope = tenantId ? { tenantId } : {};
 
   const db = getTenantClient(null);
   const [clients, users, subscriptions, routers, packages, transactions] = await Promise.all([
-    db.client.deleteMany({ where: { deletedAt: { lte: cutoff } } }),
-    db.user.deleteMany({ where: { deletedAt: { lte: cutoff } } }),
-    db.subscription.deleteMany({ where: { deletedAt: { lte: cutoff } } }),
-    db.router.deleteMany({ where: { deletedAt: { lte: cutoff } } }),
-    db.package.deleteMany({ where: { deletedAt: { lte: cutoff } } }),
-    db.transaction.deleteMany({ where: { deletedAt: { lte: cutoff } } }),
+    db.client.deleteMany({ where: { deletedAt: { lte: cutoff }, ...tenantScope } }),
+    db.user.deleteMany({ where: { deletedAt: { lte: cutoff }, ...tenantScope } }),
+    db.subscription.deleteMany({ where: { deletedAt: { lte: cutoff }, ...tenantScope } }),
+    db.router.deleteMany({ where: { deletedAt: { lte: cutoff }, ...tenantScope } }),
+    db.package.deleteMany({ where: { deletedAt: { lte: cutoff }, ...tenantScope } }),
+    db.transaction.deleteMany({ where: { deletedAt: { lte: cutoff }, ...tenantScope } }),
   ]);
 
   return {

@@ -4,6 +4,7 @@ import { jsonResponse, errorResponse } from "@/lib/auth";
 import { requirePermission } from "@/lib/rbac";
 import { getTenantFilter } from "@/lib/tenant";
 import { toISOSafe, toTimestampSafe } from "@/lib/dateUtils";
+import logger from "@/lib/logger";
 
 export async function GET(req: NextRequest) {
     try {
@@ -86,7 +87,7 @@ export async function GET(req: NextRequest) {
             summaries
         });
     } catch (e) {
-        console.error("Expired subscribers fetch error:", e);
+        logger.error("Expired subscribers fetch error:", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }

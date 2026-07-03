@@ -3,6 +3,7 @@ import { jsonResponse, errorResponse } from "@/lib/auth";
 import { requirePermission } from "@/lib/rbac";
 import { NextRequest } from "next/server";
 import { getTenantFilter } from "@/lib/tenant";
+import logger from "@/lib/logger";
 
 // GET /api/reports
 export async function GET(req: NextRequest) {
@@ -40,28 +41,36 @@ export async function GET(req: NextRequest) {
 
         switch (type) {
             case "revenue": {
-                const transactions = await db.transaction.findMany({
-                    where: {
-                        status: "COMPLETED",
-                        createdAt: { gte: startDate },
-                        ...tenantFilter
-                    },
-                    select: { amount: true, method: true, createdAt: true },
-                });
+                // HIGH-PERF FIX: Use DB-side aggregate() instead of loading ALL rows into Node memory.
+                // Previously: findMany({select: {amount}}) + JS reduce.
+                // At scale (years of transactions, thousands of tenants) this would OOM the server.
+                // Now: single DB aggregate query returning only the sum and count.
+                const [agg, byMethodGroups] = await Promise.all([
+                    db.transaction.aggregate({
+                        where: { status: "COMPLETED", createdAt: { gte: startDate }, ...tenantFilter },
+                        _sum:   { amount: true },
+                        _count: { _all: true },
+                    }),
+                    db.transaction.groupBy({
+                        by: ["method"],
+                        where: { status: "COMPLETED", createdAt: { gte: startDate }, ...tenantFilter },
+                        _sum: { amount: true },
+                    }),
+                ]);
 
-                const totalRevenue = transactions.reduce((sum, t) => sum + t.amount, 0);
+                const totalRevenue = agg._sum.amount ?? 0;
                 const byMethod: Record<string, number> = {};
-                transactions.forEach((t) => {
-                    byMethod[t.method] = (byMethod[t.method] || 0) + t.amount;
-                });
+                for (const g of byMethodGroups) {
+                    byMethod[g.method] = g._sum.amount ?? 0;
+                }
 
                 data = {
                     totalRevenue,
-                    revenue: totalRevenue, // Alias
-                    transactionCount: transactions.length,
+                    revenue: totalRevenue,
+                    transactionCount: agg._count._all,
                     byMethod,
-                    router_status: "N/A", // Dashboard requirements
-                    active_users: 0, // Dashboard requirements
+                    router_status: "N/A",
+                    active_users: 0,
                 };
                 break;
             }
@@ -112,8 +121,7 @@ export async function GET(req: NextRequest) {
             active_users: data.active_users,
         });
     } catch (e) {
-        console.error(e);
+        logger.error('[reports] GET failed', { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }
-

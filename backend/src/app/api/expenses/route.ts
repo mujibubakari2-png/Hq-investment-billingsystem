@@ -5,6 +5,7 @@ import { requirePermission } from "@/lib/rbac";
 import { parseSafeDate, toISOSafe } from "@/lib/dateUtils";
 import { ExpenseCreateSchema } from "@/lib/validators";
 import { getAssignTenantId, getTenantFilter } from "@/lib/tenant";
+import logger from "@/lib/logger";
 
 // GET /api/expenses
 export async function GET(req: NextRequest) {
@@ -18,7 +19,10 @@ export async function GET(req: NextRequest) {
 
         const { searchParams } = new URL(req.url);
         const category = searchParams.get("category") || "";
-        const search = searchParams.get("search") || "";
+        const search   = searchParams.get("search")   || "";
+        const page     = Math.max(1, parseInt(searchParams.get("page") || "1"));
+        const limit    = Math.min(500, Math.max(1, parseInt(searchParams.get("limit") || "100")));
+        const skip     = (page - 1) * limit;
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const where: any = { ...tenantFilter };
@@ -30,11 +34,16 @@ export async function GET(req: NextRequest) {
             ];
         }
 
-        const expenses = await db.expense.findMany({
-            where,
-            include: { createdBy: { select: { username: true } }, tenant: { select: { name: true } } },
-            orderBy: { date: "desc" },
-        });
+        const [expenses, total] = await Promise.all([
+            db.expense.findMany({
+                where,
+                include: { createdBy: { select: { username: true } }, tenant: { select: { name: true } } },
+                orderBy: { date: "desc" },
+                skip,
+                take: limit,
+            }),
+            db.expense.count({ where }),
+        ]);
 
         const mapped = expenses.map((e: {
             id: string;
@@ -56,9 +65,9 @@ export async function GET(req: NextRequest) {
             tenantName: e.tenant?.name ?? null,
         }));
 
-        return jsonResponse(mapped);
+        return jsonResponse({ data: mapped, total, page, limit });
     } catch (e) {
-        console.error(e);
+        logger.error("[route] error", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }
@@ -117,7 +126,7 @@ export async function POST(req: NextRequest) {
             created_by: expense.createdById, // Alias
         }, 201);
     } catch (e) {
-        console.error("EXPENSE POST ERROR:", e);
+        logger.error("EXPENSE POST ERROR:", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }

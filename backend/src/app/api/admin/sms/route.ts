@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 import { requireRole } from "@/lib/rbac";
+import logger from "@/lib/logger";
 
 
 // GET /api/admin/sms - list all SMS messages across all tenants (Super Admin only)
@@ -33,7 +34,7 @@ export async function GET(req: NextRequest) {
 
         return jsonResponse(mapped);
     } catch (e) {
-        console.error("ADMIN SMS FETCH ERROR:", e);
+        logger.error("ADMIN SMS FETCH ERROR:", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }
@@ -69,7 +70,7 @@ export async function POST(req: NextRequest) {
 
         return jsonResponse({ message: "SMS message sent successfully", sms }, 201);
     } catch (e) {
-        console.error("ADMIN SMS ACTION ERROR:", e);
+        logger.error("ADMIN SMS ACTION ERROR:", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }

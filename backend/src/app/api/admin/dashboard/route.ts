@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import { errorResponse, jsonResponse } from "@/lib/auth";
 import { requireRole } from "@/lib/rbac";
+import logger from "@/lib/logger";
 
 export async function GET(req: NextRequest) {
     try {
@@ -35,7 +36,7 @@ export async function GET(req: NextRequest) {
         });
 
     } catch (e) {
-        console.error("ADMIN DASHBOARD ERROR:", e);
+        logger.error("ADMIN DASHBOARD ERROR:", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }

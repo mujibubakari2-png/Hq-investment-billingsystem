@@ -3,6 +3,7 @@ import { getTenantClient } from "@/lib/tenantPrisma";
 import { getTenantFilter } from "@/lib/tenant";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 import { requirePermission } from "@/lib/rbac";
+import logger from "@/lib/logger";
 
 // GET /api/routers/logs — List all router action logs
 export async function GET(req: NextRequest) {
@@ -54,7 +55,7 @@ export async function GET(req: NextRequest) {
             limit,
         });
     } catch (err: any) {
-        console.error(err);
+        logger.error("[route] error", { error: err instanceof Error ? err.message : String(err) });
         return errorResponse("Internal server error", 500);
     }
 }

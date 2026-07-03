@@ -3,6 +3,7 @@ import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 import { requirePermission, requireRole } from "@/lib/rbac";
 import { canAccessTenant } from "@/lib/tenant";
+import logger from "@/lib/logger";
 
 // GET /api/hotspot-settings?routerId=...
 export async function GET(req: NextRequest) {
@@ -42,7 +43,7 @@ export async function GET(req: NextRequest) {
 
         return jsonResponse(settings);
     } catch (e: any) {
-        console.error(e);
+        logger.error("[route] error", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse(e?.message || "Internal server error", 500);
     }
 }
@@ -127,7 +128,7 @@ export async function POST(req: NextRequest) {
             }
         } catch (syncErr: any) {
             syncError = syncErr?.message || "Failed to connect to MikroTik";
-            console.error("[HOTSPOT-SYNC] Auto-sync error:", syncErr?.message);
+            logger.error("[HOTSPOT-SYNC] Auto-sync error:", { error: syncErr?.message instanceof Error ? syncErr?.message.message : String(syncErr?.message) });
         }
 
         return jsonResponse({
@@ -140,7 +141,7 @@ export async function POST(req: NextRequest) {
                 : `⚠️ Settings saved locally. MikroTik sync failed: ${syncError}`,
         });
     } catch (e: any) {
-        console.error(e);
+        logger.error("[route] error", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse(e?.message || "Internal server error", 500);
     }
 }

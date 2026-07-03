@@ -5,6 +5,7 @@ import { requireRole } from "@/lib/rbac";
 import { canAccessTenant } from "@/lib/tenant";
 import { paymentService } from "@/lib/payments/service";
 import { generateReference } from "@/lib/payments/utils";
+import logger from "@/lib/logger";
 
 /**
  * PAY-002: POST /api/invoices/[id]/pay
@@ -104,7 +105,7 @@ export async function POST(
             // Mark transaction FAILED; invoice status was not modified because the payment initiation step failed.
             await (db.$transaction as any)([
                 db.transaction.update({ where: { id: transaction.id }, data: { status: "FAILED" } }),
-            ]).catch((e: unknown) => console.error("Failed to rollback invoice status after payment initiation failure:", e));
+            ]).catch((e: unknown) => logger.error("Failed to rollback invoice status after payment initiation failure:", { error: e instanceof Error ? e.message : String(e) }));
 
             return errorResponse(result.message || "Payment initiation failed", 502);
         }
@@ -125,7 +126,7 @@ export async function POST(
             message: "Payment initiated — customer will receive a prompt on their phone",
         });
     } catch (e) {
-        console.error("[Invoice Pay] error:", e);
+        logger.error("[Invoice Pay] error:", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }

@@ -8,6 +8,7 @@ import { getMikroTikService } from "@/lib/mikrotik";
 import { syncRadiusUser } from "@/lib/radius";
 import { parseSafeDate, toISOSafe, toTimestampSafe, isValidDate } from "@/lib/dateUtils";
 import { invalidateNamespace } from "@/lib/cache";
+import logger from "@/lib/logger";
 
 
 // GET /api/subscriptions
@@ -89,7 +90,7 @@ export async function GET(req: NextRequest) {
 
         return jsonResponse({ data: mapped, total, page, limit });
     } catch (e) {
-        console.error(e);
+        logger.error("[route] error", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }
@@ -167,7 +168,7 @@ export async function POST(req: NextRequest) {
                     profileName: pkg.name,
                 });
             } catch (radErr: any) {
-                console.error("RADIUS sync error (manual sub):", radErr);
+                logger.error("RADIUS sync error (manual sub):", { error: radErr instanceof Error ? radErr.message : String(radErr) });
             }
         }
 
@@ -190,7 +191,7 @@ export async function POST(req: NextRequest) {
                     }
                 });
             } catch (err: any) {
-                console.error("Manual sub mikrotik sync error:", err);
+                logger.error("Manual sub mikrotik sync error:", { error: err instanceof Error ? err.message : String(err) });
                 await db.subscription.update({ where: { id: sub.id }, data: { syncStatus: "FAILED_SYNC" } });
                 await db.routerLog.create({
                     data: {
@@ -229,7 +230,7 @@ export async function POST(req: NextRequest) {
             router: sub.router ? { id: sub.router.id, name: sub.router.name, host: sub.router.host, status: sub.router.status } : null,
         }, 201);
     } catch (e) {
-        console.error("SUBSCRIPTION POST ERROR:", e);
+        logger.error("SUBSCRIPTION POST ERROR:", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }

@@ -13,6 +13,7 @@ import { HarakaPayProvider } from "@/lib/payments/providers/harakapay";
 
 import { env } from "@/lib/env";
 import { decrypt } from "@/lib/encryption";
+import logger from "@/lib/logger";
 
 // ─── Build ProviderConfig from environment variables (fallback) ───────────────
 
@@ -20,7 +21,7 @@ function envConfigFor(provider: ProviderName): ProviderConfig {
   const environment = (env.PAYMENT_ENVIRONMENT ?? "sandbox") as "sandbox" | "live";
 
   if (process.env.NODE_ENV === "production" && environment === "sandbox") {
-    console.error(
+    logger.error(
       "[PAYMENT] CRITICAL: PAYMENT_ENVIRONMENT=sandbox in a production environment! " +
       "Real payments will be routed to the test gateway — money will NOT be credited. " +
       "Set PAYMENT_ENVIRONMENT=live in your production .env file and restart the server."

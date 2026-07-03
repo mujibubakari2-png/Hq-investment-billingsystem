@@ -7,15 +7,29 @@ import { getJwtTenantId, getTenantFilter, isPlatformSuperAdmin } from "@/lib/ten
 import { assertTenantCanAddSubUser } from "@/lib/userLimits";
 import { writeAuditLog, getIpFromRequest } from "@/lib/auditLog";
 import { sendEmail } from "@/lib/email";
+import crypto from "crypto";
+import logger from "@/lib/logger";
 
-/** Generate a random temporary password */
-function generateTempPassword(length = 10): string {
+/**
+ * Generate a cryptographically secure temporary password.
+ *
+ * HIGH-SEC FIX: Math.random() was replaced with crypto.randomBytes().
+ * Predictable PRNG = attacker can pre-compute all possible passwords
+ * issued within a time window and brute-force access before the user
+ * logs in and changes it.
+ * Rejection sampling avoids modulo bias on the character set.
+ */
+function generateTempPassword(length = 12): string {
     const chars = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#";
-    let pwd = "";
-    for (let i = 0; i < length; i++) {
-        pwd += chars[Math.floor(Math.random() * chars.length)];
+    const max   = 256 - (256 % chars.length); // Rejection threshold
+    const result: string[] = [];
+    while (result.length < length) {
+        const buf = crypto.randomBytes(length * 2);
+        for (let i = 0; i < buf.length && result.length < length; i++) {
+            if (buf[i] < max) result.push(chars[buf[i] % chars.length]);
+        }
     }
-    return pwd;
+    return result.join("");
 }
 
 /** Send welcome email to a new sub-user */
@@ -73,26 +87,44 @@ export async function GET(req: NextRequest) {
             return errorResponse("Tenant ID missing", 400);
         }
 
+        const { searchParams } = new URL(req.url);
+        const search = searchParams.get("search") || "";
+        const page   = Math.max(1, parseInt(searchParams.get("page")  || "1"));
+        const limit  = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "50")));
+        const skip   = (page - 1) * limit;
+
         const { filter: tenantFilter } = getTenantFilter(userPayload);
 
-        // Show all users in the tenant — including SUPER_ADMIN so they can see themselves
-        // but sub-users (ADMIN/AGENT/VIEWER) are the primary focus
-        const users = await db.user.findMany({
-            where: { ...tenantFilter },
-            select: {
-                id: true,
-                username: true,
-                fullName: true,
-                email: true,
-                role: true,
-                status: true,
-                phone: true,
-                lastLogin: true,
-                createdAt: true,
-                createdById: true,
-            },
-            orderBy: { createdAt: "asc" },
-        });
+        const userWhere: Record<string, any> = { ...tenantFilter };
+        if (search) {
+            userWhere.OR = [
+                { username: { contains: search, mode: "insensitive" } },
+                { fullName: { contains: search, mode: "insensitive" } },
+                { email:    { contains: search, mode: "insensitive" } },
+            ];
+        }
+
+        const [users, total] = await Promise.all([
+            db.user.findMany({
+                where: userWhere,
+                select: {
+                    id:          true,
+                    username:    true,
+                    fullName:    true,
+                    email:       true,
+                    role:        true,
+                    status:      true,
+                    phone:       true,
+                    lastLogin:   true,
+                    createdAt:   true,
+                    createdById: true,
+                },
+                orderBy: { createdAt: "asc" },
+                skip,
+                take: limit,
+            }),
+            db.user.count({ where: userWhere }),
+        ]);
 
         // Fetch tenant info for plan name + user limits
         let planName: string | null = null;
@@ -126,13 +158,16 @@ export async function GET(req: NextRequest) {
         return jsonResponse({
             users: mapped,
             meta: {
+                total,
+                page,
+                limit,
                 subUserCount,
                 subUserLimit,
                 planName,
             },
         });
     } catch (e) {
-        console.error(e);
+        logger.error('[system-users] GET failed', { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }
@@ -228,14 +263,14 @@ export async function POST(req: NextRequest) {
             tempPassword,
             assignedRole,
             companyName
-        ).catch(err => console.warn("[SYSTEM-USERS] Welcome email failed:", err?.message));
+        ).catch(err => logger.warn('[system-users] Welcome email failed', { error: err?.message }));
 
         return jsonResponse({
             ...user,
             message: `User created. A welcome email with login credentials has been sent to ${body.email}.`,
         }, 201);
     } catch (e: any) {
-        console.error("[SYSTEM-USERS] POST error:", e);
-        return errorResponse(e?.message || "Internal server error", 500);
+        logger.error('[system-users] POST failed', { error: e?.message || String(e) });
+        return errorResponse("Internal server error", 500);
     }
 }

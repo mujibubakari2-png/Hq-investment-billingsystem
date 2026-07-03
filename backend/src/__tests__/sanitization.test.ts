@@ -16,7 +16,7 @@ describe('sanitizeHtml', () => {
     it('removes <script> tags', () => {
         const result = sanitizeHtml('<p>Hello</p><script>alert(1)</script>');
         expect(result).not.toContain('<script>');
-        expect(result).toContain('<p>Hello</p>');
+        expect(result).toBe('Hello');
     });
 
     it('removes inline event handlers', () => {
@@ -34,9 +34,9 @@ describe('sanitizeHtml', () => {
         expect(result).not.toContain('<form');
     });
 
-    it('preserves safe HTML', () => {
+    it('strips all HTML tags including previously safe ones', () => {
         const safe = '<b>bold</b> and <i>italic</i>';
-        expect(sanitizeHtml(safe)).toBe(safe);
+        expect(sanitizeHtml(safe)).toBe('bold and italic');
     });
 
     it('returns empty string for empty input', () => {

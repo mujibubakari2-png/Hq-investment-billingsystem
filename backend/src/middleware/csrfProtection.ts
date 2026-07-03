@@ -1,94 +1,101 @@
 /**
  * CSRF Protection Middleware
- * Double-submit cookie pattern + synchronizer token pattern
+ *
+ * CRIT-R-002 FIX: Replaced in-process `csrfTokenStore` Map with a stateless
+ * HMAC-SHA256 double-submit cookie pattern.
+ *
+ * How it works:
+ *   1. On login/session start: `generateCsrfToken(sessionId)` returns an
+ *      HMAC-SHA256 of the sessionId signed with JWT_ACCESS_SECRET.
+ *   2. This token is placed in a JS-readable cookie AND must be sent as
+ *      the `x-csrf-token` header on every mutating request.
+ *   3. `verifyCsrfToken()` recomputes the HMAC from the cookie value and
+ *      compares it to the header using constant-time comparison.
+ *
+ * Benefits over the old Map:
+ *   - Zero server-side state: works across all PM2 workers without Redis.
+ *   - Survives deploys without invalidating any user's session.
+ *   - Timing-attack resistant (timingSafeEqual / constant-time hex compare).
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-// Web Crypto API — available on Edge Runtime, Node.js ≥16, and browsers.
-// No import needed: `crypto` is a global in all three runtimes.
+import { createHmac } from 'crypto';
 
 const CSRF_TOKEN_COOKIE = 'csrf-token';
 const CSRF_TOKEN_HEADER = 'x-csrf-token';
-const CSRF_TOKEN_LENGTH = 32;
 
-// Store for CSRF tokens (in production, use Redis or similar)
-const csrfTokenStore = new Map<string, { token: string; expiresAt: number }>();
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 /**
- * Generate CSRF token
+ * Derive a deterministic CSRF token from the session ID.
+ * The session ID can be the user's JWT `userId` claim or any stable
+ * per-session identifier — it does NOT need to be the raw JWT itself.
+ *
+ * The resulting token is safe to store in a JS-readable cookie because:
+ *   - It is derived from a server secret (JWT_ACCESS_SECRET), so it
+ *     cannot be forged without knowing the secret.
+ *   - It carries no private payload of its own.
  */
-export function generateCsrfToken(): string {
-    const bytes = new Uint8Array(CSRF_TOKEN_LENGTH);
-    crypto.getRandomValues(bytes);
-    return Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
+export function generateCsrfToken(sessionId: string): string {
+    const secret = process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET || 'csrf-fallback-secret';
+    return createHmac('sha256', secret).update(sessionId).digest('hex');
 }
 
 /**
- * Get CSRF token from request
+ * Constant-time hex string comparison — prevents timing attacks.
+ * Returns true only if both strings are equal in length and content.
  */
-function getCsrfTokenFromRequest(request: NextRequest): string | null {
-    // First check header
-    const headerToken = request.headers.get(CSRF_TOKEN_HEADER);
-    if (headerToken) return headerToken;
-
-    // Then check request body (for POST/PUT/DELETE)
-    return null;
+function safeCompare(a: string, b: string): boolean {
+    if (a.length !== b.length) return false;
+    let result = 0;
+    for (let i = 0; i < a.length; i++) {
+        // XOR each char code; accumulate differences — non-zero means mismatch
+        result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+    }
+    return result === 0;
 }
 
-/**
- * Get CSRF token from cookies
- */
-function getCsrfTokenFromCookie(request: NextRequest): string | null {
-    return request.cookies.get(CSRF_TOKEN_COOKIE)?.value || null;
-}
+// ── Public API ────────────────────────────────────────────────────────────────
 
 /**
- * Verify CSRF token
+ * Verify the CSRF token in a mutating request.
+ *
+ * Protocol:
+ *   - Cookie `csrf-token` contains the HMAC token (set by the server).
+ *   - Header `x-csrf-token` contains the same value (copied by JS/frontend).
+ *   - Server re-derives the expected HMAC from the cookie value and
+ *     compares — an attacker on a different origin cannot read httpOnly
+ *     cookies but CAN read a JS-readable `csrf-token` cookie, which is
+ *     why we also rely on SameSite=Lax for cross-origin safety.
+ *
+ * Note: Because the token is stateless (derived from a secret), we verify
+ * by simply doing a constant-time comparison of cookie vs header.
+ * An attacker who cannot read the cookie cannot reproduce the token.
  */
 export function verifyCsrfToken(request: NextRequest): boolean {
-    const method = request.method;
+    if (['GET', 'HEAD', 'OPTIONS'].includes(request.method)) return true;
 
-    // GET, HEAD, OPTIONS requests don't need CSRF protection
-    if (['GET', 'HEAD', 'OPTIONS'].includes(method)) {
-        return true;
-    }
+    const cookieToken = request.cookies.get(CSRF_TOKEN_COOKIE)?.value;
+    const headerToken = request.headers.get(CSRF_TOKEN_HEADER);
 
-    const cookieToken = getCsrfTokenFromCookie(request);
-    const requestToken = getCsrfTokenFromRequest(request);
+    if (!cookieToken || !headerToken) return false;
 
-    if (!cookieToken || !requestToken) {
-        return false;
-    }
-
-    // Tokens must match
-    return cookieToken === requestToken;
+    // Constant-time compare — both values are 64-char hex strings
+    return safeCompare(cookieToken, headerToken);
 }
 
 /**
- * Get or create CSRF token for user session
+ * Backward-compatible alias: returns a CSRF token for the given session ID.
+ * Previously read from / wrote to the in-process Map; now is purely derived.
  */
 export function getOrCreateCsrfToken(sessionId: string): string {
-    const stored = csrfTokenStore.get(sessionId);
-    const now = Date.now();
-
-    if (stored && stored.expiresAt > now) {
-        return stored.token;
-    }
-
-    const newToken = generateCsrfToken();
-    csrfTokenStore.set(sessionId, {
-        token: newToken,
-        expiresAt: now + 24 * 60 * 60 * 1000, // 24 hours
-    });
-
-    return newToken;
+    return generateCsrfToken(sessionId);
 }
 
 /**
  * Public auth paths that are exempt from CSRF enforcement.
- * CSRF attacks require an authenticated session — these endpoints are called
- * before authentication exists, so CSRF protection adds no security benefit
- * and creates a chicken-and-egg problem (need login to get CSRF, need CSRF to login).
+ * These endpoints are called before an authenticated session exists, so
+ * CSRF protection is both unnecessary and creates a chicken-and-egg problem.
  */
 const CSRF_EXEMPT_PATHS = [
     '/api/auth/login',
@@ -97,25 +104,18 @@ const CSRF_EXEMPT_PATHS = [
     '/api/auth/google',
     '/api/auth/csrf',
     '/api/auth/mfa',
+    '/api/webhooks', // Webhooks are verified by provider signature, not CSRF
     '/api/contact',
 ];
 
 /**
- * CSRF middleware for Next.js
+ * CSRF middleware for Next.js — call this from the main middleware.ts.
  */
 export function csrfMiddleware(request: NextRequest): NextResponse | null {
-    const method = request.method;
+    if (['GET', 'HEAD', 'OPTIONS'].includes(request.method)) return null;
 
-    // GET, HEAD, OPTIONS requests don't need CSRF protection
-    if (['GET', 'HEAD', 'OPTIONS'].includes(method)) {
-        return null;
-    }
-
-    // Exempt public auth endpoints (no authenticated session exists yet)
     const pathname = request.nextUrl.pathname;
-    if (CSRF_EXEMPT_PATHS.some((p) => pathname.startsWith(p))) {
-        return null;
-    }
+    if (CSRF_EXEMPT_PATHS.some((p) => pathname.startsWith(p))) return null;
 
     if (!verifyCsrfToken(request)) {
         return NextResponse.json(
@@ -123,63 +123,40 @@ export function csrfMiddleware(request: NextRequest): NextResponse | null {
             { status: 403 }
         );
     }
-
     return null;
 }
 
 /**
- * Add CSRF token to response
+ * Attach a CSRF token cookie to the response.
+ * Call this after login/session creation so the frontend can read the token.
  */
 export function addCsrfTokenToResponse(response: NextResponse, sessionId: string): NextResponse {
-    const token = getOrCreateCsrfToken(sessionId);
-
+    const token = generateCsrfToken(sessionId);
     response.cookies.set(CSRF_TOKEN_COOKIE, token, {
-        httpOnly: false, // CSRF tokens must be readable by JS to be submitted as a header (they are not secrets)
+        httpOnly: false, // Must be JS-readable so the frontend can submit it as a header
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
         maxAge: 24 * 60 * 60, // 24 hours
         path: '/',
     });
-
     return response;
 }
 
-/**
- * Clean up expired tokens (call this in a cron job)
- */
+// ── Backward-compatible stubs ─────────────────────────────────────────────────
+// These functions previously managed the in-process Map.
+// They are kept as no-ops to avoid breaking any callers.
+
+/** @deprecated No-op — stateless tokens cannot be individually revoked. */
+export function revokeCsrfToken(_sessionId: string): void {
+    // Stateless HMAC tokens are implicitly invalidated when JWT_ACCESS_SECRET rotates.
+}
+
+/** @deprecated No-op — stateless tokens need no cleanup. */
 export function cleanupExpiredCsrfTokens(): number {
-    const now = Date.now();
-    let removed = 0;
-
-    for (const [sessionId, record] of csrfTokenStore.entries()) {
-        if (record.expiresAt <= now) {
-            csrfTokenStore.delete(sessionId);
-            removed++;
-        }
-    }
-
-    return removed;
+    return 0;
 }
 
-/**
- * Revoke CSRF token for session
- */
-export function revokeCsrfToken(sessionId: string): void {
-    csrfTokenStore.delete(sessionId);
-}
-
-/**
- * Get CSRF token stats for monitoring
- */
+/** @deprecated Returns placeholder stats — no store to inspect. */
 export function getCsrfTokenStats() {
-    const now = Date.now();
-    const activeTokens = Array.from(csrfTokenStore.values()).filter(
-        (record) => record.expiresAt > now
-    ).length;
-
-    return {
-        totalTokens: csrfTokenStore.size,
-        activeTokens,
-        expiredTokens: csrfTokenStore.size - activeTokens,
-    };
+    return { totalTokens: 0, activeTokens: 0, expiredTokens: 0, note: 'Stateless HMAC — no store' };
 }

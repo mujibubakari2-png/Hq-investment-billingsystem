@@ -189,8 +189,19 @@ model Router {
   id               String           @id @default(cuid())
   name             String
   host             String
+  // SEC-ROUTER-004 FIX: New routers now get a unique, randomly-generated
+  // username at creation time (see generateAdminUsername() in
+  // routerProvisioning.ts) instead of always defaulting to the literal
+  // "admin" — the @default("admin") below only applies to rows/paths that
+  // bypass the application layer (e.g. raw SQL, legacy rows).
   username         String?          @default("admin")
   password         String?
+  // SEC-ROUTER-003 FIX: RADIUS shared secret is now a field SEPARATE from the
+  // admin password (previously the admin password was reused as the RADIUS
+  // secret for every router, and defaulted to a static "hqsecret" string when
+  // missing). Generated per-router at creation time, AES-256-GCM encrypted at
+  // rest via encryptRouterFields()/decryptRouterFields().
+  radiusSecret     String?
   port             Int?             @default(8728)
   type             String           @default("MikroTik")
   status           RouterStatus     @default(OFFLINE)
@@ -211,6 +222,15 @@ model Router {
   restPort         Int?
   description      String?
   vpnMode          String?          @default("hybrid")
+  // ── Network configuration fields (used by /api/routers/[id]/script) ──────────
+  // These were present in route code but missing from the schema, causing TS errors.
+  // All optional — existing routers without these values get null (script endpoint
+  // validates them and returns a 400 with the specific missing field names).
+  lanIp            String?          // e.g. "192.168.88.1"
+  lanGateway       String?          // e.g. "192.168.88.1"
+  hotspotPoolRange String?          // e.g. "192.168.88.10-192.168.88.254"
+  pppoePoolRange   String?          // e.g. "10.0.0.10-10.0.0.254"
+  dns              String?          // e.g. "8.8.8.8,8.8.4.4"
   wgConfiguredAt   DateTime?
   wgEnabled        Boolean          @default(false)
   wgListenPort     Int?             @default(51820)
@@ -967,6 +987,9 @@ enum TransactionStatus {
   PENDING
   FAILED
   EXPIRED
+  // INITIATING: Transient status used to atomically claim a PENDING transaction
+  // before calling the payment gateway, preventing TOCTOU double-initiation races.
+  INITIATING
 }
 
 enum RouterStatus {

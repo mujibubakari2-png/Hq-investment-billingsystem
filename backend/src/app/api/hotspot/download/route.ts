@@ -3,6 +3,7 @@ import { readFileSync, readdirSync, statSync, existsSync } from "fs";
 import { join } from "path";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import { sanitizeMikroTikName } from "@/lib/mikrotik";
+import logger from "@/lib/logger";
 
 /**
  * GET /api/hotspot/download
@@ -41,7 +42,7 @@ export async function GET(req: NextRequest) {
         }
 
         if (!found) {
-            console.error("[HOTSPOT DOWNLOAD] Directory not found in any of:", pathsToTry);
+            logger.error("[HOTSPOT DOWNLOAD] Directory not found in any of:", { error: pathsToTry instanceof Error ? pathsToTry.message : String(pathsToTry) });
             return Response.json({
                 error: "Template directory not found on server",
                 checkedPaths: pathsToTry
@@ -185,7 +186,7 @@ add name=hs-hq interface=bridge-local profile=hq_hotspot disabled=no
         });
 
     } catch (e: any) {
-        console.error("Hotspot download error:", e);
+        logger.error("Hotspot download error:", { error: e instanceof Error ? e.message : String(e) });
         return Response.json({
             error: "Failed to package hotspot files",
             details: e.message || String(e)

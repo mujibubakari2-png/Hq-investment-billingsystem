@@ -24,7 +24,7 @@
  *     Webhook verification: check x-api-key header equals our API key
  *
  * FIX-ZP-001 (2026-06-30):
- *   Status endpoint was GET /payments/status/{order_id} — not documented.
+ *   Status endpoint was GET /payments/status/{order_id} â€” not documented.
  *   Official docs show GET /payments/order-status?order_id={order_id}.
  *   Fixed the checkStatus() method accordingly.
  */
@@ -38,6 +38,7 @@ import {
   ParsedWebhookPayload,
   ProviderConfig,
 } from "@/lib/payments/types";
+import logger from "@/lib/logger";
 import {
   formatPhoneLocal,
   timingSafeEqual,
@@ -74,7 +75,7 @@ export class ZenoPayProvider implements PaymentProvider {
     };
   }
 
-  // ── Initiate Payment ──────────────────────────────────────────────────────
+  // â”€â”€ Initiate Payment â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // POST /mobile_money_tanzania
   // buyer_phone: local TZ format per docs example (0744963858)
 
@@ -130,7 +131,7 @@ export class ZenoPayProvider implements PaymentProvider {
     }
   }
 
-  // ── Check Transaction Status ──────────────────────────────────────────────
+  // â”€â”€ Check Transaction Status â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // FIX-ZP-001: Official endpoint is GET /order-status?order_id={order_id}
   //   (NOT /status/{order_id} which was the previous incorrect implementation)
   // Response: { data: [{ order_id, payment_status, amount, reference }], result, message }
@@ -165,12 +166,12 @@ export class ZenoPayProvider implements PaymentProvider {
       };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Unknown error";
-      console.error(`[ZENOPAY] checkStatus error: ${msg}`);
+      logger.error(`[ZENOPAY] checkStatus error: ${msg}`);
       return { status: "PENDING" };
     }
   }
 
-  // ── Webhook Verification ──────────────────────────────────────────────────
+  // â”€â”€ Webhook Verification â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Official docs (webhook.php): check x-api-key header equals our API key
   // We also support HMAC via x-zeno-signature for additional security.
 
@@ -179,7 +180,7 @@ export class ZenoPayProvider implements PaymentProvider {
     rawBody: string
   ): Promise<WebhookVerification> {
     if (!this.webhookSecret && !this.apiKey) {
-      console.error("[ZENOPAY] Neither webhookSecret nor apiKey configured — rejecting webhook.");
+      logger.error("[ZENOPAY] Neither webhookSecret nor apiKey configured â€” rejecting webhook.");
       return { verified: false, reason: "Webhook secret not configured" };
     }
 
@@ -208,7 +209,7 @@ export class ZenoPayProvider implements PaymentProvider {
     return { verified: false, reason: "Missing signature header (x-api-key or x-zeno-signature)" };
   }
 
-  // ── Parse Webhook Payload ─────────────────────────────────────────────────
+  // â”€â”€ Parse Webhook Payload â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Official webhook payload: { order_id, payment_status, reference, metadata }
   // payment_status: "COMPLETED" | "FAILED"
 

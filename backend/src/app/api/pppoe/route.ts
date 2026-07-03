@@ -3,6 +3,7 @@ import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 import { requirePermission } from "@/lib/rbac";
 import { getTenantFilter } from "@/lib/tenant";
+import logger from "@/lib/logger";
 
 
 // GET /api/pppoe - list all PPPoE subscribers for the tenant
@@ -76,7 +77,7 @@ export async function GET(req: NextRequest) {
         });
 
     } catch (e) {
-        console.error("PPPoE subscribers GET error:", e);
+        logger.error("PPPoE subscribers GET error:", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }

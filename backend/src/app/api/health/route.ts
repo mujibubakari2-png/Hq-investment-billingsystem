@@ -1,25 +1,33 @@
 import { NextResponse } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
+import { getRedisClient } from "@/lib/cache";
+import { getMikroTikQueue } from "@/lib/queue";
+import logger from "@/lib/logger";
 
 export const dynamic = 'force-dynamic';
 
 /**
  * GET /api/health
- * 
- * Enhanced health-check endpoint that validates:
+ *
+ * HIGH-O-002 FIX: Enhanced health-check endpoint that now validates:
  *   1. Server is running
- *   2. Database connection is working
- *   3. Database schema is complete
- *   4. Critical tables are accessible
- *   5. System is production-ready
- * 
- * Used by: load balancers, monitoring tools, deployment orchestrators
- * Response times: typically <100ms for healthy system
+ *   2. PostgreSQL connection + latency
+ *   3. PostgreSQL schema completeness
+ *   4. Critical tables accessible
+ *   5. Redis connection + latency (NEW)
+ *   6. BullMQ queue job counts (NEW — flags if failed jobs > threshold)
+ *   7. System memory usage (NEW)
+ *
+ * Used by: load balancers, monitoring tools, PM2, deployment orchestrators.
+ * A 200 response means the instance is healthy and ready for traffic.
+ * A 503 response means degraded — the instance is live but impaired.
+ * A 500 response means critical — the instance should be removed from rotation.
  */
 
 interface HealthStatus {
     status: "ok" | "degraded" | "critical";
     timestamp: string;
+    uptime_sec: number;
     environment: string;
     version: string;
     database: {
@@ -28,16 +36,32 @@ interface HealthStatus {
         schema_verified: boolean;
         critical_tables_accessible: boolean;
     };
+    redis?: {
+        connected: boolean;
+        latency_ms?: number;
+    };
+    queue?: {
+        waiting?: number;
+        active?: number;
+        failed?: number;
+        delayed?: number;
+    };
+    memory?: {
+        heap_used_mb: number;
+        heap_total_mb: number;
+        rss_mb: number;
+    };
     diagnostics?: string[];
 }
 
 export async function GET() {
-    console.log("[HEALTH] Health check requested");
     const startTime = Date.now();
     const diagnostics: string[] = [];
+
     const response: HealthStatus = {
         status: "ok",
         timestamp: new Date().toISOString(),
+        uptime_sec: Math.floor(process.uptime()),
         environment: process.env.NODE_ENV || "unknown",
         version: process.version,
         database: {
@@ -47,32 +71,26 @@ export async function GET() {
         },
     };
 
+    // ── 1. PostgreSQL ─────────────────────────────────────────────────────────
     try {
         const db = getTenantClient(null);
 
-        // Test database connection
         const dbStart = Date.now();
         await db.$queryRaw`SELECT 1 as test`;
-        const dbLatency = Date.now() - dbStart;
+        response.database.latency_ms = Date.now() - dbStart;
         response.database.connected = true;
-        response.database.latency_ms = dbLatency;
 
-        // Verify schema (check for critical tables)
+        // Schema verification
         try {
-            const tableQuery = await db.$queryRaw<
-                { tablename: string }[]
-            >`SELECT tablename FROM pg_tables WHERE schemaname = 'public' LIMIT 1`;
-
-            if (tableQuery && tableQuery.length > 0) {
-                response.database.schema_verified = true;
-            }
-        } catch (error) {
-            diagnostics.push(
-                "Schema verification failed (non-critical): " + String(error)
-            );
+            const tableQuery = await db.$queryRaw<{ tablename: string }[]>`
+                SELECT tablename FROM pg_tables WHERE schemaname = 'public' LIMIT 1
+            `;
+            if (tableQuery?.length > 0) response.database.schema_verified = true;
+        } catch {
+            diagnostics.push("Schema verification failed (non-critical)");
         }
 
-        // Test access to critical tables
+        // Critical table access
         try {
             await Promise.all([
                 db.user.count(),
@@ -80,51 +98,87 @@ export async function GET() {
                 db.client.count(),
             ]);
             response.database.critical_tables_accessible = true;
-        } catch (error) {
-            diagnostics.push(
-                "Could not access critical tables (non-critical): " + String(error)
-            );
+        } catch (err) {
+            diagnostics.push(`Critical table access failed: ${err instanceof Error ? err.message : String(err)}`);
             response.status = "degraded";
         }
 
-        // Determine overall status
-        if (!response.database.connected) {
-            response.status = "critical";
-        } else if (
-            response.database.latency_ms &&
-            response.database.latency_ms > 5000
-        ) {
+        if (response.database.latency_ms > 5000) {
             response.status = "degraded";
-            diagnostics.push(
-                `Database latency is high: ${response.database.latency_ms}ms`
-            );
+            diagnostics.push(`Database latency high: ${response.database.latency_ms}ms`);
         }
-
-        if (diagnostics.length > 0) {
-            response.diagnostics = diagnostics;
-        }
-
-        const statusCode =
-            response.status === "ok" ? 200 : response.status === "degraded" ? 503 : 500;
-
-        return NextResponse.json(response, { status: statusCode });
-    } catch (error) {
-        console.error("[HEALTH] Health check error:", error);
-
-        return NextResponse.json(
-            {
-                status: "critical",
-                timestamp: new Date().toISOString(),
-                environment: process.env.NODE_ENV || "unknown",
-                version: process.version,
-                database: {
-                    connected: false,
-                    schema_verified: false,
-                    critical_tables_accessible: false,
-                },
-                error: String(error),
-            },
-            { status: 500 }
-        );
+    } catch (err) {
+        response.database.connected = false;
+        response.status = "critical";
+        diagnostics.push(`Database unreachable: ${err instanceof Error ? err.message : String(err)}`);
+        logger.error("[Health] Database check failed", { error: String(err) });
     }
+
+    // ── 2. Redis ──────────────────────────────────────────────────────────────
+    try {
+        const redis = getRedisClient();
+        if (redis) {
+            const redisStart = Date.now();
+            await redis.ping();
+            response.redis = {
+                connected: true,
+                latency_ms: Date.now() - redisStart,
+            };
+        } else {
+            response.redis = { connected: false };
+            // Redis being down means rate limiting, caching, and queue are all broken
+            if (response.status === "ok") response.status = "degraded";
+            diagnostics.push("Redis client not initialised (REDIS_URL missing or connection failed)");
+        }
+    } catch (err) {
+        response.redis = { connected: false };
+        if (response.status === "ok") response.status = "degraded";
+        diagnostics.push(`Redis unreachable: ${err instanceof Error ? err.message : String(err)}`);
+        logger.warn("[Health] Redis check failed", { error: String(err) });
+    }
+
+    // ── 3. BullMQ queue ───────────────────────────────────────────────────────
+    try {
+        const queue = getMikroTikQueue();
+        const counts = await queue.getJobCounts('waiting', 'active', 'failed', 'delayed');
+        response.queue = counts;
+
+        const FAILED_THRESHOLD = 100;
+        if ((counts.failed ?? 0) > FAILED_THRESHOLD) {
+            if (response.status === "ok") response.status = "degraded";
+            diagnostics.push(`BullMQ failed job count is high: ${counts.failed} (threshold: ${FAILED_THRESHOLD})`);
+        }
+    } catch (err) {
+        diagnostics.push(`BullMQ queue check failed: ${err instanceof Error ? err.message : String(err)}`);
+        logger.warn("[Health] Queue check failed", { error: String(err) });
+    }
+
+    // ── 4. Memory ─────────────────────────────────────────────────────────────
+    try {
+        const mem = process.memoryUsage();
+        response.memory = {
+            heap_used_mb: Math.round(mem.heapUsed / 1024 / 1024),
+            heap_total_mb: Math.round(mem.heapTotal / 1024 / 1024),
+            rss_mb: Math.round(mem.rss / 1024 / 1024),
+        };
+        // Flag if heap is more than 90% utilised
+        if (response.memory.heap_used_mb / response.memory.heap_total_mb > 0.9) {
+            if (response.status === "ok") response.status = "degraded";
+            diagnostics.push(`Memory pressure: heap ${response.memory.heap_used_mb}/${response.memory.heap_total_mb} MB`);
+        }
+    } catch { /* non-critical */ }
+
+    if (diagnostics.length > 0) {
+        response.diagnostics = diagnostics;
+    }
+
+    const httpStatus = response.status === "ok" ? 200 : response.status === "degraded" ? 503 : 500;
+    logger.info("[Health] Check completed", {
+        status: response.status,
+        duration_ms: Date.now() - startTime,
+        db_connected: response.database.connected,
+        redis_connected: response.redis?.connected,
+    });
+
+    return NextResponse.json(response, { status: httpStatus });
 }

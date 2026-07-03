@@ -24,6 +24,8 @@
  *   Free tier: 3 000 emails/month, 100/day — sufficient for most ISP deployments.
  */
 
+import logger from "@/lib/logger";
+
 const RESEND_API_URL = "https://api.resend.com/emails";
 
 function getResendKey(): string | undefined {
@@ -56,12 +58,11 @@ export async function sendEmail({
   // EMAIL-002: Graceful degradation — if no API key is configured, log and skip.
   // This prevents hard crashes during local development when email is not set up.
   if (!apiKey) {
-    console.warn(
-      "[EMAIL] RESEND_API_KEY is not set — skipping email send.\n" +
-      "        To enable email: add RESEND_API_KEY to your .env file.\n" +
-      `        Would have sent: subject="${subject}" to=${to}`
-    );
-    // Return success=false but with a clear dev-friendly message so callers can warn the user.
+    logger.warn("[email] RESEND_API_KEY is not set — skipping email send", {
+      subject,
+      to,
+      hint: "Add RESEND_API_KEY to your .env file to enable email.",
+    });
     return {
       success: false,
       error: "Email service is not configured. Set RESEND_API_KEY in your .env file.",
@@ -70,7 +71,7 @@ export async function sendEmail({
   }
 
   const from = getFromAddress();
-  console.log(`[EMAIL] Sending via Resend API: to=${to}, subject="${subject}"`);
+  logger.info("[email] Sending via Resend API", { to, subject });
 
   try {
     const response = await fetch(RESEND_API_URL, {
@@ -79,22 +80,14 @@ export async function sendEmail({
         "Authorization": `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        from,
-        to: [to],
-        subject,
-        text,
-        html,
-      }),
+      body: JSON.stringify({ from, to: [to], subject, text, html }),
     });
 
     const data = await response.json().catch(() => ({})) as any;
 
     if (!response.ok) {
-      // Resend returns { name, message, statusCode } on error
       const errMsg = data?.message || data?.name || `HTTP ${response.status}`;
-      console.error(`[EMAIL] Resend API error (${response.status}):`, errMsg, data);
-
+      logger.error("[email] Resend API error", { status: response.status, error: errMsg, detail: data });
       return {
         success: false,
         error: errMsg,
@@ -102,13 +95,12 @@ export async function sendEmail({
       };
     }
 
-    // Success: Resend returns { id: "..." }
-    console.log(`[EMAIL] Sent successfully. Resend message id: ${data?.id}`);
+    logger.info("[email] Sent successfully", { messageId: data?.id, to, subject });
     return { success: true, messageId: data?.id };
 
   } catch (err: any) {
     // Network-level failure (DNS, connection refused, timeout)
-    console.error("[EMAIL] Network error reaching Resend API:", err.message);
+    logger.error("[email] Network error reaching Resend API", { error: err.message, code: err.code });
     return {
       success: false,
       error: `Network error: ${err.message}`,

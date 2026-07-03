@@ -5,6 +5,7 @@ import { requirePermission } from "@/lib/rbac";
 import { getTenantFilter } from "@/lib/tenant";
 import { toISOSafe, toTimestampSafe, parseSafeDate } from "@/lib/dateUtils";
 import { invalidateNamespace } from "@/lib/cache";
+import logger from "@/lib/logger";
 
 
 // GET /api/transactions
@@ -20,16 +21,19 @@ export async function GET(req: NextRequest) {
         const { searchParams } = new URL(req.url);
         const search = searchParams.get("search") || "";
         const status = searchParams.get("status") || "";
-        const type = searchParams.get("type") || "";
-        const page = parseInt(searchParams.get("page") || "1");
+        const type   = searchParams.get("type")   || "";
+        const page   = Math.max(1, parseInt(searchParams.get("page") || "1"));
+
+        // HIGH-PERF FIX: Cap 'limit=All' to 1000 to prevent full table scans into Node memory.
+        // Use a dedicated export endpoint or paginated loops for bulk data exports.
         const limitParam = searchParams.get("limit") || "50";
-        const limit = limitParam === "All" ? 999999 : parseInt(limitParam);
-        const skip = (page - 1) * limit;
+        const limit = Math.min(1000, limitParam === "All" ? 1000 : Math.max(1, parseInt(limitParam) || 50));
+        const skip  = (page - 1) * limit;
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const where: any = { ...tenantFilter };
         if (status) where.status = status.toUpperCase();
-        if (type) where.type = type.toUpperCase();
+        if (type)   where.type   = type.toUpperCase();
         if (search) {
             where.OR = [
                 { reference: { contains: search, mode: "insensitive" } },
@@ -49,44 +53,45 @@ export async function GET(req: NextRequest) {
         ]);
 
         const mapped = transactions.map((t: any) => ({
-            id: t.id,
-            user: t.client?.username || "Unknown",
-            planName: t.planName,
-            plan: t.planName,
-            amount: t.amount,
-            type: t.type.charAt(0) + t.type.slice(1).toLowerCase(),
-            method: t.method,
-            status: t.status.charAt(0) + t.status.slice(1).toLowerCase(),
-            date: toISOSafe(t.createdAt),
-            timestamp: toTimestampSafe(t.createdAt),
+            id:         t.id,
+            user:       t.client?.username || "Unknown",
+            planName:   t.planName,
+            plan:       t.planName,
+            amount:     t.amount,
+            type:       t.type.charAt(0) + t.type.slice(1).toLowerCase(),
+            method:     t.method,
+            status:     t.status.charAt(0) + t.status.slice(1).toLowerCase(),
+            date:       toISOSafe(t.createdAt),
+            timestamp:  toTimestampSafe(t.createdAt),
             expiryDate: toISOSafe(t.expiryDate),
-            reference: t.reference,
+            reference:  t.reference,
         }));
 
         let mobileStats = null;
         if (type.toUpperCase() === "MOBILE") {
             const stats = (await db.transaction.groupBy({
-                by: ['status'],
-                where: { type: 'MOBILE', ...tenantFilter },
+                by: ["status"],
+                where: { type: "MOBILE", ...tenantFilter },
                 _count: { _all: true },
-                _sum: { amount: true }
+                _sum:   { amount: true },
             } as any)) as unknown as any[];
 
             mobileStats = {
-                totalCount: stats.reduce((acc: number, curr: any) => acc + (curr._count?._all || 0), 0),
-                totalRevenue: stats.filter((s: any) => s.status === 'COMPLETED').reduce((acc: number, curr: any) => acc + (curr._sum?.amount || 0), 0),
-                paid: stats.find((s: any) => s.status === 'COMPLETED')?._count?._all || 0,
-                unpaid: stats.find((s: any) => s.status === 'PENDING')?._count?._all || 0,
-                failed: stats.find((s: any) => s.status === 'FAILED')?._count?._all || 0,
-                canceled:
-                    (stats.find((s: any) => s.status === 'FAILED')?._count?._all || 0) +
-                    (stats.find((s: any) => s.status === 'EXPIRED')?._count?._all || 0),
+                totalCount:   stats.reduce((acc: number, curr: any) => acc + (curr._count?._all || 0), 0),
+                totalRevenue: stats
+                    .filter((s: any) => s.status === "COMPLETED")
+                    .reduce((acc: number, curr: any) => acc + (curr._sum?.amount || 0), 0),
+                paid:     stats.find((s: any) => s.status === "COMPLETED")?._count?._all || 0,
+                unpaid:   stats.find((s: any) => s.status === "PENDING")?._count?._all  || 0,
+                failed:   stats.find((s: any) => s.status === "FAILED")?._count?._all   || 0,
+                canceled: (stats.find((s: any) => s.status === "FAILED")?._count?._all  || 0) +
+                          (stats.find((s: any) => s.status === "EXPIRED")?._count?._all || 0),
             };
         }
 
         return jsonResponse({ data: mapped, total, page, limit, stats: mobileStats });
     } catch (e) {
-        console.error(e);
+        logger.error("[transactions] GET failed", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }
@@ -182,24 +187,24 @@ export async function POST(req: NextRequest) {
                 planName: planName || "Manual Transaction",
                 amount, // SEC-FIN-001 FIX: validated integer amount
 
-                type: (body.type || "MANUAL").toUpperCase(),
-                method: body.method || "Cash",
-                status: (body.status || "COMPLETED").toUpperCase(),
-                reference: body.reference || `TXN-${Date.now()}`,
+                type:      (body.type   || "MANUAL").toUpperCase(),
+                method:     body.method  || "Cash",
+                status:    (body.status || "COMPLETED").toUpperCase(),
+                reference:  body.reference || `TXN-${Date.now()}`,
                 expiryDate: parseSafeDate(body.expiryDate),
-                tenantId: tenantIdValue
+                tenantId:   tenantIdValue,
             },
         });
 
         // Invalidate dashboard cache so revenue totals update on next load
         if (tenantIdValue) {
-            invalidateNamespace(tenantIdValue, 'dashboard').catch(() => { });
+            invalidateNamespace(tenantIdValue, "dashboard").catch(() => { });
         }
 
         return jsonResponse(transaction, 201);
 
     } catch (e) {
-        console.error(e);
+        logger.error("[transactions] POST failed", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }

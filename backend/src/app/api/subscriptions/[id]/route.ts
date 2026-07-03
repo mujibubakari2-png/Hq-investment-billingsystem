@@ -5,6 +5,7 @@ import { canAccessTenant } from "@/lib/tenant";
 import { requirePermission } from "@/lib/rbac";
 import { parseOptionalDate } from "@/lib/dateUtils";
 import { SubscriptionUpdateSchema } from "@/lib/validators";
+import logger from "@/lib/logger";
 
 // GET /api/subscriptions/[id]
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -60,7 +61,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
         return jsonResponse(sub);
     } catch (e) {
-        console.error("SUBSCRIPTION UPDATE ERROR:", e);
+        logger.error("SUBSCRIPTION UPDATE ERROR:", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }

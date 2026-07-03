@@ -5,6 +5,7 @@ import { requirePermission } from "@/lib/rbac";
 import { getTenantFilter } from "@/lib/tenant";
 import { getMikroTikService } from "@/lib/mikrotik";
 import { syncRadiusUser } from "@/lib/radius";
+import logger from "@/lib/logger";
 
 export async function POST(req: NextRequest) {
     try {
@@ -90,12 +91,12 @@ export async function POST(req: NextRequest) {
                         rateLimit,
                     });
                 } catch (radErr) {
-                    console.error(`Bulk extend RADIUS sync error on ${sub.id}:`, radErr);
+                    logger.error(`Bulk extend RADIUS sync error on ${sub.id}:`, { error: radErr instanceof Error ? radErr.message : String(radErr) });
                 }
 
                 successes.push(sub.client.username);
             } catch (err: any) {
-                console.error(`Bulk extend specific error on ${sub.id}:`, err);
+                logger.error(`Bulk extend specific error on ${sub.id}:`, { error: err instanceof Error ? err.message : String(err) });
                 // Mark DB
                 await db.subscription.update({
                     where: { id: sub.id },
@@ -127,7 +128,7 @@ export async function POST(req: NextRequest) {
         });
 
     } catch (e) {
-        console.error("Bulk extend generic error:", e);
+        logger.error("Bulk extend generic error:", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }

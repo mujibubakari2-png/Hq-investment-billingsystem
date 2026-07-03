@@ -3,6 +3,7 @@ import { getTenantClient } from "@/lib/tenantPrisma";
 import { errorResponse, jsonResponse } from "@/lib/auth";
 import { requireRole } from "@/lib/rbac";
 import { sendAccountApprovedNotifications } from "@/lib/accountNotifications";
+import logger from "@/lib/logger";
 
 export async function POST(req: NextRequest) {
     try {
@@ -61,7 +62,7 @@ export async function POST(req: NextRequest) {
         });
 
     } catch (e) {
-        console.error("Approve Tenant Error:", e);
+        logger.error("Approve Tenant Error:", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }

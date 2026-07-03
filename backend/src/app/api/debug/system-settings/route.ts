@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { requireRole } from '@/lib/rbac';
 import { NextRequest } from 'next/server';
+import logger from "@/lib/logger";
 
 export async function GET(req: NextRequest) {
   try {
@@ -23,7 +24,7 @@ export async function GET(req: NextRequest) {
     });
     return NextResponse.json({ rows });
   } catch (e: any) {
-    console.error('[DEBUG_ROUTE] failed to read payment channels:', e);
+    logger.error('[DEBUG_ROUTE] failed to read payment channels:', { error: e instanceof Error ? e.message : String(e) });
     return NextResponse.json({ error: e?.message || String(e) }, { status: 500 });
   }
 }

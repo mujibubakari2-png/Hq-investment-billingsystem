@@ -6,6 +6,7 @@ import { requirePermission } from "@/lib/rbac";
 import { buildCallbackUrl, formatPhoneTZ } from "@/lib/payments/utils";
 import { paymentService } from "@/lib/payments/service";
 import { getJwtTenantId, isPlatformSuperAdmin } from "@/lib/tenant";
+import logger from "@/lib/logger";
 
 export async function POST(req: NextRequest) {
     try {
@@ -149,7 +150,7 @@ export async function POST(req: NextRequest) {
                     },
                 });
             } catch (createErr) {
-                console.warn('Failed to create tenantPayment record (best-effort):', createErr);
+                logger.warn('Failed to create tenantPayment record (best-effort):', { error: createErr instanceof Error ? createErr.message : String(createErr) });
             }
 
             if (result.success) {
@@ -215,7 +216,7 @@ export async function POST(req: NextRequest) {
                 result.status ? `Provider status: ${result.status}` : undefined
             );
         } catch (paymentErr: any) {
-            console.error("STK push error during license renewal:", paymentErr);
+            logger.error("STK push error during license renewal:", { error: paymentErr instanceof Error ? paymentErr.message : String(paymentErr) });
             // Attempt to record failure if we created a payment record earlier
             try {
                 if (paymentRecord && paymentRecord.id) {
@@ -225,7 +226,7 @@ export async function POST(req: NextRequest) {
             return errorResponse(paymentErr.message || "Payment provider error", 502, "PALMPESA_GATEWAY", "Provider request failed");
         }
     } catch (error) {
-        console.error("License Renew API Error:", error);
+        logger.error("License Renew API Error:", { error: error instanceof Error ? error.message : String(error) });
         return errorResponse("Internal server error", 500);
     }
 }

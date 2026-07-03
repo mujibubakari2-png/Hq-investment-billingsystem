@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 import { requireRole } from "@/lib/rbac";
+import logger from "@/lib/logger";
 
 // GET /api/admin/saas-plans - list all SaaS plans (Super Admin only)
 export async function GET(req: NextRequest) {
@@ -16,7 +17,7 @@ export async function GET(req: NextRequest) {
 
         return jsonResponse(plans);
     } catch (e) {
-        console.error("ADMIN SAAS PLAN FETCH ERROR:", e);
+        logger.error("ADMIN SAAS PLAN FETCH ERROR:", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }
@@ -67,7 +68,7 @@ export async function POST(req: NextRequest) {
         return errorResponse("Invalid action provided", 400);
 
     } catch (e) {
-        console.error("ADMIN SAAS PLAN ACTION ERROR:", e);
+        logger.error("ADMIN SAAS PLAN ACTION ERROR:", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }

@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
+import logger from "@/lib/logger";
 
 /**
  * GET /api/hotspot/packages
@@ -54,7 +55,7 @@ export async function GET(req: NextRequest) {
             hotspotType: p.hotspotType
         })));
     } catch (e: any) {
-        console.error("[HOTSPOT PACKAGES ERROR]:", e);
+        logger.error("[HOTSPOT PACKAGES ERROR]:", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }

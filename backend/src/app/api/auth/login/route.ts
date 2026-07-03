@@ -184,6 +184,13 @@ export async function POST(req: NextRequest) {
             error: err.message,
             stack: err.stack,
         });
-        return errorResponse("Internal server error", 500, "LOGIN_INTERNAL_ERROR", err.message);
+        return errorResponse(
+            "Internal server error",
+            500,
+            "LOGIN_INTERNAL_ERROR",
+            // HIGH-SEC-006 FIX: never leak raw error messages in production.
+            // The full error is captured in the structured logger above.
+            process.env.NODE_ENV === 'production' ? undefined : err.message
+        );
     }
 }

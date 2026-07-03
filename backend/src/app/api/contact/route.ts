@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 import { sendEmail } from "@/lib/email";
 import { env } from "@/lib/env";
+import logger from "@/lib/logger";
 
 /**
  * POST /api/contact
@@ -79,7 +80,7 @@ export async function POST(req: NextRequest) {
         });
 
         if (!result.success) {
-            console.error("[CONTACT] Failed to send contact email:", result.error);
+            logger.error("[CONTACT] Failed to send contact email", { error: String(result.error) });
             // Still return success to the user — don't expose internal SMTP errors
             // Log it and handle via monitoring
         }
@@ -101,13 +102,13 @@ export async function POST(req: NextRequest) {
             `,
         }).catch((e) => {
             // Acknowledgement failure is non-critical — just log it
-            console.warn("[CONTACT] Acknowledgement email failed:", e);
+            logger.warn("[CONTACT] Acknowledgement email failed:", { error: e instanceof Error ? e.message : String(e) });
         });
 
         return jsonResponse({ success: true, message: "Your message has been received. We will be in touch shortly." });
 
     } catch (e) {
-        console.error("[CONTACT] Error:", e);
+        logger.error("[CONTACT] Error:", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Failed to send message. Please try again later.", 500);
     }
 }

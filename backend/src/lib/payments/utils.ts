@@ -5,6 +5,7 @@
 
 import crypto from "crypto";
 import { env } from "@/lib/env";
+import logger from "@/lib/logger";
 
 // ─── Phone Number Formatting ──────────────────────────────────────────────────
 
@@ -78,7 +79,7 @@ export function buildCallbackUrl(provider: string, req?: Request, baseUrl?: stri
   // E04 FIX: Warn in production when APP_URL is not configured.
   // Without it, webhook callbacks fall back to localhost and will never be received.
   if (!env.APP_URL && process.env.NODE_ENV === "production" && !baseUrl) {
-    console.error(
+    logger.error(
       "[PAYMENT] CRITICAL: APP_URL is not set in production. " +
       "Webhook callback URLs will resolve to http://localhost:3000 and payment confirmations " +
       "will never arrive. Set APP_URL=https://yourdomain.com in your production .env file."
@@ -204,7 +205,7 @@ export async function httpPost(
   body: Record<string, unknown> | string,
   headers: Record<string, string>
 ): Promise<{ ok: boolean; status: number; data: unknown }> {
-  console.log("[TRACE][httpPost] ENTER", { url, method: "POST", headers: maskHeaders(headers), body });
+  logger.info("[TRACE][httpPost] ENTER", { url, method: "POST", headers: maskHeaders(headers), body });
 
   const isFormEncoded =
     headers["Content-Type"] === "application/x-www-form-urlencoded";
@@ -220,7 +221,7 @@ export async function httpPost(
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error("[TRACE][httpPost] EXCEPTION", { url, error: message });
+    logger.error("[TRACE][httpPost] EXCEPTION", { url, error: message });
     throw new Error(`Network error: ${message}`);
   }
 
@@ -244,7 +245,7 @@ export async function httpPost(
     }
   }
 
-  console.log("[TRACE][httpPost] EXIT", { url, status: res.status, data });
+  logger.info("[TRACE][httpPost] EXIT", { url, status: res.status, data });
   return { ok: res.ok, status: res.status, data };
 }
 
@@ -252,14 +253,14 @@ export async function httpGet(
   url: string,
   headers: Record<string, string>
 ): Promise<{ ok: boolean; status: number; data: unknown }> {
-  console.log("[TRACE][httpGet] ENTER", { url, method: "GET", headers: maskHeaders(headers) });
+  logger.info("[TRACE][httpGet] ENTER", { url, method: "GET", headers: maskHeaders(headers) });
 
   let res: Response;
   try {
     res = await fetch(url, { method: "GET", headers });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error("[TRACE][httpGet] EXCEPTION", { url, error: message });
+    logger.error("[TRACE][httpGet] EXCEPTION", { url, error: message });
     throw new Error(`Network error: ${message}`);
   }
 
@@ -283,6 +284,6 @@ export async function httpGet(
     }
   }
 
-  console.log("[TRACE][httpGet] EXIT", { url, status: res.status, data });
+  logger.info("[TRACE][httpGet] EXIT", { url, status: res.status, data });
   return { ok: res.ok, status: res.status, data };
 }

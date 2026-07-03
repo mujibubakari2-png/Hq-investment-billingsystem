@@ -12,6 +12,43 @@ import { isIPv4 } from "net";
 import { env } from "@/lib/env";
 import { getTenantClient } from "./tenantPrisma";
 import { decryptRouterFields } from "./encryption";
+import logger from "@/lib/logger";
+
+// ── SSRF Guard ────────────────────────────────────────────────────────────────
+// HIGH-SEC FIX: Prevent server-side request forgery via malicious router `host`.
+// A compromised or injected router record could otherwise make the server hit
+// AWS/GCP metadata endpoints (169.254.169.254), internal APIs, or loopback.
+//
+// MIKROTIK_ALLOW_PRIVATE=true bypasses private-range blocking for dev/VPN
+// environments where routers sit on RFC1918 addresses (e.g. WireGuard tunnels).
+
+const LOOPBACK_RE      = /^(127\.|0\.0\.0\.0|::1$|localhost$)/i;
+const LINK_LOCAL_RE    = /^169\.254\./;          // AWS/GCP/Azure metadata
+const PRIVATE_RE       = /^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/;
+const IPV6_SPECIAL_RE  = /^(fc|fd|fe80)/i;       // ULA + link-local IPv6
+
+export function validateOutboundHost(host: string): void {
+    const h = host.trim().toLowerCase();
+
+    if (LOOPBACK_RE.test(h)) {
+        throw new Error(`[SSRF] Blocked outbound request to loopback address: ${host}`);
+    }
+    if (LINK_LOCAL_RE.test(h)) {
+        throw new Error(`[SSRF] Blocked outbound request to link-local address (metadata service): ${host}`);
+    }
+    if (IPV6_SPECIAL_RE.test(h)) {
+        throw new Error(`[SSRF] Blocked outbound request to IPv6 special address: ${host}`);
+    }
+
+    // Private ranges allowed when running in VPN mode (routers behind WireGuard)
+    const allowPrivate = process.env.MIKROTIK_ALLOW_PRIVATE === 'true';
+    if (!allowPrivate && PRIVATE_RE.test(h)) {
+        throw new Error(
+            `[SSRF] Blocked outbound request to private IP ${host}. ` +
+            `If routers are on a VPN/LAN, set MIKROTIK_ALLOW_PRIVATE=true.`
+        );
+    }
+}
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -182,7 +219,7 @@ export class MikroTikService {
             // It only works if node-fetch is used as the fetch implementation.
             // For production, prefer a valid TLS cert instead of using MIKROTIK_INSECURE.
             if (this.baseUrl.startsWith('https') && env.MIKROTIK_INSECURE) {
-                console.warn(`[SECURITY WARNING] MIKROTIK_INSECURE is enabled for ${this.conn.host}. Certificate verification is disabled. This should only be used in development or isolated network environments.`);
+                logger.warn(`[MikroTik] MIKROTIK_INSECURE enabled for ${this.conn.host}. TLS verification disabled. Development/isolated networks only.`);
                 fetchOptions.agent = new https.Agent({ rejectUnauthorized: false });
             }
 
@@ -198,8 +235,7 @@ export class MikroTikService {
                 const allowHttpFallback = process.env.MIKROTIK_ALLOW_HTTP_FALLBACK === 'true';
                 if (this.baseUrl.startsWith('https') && allowHttpFallback) {
                     clearTimeout(timeout);
-                    console.warn(`[SECURITY WARNING] HTTPS failed for ${this.conn.host}, falling back to HTTP. ` +
-                        `MIKROTIK_ALLOW_HTTP_FALLBACK=true — disable in production.`);
+                    logger.warn(`[MikroTik] HTTPS failed for ${this.conn.host}, falling back to HTTP. MIKROTIK_ALLOW_HTTP_FALLBACK=true — disable in production.`);
                     const httpUrl = url.replace('https://', 'http://');
 
                     // Create a fresh controller for the fallback attempt
@@ -276,7 +312,11 @@ export class MikroTikService {
                 },
             });
         } catch (e) {
-            console.error("Failed to create router log:", e);
+            logger.error('[MikroTik] Failed to create router log', {
+                routerId: this.routerId,
+                action,
+                error: e instanceof Error ? e.message : String(e),
+            });
         }
     }
 
@@ -396,7 +436,7 @@ export class MikroTikService {
                 comment: u.comment || "",
             };
         } catch (err: any) {
-            console.error(`[MikroTik] Error finding PPPoE user ${username}:`, err.message);
+            logger.error(`[MikroTik] Error finding PPPoE user ${username}:`, err.message);
             return null;
         }
     }
@@ -502,7 +542,7 @@ export class MikroTikService {
                 limitBytesTotal: u["limit-bytes-total"] || "",
             };
         } catch (err: any) {
-            console.error(`[MikroTik] Error finding Hotspot user ${username}:`, err.message);
+            logger.error(`[MikroTik] Error finding Hotspot user ${username}:`, err.message);
             return null;
         }
     }
@@ -983,16 +1023,16 @@ export async function getMikroTikService(routerId: string, tenantId?: string | n
     }
 
     // MK-004 / SEC-001 FIX: Decrypt router credentials before use.
-    // Without this, if the password was stored via encryptRouterFields(), the raw ciphertext
-    // ("enc:v1:...") would be used as the Basic Auth password — MikroTik returns 401 on every call.
     const decryptedRouter = decryptRouterFields(router);
+
+    // HIGH-SEC SSRF FIX: Validate the host before making any outbound connection.
+    // Blocks loopback, link-local (metadata), and private IPs (unless VPN mode).
+    validateOutboundHost(decryptedRouter.host);
 
     return new MikroTikService(
         {
             host: decryptedRouter.host,
             port: router.apiPort || router.port || 8728,
-            // E22 FIX: Pass the stored restPort so the constructor uses it directly
-            // instead of the generic 8728→80 auto-mapping. Falls back to auto-mapping when null.
             restPort: (router as any).restPort ?? undefined,
             username: router.username || "admin",
             password: decryptedRouter.password || "",

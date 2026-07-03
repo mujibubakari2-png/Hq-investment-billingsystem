@@ -5,6 +5,7 @@ import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { requirePermission } from "@/lib/rbac";
 import { encrypt, decrypt } from "@/lib/encryption";
 import { VpnUserCreateSchema } from "@/lib/validators";
+import logger from "@/lib/logger";
 
 // GET /api/vpn – list VPN users (from ppp secrets stored in a table)
 export async function GET(req: NextRequest) {
@@ -16,11 +17,21 @@ export async function GET(req: NextRequest) {
         const db = getTenantClient(userPayload);
         const { filter: tenantFilter } = getTenantFilter(userPayload);
 
-        const vpnUsers = await db.vpnUser.findMany({
-            where: { ...tenantFilter },
-            include: { router: { select: { id: true, name: true, host: true } } },
-            orderBy: { createdAt: "desc" },
-        });
+        const { searchParams } = new URL(req.url);
+        const page  = Math.max(1, parseInt(searchParams.get("page")  || "1"));
+        const limit = Math.min(500, Math.max(1, parseInt(searchParams.get("limit") || "50")));
+        const skip  = (page - 1) * limit;
+
+        const [vpnUsers, total] = await Promise.all([
+            db.vpnUser.findMany({
+                where:    { ...tenantFilter },
+                include:  { router: { select: { id: true, name: true, host: true } } },
+                orderBy:  { createdAt: "desc" },
+                skip,
+                take: limit,
+            }),
+            db.vpnUser.count({ where: { ...tenantFilter } }),
+        ]);
 
         const result = vpnUsers.map(v => ({
             id: v.id,
@@ -43,9 +54,9 @@ export async function GET(req: NextRequest) {
             hasPassword: !!v.password,
         }));
 
-        return jsonResponse(result);
+        return jsonResponse({ data: result, total, page, limit });
     } catch (e) {
-        console.error("VPN list error:", e);
+        logger.error("VPN list error:", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }
@@ -125,7 +136,7 @@ export async function POST(req: NextRequest) {
                     // 'password' field is being used as the Peer's Public Key
                     await wireguardManager.addPeer(password, remoteAddress || "10.0.0.2");
                 } catch (wgErr: any) {
-                    console.error("Failed to add peer to Droplet WireGuard:", wgErr);
+                    logger.error("Failed to add peer to Droplet WireGuard:", { error: wgErr instanceof Error ? wgErr.message : String(wgErr) });
                     // Don't fail the whole request, but log it
                 }
             } else {
@@ -140,14 +151,14 @@ export async function POST(req: NextRequest) {
                 });
             }
         } catch (err: any) {
-            console.error("Failed to push VPN user to MikroTik:", err);
+            logger.error("Failed to push VPN user to MikroTik:", { error: err instanceof Error ? err.message : String(err) });
             // We keep the DB record but warn
             return jsonResponse({ ...vpnUser, warning: "Saved to database but failed to push to router: " + err.message }, 201);
         }
 
         return jsonResponse(vpnUser, 201);
     } catch (e) {
-        console.error("VPN create error:", e);
+        logger.error("VPN create error:", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }

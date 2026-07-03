@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import nodemailer from "nodemailer";
+import logger from "@/lib/logger";
 
 // Bug #8 FIX: Resolve app URL from env at startup to avoid hardcoded IPs leaking into emails.
 function getAppUrl(): string {
     const url = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL;
     if (!url) {
-        console.warn('[CRON] WARNING: APP_URL is not set. Renewal links in emails will be broken. Set APP_URL in your .env file.');
+        logger.warn('[CRON] WARNING: APP_URL is not set. Renewal links in emails will be broken. Set APP_URL in your .env file.');
         return 'https://your-billing-system-domain.com';
     }
     return url.replace(/\/$/, '');
@@ -88,7 +89,7 @@ export async function GET(req: Request) {
                 await transporter.sendMail(mailOptions);
                 sentCount++;
             } catch (err) {
-                console.error(`Failed to send expiration email to ${tenant.email}:`, err);
+                logger.error(`Failed to send expiration email to ${tenant.email}:`, { error: err instanceof Error ? err.message : String(err) });
             }
         }
 
@@ -97,7 +98,7 @@ export async function GET(req: Request) {
         });
 
     } catch (e: any) {
-        console.error("Cron Error:", e);
+        logger.error("Cron Error:", { error: e instanceof Error ? e.message : String(e) });
         return new NextResponse("Internal Server Error", { status: 500 });
     }
 }

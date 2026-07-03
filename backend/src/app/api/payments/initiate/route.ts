@@ -12,8 +12,8 @@ import { canAccessTenant, getAssignTenantId } from '@/lib/tenant';
 import { paymentService } from "@/lib/payments/service";
 import { isSupportedProvider, SUPPORTED_PROVIDERS } from "@/lib/payments/registry";
 import { isValidAmount, formatPhoneTZ } from "@/lib/payments/utils";
-import prisma from '@/lib/prisma';
 import { getTenantClient } from "@/lib/tenantPrisma";
+import logger from "@/lib/logger";
 
 export async function POST(req: NextRequest) {
   try {
@@ -71,24 +71,53 @@ export async function POST(req: NextRequest) {
     }
 
     const db = getTenantClient(tenantId);
+
+    // HIGH-DATA FIX: Atomically claim the PENDING transaction before calling
+    // the payment gateway. The old pattern (findFirst → initiatePayment → update)
+    // had a TOCTOU race: two concurrent requests could both see PENDING, both call
+    // the gateway, and double-charge the customer.
+    //
+    // Fix: use updateMany() with status=PENDING in the WHERE clause to atomically
+    // flip status to INITIATING. Only one request will get rowsUpdated > 0.
+    // Any racing duplicate gets a 409 immediately.
+    const claimed = await db.transaction.updateMany({
+      where: { reference, tenantId, type: "MOBILE", status: "PENDING" },
+      data:  { status: "INITIATING" },
+    });
+
+    if (claimed.count === 0) {
+      // Either not found, wrong amount, or already claimed by another request
+      const existing = await db.transaction.findFirst({
+        where: { reference, tenantId },
+        select: { status: true, amount: true },
+      });
+      if (!existing) return errorResponse("Pending tenant transaction not found for this reference", 404);
+      if (existing.status === "INITIATING" || existing.status !== "PENDING") {
+        return errorResponse("Payment already in progress for this reference", 409);
+      }
+      return errorResponse("Pending tenant transaction not found for this reference", 404);
+    }
+
+    // Fetch the claimed transaction to validate amount
     const existingTransaction = await db.transaction.findFirst({
-      where: {
-        reference,
-        tenantId,
-        type: "MOBILE",
-        status: "PENDING",
-      },
+      where: { reference, tenantId, type: "MOBILE", status: "INITIATING" },
       select: { id: true, amount: true },
     });
 
     if (!existingTransaction) {
-      return errorResponse("Pending tenant transaction not found for this reference", 404);
+      return errorResponse("Transaction claim lost — concurrent request won the race", 409);
     }
+
     if (Math.round(existingTransaction.amount) !== Math.round(amountNum)) {
+      // Roll back the status claim before rejecting
+      await db.transaction.updateMany({
+        where: { id: existingTransaction.id },
+        data:  { status: "PENDING" },
+      });
       return errorResponse("Payment amount does not match the pending transaction", 400);
     }
 
-    // ── Initiate ────────────────────────────────────────────────────────────
+    // ── Initiate ───────────────────────────────────────────────────────────────
     const result = await paymentService.initiatePayment({
       tenantId,
       amount: amountNum,
@@ -98,21 +127,27 @@ export async function POST(req: NextRequest) {
       description,
       buyerName,
       buyerEmail,
-      paymentContext: "TENANT", // EXPLICIT ISOLATION GUARD
+      paymentContext: "TENANT",
     });
 
     if (!result.success) {
+      // Roll back status so it can be retried
+      await db.transaction.updateMany({
+        where: { id: existingTransaction.id },
+        data:  { status: "PENDING" },
+      });
       return errorResponse(result.message, 502);
     }
-    if (result.providerRef) {
-      await db.transaction.update({
-        where: { id: existingTransaction.id },
-        data: {
-          providerRef: result.providerRef,
-          method: provider.toUpperCase(),
-        },
-      });
-    }
+
+    // Update the claimed transaction with providerRef + PENDING (gateway accepted it)
+    await db.transaction.update({
+      where: { id: existingTransaction.id },
+      data: {
+        providerRef: result.providerRef,
+        method: provider.toUpperCase(),
+        status: "PENDING",
+      },
+    });
 
     return jsonResponse({
       success: true,
@@ -124,7 +159,7 @@ export async function POST(req: NextRequest) {
     }, 200);
 
   } catch (e) {
-    console.error("[PAYMENTS/INITIATE] Error:", e);
+    logger.error('[payments/initiate] Error', { error: e instanceof Error ? e.message : String(e) });
     return errorResponse("Internal server error", 500);
   }
 }

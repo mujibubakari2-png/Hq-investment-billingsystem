@@ -7,6 +7,7 @@ import { syncRadiusUser } from "@/lib/radius";
 import { buildHotspotPortalFeedback } from "@/lib/hotspotFlow";
 import { paymentService } from "@/lib/payments/service";
 import { formatPhoneTZ } from "@/lib/payments/utils";
+import logger from "@/lib/logger";
 
 /**
  * POST /api/hotspot/purchase
@@ -253,10 +254,10 @@ export async function POST(req: NextRequest) {
           });
         }
       } else {
-        console.warn(`[HOTSPOT PURCHASE] Payment initiation failed: ${result.message}`);
+        logger.warn(`[HOTSPOT PURCHASE] Payment initiation failed: ${result.message}`);
       }
     } catch (payErr) {
-      console.error("[HOTSPOT PURCHASE] PaymentService error:", payErr);
+      logger.error("[HOTSPOT PURCHASE] PaymentService error:", { error: payErr instanceof Error ? payErr.message : String(payErr) });
     }
 
     const purchaseFeedback = paymentInitiated
@@ -264,7 +265,7 @@ export async function POST(req: NextRequest) {
       : undefined;
 
     if (!paymentInitiated) {
-      console.warn(`[HOTSPOT PURCHASE] No payment provider configured for tenant ${pkg.tenantId}. Transaction stays PENDING.`);
+      logger.warn(`[HOTSPOT PURCHASE] No payment provider configured for tenant ${pkg.tenantId}. Transaction stays PENDING.`);
     }
 
     return jsonResponse({
@@ -284,7 +285,7 @@ export async function POST(req: NextRequest) {
     });
 
   } catch (e) {
-    console.error("[HOTSPOT PURCHASE] Error:", e);
+    logger.error("[HOTSPOT PURCHASE] Error:", { error: e instanceof Error ? e.message : String(e) });
     return errorResponse("Internal server error", 500);
   }
 }
@@ -372,7 +373,7 @@ async function completeHotspotPurchase(
       });
     }
   } catch (radErr) {
-    console.error("[HOTSPOT] RADIUS sync error:", radErr);
+    logger.error("[HOTSPOT] RADIUS sync error:", { error: radErr instanceof Error ? radErr.message : String(radErr) });
   }
 
   // MikroTik activation
@@ -414,5 +415,5 @@ async function completeHotspotPurchase(
     }
   }
 
-  console.log(`✅ [HOTSPOT] Purchase complete: ${reference} → ${pkg.name}`);
+  logger.info(`✅ [HOTSPOT] Purchase complete: ${reference} → ${pkg.name}`);
 }

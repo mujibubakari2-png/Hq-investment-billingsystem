@@ -5,6 +5,7 @@ import { getTenantClient } from "@/lib/tenantPrisma";
 import { canAccessTenant } from "@/lib/tenant";
 import { parseOptionalDate } from "@/lib/dateUtils";
 import { EquipmentUpdateSchema } from "@/lib/validators";
+import logger from "@/lib/logger";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
@@ -60,7 +61,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         const eq = await db.equipment.update({ where: { id }, data: dataToUpdate });
         return jsonResponse(eq);
     } catch (err) {
-        console.error(err);
+        logger.error("[route] error", { error: err instanceof Error ? err.message : String(err) });
         return errorResponse("Internal server error", 500);
     }
 }
@@ -80,7 +81,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
         await db.equipment.delete({ where: { id } });
         return jsonResponse({ message: "Equipment deleted" });
     } catch (err) {
-        console.error(err);
+        logger.error("[route] error", { error: err instanceof Error ? err.message : String(err) });
         return errorResponse("Internal server error", 500);
     }
 }

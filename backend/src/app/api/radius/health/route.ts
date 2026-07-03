@@ -6,6 +6,7 @@ import { requirePermission } from "@/lib/rbac";
 import { backfillRadiusAccountingTenants } from "@/lib/radiusTenant";
 import { exec } from "child_process";
 import { promisify } from "util";
+import logger from "@/lib/logger";
 
 const execAsync = promisify(exec);
 
@@ -141,7 +142,7 @@ export async function GET(req: NextRequest) {
             },
         });
     } catch (e) {
-        console.error("RADIUS health check error:", e);
+        logger.error("RADIUS health check error:", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }

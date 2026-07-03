@@ -3,6 +3,7 @@ import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 import { canAccessTenant } from "@/lib/tenant";
 import { requirePermission } from "@/lib/rbac";
+import logger from "@/lib/logger";
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
@@ -34,7 +35,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
         return jsonResponse(template);
     } catch (e) {
-        console.error("TEMPLATE UPDATE ERROR:", e);
+        logger.error("TEMPLATE UPDATE ERROR:", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }
@@ -59,7 +60,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
         await db.messageTemplate.delete({ where: { id } });
         return jsonResponse({ message: "Template deleted" });
     } catch (e) {
-        console.error("TEMPLATE DELETE ERROR:", e);
+        logger.error("TEMPLATE DELETE ERROR:", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }

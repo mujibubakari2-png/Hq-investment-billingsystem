@@ -3,6 +3,7 @@ import { errorResponse, jsonResponse, hashPassword } from "@/lib/auth";
 import { verifyAndConsumeOtp } from "@/lib/otp";
 import { checkRateLimit } from "@/lib/rateLimiter";
 import { getTenantClient } from "@/lib/tenantPrisma";
+import logger from "@/lib/logger";
 
 export async function POST(req: NextRequest) {
     try {
@@ -39,7 +40,7 @@ export async function POST(req: NextRequest) {
 
         return jsonResponse({ message: "Password reset successfully" });
     } catch (e) {
-        console.error("RESET PASSWORD ERROR:", e);
+        logger.error("RESET PASSWORD ERROR:", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }

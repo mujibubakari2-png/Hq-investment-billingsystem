@@ -4,6 +4,7 @@ import { jsonResponse, errorResponse } from "@/lib/auth";
 import { buildHotspotPortalFeedback } from "@/lib/hotspotFlow";
 import { paymentService } from "@/lib/payments/service";
 import { isSupportedProvider } from "@/lib/payments/registry";
+import logger from "@/lib/logger";
 
 /**
  * GET /api/hotspot/status?reference=HP-XXXXX
@@ -85,7 +86,7 @@ export async function GET(req: NextRequest) {
                         transaction.status = liveStatus.status;
                     }
                 } catch (pollErr) {
-                    console.warn("[HOTSPOT STATUS] Live provider poll failed:", pollErr);
+                    logger.warn("[HOTSPOT STATUS] Live provider poll failed:", { error: pollErr instanceof Error ? pollErr.message : String(pollErr) });
                 }
             }
         }
@@ -126,7 +127,7 @@ export async function GET(req: NextRequest) {
         return jsonResponse(response);
 
     } catch (e) {
-        console.error("HOTSPOT STATUS ERROR:", e);
+        logger.error("HOTSPOT STATUS ERROR:", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }

@@ -1,3 +1,4 @@
+import logger from "@/lib/logger";
 import { z } from "zod";
 
 const emptyToUndefined = <T extends z.ZodTypeAny>(schema: T) =>
@@ -12,15 +13,12 @@ const envSchema = z.object({
   APP_URL: emptyToUndefined(z.string().url().optional()),
   APP_NAME: z.string().default("HQ INVESTMENT"),
 
-  // ─── JWT — Required at runtime (validated early so startup fails fast) ───────
+  // ─── JWT — REQUIRED at runtime (validated early so startup fails fast) ───────
+  // CRIT-SEC-002 FIX: These are now REQUIRED (not optional).
   // auth.ts and auth-edge.ts read these directly from process.env.
   // They are NOT used during `next build` (isNextBuild() guard bypasses them).
-  JWT_ACCESS_SECRET: emptyToUndefined(
-    z.string().min(32, "JWT_ACCESS_SECRET must be at least 32 characters").optional()
-  ),
-  JWT_REFRESH_SECRET: emptyToUndefined(
-    z.string().min(32, "JWT_REFRESH_SECRET must be at least 32 characters").optional()
-  ),
+  JWT_ACCESS_SECRET: z.string().min(32, "JWT_ACCESS_SECRET must be at least 32 characters"),
+  JWT_REFRESH_SECRET: z.string().min(32, "JWT_REFRESH_SECRET must be at least 32 characters"),
   // Legacy alias kept for backward-compatibility (MFA routes use this)
   JWT_SECRET: emptyToUndefined(z.string().min(32).optional()),
   NEXTAUTH_SECRET: emptyToUndefined(z.string().min(32).optional()),
@@ -42,6 +40,11 @@ const envSchema = z.object({
   SMTP_FROM: z.string().optional(),
 
   // ─── Webhook Secrets ──────────────────────────────────────────────────────
+  // CRIT-SEC-001: These are optional here because not every deployment
+  // uses every payment provider. However, each webhook route MUST validate
+  // that its secret is non-null before processing any incoming payload
+  // (return 503 if unset). A missing secret MUST NOT silently allow
+  // all webhooks through without signature verification.
   HOTSPOT_WEBHOOK_SECRET: z.string().optional(),
   PALMPESA_WEBHOOK_SECRET: z.string().optional(),
   ZENOPAY_WEBHOOK_SECRET: z.string().optional(),
@@ -94,7 +97,7 @@ const parsedEnv = envSchema.safeParse(process.env);
 
 if (!parsedEnv.success) {
   // Use console.warn because console.error gets stripped by compiler.removeConsole in production!
-  console.warn("❌ Invalid environment variables:", parsedEnv.error.format());
+  logger.warn("❌ Invalid environment variables:", parsedEnv.error.format());
   process.exit(1);
 }
 

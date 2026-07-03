@@ -5,6 +5,7 @@ import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { requirePermission } from "@/lib/rbac";
 import { getTenantFilter, getAssignTenantId } from "@/lib/tenant";
 import { RadiusUserCreateSchema } from '@/lib/validators';
+import logger from "@/lib/logger";
 
 // GET /api/radius/users – list RADIUS users (tenant-isolated)
 export async function GET(req: NextRequest) {
@@ -40,7 +41,7 @@ export async function GET(req: NextRequest) {
 
         return jsonResponse(result);
     } catch (e) {
-        console.error("RADIUS users list error:", e);
+        logger.error("RADIUS users list error:", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }
@@ -92,7 +93,7 @@ export async function POST(req: NextRequest) {
 
         return jsonResponse(user, 201);
     } catch (e) {
-        console.error("RADIUS user create error:", e);
+        logger.error("RADIUS user create error:", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }

@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 import { requirePermission } from "@/lib/rbac";
+import logger from "@/lib/logger";
 
 const BLOCKED_SETTING_KEYS = new Set(["paymentGateways"]);
 // GET /api/settings — all roles can read (branding, company name, etc.)
@@ -29,7 +30,7 @@ export async function GET(req: NextRequest) {
         });
         return jsonResponse(mapped);
     } catch (e) {
-        console.error(e);
+        logger.error("[route] error", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }
@@ -73,7 +74,7 @@ export async function PUT(req: NextRequest) {
 
         return jsonResponse({ message: "Settings updated", settings: mapped });
     } catch (e) {
-        console.error(e);
+        logger.error("[route] error", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }

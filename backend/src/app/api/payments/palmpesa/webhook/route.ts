@@ -5,6 +5,7 @@ import { sendEmail } from "@/lib/email";
 import { env } from "@/lib/env";
 import { rateLimitMiddleware } from "@/middleware/rateLimiter";
 import { timingSafeEqual } from "@/lib/payments/utils";
+import logger from "@/lib/logger";
 
 /**
  * POST /api/payments/palmpesa/webhook
@@ -26,7 +27,7 @@ import { timingSafeEqual } from "@/lib/payments/utils";
  */
 export async function POST(req: NextRequest) {
     try {
-        const rateLimited = rateLimitMiddleware(req);
+        const rateLimited = await rateLimitMiddleware(req); // FIXED: was missing await
         if (rateLimited) return rateLimited;
 
         const globalDb = getTenantClient(null);
@@ -43,7 +44,7 @@ export async function POST(req: NextRequest) {
         }
 
         if (!webhookSecret) {
-            console.error("[PALMPESA WEBHOOK] Webhook secret is not configured");
+            logger.error("[PALMPESA WEBHOOK] Webhook secret is not configured");
             return errorResponse("Webhook secret is not configured", 500);
         }
 
@@ -68,7 +69,7 @@ export async function POST(req: NextRequest) {
         // Non-success statuses: acknowledge and stop
         const isSuccess = paymentStatus === "COMPLETED" || paymentStatus === "SUCCESS";
         if (!isSuccess) {
-            console.log(`[PALMPESA WEBHOOK] Non-success status for order ${orderId}: ${paymentStatus}`);
+            logger.info(`[PALMPESA WEBHOOK] Non-success status for order ${orderId}: ${paymentStatus}`);
             return jsonResponse({ message: "Acknowledged non-success status" });
         }
 
@@ -89,14 +90,14 @@ export async function POST(req: NextRequest) {
         const resolvedInvoice = invoice ?? invoiceByNumber;
 
         if (!resolvedInvoice) {
-            console.error(`[PALMPESA WEBHOOK] Invoice not found for order_id: ${orderId}`);
+            logger.error(`[PALMPESA WEBHOOK] Invoice not found for order_id: ${orderId}`);
             return errorResponse("Invoice not found", 404);
         }
 
         // ISOLATION GUARD: Ensure this is a PLATFORM invoice (starts with INV-).
         // TENANT Hotspot/PPPoE payments use references like HP-... and should NOT trigger license activation.
         if (!resolvedInvoice.invoiceNumber.startsWith("INV-")) {
-            console.error(`[PALMPESA WEBHOOK] Invoice ${resolvedInvoice.invoiceNumber} is not a PLATFORM invoice. order_id: ${orderId}`);
+            logger.error(`[PALMPESA WEBHOOK] Invoice ${resolvedInvoice.invoiceNumber} is not a PLATFORM invoice. order_id: ${orderId}`);
             return errorResponse("Invoice not found (Cross-context mismatch)", 404);
         }
 
@@ -176,13 +177,13 @@ export async function POST(req: NextRequest) {
                 `,
             });
         } catch (mailError) {
-            console.error("[PALMPESA WEBHOOK] Failed to send activation email:", mailError);
+            logger.error("[PALMPESA WEBHOOK] Failed to send activation email:", { error: mailError instanceof Error ? mailError.message : String(mailError) });
         }
 
         return jsonResponse({ message: "Webhook processed successfully" });
 
     } catch (e) {
-        console.error("PALMPESA WEBHOOK ERROR:", e);
+        logger.error("PALMPESA WEBHOOK ERROR:", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }

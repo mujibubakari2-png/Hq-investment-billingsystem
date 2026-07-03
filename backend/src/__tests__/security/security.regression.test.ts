@@ -47,7 +47,9 @@ function mockJwt(payload: object): string {
     return signToken(payload as any);
 }
 
-// ─── Test Suites ──────────────────────────────────────────────────────────────
+beforeEach(() => {
+    jest.clearAllMocks();
+});
 
 // ════════════════════════════════════════════════════════════════════════════════
 // SEC-AUTH-002: Password minimum consistency (register vs reset)
@@ -56,10 +58,15 @@ describe("SEC-AUTH-002 — Password minimum length", () => {
     it("REGISTER: rejects passwords shorter than 6 characters", async () => {
         const { POST } = await import("@/app/api/auth/register/route");
         const req = makeRequest("http://localhost/api/auth/register", "POST", null, {
-            email: "test@example.com",
+            email: "short@example.com",
             password: "short",
             fullName: "Test User",
         });
+        
+        // Override IP for this request to avoid rate limit from earlier tests across runs
+        const randomIp = `192.168.1.${Math.floor(Math.random() * 255)}`;
+        Object.defineProperty(req, 'ip', { value: randomIp });
+        
         const res = await POST(req);
         expect(res.status).toBe(400);
         const json = await res.json();

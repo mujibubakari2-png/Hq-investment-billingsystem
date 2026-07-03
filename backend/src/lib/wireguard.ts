@@ -1,8 +1,8 @@
 /**
- * WireGuard Manager — Secure System Call Wrapper
+ * WireGuard Manager â€” Secure System Call Wrapper
  *
  * CRIT-001 FIX: All system calls now use execFile() instead of exec().
- *   - execFile() does NOT invoke a shell — metacharacters (;, |, $, `, etc.)
+ *   - execFile() does NOT invoke a shell â€” metacharacters (;, |, $, `, etc.)
  *     in arguments are passed literally to the binary, not interpreted by sh.
  *   - Previously, `exec(\`printf '%s' "${privateKey}" | wg pubkey\`)` allowed
  *     a malicious key string to execute arbitrary OS commands as the Node.js user.
@@ -14,10 +14,11 @@ import { promisify } from 'util';
 import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
+import logger from "@/lib/logger";
 
 const execFileAsync = promisify(execFile);
 
-// ── Input Validation ──────────────────────────────────────────────────────────
+// â”€â”€ Input Validation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /** WireGuard keys are 32-byte values encoded as Base64 (44 chars with trailing =) */
 const WG_KEY_REGEX = /^[A-Za-z0-9+/]{43}=$/;
@@ -46,7 +47,7 @@ function validateAllowedIp(ip: string): void {
     }
 }
 
-// ── Manager ───────────────────────────────────────────────────────────────────
+// â”€â”€ Manager â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export const wireguardManager = {
     /**
@@ -54,7 +55,7 @@ export const wireguardManager = {
      */
     getServerIp: async (): Promise<string> => {
         try {
-            // CRIT-001 FIX: execFile — no shell, args are literal
+            // CRIT-001 FIX: execFile â€” no shell, args are literal
             const { stdout } = await execFileAsync('ip', ['-4', 'addr', 'show', 'wg0']);
             const match = stdout.match(/inet\s+(\d+\.\d+\.\d+\.\d+)/);
             if (match && match[1]) {
@@ -71,11 +72,11 @@ export const wireguardManager = {
      */
     getServerPublicKey: async (): Promise<string | null> => {
         try {
-            // CRIT-001 FIX: execFile with sudo — no shell
+            // CRIT-001 FIX: execFile with sudo â€” no shell
             const { stdout } = await execFileAsync('sudo', ['wg', 'show', 'wg0', 'public-key']);
             return stdout.trim();
         } catch (error) {
-            console.error('[WireGuard Error] Failed to get server public key:', error);
+            logger.error('[WireGuard Error] Failed to get server public key:', { error: error instanceof Error ? error.message : String(error) });
             return null;
         }
     },
@@ -84,7 +85,7 @@ export const wireguardManager = {
      * Generate a new WireGuard private key.
      */
     generatePrivateKey: async (): Promise<string> => {
-        // CRIT-001 FIX: execFile — 'wg genkey' takes no args, no shell needed
+        // CRIT-001 FIX: execFile â€” 'wg genkey' takes no args, no shell needed
         const { stdout } = await execFileAsync('wg', ['genkey']);
         return stdout.trim();
     },
@@ -93,7 +94,7 @@ export const wireguardManager = {
      * Derive a WireGuard public key from a private key.
      *
      * CRIT-001 FIX: Previously used exec(`printf '%s' "${privateKey}" | wg pubkey`)
-     * which was injectable. Now uses execFile with stdin pipe — the private key
+     * which was injectable. Now uses execFile with stdin pipe â€” the private key
      * is passed as process input, NEVER interpolated into a shell string.
      */
     derivePublicKey: async (privateKey: string): Promise<string> => {
@@ -108,7 +109,7 @@ export const wireguardManager = {
                 resolve(stdout.trim());
             });
 
-            // Pass private key via stdin — never touches a shell
+            // Pass private key via stdin â€” never touches a shell
             child.stdin?.write(privateKey + '\n');
             child.stdin?.end();
         });
@@ -136,7 +137,7 @@ export const wireguardManager = {
 
         try {
             if (presharedKey) {
-                // Write preshared key to a secure temp file — never touches shell
+                // Write preshared key to a secure temp file â€” never touches shell
                 tmpFile = path.join(os.tmpdir(), `wg-psk-${Date.now()}.tmp`);
                 await fs.writeFile(tmpFile, presharedKey, { mode: 0o600 });
 
@@ -159,7 +160,7 @@ export const wireguardManager = {
 
             return { success: true, message: `Peer ${allowedIp} added successfully` };
         } catch (error: any) {
-            console.error('[WireGuard Error] Failed to add peer:', error);
+            logger.error('[WireGuard Error] Failed to add peer:', error);
             throw error;
         } finally {
             // Always delete the temp file, even on error
@@ -183,7 +184,7 @@ export const wireguardManager = {
 
             return { success: true, message: 'Peer removed successfully' };
         } catch (error: any) {
-            console.error('[WireGuard Error] Failed to remove peer:', error);
+            logger.error('[WireGuard Error] Failed to remove peer:', error);
             throw error;
         }
     },
@@ -208,7 +209,7 @@ export const wireguardManager = {
                 };
             });
         } catch (error) {
-            console.error('[WireGuard Error] Failed to list peers:', error);
+            logger.error('[WireGuard Error] Failed to list peers:', { error: error instanceof Error ? error.message : String(error) });
             return [];
         }
     },
@@ -236,8 +237,9 @@ export const wireguardManager = {
             }
             return false;
         } catch (error) {
-            console.error('[WireGuard Error] Failed to check peer handshake:', error);
+            logger.error('[WireGuard Error] Failed to check peer handshake:', { error: error instanceof Error ? error.message : String(error) });
             return false;
         }
     },
 };
+

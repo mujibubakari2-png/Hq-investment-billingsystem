@@ -9,15 +9,12 @@ import { env } from "@/lib/env";
 import { createUniqueTenantSlug } from "@/lib/tenantSlug";
 
 export async function POST(req: NextRequest) {
-    const rateLimitResponse = await checkRateLimit(req);
-    if (rateLimitResponse) return rateLimitResponse;
-
     const db = getTenantClient(null);
 
     try {
         let body;
         try {
-            body = await req.json();
+            body = await req.clone().json();
         } catch (e) {
             return errorResponse("Invalid JSON in request body", 400);
         }
@@ -27,6 +24,9 @@ export async function POST(req: NextRequest) {
             const msg = parsed.error.issues.map((e: any) => `${e.path.join('.')}: ${e.message}`).join('; ');
             return errorResponse(`Invalid request body: ${msg}`, 400);
         }
+
+        const rateLimitResponse = await checkRateLimit(req);
+        if (rateLimitResponse) return rateLimitResponse;
 
         const email = parsed.data.email;
         const password = parsed.data.password;
@@ -72,9 +72,9 @@ export async function POST(req: NextRequest) {
             return errorResponse("Invalid email format");
         }
 
-        // Validate password length (min 8, consistent with password-reset policy)
-        if (password.length < 8) {
-            return errorResponse("Password must be at least 8 characters long", 400);
+        // Validate password length (consistent with the registration schema)
+        if (password.length < 6) {
+            return errorResponse("Password must be at least 6 characters long", 400);
         }
 
         // Verify if email already exists

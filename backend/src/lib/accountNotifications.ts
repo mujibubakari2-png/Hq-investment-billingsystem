@@ -1,5 +1,6 @@
 import { getTenantClient } from "@/lib/tenantPrisma";
 import { sendEmail } from "@/lib/email";
+import logger from "@/lib/logger";
 
 type AccountNotificationInput = {
     tenantId?: string | null;
@@ -38,7 +39,7 @@ async function createSmsLog(recipient: string, message: string, tenantId?: strin
             },
         });
     } catch (err) {
-        console.error("[ACCOUNT NOTIFICATIONS] Failed to create SMS log:", err);
+        logger.error("[ACCOUNT NOTIFICATIONS] Failed to create SMS log:", { error: err instanceof Error ? err.message : String(err) });
     }
 }
 

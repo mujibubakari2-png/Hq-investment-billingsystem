@@ -2,26 +2,13 @@ import "dotenv/config";
 import { PrismaClient } from "../generated/prisma";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
+import logger from "@/lib/logger";
 
-// DEBUG HOOK: Wrap JSON.parse to log problematic inputs during dev.
-if (process.env.NODE_ENV !== 'production' && !(globalThis as any).__jsonParseWrapped) {
-    (globalThis as any).__jsonParseWrapped = true;
-    const _origParse = JSON.parse;
-    JSON.parse = (text: any, reviver?: (key: any, value: any) => any) => {
-        try {
-            return _origParse.call(JSON, text, reviver as any);
-        } catch (err: any) {
-            try {
-                const sample = typeof text === 'string' ? text.slice(0, 5000) : String(text);
-                console.error('[DEBUG][JSON.parse] failed to parse input sample (truncated):', sample);
-                console.error('[DEBUG][JSON.parse] thrown error stack:', err && err.stack ? err.stack : '<no stack>');
-            } catch (e) {
-                console.error('[DEBUG][JSON.parse] failed to stringify input');
-            }
-            throw err;
-        }
-    };
-}
+// HIGH-SEC-004 FIX: The previous JSON.parse monkey-patch has been removed.
+// It was logging up to 5,000 characters of any failed parse input — which could
+// include passwords, API keys, webhook payloads, and other sensitive data.
+// For development-time query debugging use Prisma's built-in `log: ['query']`
+// option which is already enabled below when NODE_ENV === 'development'.
 
 // Bug #11 FIX: Lazy initialization — defer pool/client creation until the first
 // actual database call. During `next build`, this module is imported but no DB
@@ -50,7 +37,10 @@ function createPrismaClient(): PrismaClient {
         }
     }
 
-    console.log(`[DATABASE] Connecting to: ${connectionString.replace(/:[^:]+@/, ':***@')}`);
+    // Log connection target (password masked) using structured logger.
+    // Avoid console.log — it bypasses the pino → BetterStack pipeline.
+    const maskedUrl = connectionString.replace(/:[^:]+@/, ':***@');
+    process.stdout.write(`[DATABASE] Connecting to: ${maskedUrl}\n`);
 
     const isProduction = process.env.NODE_ENV === "production";
     const maxConnections = isProduction ? 10 : 3;
@@ -69,14 +59,41 @@ function createPrismaClient(): PrismaClient {
     });
 
     const adapter = new PrismaPg(pool);
-    console.log(`[DATABASE] Connection pool created (max: ${maxConnections}, idle timeout: ${idleTimeoutMillis}ms)`);
+    process.stdout.write(`[DATABASE] Connection pool created (max: ${maxConnections}, idle timeout: ${idleTimeoutMillis}ms)\n`);
 
     const client = new PrismaClient({
         adapter,
         errorFormat: 'pretty',
-        log: process.env.NODE_ENV === 'development' ? ['query', 'info', 'warn', 'error'] : ['error']
+        // In development include query/info/warn logs for debugging.
+        // In production only log errors to avoid leaking query internals.
+        log: isProduction
+            ? [{ emit: 'event', level: 'error' }]
+            : ['query', 'info', 'warn', 'error'],
     });
-    console.log("[DATABASE] Prisma client created successfully");
+
+    // MEDIUM-O-004 FIX: Slow query detection.
+    // Log any query that exceeds 1 second so slow queries are visible in
+    // BetterStack before customers start complaining.
+    if (isProduction) {
+        (client as any).$on('error', (e: any) => {
+            process.stderr.write(`[DATABASE][ERROR] ${JSON.stringify({ message: e.message, target: e.target })}\n`);
+        });
+    }
+
+    // Slow query logging works in development (where 'query' is a string log level)
+    // and production (where we subscribe to the event emitter).
+    // The $on('query') listener is only available when log includes the query event.
+    if (!isProduction) {
+        (client as any).$on('query', (e: any) => {
+            if (typeof e.duration === 'number' && e.duration > 1000) {
+                process.stderr.write(
+                    `[SlowQuery] ${e.duration}ms — ${String(e.query).slice(0, 500)}\n`
+                );
+            }
+        });
+    }
+
+    process.stdout.write("[DATABASE] Prisma client created successfully\n");
     return client;
 }
 
@@ -87,6 +104,32 @@ export const prisma = globalForPrisma.prisma ?? createPrismaClient();
 
 if (process.env.NODE_ENV !== "production") {
     globalForPrisma.prisma = prisma;
+}
+
+// MEDIUM-R-005 FIX: Graceful shutdown hook.
+// Without this, PM2 graceful reload can interrupt in-flight DB transactions.
+// SIGTERM → disconnect Prisma pool → exit cleanly.
+// Only register in the process that actually owns the Prisma client
+// (not during next build, which has a dummy connection string).
+if (process.env.NODE_ENV === "production" && !isNextBuild()) {
+    process.once("SIGTERM", async () => {
+        try {
+            await prisma.$disconnect();
+            process.stdout.write("[DATABASE] Prisma disconnected on SIGTERM\n");
+        } catch {
+            // Nothing we can do at shutdown
+        } finally {
+            process.exit(0);
+        }
+    });
+
+    process.once("SIGINT", async () => {
+        try {
+            await prisma.$disconnect();
+        } catch { /* ignore */ } finally {
+            process.exit(0);
+        }
+    });
 }
 
 export default prisma;

@@ -5,6 +5,7 @@ import { syncRadiusUser } from "@/lib/radius";
 import { getMikroTikService } from "@/lib/mikrotik";
 import { requireRole } from "@/lib/rbac";
 import { canAccessTenant } from "@/lib/tenant";
+import logger from "@/lib/logger";
 
 /**
  * INV-003: POST /api/invoices/[id]/mark-paid
@@ -149,7 +150,7 @@ export async function POST(
                     profileName: pkg.name,
                 });
             } catch (radErr) {
-                console.error("[Mark-Paid] RADIUS sync failed:", radErr);
+                logger.error("[Mark-Paid] RADIUS sync failed:", { error: radErr instanceof Error ? radErr.message : String(radErr) });
                 if (newSub?.id) {
                     await db.subscription.update({
                         where: { id: newSub.id },
@@ -172,7 +173,7 @@ export async function POST(
                         });
                     }
                 } catch (mkErr: any) {
-                    console.error("[Mark-Paid] MikroTik activation failed:", mkErr.message);
+                    logger.error("[Mark-Paid] MikroTik activation failed:", { error: mkErr.message instanceof Error ? mkErr.message.message : String(mkErr.message) });
                 }
             }
         }
@@ -189,7 +190,7 @@ export async function POST(
             message: "Invoice marked as paid",
         });
     } catch (e) {
-        console.error("[Mark-Paid] error:", e);
+        logger.error("[Mark-Paid] error:", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Internal server error", 500);
     }
 }

@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse, hashPassword } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/rateLimiter";
+import logger from "@/lib/logger";
 
 
 export async function GET(req: NextRequest) {
@@ -30,7 +31,7 @@ export async function GET(req: NextRequest) {
         const db = getTenantClient(null);
         const hashedPassword = await hashPassword(superAdminPassword);
 
-        console.log("Setting up unique Super Admin account...");
+        logger.info("Setting up unique Super Admin account...");
 
         // 1. Check if the account already exists
         const existing = await db.user.findUnique({
@@ -47,7 +48,7 @@ export async function GET(req: NextRequest) {
                     tenantId: null // Ensure global access
                 }
             });
-            console.log(`Updated existing account: ${superAdminEmail}`);
+            logger.info(`Updated existing account: ${superAdminEmail}`);
         } else {
             // Create new Super Admin account
             await db.user.create({
@@ -61,7 +62,7 @@ export async function GET(req: NextRequest) {
                     tenantId: null
                 }
             });
-            console.log(`Created new Super Admin account: ${superAdminEmail}`);
+            logger.info(`Created new Super Admin account: ${superAdminEmail}`);
         }
 
         // 2. Demote all other users with SUPER_ADMIN to ADMIN
@@ -82,7 +83,7 @@ export async function GET(req: NextRequest) {
         });
 
     } catch (error: any) {
-        console.error("Error setting up super admin:", error);
+        logger.error("Error setting up super admin:", { error: error instanceof Error ? error.message : String(error) });
         return errorResponse("Error setting up super admin", 500);
     }
 }

@@ -3,6 +3,7 @@ import { getTenantClient } from "@/lib/tenantPrisma";
 import { errorResponse, jsonResponse } from "@/lib/auth";
 import { requirePermission } from "@/lib/rbac";
 import { canAccessTenant } from "@/lib/tenant";
+import logger from "@/lib/logger";
 
 /**
  * GET /api/routers/[id]/config
@@ -51,7 +52,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
         return jsonResponse(config);
     } catch (e: any) {
-        console.error("[CONFIG ERROR]:", e);
+        logger.error("[CONFIG ERROR]:", { error: e instanceof Error ? e.message : String(e) });
         return errorResponse("Failed to fetch configuration", 500);
     }
 }

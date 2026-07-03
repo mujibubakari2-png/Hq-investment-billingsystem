@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { NextRequest } from "next/server";
 import crypto from "crypto";
 import { cacheGet, cacheSet } from "@/lib/cache";
+import logger from "@/lib/logger";
 
 
 function isNextBuild(): boolean {
@@ -31,7 +32,7 @@ function getAccessSecret(): string {
     if (!secret) {
         throw new Error(
             "FATAL: JWT_ACCESS_SECRET environment variable is required. " +
-            "Generate with: node -e \"console.log(require('crypto').randomBytes(48).toString('hex'))\""
+            "Generate with: node -e \"logger.info(require('crypto').randomBytes(48).toString('hex'))\""
         );
     }
     if (secret.length < 32) {
@@ -46,7 +47,7 @@ function getRefreshSecret(): string {
     if (!secret) {
         throw new Error(
             "FATAL: JWT_REFRESH_SECRET environment variable is required. " +
-            "Generate with: node -e \"console.log(require('crypto').randomBytes(48).toString('hex'))\""
+            "Generate with: node -e \"logger.info(require('crypto').randomBytes(48).toString('hex'))\""
         );
     }
     if (secret.length < 32) {
@@ -230,7 +231,7 @@ export function errorResponse(
     details?: string
 ) {
     if (status >= 400) {
-        console.warn(`[API ERROR] Status ${status} (${code ?? 'NO_CODE'}): ${message}`);
+        logger.warn(`[API ERROR] Status ${status} (${code ?? 'NO_CODE'}): ${message}`);
     }
     return jsonResponse({
         success: false,

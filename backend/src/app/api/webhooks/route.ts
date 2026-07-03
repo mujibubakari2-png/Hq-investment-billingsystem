@@ -1,5 +1,6 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { checkRateLimit } from '@/lib/rateLimiter';
+import logger from "@/lib/logger";
 
 // [DEPRECATED] Legacy Webhook Handler for Gateways
 // Replaced by /api/webhooks/tenant/[tenantId]/[providerName]
@@ -9,7 +10,7 @@ export async function POST(req: NextRequest) {
         const rateLimitRes = await checkRateLimit(req);
         if (rateLimitRes) return rateLimitRes;
 
-        console.error("[DEPRECATED] Webhook hit disabled legacy route /api/webhooks. Rejecting with 410.");
+        logger.error("[DEPRECATED] Webhook hit disabled legacy route /api/webhooks. Rejecting with 410.");
 
         // Return 410 Gone to signal the provider that this URL is permanently removed.
         // Providers will typically alert the merchant to update their Webhook URL.

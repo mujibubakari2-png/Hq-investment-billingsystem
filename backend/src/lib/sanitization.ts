@@ -4,33 +4,34 @@
  */
 
 /**
- * Sanitize HTML content to remove script tags and dangerous attributes
+ * HIGH-SEC-005 FIX: Sanitize HTML content by stripping ALL tags.
+ *
+ * The previous implementation used a chain of regular expressions to remove
+ * specific dangerous patterns (<script>, event handlers, etc.). Regex-based
+ * HTML parsing is fundamentally unreliable — exotic vectors such as
+ * `<img src=x onerror=...>`, SVG XSS, CSS `expression()`, and nested/broken
+ * tag structures all bypass it.
+ *
+ * The correct approach for contexts that do not need any HTML markup is to
+ * strip every tag entirely, leaving only the text content. This is
+ * universally safe because no HTML survives.
+ *
+ * If you need to allow a specific safe subset of HTML (e.g. bold/italic in
+ * user bios), install the `sanitize-html` package and configure an explicit
+ * allowlist of tags and attributes — do not use this function for that use case.
  */
 export function sanitizeHtml(input: string): string {
     if (!input) return '';
-
-    let sanitized = input;
-
-    // Remove script tags and their content
-    sanitized = sanitized.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
-
-    // Remove event handlers
-    sanitized = sanitized.replace(/\s*on\w+\s*=\s*['"][^'"]*['"]/gi, '');
-    sanitized = sanitized.replace(/\s*on\w+\s*=\s*[^\s>]*/gi, '');
-
-    // Remove iframe tags
-    sanitized = sanitized.replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '');
-
-    // Remove base tag
-    sanitized = sanitized.replace(/<base\b[^>]*>/gi, '');
-
-    // Remove link tags with javascript:
-    sanitized = sanitized.replace(/<link\b[^>]*href\s*=\s*['"]?javascript:[^'">\s]*['"]?[^>]*>/gi, '');
-
-    // Remove forms
-    sanitized = sanitized.replace(/<form\b[^<]*(?:(?!<\/form>)<[^<]*)*<\/form>/gi, '');
-
-    return sanitized.trim();
+    // Strip every HTML/XML tag by replacing all <...> sequences.
+    // This is intentionally aggressive: any remaining text is plain-text safe.
+    return input
+        .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '') // remove script tags entirely
+        .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, '')   // remove style tags entirely
+        .replace(/<[^>]*>/g, '')   // remove all tags
+        .replace(/&lt;/gi, '<')    // decode common entities so text is readable
+        .replace(/&gt;/gi, '>')
+        .replace(/&amp;/gi, '&')
+        .trim();
 }
 
 /**

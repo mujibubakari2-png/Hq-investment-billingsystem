@@ -25,7 +25,7 @@
  * FIX-HP-001 (2026-06-29):
  *   Previous implementation hit /payments/collect with fields reference, currency,
  *   msisdn, msisdn_local, customer_name, customer_email, narration, callback_url,
- *   environment — NONE of which match the official docs.
+ *   environment â€” NONE of which match the official docs.
  *   Corrected to /api/v1/collect with only: phone, amount, description, webhook_url.
  *   Auth header changed from X-Api-Key / X-Api-Secret to single X-API-Key per docs.
  *   Status endpoint corrected from /payments/status/{id} to /api/v1/status/{id}.
@@ -40,6 +40,7 @@ import {
   ParsedWebhookPayload,
   ProviderConfig,
 } from "@/lib/payments/types";
+import logger from "@/lib/logger";
 import {
   formatPhoneLocal,
   timingSafeEqual,
@@ -77,7 +78,7 @@ export class HarakaPayProvider implements PaymentProvider {
     };
   }
 
-  // ─── Initiate Payment ──────────────────────────────────────────────────────
+  // â”€â”€â”€ Initiate Payment â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // FIX-HP-001: Official endpoint is POST /api/v1/collect
   //             Required fields: phone, amount
   //             Optional: description, webhook_url
@@ -126,7 +127,7 @@ export class HarakaPayProvider implements PaymentProvider {
     }
   }
 
-  // ─── Check Transaction Status ──────────────────────────────────────────────
+  // â”€â”€â”€ Check Transaction Status â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // FIX-HP-001: Official endpoint is GET /api/v1/status/{order_id}
   //             Response has payment.status = "completed" | "failed" | "pending"
 
@@ -159,12 +160,12 @@ export class HarakaPayProvider implements PaymentProvider {
       };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Unknown error";
-      console.error(`[HARAKAPAY] checkStatus error: ${msg}`);
+      logger.error(`[HARAKAPAY] checkStatus error: ${msg}`);
       return { status: "PENDING" };
     }
   }
 
-  // ─── Webhook Verification ──────────────────────────────────────────────────
+  // â”€â”€â”€ Webhook Verification â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // HarakaPay docs do not document a signature scheme; we accept HMAC or shared secret.
 
   async verifyWebhook(
@@ -172,7 +173,7 @@ export class HarakaPayProvider implements PaymentProvider {
     rawBody: string
   ): Promise<WebhookVerification> {
     if (!this.webhookSecret) {
-      console.error("[HARAKAPAY] Webhook secret not configured — rejecting webhook.");
+      logger.error("[HARAKAPAY] Webhook secret not configured â€” rejecting webhook.");
       return { verified: false, reason: "Webhook secret not configured" };
     }
 
@@ -199,7 +200,7 @@ export class HarakaPayProvider implements PaymentProvider {
     return { verified: false, reason: "No signature header found" };
   }
 
-  // ─── Parse Webhook Payload ─────────────────────────────────────────────────
+  // â”€â”€â”€ Parse Webhook Payload â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Official webhook payload: { order_id, status, amount, net_amount, fee_amount,
   //                             created_at, completed_at }
   // status: "completed" | "failed"

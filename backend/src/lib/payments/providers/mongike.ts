@@ -31,7 +31,7 @@
  *   Previous implementation used wrong base URL (api.mongike.com/v1),
  *   wrong initiate endpoint (/payments/initiate), wrong payload fields
  *   (reference, phone_number, phone_local, customer_name, description, callback_url,
- *   currency, environment — NONE documented), wrong auth (x-api-secret + x-environment),
+ *   currency, environment â€” NONE documented), wrong auth (x-api-secret + x-environment),
  *   and wrong webhook verification (HMAC). All corrected to match official OpenAPI spec.
  */
 
@@ -44,6 +44,7 @@ import {
   ParsedWebhookPayload,
   ProviderConfig,
 } from "@/lib/payments/types";
+import logger from "@/lib/logger";
 import {
   formatPhoneTZ,
   timingSafeEqual,
@@ -80,14 +81,14 @@ export class MongikeProvider implements PaymentProvider {
     };
   }
 
-  // ── Initiate Payment ──────────────────────────────────────────────────────
+  // â”€â”€ Initiate Payment â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // FIX-MG-001: Official endpoint POST /payments/mobile-money/tanzania
   // Required: order_id, amount, buyer_phone, fee_payer
   // Optional: buyer_name, buyer_email, metadata, webhook_url
 
   async initiatePayment(request: PaymentRequest): Promise<PaymentResponse> {
     // International format, no + sign: 255712345678
-    const phone = formatPhoneTZ(request.phone); // returns 255XXXXXXXXX — correct format
+    const phone = formatPhoneTZ(request.phone); // returns 255XXXXXXXXX â€” correct format
 
     const payload: Record<string, unknown> = {
       order_id:    request.reference,
@@ -97,7 +98,7 @@ export class MongikeProvider implements PaymentProvider {
       webhook_url: request.callbackUrl,
     };
 
-    // Optional fields — only include when provided
+    // Optional fields â€” only include when provided
     if (request.buyerName)  payload.buyer_name  = request.buyerName;
     if (request.buyerEmail) payload.buyer_email = request.buyerEmail;
 
@@ -140,20 +141,20 @@ export class MongikeProvider implements PaymentProvider {
     }
   }
 
-  // ── Check Transaction Status ──────────────────────────────────────────────
+  // â”€â”€ Check Transaction Status â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Mongike official docs do NOT document a status-check endpoint.
   // Return PENDING always; rely on webhook for authoritative status.
   // If a private status URL is configured in channel.config.apiStatusUrl, use it.
 
   async checkStatus(providerRef: string): Promise<TransactionStatus> {
-    console.warn(
+    logger.warn(
       "[MONGIKE] checkStatus called but Mongike does not document a status-check endpoint. " +
       "Returning PENDING. Rely on webhooks for authoritative status updates."
     );
     return { status: "PENDING", providerRef };
   }
 
-  // ── Webhook Verification ──────────────────────────────────────────────────
+  // â”€â”€ Webhook Verification â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // FIX-MG-001: Official docs state Mongike sends x-api-key header for webhook auth.
   // "Mongike will send the x-api-key in the request header when calling your webhook URL."
 
@@ -182,10 +183,10 @@ export class MongikeProvider implements PaymentProvider {
     return { verified: false, reason: "x-api-key mismatch" };
   }
 
-  // ── Parse Webhook Payload ─────────────────────────────────────────────────
+  // â”€â”€ Parse Webhook Payload â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Official webhook payload:
   //   { order_id, payment_status, reference, amount, metadata }
-  // payment_status: "COMPLETED" (only value per docs — webhook only fires on COMPLETED)
+  // payment_status: "COMPLETED" (only value per docs â€” webhook only fires on COMPLETED)
 
   parseWebhookPayload(body: unknown): ParsedWebhookPayload {
     const b = body as Record<string, unknown>;
