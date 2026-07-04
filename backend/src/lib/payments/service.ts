@@ -113,7 +113,16 @@ export class PaymentService {
       },
     });
 
-    logger.info("[TRACE][PaymentService.getChannel] EXIT", { tenantId, providerName, channel });
+    // SECURITY FIX: never log the full `channel` record — it carries
+    // apiKey/apiSecret/webhookSecret (encrypted at rest, but there is no
+    // reason to also ship the ciphertext to a third-party log aggregator).
+    // Log only non-sensitive identifiers instead.
+    logger.info("[TRACE][PaymentService.getChannel] EXIT", {
+      tenantId,
+      providerName,
+      channelId: channel?.id ?? null,
+      channelFound: !!channel,
+    });
     return channel;
   }
 
@@ -166,7 +175,8 @@ export class PaymentService {
 
     const channel = await this.getChannel(tenantId, providerName, paymentContext);
     const provider = getPaymentProvider(providerName, channel);
-    logger.info("[TRACE][PaymentService.initiatePayment] PROVIDER_SELECTED", { providerName, providerClass: provider.constructor?.name, channel });
+    // SECURITY FIX: log only the channel id, not the full record (see getChannel() fix above).
+    logger.info("[TRACE][PaymentService.initiatePayment] PROVIDER_SELECTED", { providerName, providerClass: provider.constructor?.name, channelId: (channel as any)?.id ?? null });
 
     const request: PaymentRequest = { amount, phone: cleanPhone, reference, description, callbackUrl, buyerName, buyerEmail };
 

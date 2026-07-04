@@ -4,6 +4,7 @@ import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 const nextConfig = {
     distDir: process.env.BUILD_DIR || '.next',
+    output: 'standalone',
     // Prisma and bcryptjs must not be bundled by webpack — they use native bindings
     serverExternalPackages: ['@prisma/client', 'bcryptjs', 'ioredis', 'bullmq'],
 

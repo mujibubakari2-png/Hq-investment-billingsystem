@@ -55,11 +55,12 @@ function getClient(): IORedis | null {
             port: conn.port,
             password: conn.password,
             tls: (conn as any).tls,
-            maxRetriesPerRequest: 3,
-            enableReadyCheck: true,
+            maxRetriesPerRequest: 1,
+            enableReadyCheck: false,
             lazyConnect: true,
-            connectTimeout: 3000,
-            commandTimeout: 2000,
+            connectTimeout: 1000,
+            commandTimeout: 1000,
+            retryStrategy: () => null,
         });
         _client.on('error', (err) => {
             logger.warn('[Cache] Redis error', { error: err.message });

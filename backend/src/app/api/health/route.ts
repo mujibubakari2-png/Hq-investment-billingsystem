@@ -3,6 +3,7 @@ import { getTenantClient } from "@/lib/tenantPrisma";
 import { getRedisClient } from "@/lib/cache";
 import { getMikroTikQueue } from "@/lib/queue";
 import logger from "@/lib/logger";
+import { withTimeout } from "@/lib/timeout";
 
 export const dynamic = 'force-dynamic';
 
@@ -76,28 +77,49 @@ export async function GET() {
         const db = getTenantClient(null);
 
         const dbStart = Date.now();
-        await db.$queryRaw`SELECT 1 as test`;
+        const dbResult = await withTimeout(
+            db.$queryRaw`SELECT 1 as test`,
+            3000,
+            'Database probe timed out'
+        );
+        if (!dbResult.ok) {
+            throw new Error(dbResult.error ?? 'Database probe timed out');
+        }
         response.database.latency_ms = Date.now() - dbStart;
         response.database.connected = true;
 
         // Schema verification
         try {
-            const tableQuery = await db.$queryRaw<{ tablename: string }[]>`
-                SELECT tablename FROM pg_tables WHERE schemaname = 'public' LIMIT 1
-            `;
-            if (tableQuery?.length > 0) response.database.schema_verified = true;
+            const tableQueryResult = await withTimeout(
+                db.$queryRaw<{ tablename: string }[]>`
+                    SELECT tablename FROM pg_tables WHERE schemaname = 'public' LIMIT 1
+                `,
+                3000,
+                'Schema verification timed out'
+            );
+            if (tableQueryResult.ok && Array.isArray(tableQueryResult.data) && tableQueryResult.data.length > 0) {
+                response.database.schema_verified = true;
+            }
         } catch {
             diagnostics.push("Schema verification failed (non-critical)");
         }
 
         // Critical table access
         try {
-            await Promise.all([
-                db.user.count(),
-                db.tenant.count(),
-                db.client.count(),
-            ]);
-            response.database.critical_tables_accessible = true;
+            const tableAccessResult = await withTimeout(
+                Promise.all([
+                    db.user.count(),
+                    db.tenant.count(),
+                    db.client.count(),
+                ]),
+                3000,
+                'Critical table access timed out'
+            );
+            if (tableAccessResult.ok) {
+                response.database.critical_tables_accessible = true;
+            } else {
+                throw new Error(tableAccessResult.error ?? 'Critical table access timed out');
+            }
         } catch (err) {
             diagnostics.push(`Critical table access failed: ${err instanceof Error ? err.message : String(err)}`);
             response.status = "degraded";
@@ -119,11 +141,15 @@ export async function GET() {
         const redis = getRedisClient();
         if (redis) {
             const redisStart = Date.now();
-            await redis.ping();
-            response.redis = {
-                connected: true,
-                latency_ms: Date.now() - redisStart,
-            };
+            const redisResult = await withTimeout(redis.ping(), 2000, 'Redis ping timed out');
+            if (redisResult.ok) {
+                response.redis = {
+                    connected: true,
+                    latency_ms: Date.now() - redisStart,
+                };
+            } else {
+                throw new Error(redisResult.error ?? 'Redis ping timed out');
+            }
         } else {
             response.redis = { connected: false };
             // Redis being down means rate limiting, caching, and queue are all broken
@@ -140,11 +166,19 @@ export async function GET() {
     // ── 3. BullMQ queue ───────────────────────────────────────────────────────
     try {
         const queue = getMikroTikQueue();
-        const counts = await queue.getJobCounts('waiting', 'active', 'failed', 'delayed');
+        const queueResult = await withTimeout(
+            queue.getJobCounts('waiting', 'active', 'failed', 'delayed'),
+            3000,
+            'Queue inspection timed out'
+        );
+        if (!queueResult.ok) {
+            throw new Error(queueResult.error ?? 'Queue inspection timed out');
+        }
+        const counts = queueResult.data;
         response.queue = counts;
 
         const FAILED_THRESHOLD = 100;
-        if ((counts.failed ?? 0) > FAILED_THRESHOLD) {
+        if (counts && (counts.failed ?? 0) > FAILED_THRESHOLD) {
             if (response.status === "ok") response.status = "degraded";
             diagnostics.push(`BullMQ failed job count is high: ${counts.failed} (threshold: ${FAILED_THRESHOLD})`);
         }
@@ -161,8 +195,9 @@ export async function GET() {
             heap_total_mb: Math.round(mem.heapTotal / 1024 / 1024),
             rss_mb: Math.round(mem.rss / 1024 / 1024),
         };
-        // Flag if heap is more than 90% utilised
-        if (response.memory.heap_used_mb / response.memory.heap_total_mb > 0.9) {
+        // Flag only if heap is above 95% utilisation, which is a more reliable threshold
+        // for a healthy service and avoids false positives on small local environments.
+        if (response.memory.heap_used_mb / response.memory.heap_total_mb > 0.95) {
             if (response.status === "ok") response.status = "degraded";
             diagnostics.push(`Memory pressure: heap ${response.memory.heap_used_mb}/${response.memory.heap_total_mb} MB`);
         }

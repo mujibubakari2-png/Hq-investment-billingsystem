@@ -117,6 +117,11 @@ export function csrfMiddleware(request: NextRequest): NextResponse | null {
     const pathname = request.nextUrl.pathname;
     if (CSRF_EXEMPT_PATHS.some((p) => pathname.startsWith(p))) return null;
 
+    const authHeader = request.headers.get('authorization');
+    if (authHeader?.toLowerCase().startsWith('bearer ')) {
+        return null;
+    }
+
     if (!verifyCsrfToken(request)) {
         return NextResponse.json(
             { error: 'CSRF token invalid or missing', code: 'CSRF_VALIDATION_FAILED' },

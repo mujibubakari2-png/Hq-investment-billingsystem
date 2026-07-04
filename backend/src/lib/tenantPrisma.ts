@@ -255,6 +255,23 @@ function createModelProxy(
                 };
             }
 
+            // ── upsert: scope where/create/update to the tenant ───────────────
+            if (prop === 'upsert') {
+                return (args: any = {}) => {
+                    const isTenantModel = TENANT_MODELS.has(model);
+                    if (tenantId !== null && isTenantModel) {
+                        const newArgs = {
+                            ...args,
+                            where: buildWhere(model, tenantId, args?.where),
+                            create: args?.create ? { ...args.create, tenantId } : args?.create,
+                            update: args?.update ? { ...args.update, tenantId } : args?.update,
+                        };
+                        return original.call(target, newArgs);
+                    }
+                    return original.call(target, args);
+                };
+            }
+
             // ── createMany: auto-inject tenantId into each row ───────────────
             if (prop === 'createMany') {
                 return (args: any = {}) => {

@@ -32,6 +32,23 @@ const LEVELS: Record<LogLevel, number> = {
   error: 3,
 };
 
+// ── RELIABILITY FIX: capture the ORIGINAL console methods now ────────────────
+// instrumentation.ts monkey-patches console.log/warn/error at process start so
+// that any stray console.* calls elsewhere in the codebase get routed through
+// this logger. If write() below called the *live* console.log/warn/error, it
+// would end up calling the patched version, which calls back into
+// logger.info/warn/error, which calls console.log again — infinite recursion
+// and an immediate stack overflow crash the moment any log line is written.
+// Capturing bound references here, at module-load time (which happens BEFORE
+// instrumentation.ts performs its override), guarantees this module always
+// writes to the real stdout/stderr, no matter what happens to the global
+// console object afterwards.
+const _stdout = {
+  log: console.log.bind(console),
+  warn: console.warn.bind(console),
+  error: console.error.bind(console),
+};
+
 const MIN_LEVEL: LogLevel =
   (process.env.LOG_LEVEL as LogLevel) ??
   (process.env.NODE_ENV === 'production' ? 'info' : 'debug');
@@ -78,18 +95,20 @@ function write(level: LogLevel, message: string, meta?: Record<string, unknown>)
     ...meta,
   };
 
-  // 1. Always write to stdout (PM2 captures this)
+  // 1. Always write to stdout (PM2 captures this).
+  // IMPORTANT: use the captured _stdout references, NOT the live global
+  // console object — see the _stdout comment above for why.
   const line = JSON.stringify(entry);
   switch (level) {
     case 'debug':
     case 'info':
-      console.log(line);
+      _stdout.log(line);
       break;
     case 'warn':
-      console.warn(line);
+      _stdout.warn(line);
       break;
     case 'error':
-      console.error(line);
+      _stdout.error(line);
       break;
   }
 

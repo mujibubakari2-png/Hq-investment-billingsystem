@@ -25,6 +25,7 @@ jest.mock('@/lib/prisma', () => {
       updateMany: jest.fn().mockResolvedValue({ count: 0 }),
       update: jest.fn().mockResolvedValue({ id: 'mock-id' }),
       create: jest.fn().mockResolvedValue({ id: 'mock-id' }),
+      upsert: jest.fn().mockResolvedValue({ id: 'mock-id' }),
       createMany: jest.fn().mockResolvedValue({ count: 0 }),
       delete: jest.fn().mockResolvedValue({}),
       deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
@@ -149,6 +150,24 @@ describe('Multi-Tenant Isolation — TenantPrisma proxy', () => {
     const callArgs = spy.mock.calls[0]?.[0] as any;
     expect(callArgs?.where?.tenantId).toBe('tenant-abc');
     expect(callArgs?.where?.tenantId).not.toBe('tenant-xyz');
+  });
+
+  it('scopes upsert operations to the tenant client', async () => {
+    const prisma = require('@/lib/prisma').default;
+    const spy = jest.spyOn(prisma.paymentChannel, 'upsert');
+    spy.mockResolvedValue({ id: 'ch-1' });
+
+    const db = getTenantClient('tenant-abc');
+    await db.paymentChannel.upsert({
+      where: { id: 'ch-1' },
+      create: { id: 'ch-1', name: 'Test Channel', provider: 'PALMPESA', status: 'ACTIVE' },
+      update: { status: 'ACTIVE' },
+    });
+
+    const callArgs = spy.mock.calls[0]?.[0] as any;
+    expect(callArgs?.where?.tenantId).toBe('tenant-abc');
+    expect(callArgs?.create?.tenantId).toBe('tenant-abc');
+    expect(callArgs?.update?.tenantId).toBe('tenant-abc');
   });
 });
 

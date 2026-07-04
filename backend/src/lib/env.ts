@@ -101,6 +101,7 @@ function isNextBuild(): boolean {
 }
 
 if (isNextBuild()) {
+  process.env.DATABASE_URL = process.env.DATABASE_URL || "postgresql://build:build@127.0.0.1:5432/build";
   process.env.JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET || "dummy-access-secret-for-build-phase-min-32-chars";
   process.env.JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || "dummy-refresh-secret-for-build-phase-min-32-chars";
 }

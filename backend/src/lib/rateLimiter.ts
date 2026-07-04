@@ -12,6 +12,20 @@ import { getUserFromRequest } from '@/lib/auth';
 import { getRedisClient } from '@/lib/cache';
 import logger from '@/lib/logger';
 
+async function runWithTimeout<T>(operation: Promise<T>, timeoutMs: number, fallback: T): Promise<T> {
+    let timer: NodeJS.Timeout | undefined;
+    try {
+        return await Promise.race([
+            operation,
+            new Promise<T>((resolve) => {
+                timer = setTimeout(() => resolve(fallback), timeoutMs);
+            }),
+        ]);
+    } finally {
+        if (timer) clearTimeout(timer);
+    }
+}
+
 interface RateLimitConfig {
     windowMs: number; // Time window in milliseconds
     maxRequests: number; // Max requests per window
@@ -24,7 +38,49 @@ interface UserRateLimitConfig {
     admin: RateLimitConfig;
 }
 
+interface MemoryRateLimitEntry {
+    count: number;
+    expiresAt: number;
+}
 
+const memoryRateLimitStore = new Map<string, MemoryRateLimitEntry>();
+
+function pruneMemoryRateLimitStore(now = Date.now()): void {
+    for (const [key, entry] of memoryRateLimitStore.entries()) {
+        if (entry.expiresAt <= now) {
+            memoryRateLimitStore.delete(key);
+        }
+    }
+}
+
+function applyMemoryRateLimit(
+    key: string,
+    ttlSec: number,
+    config: RateLimitConfig,
+): { limited: boolean; message: string; retryAfter?: number } {
+    const now = Date.now();
+    pruneMemoryRateLimitStore(now);
+
+    const existing = memoryRateLimitStore.get(key);
+    if (!existing) {
+        memoryRateLimitStore.set(key, { count: 1, expiresAt: now + ttlSec * 1000 });
+        return { limited: false, message: '' };
+    }
+
+    const nextCount = existing.count + 1;
+    if (nextCount > config.maxRequests) {
+        const retryAfter = Math.max(1, Math.ceil((existing.expiresAt - now) / 1000));
+        memoryRateLimitStore.set(key, { count: nextCount, expiresAt: existing.expiresAt });
+        return {
+            limited: true,
+            message: config.message || `Rate limit exceeded. Try again in ${retryAfter} seconds`,
+            retryAfter,
+        };
+    }
+
+    memoryRateLimitStore.set(key, { count: nextCount, expiresAt: existing.expiresAt });
+    return { limited: false, message: '' };
+}
 
 // Endpoint-specific rate limits
 const endpointLimits: Record<string, UserRateLimitConfig> = {
@@ -152,24 +208,27 @@ export async function isRateLimited(
 
     const redis = getRedisClient();
     if (!redis) {
-        logger.warn('[RateLimit] Redis unavailable, rate limiting disabled (fail-open)');
-        return { limited: false, message: '' };
+        return applyMemoryRateLimit(key, ttlSec, config);
     }
 
     try {
-        // INCR is atomic across all PM2 workers simultaneously
-        const count = await redis.incr(key);
-        if (count === 1) await redis.expire(key, ttlSec);
+        const count = await runWithTimeout(redis.incr(key), 1500, 0);
+        if (count && count === 1) {
+            await runWithTimeout(redis.expire(key, ttlSec), 1500, 0);
+        }
 
-        if (count > config.maxRequests) {
-            const retryAfter = Math.max(1, await redis.ttl(key));
+        if (count && count > config.maxRequests) {
+            const retryAfter = Math.max(1, await runWithTimeout(redis.ttl(key), 1500, 0));
             const message = config.message || `Rate limit exceeded. Try again in ${retryAfter} seconds`;
             return { limited: true, message, retryAfter };
         }
+        if (!count) {
+            return applyMemoryRateLimit(key, ttlSec, config);
+        }
         return { limited: false, message: '' };
     } catch (err: any) {
-        logger.warn('[RateLimit] Redis error, failing open', { error: err.message });
-        return { limited: false, message: '' };
+        logger.warn('[RateLimit] Redis error, falling back to memory store', { error: err.message });
+        return applyMemoryRateLimit(key, ttlSec, config);
     }
 }
 
@@ -207,12 +266,20 @@ export async function checkRateLimit(request: NextRequest) {
  * With the Redis backend this now works across all workers.
  */
 export async function resetRateLimit(identifier: string): Promise<void> {
+    const normalizedIdentifier = identifier.startsWith('rl:') ? identifier : `rl:${identifier}`;
     const redis = getRedisClient();
-    if (!redis) return;
-    try {
-        await redis.del(`rl:${identifier}`);
-    } catch (err: any) {
-        logger.warn('[RateLimit] resetRateLimit error', { error: err.message });
+    if (redis) {
+        try {
+            await redis.del(normalizedIdentifier);
+        } catch (err: any) {
+            logger.warn('[RateLimit] resetRateLimit error', { error: err.message });
+        }
+    }
+
+    for (const key of Array.from(memoryRateLimitStore.keys())) {
+        if (key === normalizedIdentifier || key.startsWith(`${normalizedIdentifier}:`)) {
+            memoryRateLimitStore.delete(key);
+        }
     }
 }
 
@@ -221,19 +288,20 @@ export async function resetRateLimit(identifier: string): Promise<void> {
  * Kept for backward compatibility with any cron job that calls it.
  */
 export function cleanupRateLimitStore(): void {
-    // Redis TTL-based eviction replaces manual Map cleanup.
+    memoryRateLimitStore.clear();
 }
 
 /**
  * Get rate limit stats for monitoring.
  */
 export async function getRateLimitStats(): Promise<{ totalKeys: number }> {
+    pruneMemoryRateLimitStore();
     const redis = getRedisClient();
-    if (!redis) return { totalKeys: 0 };
+    if (!redis) return { totalKeys: memoryRateLimitStore.size };
     try {
         const keys = await redis.keys('rl:*');
-        return { totalKeys: keys.length };
+        return { totalKeys: keys.length + memoryRateLimitStore.size };
     } catch {
-        return { totalKeys: 0 };
+        return { totalKeys: memoryRateLimitStore.size };
     }
 }
