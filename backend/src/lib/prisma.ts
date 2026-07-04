@@ -57,6 +57,7 @@ function createPrismaClient(): PrismaClient {
             ? false
             : { rejectUnauthorized: false }
     });
+    globalForPrisma.prismaPool = pool;
 
     const adapter = new PrismaPg(pool);
     process.stdout.write(`[DATABASE] Connection pool created (max: ${maxConnections}, idle timeout: ${idleTimeoutMillis}ms)\n`);
@@ -98,12 +99,23 @@ function createPrismaClient(): PrismaClient {
 }
 
 // Use globalThis to reuse the client across hot-reloads in development
-const globalForPrisma = globalThis as unknown as { prisma: PrismaClient | undefined };
+const globalForPrisma = globalThis as unknown as {
+    prisma: PrismaClient | undefined;
+    prismaPool: Pool | undefined;
+};
 
 export const prisma = globalForPrisma.prisma ?? createPrismaClient();
 
 if (process.env.NODE_ENV !== "production") {
     globalForPrisma.prisma = prisma;
+}
+
+export async function closePrisma(): Promise<void> {
+    await prisma.$disconnect();
+    if (globalForPrisma.prismaPool) {
+        await globalForPrisma.prismaPool.end();
+        globalForPrisma.prismaPool = undefined;
+    }
 }
 
 // MEDIUM-R-005 FIX: Graceful shutdown hook.
@@ -114,7 +126,7 @@ if (process.env.NODE_ENV !== "production") {
 if (process.env.NODE_ENV === "production" && !isNextBuild()) {
     process.once("SIGTERM", async () => {
         try {
-            await prisma.$disconnect();
+            await closePrisma();
             process.stdout.write("[DATABASE] Prisma disconnected on SIGTERM\n");
         } catch {
             // Nothing we can do at shutdown
@@ -125,7 +137,7 @@ if (process.env.NODE_ENV === "production" && !isNextBuild()) {
 
     process.once("SIGINT", async () => {
         try {
-            await prisma.$disconnect();
+            await closePrisma();
         } catch { /* ignore */ } finally {
             process.exit(0);
         }

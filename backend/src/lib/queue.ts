@@ -61,6 +61,13 @@ export function getMikroTikQueue(): Queue<MikroTikJobData> {
   return _queue;
 }
 
+export async function closeMikroTikQueue(): Promise<void> {
+  if (_queue) {
+    await _queue.close();
+    _queue = null;
+  }
+}
+
 // ── Enqueue ───────────────────────────────────────────────────────────────────
 
 export async function enqueueMikroTikOp(

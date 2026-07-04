@@ -17,9 +17,17 @@ export default async function globalTeardown() {
 
     // Close the Prisma database connection pool
     try {
-        const { default: db } = await import('./src/lib/prisma');
-        await db.$disconnect();
+        const { closePrisma } = await import('./src/lib/prisma');
+        await closePrisma();
     } catch {
         // ignore — prisma may not have been initialised
+    }
+
+    // Close BullMQ queue if a route test initialised it
+    try {
+        const { closeMikroTikQueue } = await import('./src/lib/queue');
+        await closeMikroTikQueue();
+    } catch {
+        // ignore — queue may not have been initialised
     }
 }
