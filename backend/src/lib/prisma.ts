@@ -111,10 +111,24 @@ if (process.env.NODE_ENV !== "production") {
 }
 
 export async function closePrisma(): Promise<void> {
-    await prisma.$disconnect();
+    try {
+        await prisma.$disconnect();
+    } catch {
+        // ignore — disconnect is best-effort during test teardown
+    }
+
     if (globalForPrisma.prismaPool) {
-        await globalForPrisma.prismaPool.end();
+        const pool = globalForPrisma.prismaPool;
         globalForPrisma.prismaPool = undefined;
+        try {
+            await pool.end();
+        } catch {
+            // ignore — pg pool shutdown is best-effort during test teardown
+        }
+    }
+
+    if (globalForPrisma.prisma) {
+        globalForPrisma.prisma = undefined;
     }
 }
 

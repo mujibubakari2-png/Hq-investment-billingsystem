@@ -31,4 +31,7 @@ export default async function globalTeardown() {
     }
 
     await Promise.allSettled(shutdowns);
+
+    // Give the event loop a short chance to settle before Jest exits.
+    await new Promise((resolve) => setTimeout(resolve, 100));
 }

@@ -212,6 +212,15 @@ export async function closeCache(): Promise<void> {
     if (_client) {
         const client = _client;
         _client = null;
-        await client.quit().catch(() => {});
+        try {
+            await client.quit();
+        } catch {
+            // ignore — Redis quit is best-effort during test teardown
+        }
+        try {
+            await client.disconnect();
+        } catch {
+            // ignore — disconnect is best-effort during test teardown
+        }
     }
 }
