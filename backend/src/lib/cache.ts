@@ -31,6 +31,7 @@ export type TtlKey = keyof typeof TTL;
 // ── Redis singleton ───────────────────────────────────────────────────────────
 
 let _client: IORedis | null = null;
+let _closing = false;
 
 /**
  * Exported singleton accessor — use this in other modules instead of
@@ -41,6 +42,7 @@ export function getRedisClient(): IORedis | null {
 }
 
 function getClient(): IORedis | null {
+    if (_closing) return null;
     if (_client) return _client;
     // Only create a client when REDIS_URL is configured
     if (!process.env.REDIS_URL && process.env.NODE_ENV === 'production') {
@@ -209,6 +211,8 @@ export async function withCache<T>(
 // ── Graceful shutdown ─────────────────────────────────────────────────────────
 
 export async function closeCache(): Promise<void> {
+    if (_closing) return;
+    _closing = true;
     if (_client) {
         const client = _client;
         _client = null;
