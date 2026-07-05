@@ -10,17 +10,17 @@ export default async function globalTeardown() {
     const shutdowns = [] as Array<Promise<unknown>>;
 
     try {
-        const { closeCache } = await import('./src/lib/cache');
-        shutdowns.push(closeCache());
-    } catch {
-        // ignore — cache may not have been initialised
-    }
-
-    try {
         const { closePrisma } = await import('./src/lib/prisma');
         shutdowns.push(closePrisma());
     } catch {
         // ignore — prisma may not have been initialised
+    }
+
+    try {
+        const { closeCache } = await import('./src/lib/cache');
+        shutdowns.push(closeCache());
+    } catch {
+        // ignore — cache may not have been initialised
     }
 
     try {

@@ -66,7 +66,7 @@ const LOGTAIL_TOKEN = process.env.LOGTAIL_SOURCE_TOKEN;
 const LOGTAIL_URL = 'https://in.logtail.com';
 
 function sendToLogtail(entry: LogEntry): void {
-  if (!LOGTAIL_TOKEN || process.env.NODE_ENV !== 'production') return;
+  if (!LOGTAIL_TOKEN || process.env.NODE_ENV !== 'production' || process.env.JEST_WORKER_ID) return;
 
   // Fire-and-forget: we intentionally don't await this
   fetch(LOGTAIL_URL, {
