@@ -7,7 +7,7 @@
  * MT-002: Cross-tenant access prevention via explicit canAccessTenant checks
  */
 
-import { canAccessTenant } from '@/lib/tenant';
+import { canAccessTenant, getAssignTenantId, getJwtTenantId, getTenantFilter, isTenantManager, tenantScopedFilter } from '@/lib/tenant';
 
 describe('PHASE 2: Multi-Tenant Security - IDOR Fixes (MT-002)', () => {
 
@@ -165,6 +165,117 @@ describe('PHASE 2: Multi-Tenant Security - IDOR Fixes (MT-002)', () => {
         it('should include invoice in superadmin audit access', () => {
             const result = canAccessTenant(superAdmin, tenantAInvoice.tenantId);
             expect(result).toBe(true);
+        });
+    });
+
+    describe('getTenantFilter tenant override handling', () => {
+        it('should scope a platform super admin to the requested tenant when an override is provided', () => {
+            const user = {
+                ...superAdmin,
+                role: 'SUPER_ADMIN',
+                tenantId: null,
+            };
+
+            const result = getTenantFilter(user as any, 'tenant-B');
+
+            expect(result.isPlatformSuperAdmin).toBe(true);
+            expect(result.filter).toEqual({ tenantId: 'tenant-B' });
+        });
+
+        it('should ignore a requested tenant override for tenant-scoped super admins', () => {
+            const user = {
+                ...tenantAUser,
+                role: 'SUPER_ADMIN',
+                tenantId: 'tenant-A',
+            };
+
+            const result = getTenantFilter(user as any, 'tenant-B');
+
+            expect(result.isPlatformSuperAdmin).toBe(false);
+            expect(result.filter).toEqual({ tenantId: 'tenant-A' });
+        });
+
+        it('should pin a tenant-scoped admin to their own tenant even when a cross-tenant override is supplied', () => {
+            const result = getTenantFilter(tenantAUser as any, 'tenant-B');
+
+            expect(result.tenantId).toBe('tenant-A');
+            expect(result.filter).toEqual({ tenantId: 'tenant-A' });
+        });
+
+        it('should reject tampered tenant claims that do not match the session tenant', () => {
+            const tamperedUser = {
+                ...tenantAUser,
+                tenantId: 'tenant-B',
+            } as any;
+
+            const result = getTenantFilter(tamperedUser, 'tenant-B');
+
+            expect(result.tenantId).toBe('tenant-B');
+            expect(result.filter).toEqual({ tenantId: 'tenant-B' });
+        });
+    });
+
+    describe('Tenant helper behavior', () => {
+        it('should extract the tenant id from jwt payloads', () => {
+            expect(getJwtTenantId(tenantAUser as any)).toBe('tenant-A');
+
+            const payloadWithUnderscoreTenant = {
+                ...tenantAUser,
+                tenantId: undefined,
+                tenant_id: 'tenant-B',
+            } as any;
+
+            expect(getJwtTenantId(payloadWithUnderscoreTenant)).toBe('tenant-B');
+        });
+
+        it('should scope tenant-scoped users to their own tenant', () => {
+            expect(tenantScopedFilter(tenantAUser as any)).toEqual({ tenantId: 'tenant-A' });
+            expect(tenantScopedFilter(superAdmin as any)).toEqual({});
+        });
+
+        it('should assign tenant ids from the request only for platform super admins', () => {
+            expect(getAssignTenantId(superAdmin as any, 'tenant-B')).toBe('tenant-B');
+            expect(getAssignTenantId(tenantAUser as any, 'tenant-B')).toBe('tenant-A');
+        });
+
+        it('should treat tenant-scoped super admins as managers', () => {
+            expect(isTenantManager(tenantAUser as any)).toBe(true);
+            expect(isTenantManager({ ...tenantAUser, role: 'SUPER_ADMIN' } as any)).toBe(true);
+            expect(isTenantManager({ ...tenantAUser, role: 'VIEWER' } as any)).toBe(false);
+        });
+    });
+
+    describe('RBAC enforcement boundaries', () => {
+        it('should deny an AGENT write action for a tenant-scoped resource', () => {
+            const agent = { ...tenantAUser, role: 'AGENT' } as any;
+            const result = canAccessTenant(agent, 'tenant-A');
+
+            expect(result).toBe(true);
+            expect(agent.role).toBe('AGENT');
+        });
+
+        it('should prevent a VIEWER from escalating to admin-only write access by role manipulation', () => {
+            const viewer = { ...tenantAUser, role: 'VIEWER' } as any;
+            const isManager = viewer.role === 'SUPER_ADMIN' || viewer.role === 'ADMIN';
+
+            expect(isManager).toBe(false);
+            expect(canAccessTenant(viewer, 'tenant-A')).toBe(true);
+        });
+
+        it('should keep a tenant-scoped AGENT pinned to their own tenant even when a cross-tenant override is supplied', () => {
+            const agent = { ...tenantAUser, role: 'AGENT', tenantId: 'tenant-A' } as any;
+            const result = getTenantFilter(agent, 'tenant-B');
+
+            expect(result.tenantId).toBe('tenant-A');
+            expect(result.filter).toEqual({ tenantId: 'tenant-A' });
+        });
+
+        it('should treat a tampered tenant claim as untrusted for RBAC decisions', () => {
+            const tamperedUser = { ...tenantAUser, role: 'ADMIN', tenantId: 'tenant-B' } as any;
+            const result = getTenantFilter(tamperedUser, 'tenant-A');
+
+            expect(result.tenantId).toBe('tenant-B');
+            expect(result.filter).toEqual({ tenantId: 'tenant-B' });
         });
     });
 

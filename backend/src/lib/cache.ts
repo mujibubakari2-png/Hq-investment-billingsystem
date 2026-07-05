@@ -210,7 +210,8 @@ export async function withCache<T>(
 
 export async function closeCache(): Promise<void> {
     if (_client) {
-        await _client.quit().catch(() => {});
+        const client = _client;
         _client = null;
+        await client.quit().catch(() => {});
     }
 }

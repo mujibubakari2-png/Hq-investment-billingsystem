@@ -18,15 +18,10 @@ export async function GET(req: NextRequest) {
         const userPayload = guard.user;
         const db = getTenantClient(userPayload);
 
-        const { filter: tenantFilter, isPlatformSuperAdmin, isTenantSuperAdmin } = getTenantFilter(userPayload);
-
-        // Super Admin can override tenant filter via query param
         const url = new URL(req.url);
         const searchParams = url.searchParams;
         const targetTenantId = searchParams.get("tenantId");
-        if ((isPlatformSuperAdmin || isTenantSuperAdmin) && targetTenantId) {
-            tenantFilter.tenantId = targetTenantId;
-        }
+        const { filter: tenantFilter, isPlatformSuperAdmin } = getTenantFilter(userPayload, targetTenantId);
 
         let activeGws: string[] = [];
         try {

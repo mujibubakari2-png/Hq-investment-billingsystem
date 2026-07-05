@@ -1,4 +1,5 @@
 import { JwtPayload } from "./auth";
+import logger from "./logger";
 
 const NO_TENANT_MATCH = "__NO_TENANT__";
 
@@ -38,17 +39,29 @@ export function tenantScopedFilter(user: JwtPayload) {
  * Tenant-owner SUPER_ADMIN users are tenant-scoped. Only tenantless platform
  * SUPER_ADMIN accounts get an empty filter.
  */
-export function getTenantFilter(user: JwtPayload) {
+export function getTenantFilter(user: JwtPayload, requestedTenantId?: string | null) {
     const tenantId = getJwtTenantId(user);
     const platformSuperAdmin = isPlatformSuperAdmin(user);
     const isSuperAdmin = user.role === "SUPER_ADMIN";
+    const effectiveTenantId = platformSuperAdmin && requestedTenantId ? requestedTenantId : tenantId;
+
+    if (!platformSuperAdmin && requestedTenantId && requestedTenantId !== tenantId) {
+        logger.security("Cross-tenant override denied", {
+            userId: user.userId,
+            requestedTenantId,
+            effectiveTenantId,
+            role: user.role,
+            type: "tenant_override_denied",
+        });
+    }
+
     return {
         isSuperAdmin,
         isPlatformSuperAdmin: platformSuperAdmin,
         isTenantSuperAdmin: isTenantSuperAdmin(user),
         isAdmin: isSuperAdmin || user.role === "ADMIN",
-        filter: platformSuperAdmin ? {} : { tenantId: tenantId ?? NO_TENANT_MATCH },
-        tenantId,
+        filter: platformSuperAdmin ? (requestedTenantId ? { tenantId: requestedTenantId } : {}) : { tenantId: effectiveTenantId ?? NO_TENANT_MATCH },
+        tenantId: effectiveTenantId,
     };
 }
 

@@ -3,7 +3,7 @@ import { getTenantClient } from "@/lib/tenantPrisma";
 import { withCache, invalidateNamespace, buildKey, TTL, getRedisClient } from "@/lib/cache";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { requirePermission } from "@/lib/rbac";
-import { isPlatformSuperAdmin } from "@/lib/tenant";
+import { getTenantFilter, isPlatformSuperAdmin } from "@/lib/tenant";
 import { toISOSafe, toTimestampSafe, getStartOfTodayTZ, getStartOfMonthTZ } from "@/lib/dateUtils";
 import logger from "@/lib/logger";
 import { writeAuditLog, getIpFromRequest } from "@/lib/auditLog";
@@ -34,24 +34,18 @@ export async function GET(req: NextRequest) {
         const targetTenantId = queryParams.get("tenantId");
         const routerId = queryParams.get("routerId");
 
-        // Base filter for tenant isolation
-        let tenantFilter: any = {};
-        if (isPlatformAdmin) {
-            if (targetTenantId) {
-                tenantFilter.tenantId = targetTenantId;
-                // HIGH-MT-002 FIX: Audit platform admin cross-tenant dashboard reads.
-                // Previously these were completely invisible in audit logs.
-                writeAuditLog({
-                    tenantId: targetTenantId,
-                    userId: userPayload.userId,
-                    action: 'CROSS_TENANT_DASHBOARD_READ',
-                    resource: 'Dashboard',
-                    details: { targetTenantId, routerId: routerId ?? undefined },
-                    ipAddress: getIpFromRequest(req),
-                }).catch(() => { /* non-blocking */ });
-            }
-        } else {
-            tenantFilter.tenantId = userPayload.tenantId;
+        const { filter: tenantFilter, tenantId: effectiveTenantId } = getTenantFilter(userPayload, isPlatformAdmin ? targetTenantId : null);
+        if (isPlatformAdmin && targetTenantId) {
+            // HIGH-MT-002 FIX: Audit platform admin cross-tenant dashboard reads.
+            // Previously these were completely invisible in audit logs.
+            writeAuditLog({
+                tenantId: targetTenantId,
+                userId: userPayload.userId,
+                action: 'CROSS_TENANT_DASHBOARD_READ',
+                resource: 'Dashboard',
+                details: { targetTenantId, routerId: routerId ?? undefined },
+                ipAddress: getIpFromRequest(req),
+            }).catch(() => { /* non-blocking */ });
         }
 
         // Router filter for stats (clients, subscriptions, transactions)
@@ -71,7 +65,7 @@ export async function GET(req: NextRequest) {
         // after every sync, so the cache self-invalidates within seconds of a
         // status change rather than waiting the full 60-second TTL.
         const cacheKey = buildKey(
-            userPayload.tenantId ?? (targetTenantId || null),
+            effectiveTenantId ?? null,
             'dashboard',
             `stats:${routerId || 'all'}`,
         );

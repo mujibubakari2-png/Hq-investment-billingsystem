@@ -7,27 +7,28 @@
  */
 
 export default async function globalTeardown() {
-    // Close Redis connection from cache.ts singleton
+    const shutdowns = [] as Array<Promise<unknown>>;
+
     try {
         const { closeCache } = await import('./src/lib/cache');
-        await closeCache();
+        shutdowns.push(closeCache());
     } catch {
         // ignore — cache may not have been initialised
     }
 
-    // Close the Prisma database connection pool
     try {
         const { closePrisma } = await import('./src/lib/prisma');
-        await closePrisma();
+        shutdowns.push(closePrisma());
     } catch {
         // ignore — prisma may not have been initialised
     }
 
-    // Close BullMQ queue if a route test initialised it
     try {
         const { closeMikroTikQueue } = await import('./src/lib/queue');
-        await closeMikroTikQueue();
+        shutdowns.push(closeMikroTikQueue());
     } catch {
         // ignore — queue may not have been initialised
     }
+
+    await Promise.allSettled(shutdowns);
 }
