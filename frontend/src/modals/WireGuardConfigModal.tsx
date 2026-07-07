@@ -99,7 +99,10 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
     // MikroTik .rsc here; full router scripts are produced only by the
     // Router Setup Wizard → Generate → Create Config step.
 
-    const serverConfig = `# ═══════════════════════════════════════════════════════════════\n# WireGuard Server Config (wg-quick style)\n# For Router: ${config.routerName} (${config.routerId})\n# ═══════════════════════════════════════════════════════════════\n\n[Interface]\n# Replace <SERVER_PRIVATE_KEY> with your server's private key\nPrivateKey = <SERVER_PRIVATE_KEY>\nAddress = ${config.serverTunnelIp}/24\nListenPort = ${config.listenPort}\nDNS = 8.8.8.8, 1.1.1.1\n\n[Peer]\n# Router peer\nPublicKey = ${config.routerPublicKey}\nPresharedKey = ${config.presharedKey}\n# AllowedIPs: only the router's tunnel IP (management traffic only)\nAllowedIPs = ${config.routerTunnelIp}/32\nEndpoint = ${config.routerHost}:${config.listenPort}\nPersistentKeepalive = 25\n\n# Note: This is WireGuard config only. Full MikroTik .rsc is available from the Router Setup Wizard → Generate → Create Config.`;
+    const routerPrivateKey = config.routerPrivateKey || '<ROUTER_PRIVATE_KEY>';
+    const serverPrivateKey = (config as any).serverPrivateKey || '<SERVER_PRIVATE_KEY>';
+
+    const serverConfig = `# ═══════════════════════════════════════════════════════════════\n# WireGuard Server Config (wg-quick style)\n# For Router: ${config.routerName} (${config.routerId})\n# ═══════════════════════════════════════════════════════════════\n\n[Interface]\n# The router's private key (kept on the device)\nPrivateKey = ${routerPrivateKey}\nAddress = ${config.serverTunnelIp}/24\nListenPort = ${config.listenPort}\nDNS = 8.8.8.8, 1.1.1.1\n\n[Peer]\n# ISP Server peer\nPublicKey = ${config.serverPublicKey}\nPresharedKey = ${config.presharedKey}\n# AllowedIPs: only the router's tunnel IP (management traffic only)\nAllowedIPs = ${config.routerTunnelIp}/32\nEndpoint = ${config.routerHost}:${config.listenPort}\nPersistentKeepalive = 25\n\n# Note: This is WireGuard config only. Full MikroTik .rsc is available from the Router Setup Wizard → Generate → Create Config.`;
 
     // Client config for the HQInvestment ISP server
     const clientConfig = `# ═══════════════════════════════════════════════════════════════
@@ -109,8 +112,8 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
 # ═══════════════════════════════════════════════════════════════
 
 [Interface]
-# HQInvestment ISP Server side
-PrivateKey = <SERVER_PRIVATE_KEY>
+# HQInvestment ISP Server side — server private key (KEEP SECRET)
+PrivateKey = ${serverPrivateKey}
 Address = ${config.serverTunnelIp}/24
 DNS = 8.8.8.8, 1.1.1.1
 
