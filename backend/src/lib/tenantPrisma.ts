@@ -132,6 +132,23 @@ function buildWhere(
     };
 }
 
+function injectTenantData(
+    model: string,
+    tenantId: string | null,
+    data?: Record<string, unknown>,
+): Record<string, unknown> | undefined {
+    const isTenantModel = TENANT_MODELS.has(model);
+    if (tenantId === null || !isTenantModel || !data || typeof data !== 'object' || Array.isArray(data)) {
+        return data as Record<string, unknown> | undefined;
+    }
+
+    const { tenantId: _ignoredTenantId, ...rest } = data;
+    return {
+        ...rest,
+        tenantId,
+    };
+}
+
 // ── Model delegate proxy factory ──────────────────────────────────────────────
 
 function createModelProxy(
@@ -151,13 +168,23 @@ function createModelProxy(
                 prop === 'findFirstOrThrow' ||
                 prop === 'count' ||
                 prop === 'aggregate' ||
-                prop === 'updateMany' ||
                 prop === 'deleteMany'
             ) {
                 return (args: any = {}) => {
                     const newArgs = {
                         ...args,
                         where: buildWhere(model, tenantId, args?.where),
+                    };
+                    return original.call(target, newArgs);
+                };
+            }
+
+            if (prop === 'updateMany') {
+                return (args: any = {}) => {
+                    const newArgs = {
+                        ...args,
+                        where: buildWhere(model, tenantId, args?.where),
+                        data: injectTenantData(model, tenantId, args?.data),
                     };
                     return original.call(target, newArgs);
                 };
@@ -212,6 +239,25 @@ function createModelProxy(
                             );
                         }
                     }
+                    return original.call(target, {
+                        ...args,
+                        data: injectTenantData(model, tenantId, args?.data),
+                    });
+                };
+            }
+
+            // ── updateMany: preserve the effective tenant in data ───────────
+            if (prop === 'updateMany') {
+                return async (args: any = {}) => {
+                    const isTenantModel = TENANT_MODELS.has(model);
+                    if (tenantId !== null && isTenantModel) {
+                        const newArgs = {
+                            ...args,
+                            where: buildWhere(model, tenantId, args?.where),
+                            data: injectTenantData(model, tenantId, args?.data),
+                        };
+                        return original.call(target, newArgs);
+                    }
                     return original.call(target, args);
                 };
             }
@@ -243,15 +289,11 @@ function createModelProxy(
             // ── create: auto-inject tenantId into data ───────────────────────
             if (prop === 'create') {
                 return (args: any = {}) => {
-                    const isTenantModel = TENANT_MODELS.has(model);
-                    if (tenantId !== null && isTenantModel && args.data) {
-                        const newArgs = {
-                            ...args,
-                            data: { ...args.data, tenantId },
-                        };
-                        return original.call(target, newArgs);
-                    }
-                    return original.call(target, args);
+                    const newArgs = {
+                        ...args,
+                        data: injectTenantData(model, tenantId, args?.data),
+                    };
+                    return original.call(target, newArgs);
                 };
             }
 
@@ -263,8 +305,8 @@ function createModelProxy(
                         const newArgs = {
                             ...args,
                             where: buildWhere(model, tenantId, args?.where),
-                            create: args?.create ? { ...args.create, tenantId } : args?.create,
-                            update: args?.update ? { ...args.update, tenantId } : args?.update,
+                            create: injectTenantData(model, tenantId, args?.create),
+                            update: injectTenantData(model, tenantId, args?.update),
                         };
                         return original.call(target, newArgs);
                     }
@@ -283,10 +325,7 @@ function createModelProxy(
                     ) {
                         const newArgs = {
                             ...args,
-                            data: args.data.map((row: any) => ({
-                                ...row,
-                                tenantId,
-                            })),
+                            data: args.data.map((row: any) => injectTenantData(model, tenantId, row) ?? row),
                         };
                         return original.call(target, newArgs);
                     }

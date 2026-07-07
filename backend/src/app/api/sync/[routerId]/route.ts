@@ -17,14 +17,15 @@ export async function GET(
     logger.info(`[SYNC] Sync request received for router: ${routerId}`);
 
     try {
-        const db = getTenantClient(null);
-        const router = await db.router.findFirst({
+        const unscopedDb = getTenantClient(null);
+        const router = await unscopedDb.router.findFirst({
             where: {
                 OR: [
                     { id: routerId },
                     { name: routerId }
                 ]
-            }
+            },
+            select: { id: true, tenantId: true, name: true },
         });
 
         if (!router) {
@@ -38,6 +39,7 @@ export async function GET(
             );
         }
 
+        const db = getTenantClient(router.tenantId ?? null);
         await db.router.update({
             where: { id: router.id },
             data: {

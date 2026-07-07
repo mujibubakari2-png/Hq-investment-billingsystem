@@ -1018,8 +1018,8 @@ export async function getMikroTikService(routerId: string, tenantId?: string | n
     const router = await unscopedDb.router.findUnique({ where: { id: routerId } });
     if (!router) throw new Error("Router not found");
 
-    // Strict tenant isolation check.
-    // Tenant-scoped callers must never access a router from a different tenant.
+    // Strict tenant isolation check for callers that explicitly provide a tenant.
+    // When no tenant is supplied, preserve the existing behavior for legacy callers.
     if (tenantId !== undefined && tenantId !== null && router.tenantId !== tenantId) {
         throw new Error("Unauthorized: This router belongs to another tenant");
     }

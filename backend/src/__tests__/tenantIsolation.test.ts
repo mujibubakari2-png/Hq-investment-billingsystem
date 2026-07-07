@@ -119,6 +119,36 @@ describe("Tenant Isolation (tenantPrisma)", () => {
         ).rejects.toThrow();
     });
 
+    it("should not allow tenant-scoped updates to spoof the tenantId field", async () => {
+        const db1 = getTenantClient(tenant1Id);
+
+        const updated = await db1.client.update({
+            where: { id: clientId1 },
+            data: { fullName: "Tenant 1 Updated", tenantId: tenant2Id },
+        });
+
+        expect(updated.tenantId).toBe(tenant1Id);
+        expect(updated.fullName).toBe("Tenant 1 Updated");
+
+        const fresh = await prisma.client.findUnique({ where: { id: clientId1 } });
+        expect(fresh?.tenantId).toBe(tenant1Id);
+    });
+
+    it("should not allow tenant-scoped updateMany to spoof the tenantId field", async () => {
+        const db1 = getTenantClient(tenant1Id);
+
+        const result = await db1.client.updateMany({
+            where: { id: clientId1 },
+            data: { fullName: "Tenant 1 Updated via updateMany", tenantId: tenant2Id },
+        });
+
+        expect(result.count).toBe(1);
+
+        const fresh = await prisma.client.findUnique({ where: { id: clientId1 } });
+        expect(fresh?.tenantId).toBe(tenant1Id);
+        expect(fresh?.fullName).toBe("Tenant 1 Updated via updateMany");
+    });
+
     it("should allow super admin (null tenantId) to see all clients", async () => {
         const superDb = getTenantClient(null);
         const clients = await superDb.client.findMany();

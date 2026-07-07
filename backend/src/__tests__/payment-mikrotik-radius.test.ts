@@ -421,7 +421,7 @@ describe('§4 – MikroTik Activation', () => {
         const mk = makeMikroTik();
         await runWebhook({ pkg: makePkg({ routerId: ROUTER_ID }), mikrotikService: mk });
 
-        expect(getMikroTikService).toHaveBeenCalledWith(ROUTER_ID);
+        expect(getMikroTikService).toHaveBeenCalledWith(ROUTER_ID, TENANT_ID);
         expect(mk.activateService).toHaveBeenCalledTimes(1);
     });
 
