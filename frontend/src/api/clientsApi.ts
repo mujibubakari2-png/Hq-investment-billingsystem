@@ -29,9 +29,10 @@ export interface PackageItem {
 }
 
 export const packagesApi = {
-    list: (params?: Record<string, string>) => {
+    list: async (params?: Record<string, string>) => {
         const qs = params ? '?' + new URLSearchParams(params).toString() : '';
-        return get<PackageItem[]>(`/packages${qs}`);
+        const response = await get<{ data: PackageItem[]; total: number; page: number; limit: number }>(`/packages${qs}`);
+        return response.data;
     },
     get:    (id: string)                                => get<Record<string, unknown>>(`/packages/${id}`),
     create: (data: Record<string, unknown>)             => post<Record<string, unknown>>('/packages', data),
