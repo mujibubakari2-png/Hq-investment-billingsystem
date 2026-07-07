@@ -10,6 +10,7 @@ import TodayIcon from '@mui/icons-material/Today';
 import WifiIcon from '@mui/icons-material/Wifi';
 import PersonIcon from '@mui/icons-material/Person';
 import { useNavigate, Link } from 'react-router-dom';
+import { normalizeApiList } from '../utils/apiResponse';
 import { expiredSubscribersApi, subscriptionsApi, routersApi } from '../api';
 import { formatDate } from '../utils/formatters';
 import type { ExpiredSubscriber, Router } from '../types';
@@ -43,7 +44,7 @@ export default function ExpiredSubscribers() {
                 page: currentPage,
                 limit: entriesPerPage
             });
-            setSubs((res.data || []) as unknown as ExpiredSubscriber[]);
+            setSubs(normalizeApiList<ExpiredSubscriber>(res));
             setTotalSubs(res.total || 0);
             setSummaries(res.summaries || null);
         } catch (err) {
@@ -75,7 +76,7 @@ export default function ExpiredSubscribers() {
     const fetchRouters = async () => {
         try {
             const data = await routersApi.list();
-            setRoutersList(data as unknown as Router[]);
+            setRoutersList(normalizeApiList<Router>(data));
         } catch (err) {
             console.error('Failed to fetch routers:', err);
         }

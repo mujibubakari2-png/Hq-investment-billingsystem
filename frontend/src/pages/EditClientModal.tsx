@@ -3,6 +3,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import CloseIcon from '@mui/icons-material/Close';
 import CheckIcon from '@mui/icons-material/Check';
 import { routersApi, packagesApi, clientsApi } from '../api';
+import { normalizeApiList } from '../utils/apiResponse';
 import type { Client, Router, Package } from '../types';
 import { getPhoneError } from '../utils/validators';
 
@@ -40,8 +41,8 @@ export default function EditClientModal({ client, onClose, onSave }: EditClientM
             routersApi.list(),
             packagesApi.list(),
         ]).then(([routers, packages]) => {
-            setRoutersList(routers as unknown as Router[]);
-            setPackagesList(packages as unknown as Package[]);
+            setRoutersList(normalizeApiList<Router>(routers));
+            setPackagesList(normalizeApiList<Package>(packages));
         }).catch(() => {
             setLoadError('Failed to load data. Check your network connection.');
         }).finally(() => setLoadingData(false));

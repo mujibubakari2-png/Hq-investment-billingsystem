@@ -3,6 +3,7 @@ import ExtensionIcon from '@mui/icons-material/Extension';
 import CloseIcon from '@mui/icons-material/Close';
 import CheckIcon from '@mui/icons-material/Check';
 import { packagesApi } from '../api';
+import { normalizeApiList } from '../utils/apiResponse';
 import type { ExpiredSubscriber, Package } from '../types';
 import { formatDate } from '../utils/formatters';
 
@@ -31,7 +32,7 @@ export default function ExtendSubscriberModal({ subscriber, onClose, onSave }: E
     // Proper error handling for data loading
     useEffect(() => {
         packagesApi.list()
-            .then(d => setPackagesList(d as unknown as Package[]))
+            .then((response) => setPackagesList(normalizeApiList<Package>(response)))
             .catch(() => setLoadError('Failed to load packages. Check your network connection.'))
             .finally(() => setLoadingData(false));
     }, []);

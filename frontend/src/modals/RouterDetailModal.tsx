@@ -158,7 +158,7 @@ export default function RouterDetailModal({ router, onClose, onDelete }: RouterD
                                 { label: 'API Port', value: router.port ? String(router.port) : '—', mono: true },
                                 { label: 'Router Type', value: router.type || 'RouterOS', mono: false },
                                 { label: 'Last Seen', value: formatDateTime(router.lastSeen), mono: false },
-                                { label: 'Description', value: (router as any).description || '—', mono: false },
+                                { label: 'Description', value: router.description || '—', mono: false },
                             ]).map(row => (
                                 <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 14px', borderBottom: '1px solid var(--border-light)', fontSize: '0.82rem', gap: 8, alignItems: 'flex-start' }}>
                                     <span style={{ color: 'var(--text-secondary)', flexShrink: 0 }}>{row.label}</span>

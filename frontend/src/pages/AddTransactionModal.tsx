@@ -3,6 +3,7 @@ import AddCircleIcon from '@mui/icons-material/AddCircle';
 import CloseIcon from '@mui/icons-material/Close';
 import CheckIcon from '@mui/icons-material/Check';
 import { packagesApi, routersApi } from '../api';
+import { normalizeApiList } from '../utils/apiResponse';
 import type { Package, Router } from '../types';
 
 interface TransactionData {
@@ -49,8 +50,8 @@ export default function AddTransactionModal({ onClose, onSave }: AddTransactionM
             routersApi.list(),
             packagesApi.list(),
         ]).then(([routers, packages]) => {
-            setRoutersList(routers as unknown as Router[]);
-            setPackagesList(packages as unknown as Package[]);
+            setRoutersList(normalizeApiList<Router>(routers));
+            setPackagesList(normalizeApiList<Package>(packages));
         }).catch(() => {
             setLoadError('Failed to load data. Check your network connection.');
         }).finally(() => setLoadingData(false));

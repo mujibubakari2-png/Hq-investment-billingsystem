@@ -6,6 +6,7 @@ import SpeedIcon from '@mui/icons-material/Speed';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import SettingsIcon from '@mui/icons-material/Settings';
 import { routersApi } from '../api';
+import { normalizeApiList } from '../utils/apiResponse';
 import type { Router } from '../types';
 
 // Typed interface instead of `object`
@@ -66,7 +67,7 @@ export default function AddPackageModal({ onClose, onSave }: AddPackageModalProp
     //  Proper error handling for data loading
     useEffect(() => {
         routersApi.list()
-            .then(d => setRoutersList(d as unknown as Router[]))
+            .then((response) => setRoutersList(normalizeApiList<Router>(response)))
             .catch(() => setLoadError('Failed to load routers. Check your network connection.'))
             .finally(() => setLoadingData(false));
     }, []);

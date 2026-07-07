@@ -9,6 +9,7 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import SyncIcon from '@mui/icons-material/Sync';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { smsTemplatesApi } from '../api';
+import { normalizeApiList } from '../utils/apiResponse';
 import AddMessageTemplateModal from '../modals/AddMessageTemplateModal';
 import EditMessageTemplateModal from '../modals/EditMessageTemplateModal';
 import ConfirmDeleteModal from '../modals/ConfirmDeleteModal';
@@ -47,7 +48,7 @@ export default function MessageTemplates() {
         setLoading(true);
         try {
             const data = await smsTemplatesApi.list();
-            setTemplates(data as unknown as Template[]);
+            setTemplates(normalizeApiList<Template>(data));
         } catch (err) {
             console.error('Failed to load templates:', err);
             setTemplates([]);

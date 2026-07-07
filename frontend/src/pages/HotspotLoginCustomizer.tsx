@@ -17,10 +17,21 @@ import RouterIcon from '@mui/icons-material/Router';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import PreviewIcon from '@mui/icons-material/Preview';
 import { routersApi, settingsApi, packagesApi, hotspotSettingsApi, CLEAN_API_URL } from '../api';
+import { normalizeApiList } from '../utils/apiResponse';
 import authStore from '../stores/authStore';
 import type { Router } from '../types';
 import { CustomizerPanel } from '../components/hotspot/CustomizerPanel';
 import { HotspotLivePreview } from '../components/hotspot/HotspotLivePreview';
+
+interface HotspotPackage {
+    id: string;
+    name: string;
+    price?: number;
+    duration?: number;
+    durationUnit?: string;
+    validity?: string;
+    bandwidth?: string;
+}
 
 export default function HotspotLoginCustomizer() {
     const [searchParams] = useSearchParams();
@@ -32,7 +43,7 @@ export default function HotspotLoginCustomizer() {
     const [loadingRouters, setLoadingRouters] = useState(true);
 
     // Packages for the selected router
-    const [routerPackages, setRouterPackages] = useState<any[]>([]);
+    const [routerPackages, setRouterPackages] = useState<HotspotPackage[]>([]);
 
     // Customization options
     const [primaryColor, setPrimaryColor] = useState('#1a1a2e');
@@ -59,7 +70,7 @@ export default function HotspotLoginCustomizer() {
             setLoadingRouters(true);
             try {
                 const data = await routersApi.list();
-                const routers = data as unknown as Router[];
+                const routers = normalizeApiList<Router>(data);
                 setRouters(routers);
                 // Auto-select router from URL param or first router
                 const routerIdParam = searchParams.get('routerId');
@@ -98,10 +109,8 @@ export default function HotspotLoginCustomizer() {
         if (!selectedRouterId) return;
         const loadPackages = async () => {
             try {
-                const pkgs = await packagesApi.list({ routerId: selectedRouterId, status: 'Active' });
-                const list = Array.isArray(pkgs) ? pkgs : [];
-                // Map the packages to the format expected by the preview and generated HTML
-                const mapped = list.map((p: any) => ({
+                const pkgs = normalizeApiList<HotspotPackage>(await packagesApi.list({ routerId: selectedRouterId, status: 'Active' }));
+                const mapped = pkgs.map((p) => ({
                     id: p.id,
                     name: p.name,
                     price: p.price || 0,
@@ -687,7 +696,7 @@ export default function HotspotLoginCustomizer() {
                     return r.json();
                 })
                 .then(function(d) {
-                    var pkgs = Array.isArray(d) ? d : (d.data || []);
+                    var pkgs = normalizeApiList<any>(d);
                     if (pkgs.length > 0) {
                         // Map live packages to display format
                         var mapped = pkgs.map(function(p) {
@@ -765,9 +774,10 @@ export default function HotspotLoginCustomizer() {
             }
 
             setTimeout(() => setSaveSuccess(false), 3000);
-        } catch (err: any) {
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
             console.error('Failed to save settings:', err);
-            setSaveError(err.message || 'Failed to save settings. Please try again.');
+            setSaveError(message || 'Failed to save settings. Please try again.');
             setTimeout(() => setSaveError(null), 5000);
         } finally {
             setSaving(false);
@@ -1062,15 +1072,16 @@ TROUBLESHOOTING:
             const safeZipName = (selectedRouter?.name || 'template')
                 .trim()
                 .replace(/\s+/g, '-')
-                .replace(/[^a-zA-Z0-9\-]/g, '')
+                .replace(/[^a-zA-Z0-9-]/g, '')
                 .replace(/-+/g, '-')
                 .replace(/^-+|-+$/g, '')
                 .toLowerCase();
             saveAs(content, `hotspot-${safeZipName}.zip`);
 
-        } catch (err: any) {
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
             console.error("Download zip error:", err);
-            alert("Error downloading hotspot files: " + err.message);
+            alert("Error downloading hotspot files: " + message);
         }
     };
 
@@ -1084,7 +1095,7 @@ TROUBLESHOOTING:
     };
 
     // â”€â”€ Preview packages for the live panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    const previewPackages = routerPackages.map((p: any) => ({
+    const previewPackages = routerPackages.map((p: HotspotPackage) => ({
         id: p.id,
         name: p.name,
         price: p.price || 0,

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import CloseIcon from '@mui/icons-material/Close';
 import CheckIcon from '@mui/icons-material/Check';
 import VisibilityIcon from '@mui/icons-material/Visibility';
@@ -22,7 +22,7 @@ interface AddRouterModalProps {
     initialData?: Partial<Router>;
 }
 
-const VPN_OPTIONS = [
+const VPN_OPTIONS: readonly VpnCard[] = [
     {
         value: 'hybrid',
         label: 'Hybrid',
@@ -51,7 +51,18 @@ const VPN_OPTIONS = [
         border: '#ddd6fe',
         description: 'Traditional VPN with wide compatibility and port forwarding.',
     },
-] as const;
+];
+
+type VpnCard = {
+    value: 'hybrid' | 'wireguard' | 'openvpn';
+    label: string;
+    icon: ReactNode;
+    color: string;
+    bg: string;
+    border: string;
+    description: string;
+    badge?: string;
+};
 
 type VpnMode = 'hybrid' | 'wireguard' | 'openvpn';
 
@@ -60,13 +71,13 @@ export default function AddRouterModal({ onClose, onSave, initialData }: AddRout
     const [accessCode, setAccessCode] = useState(initialData?.password || '');
     const [showAccessCode, setShowAccessCode] = useState(false);
     const [vpnMode, setVpnMode] = useState<VpnMode>((initialData?.vpnMode as VpnMode) || 'hybrid');
-    const [description, setDescription] = useState((initialData as any)?.description || '');
+    const [description, setDescription] = useState(initialData?.description || '');
     const [status, setStatus] = useState<'Online' | 'Offline'>(initialData?.status === 'Online' ? 'Online' : 'Offline');
     const [showAdvanced, setShowAdvanced] = useState(false);
     const [host, setHost] = useState(initialData?.host || '0.0.0.0');
     const [username, setUsername] = useState(initialData?.username || 'admin');
     const [port, setPort] = useState<number | undefined>(initialData?.port || undefined);
-    const [apiPort, setApiPort] = useState<number | undefined>((initialData as any)?.apiPort || undefined);
+    const [apiPort, setApiPort] = useState<number | undefined>(initialData?.apiPort || undefined);
 
     const isEdit = !!initialData?.id;
 
@@ -220,9 +231,9 @@ export default function AddRouterModal({ onClose, onSave, initialData }: AddRout
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                                             {opt.icon}
                                             <span style={{ fontWeight: 700, fontSize: '0.88rem', color: isSelected ? opt.color : 'var(--text-primary)' }}>{opt.label}</span>
-                                            {'badge' in opt && (
+                                            {opt.badge && (
                                                 <span style={{ fontSize: '0.62rem', fontWeight: 800, background: opt.color, color: '#fff', padding: '2px 7px', borderRadius: 10, letterSpacing: 0.3, whiteSpace: 'nowrap' }}>
-                                                    {(opt as any).badge}
+                                                    {opt.badge}
                                                 </span>
                                             )}
                                         </div>

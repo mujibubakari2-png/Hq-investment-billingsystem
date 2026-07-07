@@ -4,6 +4,7 @@
  */
 
 import React from 'react';
+import type { SvgIconProps } from '@mui/material/SvgIcon';
 import DownloadIcon from '@mui/icons-material/Download';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import SettingsIcon from '@mui/icons-material/Settings';
@@ -37,7 +38,13 @@ export type VerifyStatus = 'checking' | 'success' | 'failed';
 
 // ── Step definitions ──────────────────────────────────────────────────────────
 
-export const WIZARD_STEPS = [
+interface WizardStep {
+    label: string;
+    sub: string;
+    icon: React.ReactElement<SvgIconProps>;
+}
+
+export const WIZARD_STEPS: WizardStep[] = [
     { label: 'Download',    sub: 'OVPN Script',    icon: <DownloadIcon /> },
     { label: 'Connection',  sub: 'Verify Online',  icon: <CableIcon /> },
     { label: 'Services',    sub: 'Choose Setup',   icon: <SettingsIcon /> },
@@ -91,10 +98,14 @@ export function WizardStepBar({ currentStep, onStepClick }: WizardStepBarProps) 
                                 boxShadow: isActive ? '0 0 0 3px rgba(33,150,243,0.2)' : 'none',
                                 transition: 'all 0.2s',
                             }}>
-                                {isDone
-                                    ? <CheckCircleIcon style={{ fontSize: 22 }} />
-                                    : React.cloneElement(step.icon as React.ReactElement, { style: { fontSize: 20 } })
-                                }
+                                {isDone ? (
+                                    <CheckCircleIcon style={{ fontSize: 22 }} />
+                                ) : (
+                                    (() => {
+                                        const Icon = step.icon.type as any;
+                                        return <Icon style={{ fontSize: 20 }} />;
+                                    })()
+                                )}
                             </div>
                             <div style={{ textAlign: 'center' }}>
                                 <div style={{ fontSize: '0.72rem', fontWeight: isActive ? 700 : 500, color: isActive ? 'var(--primary)' : 'var(--text-secondary)' }}>

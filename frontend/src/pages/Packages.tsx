@@ -25,7 +25,7 @@ export default function Packages() {
         setLoading(true);
         try {
             const data = await packagesApi.list();
-            setPackages(data as unknown as Package[]);
+            setPackages(data);
         } catch (err) { console.error('Failed to load packages:', err); }
         finally { setLoading(false); }
     };

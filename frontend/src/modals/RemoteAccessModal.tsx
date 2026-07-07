@@ -10,25 +10,16 @@ import ErrorIcon from '@mui/icons-material/Error';
 import SyncIcon from '@mui/icons-material/Sync';
 import LockIcon from '@mui/icons-material/Lock';
 import type { Router } from '../types';
-import { routersApi } from '../api';
+import { routersApi, type WireGuardConfig } from '../api';
 
 interface RemoteAccessModalProps {
     router: Router;
     onClose: () => void;
 }
 
-interface WgStatus {
-    tunnelActive: boolean;
-    tunnelStatusMessage: string;
-    routerTunnelIp: string;
-    serverTunnelIp: string;
-    lastHandshakeSeconds: number | null;
-    enabled: boolean;
-}
-
 export default function RemoteAccessModal({ router, onClose }: RemoteAccessModalProps) {
     const [showPassword, setShowPassword] = useState(false);
-    const [wgStatus, setWgStatus] = useState<WgStatus | null>(null);
+    const [wgStatus, setWgStatus] = useState<WireGuardConfig | null>(null);
     const [loadingWg, setLoadingWg] = useState(true);
     const [copied, setCopied] = useState('');
 
@@ -38,7 +29,7 @@ export default function RemoteAccessModal({ router, onClose }: RemoteAccessModal
         const fetchStatus = async () => {
             setLoadingWg(true);
             try {
-                const res = await routersApi.wireguard.getConfig(router.id) as any;
+                const res = await routersApi.wireguard.getConfig(router.id);
                 if (!cancelled) setWgStatus(res);
             } catch {
                 if (!cancelled) setWgStatus(null);

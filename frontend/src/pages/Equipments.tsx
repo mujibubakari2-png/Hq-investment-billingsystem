@@ -8,6 +8,7 @@ import AddEquipmentModal from '../modals/AddEquipmentModal';
 import EditEquipmentModal from '../modals/EditEquipmentModal';
 import ConfirmDeleteModal from '../modals/ConfirmDeleteModal';
 import { equipmentsApi } from '../api';
+import { normalizeApiList } from '../utils/apiResponse';
 import type { Equipment } from '../types';
 
 export default function Equipments() {
@@ -18,11 +19,11 @@ export default function Equipments() {
     const [equipmentList, setEquipmentList] = useState<Equipment[]>([]);
     const [loading, setLoading] = useState(true);
 
-    const fetchEquipment = async () => {
+    const loadEquipment = async () => {
         setLoading(true);
         try {
-            const data = await equipmentsApi.list();
-            setEquipmentList(data as unknown as Equipment[]);
+            const response = await equipmentsApi.list();
+            setEquipmentList(normalizeApiList<Equipment>(response));
         } catch (err) {
             console.error('Failed to load equipment:', err);
         } finally {
@@ -31,7 +32,7 @@ export default function Equipments() {
     };
 
     useEffect(() => {
-        fetchEquipment();
+        void Promise.resolve().then(loadEquipment);
     }, []);
 
     const filtered = equipmentList.filter(eq =>
@@ -42,9 +43,10 @@ export default function Equipments() {
 
     const handleEditEquipment = async (updated: Equipment) => {
         try {
-            await equipmentsApi.update(updated.id, updated as unknown as Record<string, unknown>);
+            const payload: Record<string, unknown> = { ...updated };
+            await equipmentsApi.update(updated.id, payload);
             setEditEquipment(null);
-            fetchEquipment();
+            await loadEquipment();
         } catch (err) {
             console.error('Failed to update equipment:', err);
             alert('Failed to update equipment.');
@@ -55,9 +57,10 @@ export default function Equipments() {
         <div>
             {showAddModal && <AddEquipmentModal onClose={() => setShowAddModal(false)} onSave={async (data) => {
                 try {
-                    await equipmentsApi.create(data as Record<string, unknown>);
+                    const payload: Record<string, unknown> = { ...data };
+                    await equipmentsApi.create(payload);
                     setShowAddModal(false);
-                    fetchEquipment();
+                    await loadEquipment();
                 } catch (err) {
                     console.error('Failed to add equipment:', err);
                     alert('Failed to add equipment.');
@@ -80,7 +83,7 @@ export default function Equipments() {
                         try {
                             await equipmentsApi.delete(deleteId);
                             setDeleteId(null);
-                            fetchEquipment();
+                            await loadEquipment();
                         } catch (err) {
                             console.error('Failed to remove equipment:', err);
                             alert('Failed to remove equipment.');

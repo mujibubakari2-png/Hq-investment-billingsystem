@@ -1,4 +1,5 @@
 import { paymentChannelsApi } from '../api/financeApi';
+import { normalizeApiList } from '../utils/apiResponse';
 
 export type ChannelProvider = 'PALMPESA' | 'ZENOPAY' | 'HARAKAPAY' | 'MONGIKE' | 'BANK_TRANSFER';
 
@@ -15,9 +16,8 @@ export interface ProviderChannel {
 }
 
 export async function loadProviderChannel(provider: ChannelProvider): Promise<ProviderChannel | null> {
-    const rows = await paymentChannelsApi.list();
-    const channels = Array.isArray(rows) ? rows : [];
-    return (channels.find((ch: any) => String(ch.provider || '').toUpperCase() === provider) as ProviderChannel | undefined) ?? null;
+    const rows = normalizeApiList<Record<string, unknown>>(await paymentChannelsApi.list());
+    return (rows.find((ch: any) => String(ch.provider || '').toUpperCase() === provider) as ProviderChannel | undefined) ?? null;
 }
 
 export async function saveProviderChannel(args: {

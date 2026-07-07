@@ -11,6 +11,7 @@ import CheckBoxOutlineBlankIcon from '@mui/icons-material/CheckBoxOutlineBlank';
 import RouterIcon from '@mui/icons-material/Router';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
+import { normalizeApiList } from '../utils/apiResponse';
 import { voucherCodesApi } from '../api';
 import type { Voucher } from '../types';
 import GenerateVouchersModal from '../modals/GenerateVouchersModal';
@@ -54,7 +55,7 @@ export default function VoucherCodes() {
         setLoading(true);
         try {
             const res = await voucherCodesApi.list({ limit: '1000' });
-            setVouchers((res.data || []) as unknown as Voucher[]);
+            setVouchers(normalizeApiList<Voucher>(res));
         } catch (err) {
             console.error('Failed to fetch vouchers', err);
         } finally {

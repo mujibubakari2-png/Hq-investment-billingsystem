@@ -11,6 +11,7 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import PersonIcon from '@mui/icons-material/Person';
 import RouterIcon from '@mui/icons-material/Router';
 import SpeedIcon from '@mui/icons-material/Speed';
+import { normalizeApiList } from '../utils/apiResponse';
 import { vpnApi, routersApi } from '../api';
 import ConfirmDeleteModal from '../modals/ConfirmDeleteModal';
 
@@ -59,8 +60,8 @@ export default function VpnManagement() {
                 vpnApi.list(),
                 routersApi.list(),
             ]);
-            setVpnUsers(vpnData as unknown as VpnUser[]);
-            setRouters(routerData as unknown as Array<{ id: string; name: string }>);
+            setVpnUsers(normalizeApiList<VpnUser>(vpnData));
+            setRouters(normalizeApiList(routerData));
         } catch (err) {
             console.error('Failed to load VPN data:', err);
         } finally {

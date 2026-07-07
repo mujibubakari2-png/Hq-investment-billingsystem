@@ -4,6 +4,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import CheckIcon from '@mui/icons-material/Check';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
+import { normalizeApiList } from '../utils/apiResponse';
 import { clientsApi } from '../api';
 import type { ClientListItem } from '../api/clientsApi';
 
@@ -40,8 +41,7 @@ export default function CreateInvoiceModal({ onClose, onSave }: CreateInvoiceMod
     useEffect(() => {
         clientsApi.list()
             .then(r => {
-                const data = Array.isArray(r) ? r : (r as any)?.data || [];
-                setClients(data);
+                setClients(normalizeApiList(r));
             })
             .catch(() => setError('Failed to load clients list.'))
             .finally(() => setClientsLoading(false));

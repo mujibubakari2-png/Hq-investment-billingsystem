@@ -11,6 +11,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import DeleteIcon from '@mui/icons-material/Delete';
 import WifiIcon from '@mui/icons-material/Wifi';
+import { normalizeApiList } from '../utils/apiResponse';
 import { clientsApi, radiusSyncApi } from '../api';
 import { formatDate } from '../utils/formatters';
 import AddClientModal from '../modals/AddClientModal';
@@ -55,7 +56,7 @@ export default function Clients() {
             if (statusFilter && statusFilter !== 'All') params.status = statusFilter.toUpperCase();
             if (searchTerm) params.search = searchTerm;
             const res = await clientsApi.list(params);
-            setClients(res.data as unknown as Client[]);
+            setClients(normalizeApiList<Client>(res));
             setTotal(res.total);
         } catch (err) {
             console.error('Failed to fetch clients:', err);

@@ -56,7 +56,7 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
             try {
                 setLoading(true);
                 const data = await routersApi.wireguard.getConfig(router.id);
-                setConfig((data as unknown) as WgConfig);
+                setConfig(data);
             } catch (err: unknown) {
                 const errorMessage = err instanceof Error ? err.message : 'Failed to load WireGuard configuration';
                 setError(errorMessage);
@@ -192,9 +192,9 @@ PersistentKeepalive = 25`;
             else if (action === 'deactivate') result = await routersApi.wireguard.deactivate(router.id);
             else result = await routersApi.wireguard.pushConfig(router.id);
 
-            const resultObj = (result as unknown) as Record<string, unknown>;
-            const success = typeof resultObj.success === 'boolean' ? (resultObj.success as boolean) : false;
-            const message = typeof resultObj.message === 'string' ? (resultObj.message as string) : 'Action completed';
+            const resultObj = result as { success?: boolean; message?: string };
+            const success = typeof resultObj.success === 'boolean' ? resultObj.success : false;
+            const message = typeof resultObj.message === 'string' ? resultObj.message : 'Action completed';
             setActionResult({ success, message });
             if (success) {
                 if (config) {

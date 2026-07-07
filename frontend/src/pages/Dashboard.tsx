@@ -11,6 +11,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { dashboardApi, routersApi } from '../api';
+import { normalizeApiList } from '../utils/apiResponse';
 import type { DashboardResponse } from '../api';
 import { useSearchParams } from 'react-router-dom';
 import authStore from '../stores/authStore';
@@ -99,7 +100,7 @@ export default function Dashboard() {
                 routersApi.list(),
             ]);
             setStats(dashData);
-            setRouters(routerData as unknown as Router[]);
+            setRouters(normalizeApiList<Router>(routerData));
         } catch (err) {
             console.error('Dashboard fetch error:', err);
             setError('Failed to load dashboard data. Please try again.');

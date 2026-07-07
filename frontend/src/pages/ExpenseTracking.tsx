@@ -4,6 +4,7 @@ import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { expensesApi } from '../api';
+import { normalizeApiList } from '../utils/apiResponse';
 import type { Expense } from '../types';
 import AddExpenseModal from '../modals/AddExpenseModal';
 import EditExpenseModal from '../modals/EditExpenseModal';
@@ -20,10 +21,11 @@ export default function ExpenseTracking() {
     const fetchExpenses = async () => {
         setLoading(true);
         try {
-            const data = await expensesApi.list();
-            setExpenses(data as unknown as Expense[]);
+            const response = await expensesApi.list();
+            setExpenses(normalizeApiList<Expense>(response));
         } catch (err) {
             console.error('Failed to load expenses:', err);
+            setExpenses([]);
         } finally {
             setLoading(false);
         }

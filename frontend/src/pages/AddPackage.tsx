@@ -7,6 +7,7 @@ import SpeedIcon from '@mui/icons-material/Speed';
 import CloseIcon from '@mui/icons-material/Close';
 import CheckIcon from '@mui/icons-material/Check';
 import { routersApi, packagesApi } from '../api';
+import { normalizeApiList } from '../utils/apiResponse';
 import type { Router } from '../types';
 
 export default function AddPackage() {
@@ -32,7 +33,7 @@ export default function AddPackage() {
     const [submitting, setSubmitting] = useState(false);
 
     useEffect(() => {
-        routersApi.list().then(d => setRoutersList(d as unknown as Router[])).catch(console.error);
+        routersApi.list().then(d => setRoutersList(normalizeApiList<Router>(d))).catch(console.error);
     }, []);
 
     const handleSave = async () => {

@@ -1,0 +1,2120 @@
+﻿=== AddClientModal.tsx ===
+import { useState, useEffect } from 'react';
+import PersonAddIcon from '@mui/icons-material/PersonAdd';
+import CloseIcon from '@mui/icons-material/Close';
+import CheckIcon from '@mui/icons-material/Check';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import SettingsIcon from '@mui/icons-material/Settings';
+import KeyIcon from '@mui/icons-material/Key';
+import PowerSettingsNewIcon from '@mui/icons-material/PowerSettingsNew';
+import { generatePassword, generateUsername } from '../utils/formatters';
+import { clientsApi } from '../api';
+import { getPhoneError } from '../utils/validators';
+
+interface AddClientModalProps {
+    onClose: () => void;
+    onSave?: (data: Record<string, unknown>) => void;
+}
+
+export default function AddClientModal({ onClose, onSave }: AddClientModalProps) {
+    const [username] = useState(generateUsername());
+    const [fullName, setFullName] = useState('');
+    const [accountType, setAccountType] = useState('Personal');
+    const [email, setEmail] = useState('');
+    const [phoneNumber, setPhoneNumber] = useState('');
+    const [autoGenPassword, setAutoGenPassword] = useState(true);
+    const [loginPassword, setLoginPassword] = useState(generatePassword());
+    const [enablePPPoE, setEnablePPPoE] = useState(false);
+    const [pppoePassword, setPppoePassword] = useState('');
+    const [activateNow, setActivateNow] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+
+    // ESC key handler
+    useEffect(() => {
+        const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+        document.addEventListener('keydown', handler);
+        return () => document.removeEventListener('keydown', handler);
+    }, [onClose]);
+
+    const handleRefreshPassword = () => {
+        setLoginPassword(generatePassword());
+    };
+
+    const phoneError = getPhoneError(phoneNumber);
+
+    // Send data directly to API instead of relying on parent callback
+    const handleSave = async () => {
+        if (!fullName) return;
+        setLoading(true);
+        setError('');
+        try {
+            await clientsApi.create({
+                username,
+                fullName,
+                email: email || undefined,
+                phone: phoneNumber || undefined,
+                accountType: accountType === 'Hotspot' ? 'PERSONAL' : accountType.toUpperCase(),
+                serviceType: accountType === 'Hotspot' ? 'HOTSPOT' : (enablePPPoE ? 'PPPOE' : 'HOTSPOT'),
+                password: loginPassword,
+                status: activateNow ? 'ACTIVE' : 'INACTIVE',
+            });
+            onSave?.({}); // notify parent to refresh list
+            onClose();
+        } catch (err: any) {
+            setError(err.message || 'Failed to create client');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal" onClick={(e) => e.stopPropagation()}>
+                {/* Header */}
+                <div className="modal-header">
+                    <div className="modal-header-left">
+                        <div className="modal-header-icon">
+                            <PersonAddIcon fontSize="small" />
+                        </div>
+                        <div>
+                            <div className="modal-title">Add New Client</div>
+
+=== AddEquipmentModal.tsx ===
+import { useState } from 'react';
+import RouterIcon from '@mui/icons-material/Router';
+import CloseIcon from '@mui/icons-material/Close';
+import CheckIcon from '@mui/icons-material/Check';
+
+interface AddEquipmentModalProps {
+    onClose: () => void;
+    onSave?: (data: object) => void;
+}
+
+const EQUIPMENT_TYPES = ['Router', 'Switch', 'Antenna', 'OLT', 'ONT', 'Server', 'UPS', 'Cable', 'Other'];
+
+export default function AddEquipmentModal({ onClose, onSave }: AddEquipmentModalProps) {
+    const [name, setName] = useState('');
+    const [type, setType] = useState('Router');
+    const [serialNumber, setSerialNumber] = useState('');
+    const [status, setStatus] = useState('Active');
+    const [location, setLocation] = useState('');
+    const [assignedTo, setAssignedTo] = useState('');
+    const [purchaseDate, setPurchaseDate] = useState(new Date().toISOString().split('T')[0]);
+    const [notes, setNotes] = useState('');
+
+    const handleSave = () => {
+        if (onSave) onSave({ name, type, serialNumber, status, location, assignedTo, purchaseDate, notes });
+        onClose();
+    };
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal modal-md" onClick={e => e.stopPropagation()}>
+                <div className="modal-header">
+                    <div className="modal-header-left">
+                        <div className="modal-header-icon" style={{ background: 'var(--teal-light)', color: 'var(--teal)' }}>
+                            <RouterIcon fontSize="small" />
+                        </div>
+                        <div>
+                            <div className="modal-title">Add Equipment</div>
+                            <div className="modal-subtitle">Add new network equipment to inventory</div>
+                        </div>
+                    </div>
+                    <button className="modal-close" onClick={onClose}><CloseIcon fontSize="small" /></button>
+                </div>
+
+                <div className="modal-body">
+                    <div className="form-row">
+                        <div className="form-group">
+                            <label className="form-label">Equipment Name <span className="required">*</span></label>
+                            <input type="text" className="form-input" placeholder="e.g., MikroTik hAP acÂ³" value={name} onChange={e => setName(e.target.value)} />
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label">Equipment Type <span className="required">*</span></label>
+                            <select className="form-select" value={type} onChange={e => setType(e.target.value)}>
+                                {EQUIPMENT_TYPES.map(t => <option key={t}>{t}</option>)}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div className="form-row">
+                        <div className="form-group">
+                            <label className="form-label">Serial Number</label>
+                            <input type="text" className="form-input" placeholder="Manufacturer serial number" value={serialNumber} onChange={e => setSerialNumber(e.target.value)} />
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label">Status</label>
+                            <select className="form-select" value={status} onChange={e => setStatus(e.target.value)}>
+                                <option>Active</option>
+                                <option>Inactive</option>
+                                <option>Maintenance</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div className="form-row">
+                        <div className="form-group">
+                            <label className="form-label">Location <span className="required">*</span></label>
+                            <input type="text" className="form-input" placeholder="e.g., Server Room, Tower A" value={location} onChange={e => setLocation(e.target.value)} />
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label">Assigned To</label>
+                            <input type="text" className="form-input" placeholder="Client or staff name" value={assignedTo} onChange={e => setAssignedTo(e.target.value)} />
+
+=== AddExpenseModal.tsx ===
+import { useState } from 'react';
+import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
+import CloseIcon from '@mui/icons-material/Close';
+import CheckIcon from '@mui/icons-material/Check';
+
+interface AddExpenseModalProps {
+    onClose: () => void;
+    onSave?: (data: object) => void;
+}
+
+const CATEGORIES = ['Infrastructure', 'Maintenance', 'Staff', 'Utilities', 'Equipment', 'Marketing', 'Transport', 'Office', 'Other'];
+
+export default function AddExpenseModal({ onClose, onSave }: AddExpenseModalProps) {
+    const [category, setCategory] = useState('Infrastructure');
+    const [description, setDescription] = useState('');
+    const [amount, setAmount] = useState('');
+    const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+    const [reference, setReference] = useState('');
+
+    const handleSave = () => {
+        if (onSave) onSave({ category, description, amount: Number(amount), date, reference });
+        onClose();
+    };
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal" style={{ maxWidth: 520 }} onClick={e => e.stopPropagation()}>
+                <div className="modal-header">
+                    <div className="modal-header-left">
+                        <div className="modal-header-icon" style={{ background: 'var(--warning-light)', color: 'var(--warning)' }}>
+                            <AccountBalanceWalletIcon fontSize="small" />
+                        </div>
+                        <div>
+                            <div className="modal-title">Add Expense</div>
+                            <div className="modal-subtitle">Record a new business expense</div>
+                        </div>
+                    </div>
+                    <button className="modal-close" onClick={onClose}><CloseIcon fontSize="small" /></button>
+                </div>
+
+                <div className="modal-body">
+                    <div className="form-row">
+                        <div className="form-group">
+                            <label className="form-label">Category <span className="required">*</span></label>
+                            <select className="form-select" value={category} onChange={e => setCategory(e.target.value)}>
+                                {CATEGORIES.map(c => <option key={c}>{c}</option>)}
+                            </select>
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label">Amount (TZS) <span className="required">*</span></label>
+                            <input type="number" className="form-input" placeholder="0" value={amount} onChange={e => setAmount(e.target.value)} />
+                        </div>
+                    </div>
+
+                    <div className="form-group">
+                        <label className="form-label">Description <span className="required">*</span></label>
+                        <input type="text" className="form-input" placeholder="Brief description of the expense" value={description} onChange={e => setDescription(e.target.value)} />
+                    </div>
+
+                    <div className="form-row">
+                        <div className="form-group">
+                            <label className="form-label">Date <span className="required">*</span></label>
+                            <input type="date" className="form-input" value={date} onChange={e => setDate(e.target.value)} />
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label">Reference Number</label>
+                            <input type="text" className="form-input" placeholder="Receipt or invoice number" value={reference} onChange={e => setReference(e.target.value)} />
+                        </div>
+                    </div>
+                </div>
+
+                <div className="modal-footer">
+                    <div className="modal-footer-left">Fields marked with <span style={{ color: 'var(--primary)' }}>*</span> are required</div>
+                    <div className="modal-footer-right">
+                        <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
+                        <button className="btn btn-primary" onClick={handleSave} disabled={!description || !amount}>
+                            <CheckIcon fontSize="small" /> Add Expense
+                        </button>
+                    </div>
+                </div>
+
+=== AddMessageTemplateModal.tsx ===
+import { useState } from 'react';
+import DescriptionIcon from '@mui/icons-material/Description';
+import CloseIcon from '@mui/icons-material/Close';
+import CheckIcon from '@mui/icons-material/Check';
+
+interface AddMessageTemplateModalProps {
+    onClose: () => void;
+    onSave?: (data: object) => void;
+}
+
+const VARIABLES = ['{name}', '{plan}', '{expiry}', '{amount}', '{voucher}', '{company}'];
+
+export default function AddMessageTemplateModal({ onClose, onSave }: AddMessageTemplateModalProps) {
+    const [name, setName] = useState('');
+    const [type, setType] = useState('Activation');
+    const [content, setContent] = useState('');
+
+    const insertVariable = (variable: string) => {
+        setContent(prev => prev + variable);
+    };
+
+    const handleSave = () => {
+        if (onSave) onSave({ name, type, content });
+        onClose();
+    };
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal" style={{ maxWidth: 580 }} onClick={e => e.stopPropagation()}>
+                <div className="modal-header">
+                    <div className="modal-header-left">
+                        <div className="modal-header-icon" style={{ background: 'var(--purple-light)', color: 'var(--purple)' }}>
+                            <DescriptionIcon fontSize="small" />
+                        </div>
+                        <div>
+                            <div className="modal-title">Add Message Template</div>
+                            <div className="modal-subtitle">Create a reusable SMS template</div>
+                        </div>
+                    </div>
+                    <button className="modal-close" onClick={onClose}><CloseIcon fontSize="small" /></button>
+                </div>
+
+                <div className="modal-body">
+                    <div className="form-row">
+                        <div className="form-group">
+                            <label className="form-label">Template Name <span className="required">*</span></label>
+                            <input type="text" className="form-input" placeholder="e.g., Activation Welcome" value={name} onChange={e => setName(e.target.value)} />
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label">Template Type <span className="required">*</span></label>
+                            <select className="form-select" value={type} onChange={e => setType(e.target.value)}>
+                                <option>Activation</option>
+                                <option>Expiry</option>
+                                <option>Payment</option>
+                                <option>Reminder</option>
+                                <option>Custom</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div className="form-group">
+                        <label className="form-label">Message Content <span className="required">*</span></label>
+                        <div style={{ marginBottom: 8 }}>
+                            <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: 6 }}>Insert variable:</div>
+                            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                                {VARIABLES.map(v => (
+                                    <button
+                                        key={v}
+                                        className="btn btn-secondary btn-sm"
+                                        onClick={() => insertVariable(v)}
+                                    >
+                                        {v}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                        <textarea
+                            className="form-input"
+                            rows={5}
+                            placeholder="Dear {name}, your {plan} subscription is now active and expires on {expiry}. Thank you for choosing us!"
+
+=== AddPackageModal.tsx ===
+import { useState, useEffect } from 'react';
+import InventoryIcon from '@mui/icons-material/Inventory';
+import CloseIcon from '@mui/icons-material/Close';
+import CheckIcon from '@mui/icons-material/Check';
+import SpeedIcon from '@mui/icons-material/Speed';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import SettingsIcon from '@mui/icons-material/Settings';
+import { routersApi } from '../api';
+import { normalizeApiList } from '../utils/apiResponse';
+import type { Router } from '../types';
+
+// Typed interface instead of `object`
+interface PackageFormData {
+    packageType: string;
+    category: string;
+    name: string;
+    price: number;
+    duration: number;
+    durationUnit: string;
+    router: string;
+    uploadSpeed: string;
+    uploadUnit: string;
+    downloadSpeed: string;
+    downloadUnit: string;
+    burstEnabled: boolean;
+    hotspotType: string;
+    devices: number;
+    paymentType: string;
+    status: string;
+}
+
+interface AddPackageModalProps {
+    onClose: () => void;
+    onSave?: (data: PackageFormData) => void;
+}
+
+export default function AddPackageModal({ onClose, onSave }: AddPackageModalProps) {
+    const [packageType, setPackageType] = useState('Hotspot');
+    const [accountType, setAccountType] = useState('Personal');
+    const [name, setName] = useState('');
+    const [price, setPrice] = useState('');
+    const [duration, setDuration] = useState('');
+    const [durationUnit, setDurationUnit] = useState('Minutes');
+    const [router, setRouter] = useState('');
+    const [uploadSpeed, setUploadSpeed] = useState('1');
+    const [uploadUnit, setUploadUnit] = useState('Mbps');
+    const [downloadSpeed, setDownloadSpeed] = useState('1');
+    const [downloadUnit, setDownloadUnit] = useState('Mbps');
+    const [burstEnabled, setBurstEnabled] = useState(false);
+    const [hotspotType, setHotspotType] = useState('Unlimited');
+    const [devices, setDevices] = useState(1);
+    // Removed duplicate payStatus â€” replaced with proper package status
+    const [pkgStatus, setPkgStatus] = useState('Active');
+    const [paymentType, setPaymentType] = useState('Prepaid');
+    const [routersList, setRoutersList] = useState<Router[]>([]);
+
+    const [loadError, setLoadError] = useState('');
+    const [loadingData, setLoadingData] = useState(true);
+
+    //  ESC key handler
+    useEffect(() => {
+        const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+        document.addEventListener('keydown', handler);
+        return () => document.removeEventListener('keydown', handler);
+    }, [onClose]);
+
+    //  Proper error handling for data loading
+    useEffect(() => {
+        routersApi.list()
+            .then((response) => {
+                setRoutersList(normalizeApiList<Router>(response));
+            })
+            .catch(() => setLoadError('Failed to load routers. Check your network connection.'))
+            .finally(() => setLoadingData(false));
+    }, []);
+
+    const handleSave = () => {
+        if (onSave) onSave({
+            packageType,
+            // Map accountType â†’ category for backend compatibility
+
+=== AddPaymentChannelModal.tsx ===
+import { useState } from 'react';
+import PaymentIcon from '@mui/icons-material/Payment';
+import CloseIcon from '@mui/icons-material/Close';
+import CheckIcon from '@mui/icons-material/Check';
+import { paymentChannelsApi } from '../api/financeApi';
+
+interface AddPaymentChannelModalProps {
+    onClose: () => void;
+    onSave?: (data: object) => void;
+}
+
+export default function AddPaymentChannelModal({ onClose, onSave }: AddPaymentChannelModalProps) {
+    const [name, setName] = useState('');
+    const [provider, setProvider] = useState('PALMPESA');
+    const [accountNumber, setAccountNumber] = useState('');
+    const [apiKey, setApiKey] = useState('');
+    const [apiSecret, setApiSecret] = useState('');
+    const [webhookSecret, setWebhookSecret] = useState('');
+    const [environment, setEnvironment] = useState<'sandbox' | 'live'>('sandbox');
+    const [active, setActive] = useState(true);
+    // MOD-001: Add proper loading and error state
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+
+    const showApiFields = ['PALMPESA', 'ZENOPAY', 'HARAKAPAY', 'MONGIKE'].includes(provider);
+
+    // MOD-001 FIX: handleSave now calls the API directly with loading/error state.
+    // Previously it just called onSave() with raw form data and closed immediately
+    // without making any network request â€” credentials were silently discarded.
+    const handleSave = async () => {
+        if (!name || !provider) return;
+        setLoading(true);
+        setError('');
+        try {
+            await paymentChannelsApi.create({
+                name,
+                provider,
+                accountNumber: accountNumber || null,
+                apiKey: apiKey || null,
+                apiSecret: apiSecret || null,
+                webhookSecret: webhookSecret || null,
+                environment,
+                status: active ? 'ACTIVE' : 'INACTIVE',
+            });
+            onSave?.({});
+            onClose();
+        } catch (err: any) {
+            setError(err.message || 'Failed to add payment channel');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal" style={{ maxWidth: 560 }} onClick={e => e.stopPropagation()}>
+                <div className="modal-header">
+                    <div className="modal-header-left">
+                        <div className="modal-header-icon" style={{ background: 'var(--cyan-light)', color: 'var(--cyan)' }}>
+                            <PaymentIcon fontSize="small" />
+                        </div>
+                        <div>
+                            <div className="modal-title">Add Payment Channel</div>
+                            <div className="modal-subtitle">Configure a new payment method</div>
+                        </div>
+                    </div>
+                    <button className="modal-close" onClick={onClose}><CloseIcon fontSize="small" /></button>
+                </div>
+
+                <div className="modal-body">
+                    {/* Error display */}
+                    {error && (
+                        <div style={{
+                            background: '#fee2e2', color: '#dc2626', padding: '10px 14px',
+                            borderRadius: 8, marginBottom: 16, fontSize: '0.82rem', fontWeight: 500,
+                            border: '1px solid #fecaca',
+                        }}>
+                            {error}
+                        </div>
+                    )}
+
+=== AddRouterModal.tsx ===
+import { useState } from 'react';
+import CloseIcon from '@mui/icons-material/Close';
+import CheckIcon from '@mui/icons-material/Check';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
+import SecurityIcon from '@mui/icons-material/Security';
+import VpnLockIcon from '@mui/icons-material/VpnLock';
+import ShieldIcon from '@mui/icons-material/Shield';
+import AddTaskIcon from '@mui/icons-material/AddTask';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import EditIcon from '@mui/icons-material/Edit';
+import PowerSettingsNewIcon from '@mui/icons-material/PowerSettingsNew';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import RouterIcon from '@mui/icons-material/Router';
+import LanIcon from '@mui/icons-material/Lan';
+import PersonIcon from '@mui/icons-material/Person';
+import type { Router } from '../types';
+
+interface AddRouterModalProps {
+    onClose: () => void;
+    onSave?: (data: Partial<Router>) => void;
+    initialData?: Partial<Router>;
+}
+
+const VPN_OPTIONS = [
+    {
+        value: 'hybrid',
+        label: 'Hybrid',
+        badge: 'Recommended',
+        icon: <AddTaskIcon style={{ fontSize: 20, color: '#16a34a' }} />,
+        color: '#16a34a',
+        bg: '#f0fdf4',
+        border: '#bbf7d0',
+        description: 'WireGuard + OpenVPN â€” best performance with easy management access.',
+    },
+    {
+        value: 'wireguard',
+        label: 'WireGuard',
+        icon: <VpnLockIcon style={{ fontSize: 20, color: '#2563eb' }} />,
+        color: '#2563eb',
+        bg: '#eff6ff',
+        border: '#bfdbfe',
+        description: 'Fast & modern. Lightweight, low latency VPN tunnel.',
+    },
+    {
+        value: 'openvpn',
+        label: 'OpenVPN',
+        icon: <ShieldIcon style={{ fontSize: 20, color: '#7c3aed' }} />,
+        color: '#7c3aed',
+        bg: '#f5f3ff',
+        border: '#ddd6fe',
+        description: 'Traditional VPN with wide compatibility and port forwarding.',
+    },
+] as const;
+
+type VpnCard = {
+    value: 'hybrid' | 'wireguard' | 'openvpn';
+    label: string;
+    icon: JSX.Element;
+    color: string;
+    bg: string;
+    border: string;
+    description: string;
+    badge?: string;
+};
+
+type VpnMode = 'hybrid' | 'wireguard' | 'openvpn';
+
+export default function AddRouterModal({ onClose, onSave, initialData }: AddRouterModalProps) {
+    const [routerName, setRouterName] = useState(initialData?.name || '');
+    const [accessCode, setAccessCode] = useState(initialData?.password || '');
+    const [showAccessCode, setShowAccessCode] = useState(false);
+    const [vpnMode, setVpnMode] = useState<VpnMode>((initialData?.vpnMode as VpnMode) || 'hybrid');
+    const [description, setDescription] = useState(initialData?.description || '');
+    const [status, setStatus] = useState<'Online' | 'Offline'>(initialData?.status === 'Online' ? 'Online' : 'Offline');
+    const [showAdvanced, setShowAdvanced] = useState(false);
+    const [host, setHost] = useState(initialData?.host || '0.0.0.0');
+    const [username, setUsername] = useState(initialData?.username || 'admin');
+    const [port, setPort] = useState<number | undefined>(initialData?.port || undefined);
+    const [apiPort, setApiPort] = useState<number | undefined>(initialData?.apiPort || undefined);
+
+=== AddSystemUserModal.tsx ===
+import { useState, useEffect } from 'react';
+import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
+import CloseIcon from '@mui/icons-material/Close';
+import CheckIcon from '@mui/icons-material/Check';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
+import { generatePassword } from '../utils/formatters';
+import { getPhoneError } from '../utils/validators';
+import { useAuth } from '../stores/authStore';
+
+interface AddSystemUserModalProps {
+    onClose: () => void;
+    onSave?: (data: object) => void;
+}
+
+export default function AddSystemUserModal({ onClose, onSave }: AddSystemUserModalProps) {
+    const [username, setUsername] = useState('');
+    const [email, setEmail] = useState('');
+    const [phone, setPhone] = useState('');
+    const [role, setRole] = useState('Agent');
+    const [password, setPassword] = useState(generatePassword());
+    const [showPass, setShowPass] = useState(false);
+    const [active, setActive] = useState(true);
+    const [loading, setLoading] = useState(false);
+
+    //  Get current user to check if they're a SUPER_ADMIN
+    const { user: currentUser } = useAuth();
+
+    // ESC key handler
+    useEffect(() => {
+        const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+        document.addEventListener('keydown', handler);
+        return () => document.removeEventListener('keydown', handler);
+    }, [onClose]);
+
+    const phoneError = getPhoneError(phone);
+
+    const handleSave = () => {
+        setLoading(true);
+        if (onSave) onSave({ username, email, phone, role, password, status: active ? 'Active' : 'Inactive' });
+        onClose();
+    };
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal" style={{ maxWidth: 560 }} onClick={e => e.stopPropagation()}>
+                <div className="modal-header">
+                    <div className="modal-header-left">
+                        <div className="modal-header-icon">
+                            <AdminPanelSettingsIcon fontSize="small" />
+                        </div>
+                        <div>
+                            <div className="modal-title">Add System User</div>
+                            <div className="modal-subtitle">Create an administrator or agent account</div>
+                        </div>
+                    </div>
+                    <button className="modal-close" onClick={onClose}><CloseIcon fontSize="small" /></button>
+                </div>
+
+                <div className="modal-body">
+                    <div className="form-row">
+                        <div className="form-group">
+                            <label className="form-label">Username <span className="required">*</span></label>
+                            <input type="text" className="form-input" placeholder="e.g., agent_john" value={username} onChange={e => setUsername(e.target.value)} />
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label">Role <span className="required">*</span></label>
+                            <select className="form-select" value={role} onChange={e => setRole(e.target.value)}>
+                                {/* Only show Super Admin option to existing SUPER_ADMIN users */}
+                                {currentUser?.role === 'SUPER_ADMIN' && <option>Super Admin</option>}
+                                <option>Admin</option>
+                                <option>Agent</option>
+                                <option>Viewer</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div className="form-row">
+                        <div className="form-group">
+
+=== AddTransactionModal.tsx ===
+import { useState, useEffect } from 'react';
+import AddCircleIcon from '@mui/icons-material/AddCircle';
+import CloseIcon from '@mui/icons-material/Close';
+import CheckIcon from '@mui/icons-material/Check';
+import { packagesApi, routersApi } from '../api';
+import { normalizeApiList } from '../utils/apiResponse';
+import type { Package, Router } from '../types';
+
+interface TransactionData {
+    username: string;
+    planId: string;
+    amount: string;
+    type: string;
+    method: string;
+    reference: string;
+    router: string;
+    notes: string;
+}
+
+interface AddTransactionModalProps {
+    onClose: () => void;
+    onSave?: (data: TransactionData) => void;
+}
+
+export default function AddTransactionModal({ onClose, onSave }: AddTransactionModalProps) {
+    const [routersList, setRoutersList] = useState<Router[]>([]);
+    const [packagesList, setPackagesList] = useState<Package[]>([]);
+    const [username, setUsername] = useState('');
+    const [planId, setPlanId] = useState('');
+    const [amount, setAmount] = useState('');
+    const [type, setType] = useState('Manual');
+    const [method, setMethod] = useState('Cash');
+    const [reference, setReference] = useState('');
+    const [router, setRouter] = useState('');
+    const [notes, setNotes] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [loadError, setLoadError] = useState('');
+    const [loadingData, setLoadingData] = useState(true);
+
+    // ESC key handler
+    useEffect(() => {
+        const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+        document.addEventListener('keydown', handler);
+        return () => document.removeEventListener('keydown', handler);
+    }, [onClose]);
+
+    // Proper error handling for parallel data loading
+    useEffect(() => {
+        Promise.all([
+            routersApi.list(),
+            packagesApi.list(),
+        ]).then(([routersResponse, packagesResponse]) => {
+            setRoutersList(normalizeApiList<Router>(routersResponse));
+            setPackagesList(normalizeApiList<Package>(packagesResponse));
+        }).catch(() => {
+            setLoadError('Failed to load data. Check your network connection.');
+        }).finally(() => setLoadingData(false));
+    }, []);
+
+    const selectedPlan = packagesList.find(p => p.id === planId);
+
+    const handlePlanChange = (id: string) => {
+        setPlanId(id);
+        const plan = packagesList.find(p => p.id === id);
+        if (plan) setAmount(String(plan.price));
+    };
+
+    const handleSave = () => {
+        setLoading(true);
+        if (onSave) {
+            onSave({ username, planId, amount, type, method, reference, router, notes });
+        }
+        onClose();
+    };
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal" style={{ maxWidth: 600 }} onClick={e => e.stopPropagation()}>
+                <div className="modal-header">
+                    <div className="modal-header-left">
+
+=== ConfirmDeleteModal.tsx ===
+import { useEffect } from 'react';
+import CloseIcon from '@mui/icons-material/Close';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import DeleteIcon from '@mui/icons-material/Delete';
+
+interface ConfirmDeleteModalProps {
+    title?: string;
+    message?: string;
+    confirmLabel?: string;
+    onClose: () => void;
+    onConfirm: () => void;
+}
+
+export default function ConfirmDeleteModal({
+    title = 'Confirm Delete',
+    message = 'Are you sure you want to delete this item? This action cannot be undone.',
+    confirmLabel = 'Delete',
+    onClose,
+    onConfirm,
+}: ConfirmDeleteModalProps) {
+    // ESC key handler
+    useEffect(() => {
+        const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+        document.addEventListener('keydown', handler);
+        return () => document.removeEventListener('keydown', handler);
+    }, [onClose]);
+
+    // Close modal first, then execute confirm via setTimeout
+    // This prevents React state update warnings if parent unmounts the component
+    const handleConfirm = () => {
+        onClose();
+        setTimeout(() => onConfirm(), 0);
+    };
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal" style={{ maxWidth: 420 }} onClick={e => e.stopPropagation()}>
+                <div className="modal-header">
+                    <div className="modal-header-left">
+                        <div className="modal-header-icon" style={{ background: 'var(--danger-light)', color: 'var(--danger)' }}>
+                            <WarningAmberIcon fontSize="small" />
+                        </div>
+                        <div>
+                            <div className="modal-title">{title}</div>
+                        </div>
+                    </div>
+                    <button className="modal-close" onClick={onClose}><CloseIcon fontSize="small" /></button>
+                </div>
+
+                <div className="modal-body">
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: 1.6 }}>
+                        {message}
+                    </p>
+                </div>
+
+                <div className="modal-footer">
+                    <div className="modal-footer-left" />
+                    <div className="modal-footer-right">
+                        <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
+                        <button className="btn btn-primary" onClick={handleConfirm}>
+                            <DeleteIcon fontSize="small" /> {confirmLabel}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+=== CreateInvoiceModal.tsx ===
+import { useState, useEffect } from 'react';
+import ReceiptIcon from '@mui/icons-material/Receipt';
+import CloseIcon from '@mui/icons-material/Close';
+import CheckIcon from '@mui/icons-material/Check';
+import AddIcon from '@mui/icons-material/Add';
+import DeleteIcon from '@mui/icons-material/Delete';
+import { clientsApi } from '../api';
+import { normalizeApiList } from '../utils/apiResponse';
+import type { ClientListItem } from '../api/clientsApi';
+
+interface InvoiceItem {
+    description: string;
+    quantity: number;
+    unitPrice: number;
+}
+
+interface CreateInvoiceModalProps {
+    onClose: () => void;
+    onSave: (data: Record<string, unknown>) => void;
+}
+
+export default function CreateInvoiceModal({ onClose, onSave }: CreateInvoiceModalProps) {
+    // Use clientId (UUID) instead of client name text input
+    const [clientId, setClientId] = useState('');
+    const [clients, setClients] = useState<ClientListItem[]>([]);
+    const [clientsLoading, setClientsLoading] = useState(true);
+    const [dueDate, setDueDate] = useState(() => new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0]);
+    const [status, setStatus] = useState('Draft');
+    const [items, setItems] = useState<InvoiceItem[]>([{ description: '', quantity: 1, unitPrice: 0 }]);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+
+    // ESC key handler
+    useEffect(() => {
+        const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+        document.addEventListener('keydown', handler);
+        return () => document.removeEventListener('keydown', handler);
+    }, [onClose]);
+
+    // Load clients list for select dropdown
+    useEffect(() => {
+        clientsApi.list()
+            .then(r => {
+                setClients(normalizeApiList<ClientListItem>(r));
+            })
+            .catch(() => setError('Failed to load clients list.'))
+            .finally(() => setClientsLoading(false));
+    }, []);
+
+    const addItem = () => {
+        setItems([...items, { description: '', quantity: 1, unitPrice: 0 }]);
+    };
+
+    const removeItem = (index: number) => {
+        setItems(items.filter((_, i) => i !== index));
+    };
+
+    const updateItem = (index: number, field: keyof InvoiceItem, value: string | number) => {
+        const updated = [...items];
+        if (field === 'description' && typeof value === 'string') {
+            updated[index].description = value;
+        } else if (field === 'quantity' && typeof value === 'number') {
+            updated[index].quantity = value;
+        } else if (field === 'unitPrice' && typeof value === 'number') {
+            updated[index].unitPrice = value;
+        }
+        setItems(updated);
+    };
+
+    const total = items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
+
+    const handleSave = async () => {
+        if (!clientId) return;
+        setLoading(true);
+        setError('');
+        try {
+            onSave({
+                clientId, // Send clientId (UUID) instead of client name
+                dueDate,
+                status,
+
+=== EditClientModal.tsx ===
+import { useState, useEffect } from 'react';
+import EditIcon from '@mui/icons-material/Edit';
+import CloseIcon from '@mui/icons-material/Close';
+import CheckIcon from '@mui/icons-material/Check';
+import { routersApi, packagesApi, clientsApi } from '../api';
+import { normalizeApiList } from '../utils/apiResponse';
+import type { Client, Router, Package } from '../types';
+import { getPhoneError } from '../utils/validators';
+
+interface EditClientModalProps {
+    client: Client;
+    onClose: () => void;
+    onSave?: (updated: Client) => void;
+}
+
+export default function EditClientModal({ client, onClose, onSave }: EditClientModalProps) {
+    const [fullName, setFullName] = useState(client.fullName);
+    const [email, setEmail] = useState(client.email || '');
+    const [phone, setPhone] = useState(client.phone);
+    const [accountType, setAccountType] = useState(client.accountType);
+    const [status, setStatus] = useState(client.status);
+    const [router, setRouter] = useState(client.router || '');
+    const [plan, setPlan] = useState(client.plan || '');
+    const [routersList, setRoutersList] = useState<Router[]>([]);
+    const [packagesList, setPackagesList] = useState<Package[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+    const [loadError, setLoadError] = useState('');
+    const [loadingData, setLoadingData] = useState(true);
+
+    // ESC key handler
+    useEffect(() => {
+        const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') handleClose(); };
+        document.addEventListener('keydown', handler);
+        return () => document.removeEventListener('keydown', handler);
+    }, [onClose]);
+
+    // Proper error handling for data loading
+    useEffect(() => {
+        Promise.all([
+            routersApi.list(),
+            packagesApi.list(),
+        ]).then(([routersResponse, packagesResponse]) => {
+            setRoutersList(normalizeApiList<Router>(routersResponse));
+            setPackagesList(normalizeApiList<Package>(packagesResponse));
+        }).catch(() => {
+            setLoadError('Failed to load data. Check your network connection.');
+        }).finally(() => setLoadingData(false));
+    }, []);
+
+    const phoneError = getPhoneError(phone);
+
+    // Unsaved changes warning
+    const isDirty = fullName !== client.fullName || email !== (client.email || '') || phone !== client.phone
+        || accountType !== client.accountType || status !== client.status;
+
+    const handleClose = () => {
+        if (isDirty && !confirm('You have unsaved changes. Are you sure you want to close?')) return;
+        onClose();
+    };
+
+    // Send data directly to API instead of relying on parent callback
+    const handleSave = async () => {
+        setLoading(true);
+        setError('');
+        try {
+            await clientsApi.update(client.id, {
+                fullName,
+                email: email || undefined,
+                phone: phone || undefined,
+                accountType: accountType.toUpperCase(),
+                status: status.toUpperCase(),
+            });
+            onSave?.({ ...client, fullName, email, phone, accountType, status, router, plan });
+            onClose();
+        } catch (err: any) {
+            setError(err.message || 'Failed to update client');
+        } finally {
+            setLoading(false);
+        }
+
+=== EditEquipmentModal.tsx ===
+import { useState } from 'react';
+import DevicesIcon from '@mui/icons-material/Devices';
+import CloseIcon from '@mui/icons-material/Close';
+import CheckIcon from '@mui/icons-material/Check';
+import type { Equipment } from '../types';
+import { formatDateForInput } from '../utils/formatters';
+
+interface EditEquipmentModalProps {
+    equipment: Equipment;
+    onClose: () => void;
+    onSave: (data: Equipment) => void;
+}
+
+const EQUIPMENT_TYPES = ['Router', 'Switch', 'Antenna', 'OLT', 'ONT', 'Server', 'UPS', 'Cable', 'Other'];
+
+export default function EditEquipmentModal({ equipment, onClose, onSave }: EditEquipmentModalProps) {
+    const [name, setName] = useState(equipment.name);
+    const [type, setType] = useState(equipment.type);
+    const [serialNumber, setSerialNumber] = useState(equipment.serialNumber);
+    const [status, setStatus] = useState(equipment.status);
+    const [location, setLocation] = useState(equipment.location);
+    const [assignedTo, setAssignedTo] = useState(equipment.assignedTo || '');
+    const [purchaseDate, setPurchaseDate] = useState(formatDateForInput(equipment.purchaseDate));
+    const [notes, setNotes] = useState(equipment.notes || '');
+
+    const handleSave = () => {
+        onSave({
+            ...equipment,
+            name, type, serialNumber, status: status as Equipment['status'],
+            location, assignedTo, purchaseDate, notes,
+        });
+    };
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal" style={{ maxWidth: 600 }} onClick={e => e.stopPropagation()}>
+                <div className="modal-header">
+                    <div className="modal-header-left">
+                        <div className="modal-header-icon" style={{ background: 'var(--teal-light)', color: 'var(--teal)' }}>
+                            <DevicesIcon fontSize="small" />
+                        </div>
+                        <div>
+                            <div className="modal-title">Edit Equipment</div>
+                            <div className="modal-subtitle">Update equipment details</div>
+                        </div>
+                    </div>
+                    <button className="modal-close" onClick={onClose}><CloseIcon fontSize="small" /></button>
+                </div>
+
+                <div className="modal-body">
+                    <div className="form-row">
+                        <div className="form-group">
+                            <label className="form-label">Equipment Name <span className="required">*</span></label>
+                            <input type="text" className="form-input" value={name} onChange={e => setName(e.target.value)} />
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label">Equipment Type <span className="required">*</span></label>
+                            <select className="form-select" value={type} onChange={e => setType(e.target.value)}>
+                                {EQUIPMENT_TYPES.map(t => <option key={t}>{t}</option>)}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div className="form-row">
+                        <div className="form-group">
+                            <label className="form-label">Serial Number</label>
+                            <input type="text" className="form-input" value={serialNumber} onChange={e => setSerialNumber(e.target.value)} />
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label">Status</label>
+                            <select className="form-select" value={status} onChange={e => setStatus(e.target.value as Equipment['status'])}>
+                                <option>Active</option>
+                                <option>Inactive</option>
+                                <option>Maintenance</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div className="form-row">
+                        <div className="form-group">
+
+=== EditExpenseModal.tsx ===
+import { useState } from 'react';
+import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
+import CloseIcon from '@mui/icons-material/Close';
+import CheckIcon from '@mui/icons-material/Check';
+import type { Expense } from '../types';
+import { formatDateForInput } from '../utils/formatters';
+
+interface EditExpenseModalProps {
+    expense: Expense;
+    onClose: () => void;
+    onSave: (data: Expense) => void;
+}
+
+const CATEGORIES = ['Internet', 'Equipment', 'Salary', 'Rent', 'Utilities', 'Marketing', 'Transport', 'Office Supplies', 'Other'];
+
+export default function EditExpenseModal({ expense, onClose, onSave }: EditExpenseModalProps) {
+    const [description, setDescription] = useState(expense.description);
+    const [category, setCategory] = useState(expense.category);
+    const [amount, setAmount] = useState(String(expense.amount));
+    const [date, setDate] = useState(formatDateForInput(expense.date));
+    const [reference, setReference] = useState(expense.reference || '');
+
+    const handleSave = () => {
+        onSave({
+            ...expense,
+            description,
+            category,
+            amount: Number(amount),
+            date,
+            reference,
+        });
+    };
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal" style={{ maxWidth: 520 }} onClick={e => e.stopPropagation()}>
+                <div className="modal-header">
+                    <div className="modal-header-left">
+                        <div className="modal-header-icon" style={{ background: 'var(--warning-light)', color: 'var(--warning)' }}>
+                            <AccountBalanceWalletIcon fontSize="small" />
+                        </div>
+                        <div>
+                            <div className="modal-title">Edit Expense</div>
+                            <div className="modal-subtitle">Update expense record</div>
+                        </div>
+                    </div>
+                    <button className="modal-close" onClick={onClose}><CloseIcon fontSize="small" /></button>
+                </div>
+
+                <div className="modal-body">
+                    <div className="form-group">
+                        <label className="form-label">Description <span className="required">*</span></label>
+                        <input type="text" className="form-input" value={description} onChange={e => setDescription(e.target.value)} />
+                    </div>
+
+                    <div className="form-row">
+                        <div className="form-group">
+                            <label className="form-label">Category <span className="required">*</span></label>
+                            <select className="form-select" value={category} onChange={e => setCategory(e.target.value)}>
+                                {CATEGORIES.map(c => <option key={c}>{c}</option>)}
+                            </select>
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label">Amount (TZS) <span className="required">*</span></label>
+                            <input type="number" className="form-input" value={amount} onChange={e => setAmount(e.target.value)} />
+                        </div>
+                    </div>
+
+                    <div className="form-group">
+                        <label className="form-label">Date</label>
+                        <input type="date" className="form-input" value={date} onChange={e => setDate(e.target.value)} />
+                    </div>
+
+                    <div className="form-group">
+                        <label className="form-label">Reference</label>
+                        <input type="text" className="form-input" placeholder="Payment reference" value={reference} onChange={e => setReference(e.target.value)} />
+                    </div>
+                </div>
+
+                <div className="modal-footer">
+
+=== EditMessageTemplateModal.tsx ===
+import { useState } from 'react';
+import DescriptionIcon from '@mui/icons-material/Description';
+import CloseIcon from '@mui/icons-material/Close';
+import CheckIcon from '@mui/icons-material/Check';
+
+interface Template {
+    id: string;
+    name: string;
+    type: string;
+    content: string;
+}
+
+interface EditMessageTemplateModalProps {
+    template: Template;
+    onClose: () => void;
+    onSave: (data: Template) => void;
+}
+
+const TEMPLATE_TYPES = ['Activation', 'Expiry', 'Payment', 'Custom', 'Reminder', 'Welcome'];
+
+export default function EditMessageTemplateModal({ template, onClose, onSave }: EditMessageTemplateModalProps) {
+    const [name, setName] = useState(template.name);
+    const [type, setType] = useState(template.type);
+    const [content, setContent] = useState(template.content);
+
+    const handleSave = () => {
+        onSave({ ...template, name, type, content });
+    };
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal" style={{ maxWidth: 560 }} onClick={e => e.stopPropagation()}>
+                <div className="modal-header">
+                    <div className="modal-header-left">
+                        <div className="modal-header-icon" style={{ background: 'var(--info-light)', color: 'var(--info)' }}>
+                            <DescriptionIcon fontSize="small" />
+                        </div>
+                        <div>
+                            <div className="modal-title">Edit Template</div>
+                            <div className="modal-subtitle">Update message template</div>
+                        </div>
+                    </div>
+                    <button className="modal-close" onClick={onClose}><CloseIcon fontSize="small" /></button>
+                </div>
+
+                <div className="modal-body">
+                    <div className="form-row">
+                        <div className="form-group">
+                            <label className="form-label">Template Name <span className="required">*</span></label>
+                            <input type="text" className="form-input" value={name} onChange={e => setName(e.target.value)} />
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label">Type <span className="required">*</span></label>
+                            <select className="form-select" value={type} onChange={e => setType(e.target.value)}>
+                                {TEMPLATE_TYPES.map(t => <option key={t}>{t}</option>)}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div className="form-group">
+                        <label className="form-label">Content <span className="required">*</span></label>
+                        <textarea
+                            className="form-input"
+                            rows={5}
+                            value={content}
+                            onChange={e => setContent(e.target.value)}
+                            style={{ resize: 'vertical', fontFamily: 'monospace', fontSize: '0.85rem' }}
+                        />
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 4 }}>
+                            Available variables: {'{username}'}, {'{plan}'}, {'{expires}'}, {'{amount}'}, {'{reference}'}, {'{portal_url}'}, {'{hours}'}
+                        </div>
+                    </div>
+                </div>
+
+                <div className="modal-footer">
+                    <div className="modal-footer-left" />
+                    <div className="modal-footer-right">
+                        <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
+                        <button className="btn btn-primary" onClick={handleSave} disabled={!name || !content}>
+                            <CheckIcon fontSize="small" /> Save Changes
+
+=== EditVoucherModal.tsx ===
+import { useState } from 'react';
+import EditIcon from '@mui/icons-material/Edit';
+import CloseIcon from '@mui/icons-material/Close';
+import type { Voucher } from '../types'; // I assume Voucher is exported
+
+interface EditVoucherModalProps {
+    voucher: Voucher;
+    onClose: () => void;
+    onSave: () => void;
+}
+
+export default function EditVoucherModal({ voucher, onClose, onSave }: EditVoucherModalProps) {
+    const [status, setStatus] = useState(voucher.status || 'Unused');
+    const [code, setCode] = useState(voucher.code || '');
+    const [customer, setCustomer] = useState(voucher.customer ? voucher.customer.toString() : '');
+    const [usedBy, setUsedBy] = useState(voucher.usedBy || '');
+    const [error, setError] = useState<string | null>(null);
+    const [loading, setLoading] = useState(false);
+
+    const handleSave = async () => {
+        try {
+            setLoading(true);
+            setError(null);
+            // In case vouchersApi doesn't have update natively
+            await fetch(`${(import.meta.env.VITE_API_URL as string) ?? ''}/api/vouchers/${voucher.id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                credentials: 'include',
+                body: JSON.stringify({ code, status: status.toUpperCase(), customer, usedBy })
+            });
+
+            onSave();
+            onClose();
+        } catch (err: unknown) {
+            const errorMessage = err instanceof Error ? err.message : 'Failed to update voucher';
+            setError(errorMessage);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal" style={{ maxWidth: 500 }} onClick={e => e.stopPropagation()}>
+                <div className="modal-header">
+                    <div className="modal-header-left">
+                        <div className="modal-header-icon" style={{ background: 'var(--warning-light)', color: 'var(--warning)' }}>
+                            <EditIcon fontSize="small" />
+                        </div>
+                        <div>
+                            <div className="modal-title">Edit Voucher</div>
+                            <div className="modal-subtitle">Update voucher details manually</div>
+                        </div>
+                    </div>
+                    <button className="modal-close" onClick={onClose}><CloseIcon fontSize="small" /></button>
+                </div>
+
+                <div className="modal-body">
+                    {error && (
+                        <div style={{
+                            background: '#fee2e2', color: '#dc2626', padding: '10px 14px',
+                            borderRadius: 8, marginBottom: 16, fontSize: '0.82rem', fontWeight: 500,
+                            border: '1px solid #fecaca'
+                        }}>
+                            {error}
+                        </div>
+                    )}
+
+                    <div className="form-group">
+                        <label className="form-label">Voucher Code</label>
+                        <input
+                            type="text"
+                            className="form-input"
+                            value={code}
+                            onChange={e => setCode(e.target.value)}
+                        />
+                    </div>
+
+
+=== ExtendSubscriberModal.tsx ===
+import { useState, useEffect } from 'react';
+import ExtensionIcon from '@mui/icons-material/Extension';
+import CloseIcon from '@mui/icons-material/Close';
+import CheckIcon from '@mui/icons-material/Check';
+import { packagesApi } from '../api';
+import { normalizeApiList } from '../utils/apiResponse';
+import type { ExpiredSubscriber, Package } from '../types';
+import { formatDate } from '../utils/formatters';
+
+interface ExtendSubscriberModalProps {
+    subscriber: ExpiredSubscriber;
+    onClose: () => void;
+    onSave?: (data: object) => void;
+}
+
+export default function ExtendSubscriberModal({ subscriber, onClose, onSave }: ExtendSubscriberModalProps) {
+    const [packagesList, setPackagesList] = useState<Package[]>([]);
+    const [planId, setPlanId] = useState('');
+    const [method, setMethod] = useState('Cash');
+    const [reference, setReference] = useState('');
+    const [amount, setAmount] = useState('');
+    const [loadError, setLoadError] = useState('');
+    const [loadingData, setLoadingData] = useState(true);
+
+    // ESC key handler
+    useEffect(() => {
+        const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+        document.addEventListener('keydown', handler);
+        return () => document.removeEventListener('keydown', handler);
+    }, [onClose]);
+
+    // Proper error handling for data loading
+    useEffect(() => {
+        packagesApi.list()
+            .then((response) => {
+                setPackagesList(normalizeApiList<Package>(response));
+            })
+            .catch(() => setLoadError('Failed to load packages. Check your network connection.'))
+            .finally(() => setLoadingData(false));
+    }, []);
+
+    const selectedPlan = packagesList.find(p => p.id === planId);
+
+    const handlePlanChange = (id: string) => {
+        setPlanId(id);
+        const plan = packagesList.find(p => p.id === id);
+        if (plan) setAmount(String(plan.price));
+    };
+
+    const handleSave = () => {
+        if (onSave) onSave({ subscriber: subscriber.id, planId, method, reference, amount });
+        onClose();
+    };
+
+    const filteredPackages = packagesList.filter(p => p.type === subscriber.type);
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal" style={{ maxWidth: 520 }} onClick={e => e.stopPropagation()}>
+                <div className="modal-header">
+                    <div className="modal-header-left">
+                        <div className="modal-header-icon" style={{ background: 'var(--secondary-light)', color: 'var(--secondary)' }}>
+                            <ExtensionIcon fontSize="small" />
+                        </div>
+                        <div>
+                            <div className="modal-title">Extend Subscription</div>
+                            <div className="modal-subtitle">Renew service for {subscriber.username}</div>
+                        </div>
+                    </div>
+                    <button className="modal-close" onClick={onClose}><CloseIcon fontSize="small" /></button>
+                </div>
+
+                <div className="modal-body">
+                    {/* Show loading and error states */}
+                    {loadError && (
+                        <div style={{
+                            background: '#fee2e2', color: '#dc2626', padding: '10px 14px',
+                            borderRadius: 8, marginBottom: 16, fontSize: '0.82rem', fontWeight: 500,
+                            border: '1px solid #fecaca'
+                        }}>
+
+=== GenerateVouchersModal.tsx ===
+import { useState, useEffect } from 'react';
+import ConfirmationNumberIcon from '@mui/icons-material/ConfirmationNumber';
+import CloseIcon from '@mui/icons-material/Close';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import { packagesApi, routersApi } from '../api';
+import { normalizeApiList } from '../utils/apiResponse';
+import type { Package, Router } from '../types';
+import { useAuth } from '../stores/authStore';
+
+interface GenerateVouchersModalProps {
+    onClose: () => void;
+    onGenerate?: (data: VoucherConfig) => Promise<void>;
+}
+
+interface VoucherConfig {
+    packageType: string;
+    routerId: string;
+    packageId: string;
+    count: number;
+    codeLength: number;
+    codeFormat: 'alphanumeric-upper' | 'alphanumeric-lower' | 'numeric';
+    prefix: string;
+    smsPhone: string;
+    sendSms: boolean;
+    createdById?: string;
+}
+
+export default function GenerateVouchersModal({ onClose, onGenerate }: GenerateVouchersModalProps) {
+    const [packageType, setPackageType] = useState('');
+    const [routerId, setRouterId] = useState('');
+    const [packageId, setPackageId] = useState('');
+    const [error, setError] = useState<string | null>(null);
+    const [count, setCount] = useState(1);
+    const [codeLength, setCodeLength] = useState(8);
+    const [codeFormat, setCodeFormat] = useState<'alphanumeric-upper' | 'alphanumeric-lower' | 'numeric'>('alphanumeric-upper');
+    const [prefix, setPrefix] = useState('');
+    const [smsPhone, setSmsPhone] = useState('');
+    const [sendSms, setSendSms] = useState(false);
+    const [showAdvanced, setShowAdvanced] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
+    const [routersList, setRoutersList] = useState<Router[]>([]);
+    const [packagesList, setPackagesList] = useState<Package[]>([]);
+    const [loadError, setLoadError] = useState('');
+    const [loadingData, setLoadingData] = useState(true);
+
+    // Use authStore instead of direct localStorage access
+    const { user } = useAuth();
+
+    useEffect(() => {
+        // Proper error handling for data loading
+        Promise.all([
+            routersApi.list(),
+            packagesApi.list(),
+        ]).then(([routersResponse, packagesResponse]) => {
+            setRoutersList(normalizeApiList<Router>(routersResponse));
+            setPackagesList(normalizeApiList<Package>(packagesResponse));
+        }).catch(() => {
+            setLoadError('Failed to load data. Check your network connection.');
+        }).finally(() => setLoadingData(false));
+    }, []);
+
+    const selectedRouter = routersList.find(r => r.id === routerId);
+    const filteredPackages = packagesList.filter(p =>
+        (!packageType || p.type === packageType) &&
+        (!routerId || p.router === selectedRouter?.name)
+    );
+
+    const handleGenerate = async () => {
+        if (!packageId || !routerId) {
+            setError('Router and Package are required');
+            return;
+        }
+        setError(null);
+        setSubmitting(true);
+
+        // Use authStore user instead of localStorage
+        const createdById = user?.id;
+        if (!createdById) {
+            setError('Session expired. Please log in again.');
+
+=== MikrotikScriptModal.tsx ===
+import { useState } from 'react';
+import { generateMikrotikScript } from '../utils/mikrotikScriptGenerator';
+import { sanitizeMikroTikName } from '../utils/mikrotikUtils';
+import CloseIcon from '@mui/icons-material/Close';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import DownloadIcon from '@mui/icons-material/Download';
+import DescriptionIcon from '@mui/icons-material/Description';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import { getPublicApiBase } from '../utils/config';
+import type { Router } from '../types';
+
+interface MikrotikScriptModalProps {
+    router: Router;
+    onClose: () => void;
+}
+
+export default function MikrotikScriptModal({ router, onClose }: MikrotikScriptModalProps) {
+    const [copied, setCopied] = useState(false);
+
+    // Generate router ID code - handle both numeric IDs and UUIDs
+    const generateRouterIdCode = (id: string): string => {
+        // If it's a numeric ID, pad it; if it's a UUID, use first 8 chars
+        const numericId = parseInt(id, 10);
+        if (!isNaN(numericId)) {
+            return `MYR-${String(numericId).padStart(3, '0')}VBHBC`;
+        }
+        // For UUIDs or other formats, extract alphanumeric prefix
+        const prefix = id.replace(/[^a-zA-Z0-9]/g, '').substring(0, 8).toUpperCase();
+        return `MYR-${prefix}VBHBC`;
+    };
+
+    const routerIdCode = generateRouterIdCode(router.id);
+
+    const publicApiBase = getPublicApiBase();
+
+    // Extract hostname from the resolved base URL for RADIUS / walled-garden
+    const apiHost = publicApiBase.startsWith('http')
+        ? new URL(publicApiBase).hostname
+        : window.location.hostname;
+
+    const mikrotikScript = generateMikrotikScript({
+        routerName: router.name,
+        routerUsername: router.username,
+        routerPassword: router.password,
+        routerId: routerIdCode,
+        apiHost,
+        publicApiBase,
+        isWireGuard: false
+    });
+
+    const handleCopy = () => {
+        navigator.clipboard.writeText(mikrotikScript);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2500);
+    };
+
+    const handleDownload = () => {
+        const blob = new Blob([mikrotikScript], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `mikrotik-script-${sanitizeMikroTikName(router.name)}.rsc`;
+        a.click();
+        URL.revokeObjectURL(url);
+    };
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal" style={{ maxWidth: 750 }} onClick={e => e.stopPropagation()}>
+                {/* Header */}
+                <div className="modal-header" style={{
+                    background: 'linear-gradient(135deg, #4338ca 0%, #6366f1 100%)', color: '#fff',
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                        <DescriptionIcon style={{ flexShrink: 0 }} />
+                        <div style={{ minWidth: 0 }}>
+                            <div style={{ fontWeight: 700, fontSize: '1.05rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>MikroTik Configuration Script</div>
+                            <div style={{ fontSize: '0.8rem', opacity: 0.85, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{router.name} â€” {routerIdCode}</div>
+                        </div>
+                    </div>
+
+=== RemoteAccessModal.tsx ===
+import { useState, useEffect } from 'react';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import LanguageIcon from '@mui/icons-material/Language';
+import RouterIcon from '@mui/icons-material/Router';
+import CloseIcon from '@mui/icons-material/Close';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ErrorIcon from '@mui/icons-material/Error';
+import SyncIcon from '@mui/icons-material/Sync';
+import LockIcon from '@mui/icons-material/Lock';
+import type { Router } from '../types';
+import { routersApi } from '../api';
+
+interface RemoteAccessModalProps {
+    router: Router;
+    onClose: () => void;
+}
+
+interface WgStatus {
+    tunnelActive: boolean;
+    tunnelStatusMessage: string;
+    routerTunnelIp: string;
+    serverTunnelIp: string;
+    lastHandshakeSeconds: number | null;
+    enabled: boolean;
+}
+
+export default function RemoteAccessModal({ router, onClose }: RemoteAccessModalProps) {
+    const [showPassword, setShowPassword] = useState(false);
+    const [wgStatus, setWgStatus] = useState<WgStatus | null>(null);
+    const [loadingWg, setLoadingWg] = useState(true);
+    const [copied, setCopied] = useState('');
+
+    // Fetch live WireGuard / VPN status on open
+    useEffect(() => {
+        let cancelled = false;
+        const fetchStatus = async () => {
+            setLoadingWg(true);
+            try {
+                const res = await routersApi.wireguard.getConfig(router.id) as WgStatus;
+                if (!cancelled) setWgStatus(res);
+            } catch {
+                if (!cancelled) setWgStatus(null);
+            } finally {
+                if (!cancelled) setLoadingWg(false);
+            }
+        };
+        fetchStatus();
+        return () => { cancelled = true; };
+    }, [router.id]);
+
+    const handleCopy = (text: string, label: string) => {
+        navigator.clipboard.writeText(text);
+        setCopied(label);
+        setTimeout(() => setCopied(''), 2000);
+    };
+
+    // Tunnel IP is the address Winbox should connect to via VPN
+    const tunnelHost = wgStatus?.routerTunnelIp || router.host;
+    const winboxUrl = `winbox://${router.username || 'admin'}:${router.password || ''}@${tunnelHost}`;
+    const webFigUrl = `http://${tunnelHost}`;
+
+    const isTunnelActive = wgStatus?.tunnelActive === true;
+    const isTunnelConfigured = wgStatus?.enabled === true;
+
+    const HandshakeAgo = () => {
+        if (!wgStatus?.lastHandshakeSeconds) return null;
+        const s = wgStatus.lastHandshakeSeconds;
+        const display = s < 60 ? `${s}s ago` : s < 3600 ? `${Math.floor(s / 60)}m ago` : `${Math.floor(s / 3600)}h ago`;
+        return <span style={{ fontSize: '0.75rem', color: '#6b7280', marginLeft: 8 }}>Last handshake: {display}</span>;
+    };
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal" style={{ maxWidth: 540 }} onClick={e => e.stopPropagation()}>
+                {/* Header */}
+                <div className="modal-header">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                        <RouterIcon style={{ color: '#be185d', flexShrink: 0 }} />
+
+=== RouterDetailModal.tsx ===
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import CloseIcon from '@mui/icons-material/Close';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import CancelIcon from '@mui/icons-material/Cancel';
+import RouterIcon from '@mui/icons-material/Router';
+import VpnLockIcon from '@mui/icons-material/VpnLock';
+import DownloadIcon from '@mui/icons-material/Download';
+import LoginIcon from '@mui/icons-material/Login';
+import DeleteIcon from '@mui/icons-material/Delete';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import MemoryIcon from '@mui/icons-material/Memory';
+import SpeedIcon from '@mui/icons-material/Speed';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import PeopleIcon from '@mui/icons-material/People';
+import LanIcon from '@mui/icons-material/Lan';
+import SyncIcon from '@mui/icons-material/Sync';
+import WireGuardConfigModal from './WireGuardConfigModal';
+import { getPublicApiBase } from '../utils/config';
+import { routersApi } from '../api';
+import type { Router } from '../types';
+import { formatDateTime } from '../utils/formatters';
+import { sanitizeMikroTikName } from '../utils/mikrotikUtils';
+import { generateMikrotikScript } from '../utils/mikrotikScriptGenerator';
+
+interface RouterDetailModalProps {
+    router: Router;
+    onClose: () => void;
+    onDelete?: (router: Router) => void;
+}
+
+interface WgStatus {
+    tunnelActive: boolean;
+    tunnelStatusMessage: string;
+    routerTunnelIp: string;
+    serverTunnelIp: string;
+    lastHandshakeSeconds: number | null;
+    enabled: boolean;
+}
+
+function GaugeBar({ value, max = 100, color }: { value: number; max?: number; color: string }) {
+    const pct = Math.min(Math.round((value / max) * 100), 100);
+    return (
+        <div style={{ background: '#e5e7eb', borderRadius: 4, height: 6, width: '100%', overflow: 'hidden' }}>
+            <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: 4, transition: 'width 0.5s ease' }} />
+        </div>
+    );
+}
+
+export default function RouterDetailModal({ router, onClose, onDelete }: RouterDetailModalProps) {
+    const navigate = useNavigate();
+    const [showWireGuard, setShowWireGuard] = useState(false);
+    const [wgStatus, setWgStatus] = useState<WgStatus | null>(null);
+    const [loadingWg, setLoadingWg] = useState(true);
+
+    useEffect(() => {
+        let cancelled = false;
+        routersApi.wireguard.getConfig(router.id)
+            .then((res: any) => { if (!cancelled) setWgStatus(res); })
+            .catch(() => { if (!cancelled) setWgStatus(null); })
+            .finally(() => { if (!cancelled) setLoadingWg(false); });
+        return () => { cancelled = true; };
+    }, [router.id]);
+
+    const downloadScript = () => {
+        const routerIdCode = `MYR-${router.id.padStart(3, '0')}VBHBC`;
+        const safeRouterName = sanitizeMikroTikName(router.name);
+        const publicApiBase = getPublicApiBase();
+        const apiHost = publicApiBase.startsWith('http')
+            ? new URL(publicApiBase).hostname
+            : window.location.hostname;
+        const script = generateMikrotikScript({
+            routerName: router.name,
+            routerUsername: router.username,
+            routerPassword: router.password,
+            routerId: routerIdCode,
+            apiHost,
+            publicApiBase,
+            isWireGuard: false,
+        });
+
+=== SendSmsModal.tsx ===
+import { useState, useEffect } from 'react';
+import SmsIcon from '@mui/icons-material/Sms';
+import CloseIcon from '@mui/icons-material/Close';
+import SendIcon from '@mui/icons-material/Send';
+import type { MessageTemplate } from '../types';
+import { getPhoneError } from '../utils/validators';
+
+interface SendSmsModalProps {
+    templates?: MessageTemplate[];
+    onClose: () => void;
+    onSend?: (data: object) => void;
+    defaultRecipient?: string;
+}
+
+export default function SendSmsModal({ templates = [], onClose, onSend, defaultRecipient }: SendSmsModalProps) {
+    const [recipientType, setRecipientType] = useState(defaultRecipient ? 'individual' : 'all');
+    const [recipientPhone, setRecipientPhone] = useState(defaultRecipient || '');
+    const [templateId, setTemplateId] = useState('');
+    const [message, setMessage] = useState('');
+    const [loading, setLoading] = useState(false);
+
+    // ESC key handler
+    useEffect(() => {
+        const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+        document.addEventListener('keydown', handler);
+        return () => document.removeEventListener('keydown', handler);
+    }, [onClose]);
+
+    const handleTemplateChange = (id: string) => {
+        setTemplateId(id);
+        const tmpl = templates.find(t => t.id === id);
+        if (tmpl) setMessage(tmpl.content);
+    };
+
+    // Phone validation for individual recipient
+    const phoneError = recipientType === 'individual' ? getPhoneError(recipientPhone) : '';
+
+    const handleSend = () => {
+        setLoading(true);
+        if (onSend) onSend({ recipientType, recipientPhone, message });
+        onClose();
+    };
+
+    // Disable send button when individual recipient has no valid phone
+    const isSendDisabled = loading
+        || !message.trim()
+        || (recipientType === 'individual' && (!recipientPhone.trim() || !!phoneError));
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal" style={{ maxWidth: 540 }} onClick={e => e.stopPropagation()}>
+                <div className="modal-header">
+                    <div className="modal-header-left">
+                        <div className="modal-header-icon" style={{ background: 'var(--cyan-light)', color: 'var(--cyan)' }}>
+                            <SmsIcon fontSize="small" />
+                        </div>
+                        <div>
+                            <div className="modal-title">Send SMS</div>
+                            <div className="modal-subtitle">Send a message to clients</div>
+                        </div>
+                    </div>
+                    <button className="modal-close" onClick={onClose}><CloseIcon fontSize="small" /></button>
+                </div>
+
+                <div className="modal-body">
+                    <div className="form-group">
+                        <label className="form-label">Recipient</label>
+                        <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
+                            {[
+                                { value: 'all', label: 'All Clients' },
+                                { value: 'active', label: 'Active' },
+                                { value: 'expired', label: 'Expired' },
+                                { value: 'individual', label: 'Individual' },
+                            ].map(opt => (
+                                <button
+                                    key={opt.value}
+                                    className={`btn btn-sm ${recipientType === opt.value ? 'btn-primary' : 'btn-secondary'}`}
+                                    onClick={() => setRecipientType(opt.value)}
+                                    style={{ flexShrink: 0 }}
+                                >
+
+=== ViewClientModal.tsx ===
+import { useEffect } from 'react';
+import PersonIcon from '@mui/icons-material/Person';
+import CloseIcon from '@mui/icons-material/Close';
+import WifiIcon from '@mui/icons-material/Wifi';
+import PhoneIcon from '@mui/icons-material/Phone';
+import EmailIcon from '@mui/icons-material/Email';
+import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
+import type { Client } from '../types';
+import { formatDate } from '../utils/formatters';
+
+interface ViewClientModalProps {
+    client: Client;
+    onClose: () => void;
+    onEdit?: () => void;
+}
+
+export default function ViewClientModal({ client, onClose, onEdit }: ViewClientModalProps) {
+    // ESC key handler
+    useEffect(() => {
+        const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+        document.addEventListener('keydown', handler);
+        return () => document.removeEventListener('keydown', handler);
+    }, [onClose]);
+
+    const initials = client.fullName?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || client.username.slice(0, 2).toUpperCase();
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal" style={{ maxWidth: 540 }} onClick={e => e.stopPropagation()}>
+                <div className="modal-header">
+                    <div className="modal-header-left">
+                        <div className="modal-header-icon">
+                            <PersonIcon fontSize="small" />
+                        </div>
+                        <div>
+                            <div className="modal-title">Client Details</div>
+                            <div className="modal-subtitle">Account information</div>
+                        </div>
+                    </div>
+                    <button className="modal-close" onClick={onClose}><CloseIcon fontSize="small" /></button>
+                </div>
+
+                <div className="modal-body">
+                    {/* Profile header */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '16px', background: 'var(--bg-hover)', borderRadius: 'var(--radius)', marginBottom: 20 }}>
+                        <div className="user-avatar blue" style={{ width: 56, height: 56, fontSize: '1.2rem' }}>
+                            {initials}
+                        </div>
+                        <div>
+                            <div style={{ fontWeight: 700, fontSize: '1rem' }}>{client.fullName}</div>
+                            <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>@{client.username}</div>
+                            <div style={{ marginTop: 4 }}>
+                                <span className={`badge ${client.status.toLowerCase()}`}>{client.status}</span>
+                                <span className={`badge ${client.serviceType.toLowerCase()}`} style={{ marginLeft: 6 }}>{client.serviceType}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Info grid */}
+                    <div className="grid-2 gap-16">
+                        {client.phone && (
+                            <div className="info-item">
+                                <div className="info-label"><PhoneIcon style={{ fontSize: 14 }} /> Phone</div>
+                                <div className="info-value">{client.phone}</div>
+                            </div>
+                        )}
+                        {client.email && (
+                            <div className="info-item">
+                                <div className="info-label"><EmailIcon style={{ fontSize: 14 }} /> Email</div>
+                                <div className="info-value">{client.email}</div>
+                            </div>
+                        )}
+                        <div className="info-item">
+                            <div className="info-label">Account Type</div>
+                            <div className="info-value">{client.accountType}</div>
+                        </div>
+                        <div className="info-item">
+                            <div className="info-label"><CalendarTodayIcon style={{ fontSize: 14 }} /> Created On</div>
+                            <div className="info-value">{formatDate(client.createdOn)}</div>
+                        </div>
+
+=== ViewInvoiceModal.tsx ===
+import ReceiptIcon from '@mui/icons-material/Receipt';
+import CloseIcon from '@mui/icons-material/Close';
+import PrintIcon from '@mui/icons-material/Print';
+import type { Invoice } from '../types';
+import { formatDate } from '../utils/formatters';
+
+interface ViewInvoiceModalProps {
+    invoice: Invoice;
+    onClose: () => void;
+}
+
+export default function ViewInvoiceModal({ invoice, onClose }: ViewInvoiceModalProps) {
+    const handlePrint = () => {
+        const printContent = `
+            <html><head><title>Invoice ${invoice.invoiceNumber}</title>
+            <style>
+                body { font-family: 'Segoe UI', sans-serif; padding: 40px; color: #333; }
+                h1 { font-size: 1.8rem; margin-bottom: 4px; }
+                .inv-header { display: flex; justify-content: space-between; margin-bottom: 30px; }
+                .badge { padding: 4px 12px; border-radius: 12px; font-size: 0.8rem; font-weight: 600; }
+                .badge.paid { background: #e8f5e9; color: #2e7d32; }
+                .badge.unpaid { background: #fff3e0; color: #e65100; }
+                .badge.overdue { background: #ffebee; color: #c62828; }
+                .badge.draft { background: #f5f5f5; color: #757575; }
+                table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+                th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #e0e0e0; }
+                th { background: #f5f5f5; font-weight: 600; font-size: 0.85rem; }
+                .total-row { font-weight: 700; font-size: 1.1rem; }
+                .meta { font-size: 0.85rem; color: #666; }
+            </style></head><body>
+            <div class="inv-header">
+                <div>
+                    <h1>Invoice ${invoice.invoiceNumber}</h1>
+                    <p class="meta">Client: <strong>${invoice.client}</strong></p>
+                </div>
+                <div style="text-align: right;">
+                    <span class="badge ${invoice.status.toLowerCase()}">${invoice.status}</span>
+                    <p class="meta" style="margin-top: 8px">Issued: ${formatDate(invoice.issuedDate)}<br/>Due: ${formatDate(invoice.dueDate)}</p>
+                </div>
+            </div>
+            <table>
+                <thead><tr><th>Description</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr></thead>
+                <tbody>
+                    ${(invoice.items || []).map(item =>
+                        `<tr><td>${item.description}</td><td>${item.quantity}</td><td>${item.unitPrice.toLocaleString()} TZS</td><td>${item.total.toLocaleString()} TZS</td></tr>`
+                    ).join('')}
+                    <tr class="total-row"><td colspan="3" style="text-align: right">Total</td><td>${invoice.amount.toLocaleString()} TZS</td></tr>
+                </tbody>
+            </table>
+            </body></html>
+        `;
+        const printWindow = window.open('', '_blank');
+        if (printWindow) {
+            printWindow.document.write(printContent);
+            printWindow.document.close();
+            printWindow.print();
+        }
+    };
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal" style={{ maxWidth: 640 }} onClick={e => e.stopPropagation()}>
+                <div className="modal-header">
+                    <div className="modal-header-left">
+                        <div className="modal-header-icon" style={{ background: 'var(--info-light)', color: 'var(--info)' }}>
+                            <ReceiptIcon fontSize="small" />
+                        </div>
+                        <div>
+                            <div className="modal-title">Invoice {invoice.invoiceNumber}</div>
+                            <div className="modal-subtitle">{invoice.client}</div>
+                        </div>
+                    </div>
+                    <button className="modal-close" onClick={onClose}><CloseIcon fontSize="small" /></button>
+                </div>
+
+                <div className="modal-body">
+                    <div className="responsive-grid-3" style={{ marginBottom: 20 }}>
+                        <div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Status</div>
+                            <span className={`badge ${invoice.status === 'Paid' ? 'active' : invoice.status === 'Overdue' ? 'expired' : 'inactive'}`}>
+
+=== ViewTransactionModal.tsx ===
+import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
+import CloseIcon from '@mui/icons-material/Close';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import type { Transaction } from '../types';
+import { formatDateTime } from '../utils/formatters';
+
+interface ViewTransactionModalProps {
+    transaction: Transaction;
+    onClose: () => void;
+}
+
+export default function ViewTransactionModal({ transaction, onClose }: ViewTransactionModalProps) {
+    const handleCopyRef = () => {
+        navigator.clipboard.writeText(transaction.reference);
+        alert('Reference copied!');
+    };
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal" style={{ maxWidth: 500 }} onClick={e => e.stopPropagation()}>
+                <div className="modal-header">
+                    <div className="modal-header-left">
+                        <div className="modal-header-icon">
+                            <ReceiptLongIcon fontSize="small" />
+                        </div>
+                        <div>
+                            <div className="modal-title">Transaction Details</div>
+                            <div className="modal-subtitle">Ref: {transaction.reference}</div>
+                        </div>
+                    </div>
+                    <button className="modal-close" onClick={onClose}><CloseIcon fontSize="small" /></button>
+                </div>
+
+                <div className="modal-body">
+                    <div className="grid-2 gap-16">
+                        <div style={{ padding: '12px 0', borderBottom: '1px solid var(--border-light)' }}>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: 4 }}>Username</div>
+                            <div style={{ fontWeight: 600 }}>{transaction.user}</div>
+                        </div>
+                        <div style={{ padding: '12px 0', borderBottom: '1px solid var(--border-light)' }}>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: 4 }}>Amount</div>
+                            <div style={{ fontWeight: 700, color: 'var(--secondary)' }}>{transaction.amount.toLocaleString()} TZS</div>
+                        </div>
+                        <div style={{ padding: '12px 0', borderBottom: '1px solid var(--border-light)' }}>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: 4 }}>Plan</div>
+                            <div style={{ fontWeight: 500 }}>{transaction.planName || 'â€”'}</div>
+                        </div>
+                        <div style={{ padding: '12px 0', borderBottom: '1px solid var(--border-light)' }}>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: 4 }}>Method</div>
+                            <div style={{ fontWeight: 500, textTransform: 'capitalize' }}>{transaction.method}</div>
+                        </div>
+                        <div style={{ padding: '12px 0', borderBottom: '1px solid var(--border-light)' }}>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: 4 }}>Type</div>
+                            <span className={`badge ${transaction.type === 'Mobile' ? 'hotspot' : transaction.type === 'Voucher' ? 'pppoe' : 'inactive'}`}>
+                                {transaction.type || 'Manual'}
+                            </span>
+                        </div>
+                        <div style={{ padding: '12px 0', borderBottom: '1px solid var(--border-light)' }}>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: 4 }}>Status</div>
+                            <span className={`badge ${transaction.status === 'Completed' ? 'active' : transaction.status === 'Pending' ? 'expired' : 'suspended'}`}>
+                                {transaction.status}
+                            </span>
+                        </div>
+                        <div style={{ padding: '12px 0', borderBottom: '1px solid var(--border-light)' }}>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: 4 }}>Created Date</div>
+                            <div style={{ fontWeight: 500 }}>{formatDateTime(transaction.date)}</div>
+                        </div>
+                        <div style={{ padding: '12px 0', borderBottom: '1px solid var(--border-light)' }}>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: 4 }}>Expiry Date</div>
+                            <div style={{ fontWeight: 500 }}>{transaction.expiryDate ? formatDateTime(transaction.expiryDate) : 'â€”'}</div>
+                        </div>
+                    </div>
+
+                    <div style={{ marginTop: 16, padding: '12px 16px', background: 'var(--bg-secondary, #f8f9fa)', borderRadius: 'var(--radius)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Reference</div>
+                            <div style={{ fontFamily: 'monospace', fontWeight: 600 }}>{transaction.reference}</div>
+                        </div>
+                        <button className="btn-icon sync" onClick={handleCopyRef} title="Copy Reference">
+                            <ContentCopyIcon style={{ fontSize: 16 }} />
+
+=== WireGuardConfigModal.tsx ===
+import { useState, useEffect } from 'react';
+import CloseIcon from '@mui/icons-material/Close';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import DownloadIcon from '@mui/icons-material/Download';
+import VpnLockIcon from '@mui/icons-material/VpnLock';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import SendIcon from '@mui/icons-material/Send';
+import PowerSettingsNewIcon from '@mui/icons-material/PowerSettingsNew';
+import SyncIcon from '@mui/icons-material/Sync';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import { routersApi } from '../api';
+import { getPublicApiBase } from '../utils/config';
+import { generateMikrotikScript } from '../utils/mikrotikScriptGenerator';
+import { sanitizeMikroTikName } from '../utils/mikrotikUtils';
+import type { Router } from '../types';
+import RouterIcon from '@mui/icons-material/Router';
+
+interface WireGuardConfigModalProps {
+    router: Router;
+    onClose: () => void;
+}
+
+interface WgConfig {
+    routerId: string;
+    routerName: string;
+    routerHost: string;
+    enabled: boolean;
+    configuredAt: string | null;
+    routerPrivateKey: string;
+    routerPublicKey: string;
+    serverPublicKey: string;
+    presharedKey: string;
+    routerTunnelIp: string;
+    serverTunnelIp: string;
+    listenPort: number;
+    serverEndpoint: string;
+    serverPort: number;
+    tunnelActive: boolean;
+    lastHandshakeSeconds: number | null;
+    tunnelStatusMessage: string;
+}
+
+export default function WireGuardConfigModal({ router, onClose }: WireGuardConfigModalProps) {
+    const [copied, setCopied] = useState<string | null>(null);
+    const [activeTab, setActiveTab] = useState<'server' | 'client'>('server');
+    const [loading, setLoading] = useState(true);
+    const [config, setConfig] = useState<WgConfig | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    const [actionLoading, setActionLoading] = useState<string | null>(null);
+    const [actionResult, setActionResult] = useState<{ success: boolean; message: string } | null>(null);
+
+    // Fetch persisted WireGuard config from the backend
+    useEffect(() => {
+        const fetchConfig = async () => {
+            try {
+                setLoading(true);
+                const data = await routersApi.wireguard.getConfig(router.id) as WgConfig;
+                setConfig(data);
+            } catch (err: unknown) {
+                const errorMessage = err instanceof Error ? err.message : 'Failed to load WireGuard configuration';
+                setError(errorMessage);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchConfig();
+    }, [router.id]);
+
+    if (loading) {
+        return (
+            <div className="modal-overlay" onClick={onClose}>
+                <div className="modal" style={{ maxWidth: 500 }} onClick={e => e.stopPropagation()}>
+                    <div className="modal-body" style={{ textAlign: 'center', padding: 40 }}>
+                        <SyncIcon style={{ fontSize: 48, color: '#15803d', animation: 'spin 1s linear infinite' }} />
+                        <p style={{ marginTop: 16, fontWeight: 600 }}>Loading WireGuard Configuration...</p>
+                        <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>Generating persistent keys for {router.name}</p>
+                    </div>
+                </div>
+            </div>
+

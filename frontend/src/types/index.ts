@@ -73,6 +73,12 @@ export interface Router {
   memoryUsed: number;
   uptime: string;
   lastSeen: string;
+  lanIp?: string;
+  lanGateway?: string;
+  hotspotPoolRange?: string;
+  pppoePoolRange?: string;
+  dns?: string;
+  radiusSecret?: string;
 }
 
 export interface Equipment {

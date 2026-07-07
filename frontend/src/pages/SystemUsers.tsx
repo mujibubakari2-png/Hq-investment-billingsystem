@@ -11,20 +11,18 @@ import GroupIcon from '@mui/icons-material/Group';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 
 import { systemUsersApi } from '../api';
+import type { SystemUser as SharedSystemUser } from '../types';
 import { formatDateTime } from '../utils/formatters';
 
-interface SystemUser {
-    id: string;
-    username: string;
-    fullName?: string | null;
-    email: string;
-    role: string;
+type SystemUser = Omit<SharedSystemUser, 'lastLogin' | 'createdAt' | 'phone' | 'fullName'> & {
+    fullName?: string;
     rawRole?: string;
-    status: string;
-    phone?: string | null;
+    status: SharedSystemUser['status'];
+    role: SharedSystemUser['role'];
+    phone?: string;
     lastLogin?: string | null;
     createdAt?: string | null;
-}
+};
 
 interface UsersMeta {
     subUserCount: number;
@@ -74,15 +72,35 @@ export default function SystemUsers() {
     const fetchUsers = async () => {
         try {
             setIsRefreshing(true);
-            const data: any = await systemUsersApi.list();
-            // New API returns { users, meta }; old API returned an array
-            if (Array.isArray(data)) {
-                setUsers(data);
-                setMeta(null);
-            } else {
-                setUsers(data.users ?? []);
-                setMeta(data.meta ?? null);
-            }
+            const data = await systemUsersApi.list();
+            const metaRecord = data.meta as Record<string, unknown> | undefined;
+            const mappedUsers = Array.isArray(data.users)
+                ? (data.users as Array<Record<string, unknown>>).map((user): SystemUser => {
+                    const roleValue = typeof user.role === 'string' ? user.role : 'Agent';
+                    const normalizedRole = roleValue === 'Super Admin' || roleValue === 'Admin' || roleValue === 'Agent' || roleValue === 'Viewer'
+                        ? roleValue
+                        : 'Agent';
+                    const statusValue = typeof user.status === 'string' ? user.status : 'Active';
+                    return {
+                        id: String(user.id ?? ''),
+                        username: String(user.username ?? ''),
+                        fullName: typeof user.fullName === 'string' ? user.fullName : undefined,
+                        email: String(user.email ?? ''),
+                        role: normalizedRole as SystemUser['role'],
+                        rawRole: typeof user.rawRole === 'string' ? user.rawRole : undefined,
+                        status: statusValue as SystemUser['status'],
+                        phone: typeof user.phone === 'string' ? user.phone : undefined,
+                        lastLogin: typeof user.lastLogin === 'string' ? user.lastLogin : null,
+                        createdAt: typeof user.createdAt === 'string' ? user.createdAt : null,
+                    };
+                })
+                : [];
+            setUsers(mappedUsers);
+            setMeta(metaRecord ? {
+                subUserCount: Number(metaRecord.subUserCount ?? 0),
+                subUserLimit: Number(metaRecord.subUserLimit ?? 0),
+                planName: typeof metaRecord.planName === 'string' ? metaRecord.planName : null,
+            } : null);
         } catch (err) {
             console.error('Failed to load users:', err);
         } finally {

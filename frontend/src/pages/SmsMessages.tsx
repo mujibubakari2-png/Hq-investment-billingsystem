@@ -9,6 +9,7 @@ import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import PendingIcon from '@mui/icons-material/Pending';
 import SyncIcon from '@mui/icons-material/Sync';
 import { smsApi } from '../api';
+import { normalizeApiList } from '../utils/apiResponse';
 import type { SmsMessage } from '../types';
 import { formatDateTime } from '../utils/formatters';
 
@@ -36,7 +37,7 @@ export default function SmsMessages() {
             if (statusFilter !== 'All') params.status = statusFilter;
 
             const res = await smsApi.list(params);
-            setMessages((res.data || []) as unknown as SmsMessage[]);
+            setMessages(normalizeApiList<SmsMessage>(res));
             setTotalMessages(res.total || 0);
             setSummaries((res as any).summaries || null);
         } catch (err) {

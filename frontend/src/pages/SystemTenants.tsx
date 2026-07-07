@@ -6,6 +6,7 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import ExtensionIcon from '@mui/icons-material/Extension';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import { useNavigate } from 'react-router-dom';
+import { normalizeApiList } from '../utils/apiResponse';
 import { superAdminTenantsApi, adminInvoicesApi } from '../api';
 import { formatExactDate, formatDate } from '../utils/formatters';
 
@@ -21,7 +22,7 @@ export default function SystemTenants() {
         try {
             setIsLoading(true);
             const data = await superAdminTenantsApi.list();
-            setTenants(data);
+            setTenants(normalizeApiList<any>(data));
         } catch (err: any) {
             setError(err.message || 'Failed to load tenants');
         } finally {

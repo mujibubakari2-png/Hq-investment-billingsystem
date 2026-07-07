@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { paymentChannelsApi } from '../api/financeApi';
+import { normalizeApiList } from '../utils/apiResponse';
 import PaymentIcon from '@mui/icons-material/Payment';
 import SaveIcon from '@mui/icons-material/Save';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
@@ -32,17 +33,21 @@ export default function PaymentChannels() {
     const [saving, setSaving] = useState(false);
 
     useEffect(() => {
-        paymentChannelsApi.list().then((channels: any) => {
-            const rows = Array.isArray(channels) ? channels : [];
-            const byProvider = new Map(rows.map((ch: any) => [String(ch.provider || '').toUpperCase(), ch]));
+        paymentChannelsApi.list().then((response: unknown) => {
+            const rows = normalizeApiList<Record<string, unknown>>(response);
+            const byProvider = new Map(rows.map((ch: Record<string, unknown>) => [String(ch.provider ?? '').toUpperCase(), ch]));
             const merged = gatewayCatalog.map((gw) => {
                 const channel = byProvider.get(gw.provider);
                 if (!channel) return gw;
                 const enabled = String(channel.status || '').toUpperCase() === 'ACTIVE' || channel.status === 'Active';
+                const id = typeof channel.id === 'string' ? channel.id : gw.id;
+                const name = typeof channel.name === 'string' ? channel.name : gw.name;
+                const description = typeof channel.description === 'string' ? channel.description : gw.description;
                 return {
                     ...gw,
-                    id: channel.id,
-                    name: channel.name || gw.name,
+                    id,
+                    name,
+                    description,
                     enabled,
                     isDefault: false,
                     persisted: true,

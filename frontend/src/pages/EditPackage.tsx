@@ -7,6 +7,7 @@ import SpeedIcon from '@mui/icons-material/Speed';
 import CloseIcon from '@mui/icons-material/Close';
 import CheckIcon from '@mui/icons-material/Check';
 import { packagesApi, routersApi } from '../api';
+import { normalizeApiList } from '../utils/apiResponse';
 import type { Package, Router } from '../types';
 
 export default function EditPackage() {
@@ -23,11 +24,11 @@ export default function EditPackage() {
             setLoading(true);
             try {
                 const r = await routersApi.list();
-                setRoutersList(r as unknown as Router[]);
+                setRoutersList(normalizeApiList<Router>(r));
 
                 if (id) {
                     const p = await packagesApi.list();
-                    const found = (p as unknown as Package[]).find(x => x.id === id);
+                    const found = normalizeApiList<Package>(p).find(x => x.id === id);
                     if (found) setPkg(found);
                 }
             } catch (err) {

@@ -91,49 +91,63 @@ export default function EditPlan() {
     // Load subscription + packages + routers
     useEffect(() => {
         if (!id) return;
-        setLoading(true);
-        setError(null);
 
-        Promise.all([
-            subscriptionsApi.list({ page: '1', limit: '1000' }),
-            packagesApi.list(),
-            routersApi.list(),
-            // Also fetch the specific subscription detail
-            get<SubscriptionDetail>(`/subscriptions/${id}`),
-        ])
-            .then(([, pkgs, rtrs, subData]) => {
-                setPackages(pkgs as unknown as PkgOption[]);
-                setRouters(rtrs as unknown as RouterOption[]);
+        const loadData = async () => {
+            setLoading(true);
+            setError(null);
+            try {
+                const [ , pkgs, rtrs, subData ] = await Promise.all([
+                    subscriptionsApi.list({ page: '1', limit: '1000' }),
+                    packagesApi.list(),
+                    routersApi.list(),
+                    get<SubscriptionDetail>(`/subscriptions/${id}`),
+                ]);
+
+                setPackages(Array.isArray(pkgs)
+                    ? pkgs.map((pkg: unknown) => {
+                        const packageItem = pkg as {
+                            id: string;
+                            name: string;
+                            type: string;
+                            price: number;
+                            duration: number;
+                            durationUnit: string;
+                            uploadSpeed: number;
+                            uploadUnit: string;
+                            downloadSpeed: number;
+                            downloadUnit: string;
+                        };
+                        return {
+                            id: packageItem.id,
+                            name: packageItem.name,
+                            type: packageItem.type,
+                            price: packageItem.price,
+                            duration: packageItem.duration,
+                            durationUnit: packageItem.durationUnit,
+                            uploadSpeed: packageItem.uploadSpeed,
+                            uploadUnit: packageItem.uploadUnit,
+                            downloadSpeed: packageItem.downloadSpeed,
+                            downloadUnit: packageItem.downloadUnit,
+                        };
+                    })
+                    : []);
+                setRouters(Array.isArray(rtrs)
+                    ? rtrs.map((router: unknown) => {
+                        const routerItem = router as { id: string; name: string };
+                        return { id: routerItem.id, name: routerItem.name };
+                    })
+                    : []);
 
                 setSub(subData);
-
-                // Populate form fields
-                setPackageId(subData.packageId || '');
-                setRouterId(subData.routerId || '');
-                setStatus(subData.status || 'ACTIVE');
-                setMethod(subData.method || '');
-
-                // Parse dates
-                if (subData.activatedAt) {
-                    const d = new Date(subData.activatedAt);
-                    if (!isNaN(d.getTime())) {
-                        setActivatedDate(d.toISOString().split('T')[0]);
-                        setActivatedTime(d.toTimeString().slice(0, 8));
-                    }
-                }
-                if (subData.expiresAt) {
-                    const d = new Date(subData.expiresAt);
-                    if (!isNaN(d.getTime())) {
-                        setExpiresDate(d.toISOString().split('T')[0]);
-                        setExpiresTime(d.toTimeString().slice(0, 8));
-                    }
-                }
-            })
-            .catch((err) => {
+            } catch (err) {
                 console.error('Failed to load edit plan data:', err);
                 setError('Failed to load subscription data. Please try again.');
-            })
-            .finally(() => setLoading(false));
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        void Promise.resolve().then(loadData);
     }, [id]);
 
     const handleSave = async () => {
@@ -160,9 +174,10 @@ export default function EditPlan() {
             setTimeout(() => {
                 navigate(-1);
             }, 1500);
-        } catch (err: any) {
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
             console.error('Failed to save:', err);
-            setError(err.message || 'Failed to save changes. Please try again.');
+            setError(message || 'Failed to save changes. Please try again.');
         } finally {
             setSaving(false);
         }

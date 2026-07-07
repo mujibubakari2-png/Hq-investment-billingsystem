@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import RouterIcon from '@mui/icons-material/Router';
 import AddIcon from '@mui/icons-material/Add';
 import SearchIcon from '@mui/icons-material/Search';
@@ -11,6 +11,7 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import PowerSettingsNewIcon from '@mui/icons-material/PowerSettingsNew';
 import SyncIcon from '@mui/icons-material/Sync';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
+import { normalizeApiList } from '../utils/apiResponse';
 import { routersApi } from '../api';
 import AddRouterModal from '../modals/AddRouterModal';
 import RouterDetailModal from '../modals/RouterDetailModal';
@@ -21,6 +22,31 @@ import LanguageIcon from '@mui/icons-material/Language';
 import CellTowerIcon from '@mui/icons-material/CellTower';
 import type { Router } from '../types';
 import { formatDate } from '../utils/formatters';
+
+interface RouterCreatePayload extends Record<string, unknown> {
+    name: string;
+    host?: string;
+    username?: string;
+    password?: string;
+    port?: number;
+    apiPort?: number;
+    vpnMode?: string;
+    description?: string;
+}
+
+interface RouterTestResult {
+    success?: boolean;
+    info?: {
+        cpuLoad?: number;
+        version?: string;
+        uptime?: string;
+    };
+    message?: string;
+}
+
+interface RouterCreateResult {
+    name?: string;
+}
 
 export default function Mikrotiks() {
     const [routers, setRouters] = useState<Router[]>([]);
@@ -51,7 +77,7 @@ export default function Mikrotiks() {
         return () => document.removeEventListener('mousedown', handleClick);
     }, [actionMenuId]);
 
-    const fetchRouters = async () => {
+    const fetchRouters = useCallback(async () => {
         setLoading(true);
         try {
             const res = await routersApi.listPaginated({
@@ -59,21 +85,32 @@ export default function Mikrotiks() {
                 page: currentPage,
                 limit: pageSize
             });
-            setRouters((res.data || []) as unknown as Router[]);
-            setTotalRouters(res.total || 0);
+            setRouters(normalizeApiList<Router>(res));
+            if (res && typeof res === 'object' && 'total' in res) {
+                setTotalRouters((res as { total?: number }).total ?? 0);
+            } else {
+                setTotalRouters(0);
+            }
         } catch (err) {
             console.error('Failed to load routers:', err);
         } finally {
             setLoading(false);
         }
-    };
+    }, [searchTerm, currentPage, pageSize]);
 
-    useEffect(() => { fetchRouters(); }, [searchTerm, currentPage, pageSize]);
-    useEffect(() => { setCurrentPage(1); }, [searchTerm, pageSize]);
+    useEffect(() => {
+        void Promise.resolve().then(fetchRouters);
+    }, [fetchRouters]);
+
+    useEffect(() => {
+        void Promise.resolve().then(() => setCurrentPage(1));
+    }, [searchTerm, pageSize]);
 
     // Background live stats sync (halisi CPU load)
+    const routerIds = useMemo(() => routers.map(r => r.id).join(','), [routers]);
+
     useEffect(() => {
-        if (routers.length === 0) return;
+        if (routerIds.length === 0) return;
         
         let isCancelled = false;
         const syncLiveStats = async () => {
@@ -81,15 +118,16 @@ export default function Mikrotiks() {
             await Promise.allSettled(
                 routers.map(async (r) => {
                     try {
-                        const res = await routersApi.testConnection(r.id) as any;
+                        const res = await routersApi.testConnection(r.id) as RouterTestResult;
                         if (!isCancelled && res?.success && res?.info) {
+                            const info = res.info;
                             setRouters(prev => prev.map(router => 
                                 router.id === r.id 
                                     ? { 
                                         ...router, 
-                                        cpuLoad: res.info.cpuLoad, 
+                                        cpuLoad: info.cpuLoad ?? router.cpuLoad,
                                         status: 'Online',
-                                        uptime: res.info.uptime || router.uptime
+                                        uptime: info.uptime || router.uptime
                                       }
                                     : router
                             ));
@@ -112,33 +150,34 @@ export default function Mikrotiks() {
             isCancelled = true;
             clearInterval(timer);
         };
-    }, [routers.map(r => r.id).join(',')]); // Only re-run effect if the LIST of routers changes
-    const handleAddRouter = async (data: any) => {
+    }, [routerIds, routers]); // Only re-run effect if the LIST of routers changes
+    const handleAddRouter = async (data: Partial<Router>) => {
         try {
-            const res = await routersApi.create({
-                name: data.name,
-                host: data.host || '0.0.0.0',
-                username: data.username || 'admin',
+            const payload: RouterCreatePayload = {
+                name: data.name ?? '',
+                host: data.host ?? '0.0.0.0',
+                username: data.username ?? 'admin',
                 password: data.password,
                 port: data.port,
                 apiPort: data.apiPort,
                 vpnMode: data.vpnMode,
                 description: data.description,
-            });
+            };
+            const res = await routersApi.create(payload);
             setShowAddModal(false);
-            fetchRouters();
-            alert(`Router "${(res as any).name}" created successfully! Open the router Details to download the MikroTik script.`);
+            await fetchRouters();
+            alert(`Router "${(res as RouterCreateResult).name || 'unknown'}" created successfully! Open the router Details to download the MikroTik script.`);
         } catch (err) {
             console.error('Failed to create router:', err);
             alert('Failed to create router.');
         }
     };
 
-    const handleEditRouter = async (data: any) => {
+    const handleEditRouter = async (data: Partial<Router>) => {
         if (!selectedRouterToEdit) return;
         try {
-            await routersApi.update(selectedRouterToEdit.id, {
-                name: data.name,
+            const payload: RouterCreatePayload = {
+                name: data.name ?? '',
                 host: data.host,
                 username: data.username,
                 password: data.password,
@@ -146,13 +185,15 @@ export default function Mikrotiks() {
                 apiPort: data.apiPort || undefined,
                 vpnMode: data.vpnMode,
                 description: data.description,
-            });
+            };
+            await routersApi.update(selectedRouterToEdit.id, payload);
             setSelectedRouterToEdit(null);
-            fetchRouters();
+            await fetchRouters();
             alert('Router updated successfully!');
-        } catch (err: any) {
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
             console.error('Failed to update router:', err);
-            alert(`Failed to update router: ${err?.message || 'Unknown error'}`);
+            alert(`Failed to update router: ${message || 'Unknown error'}`);
         }
     };
 
@@ -160,14 +201,16 @@ export default function Mikrotiks() {
         setTestingId(router.id);
         try {
             const result = await routersApi.testConnection(router.id);
-            if ((result as any).success) {
-                alert(`✅ Connected! RouterOS ${(result as any).info?.version || ''}`);
+            const connectionResult = result as RouterTestResult;
+            if (connectionResult.success) {
+                alert(`✅ Connected! RouterOS ${connectionResult.info?.version || ''}`);
             } else {
-                alert(`❌ Connection failed: ${(result as any).message || 'Unknown error'}`);
+                alert(`❌ Connection failed: ${connectionResult.message || 'Unknown error'}`);
             }
             fetchRouters();
-        } catch (err: any) {
-            alert(`❌ Connection failed: ${err?.message || 'Unknown error'}`);
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            alert(`❌ Connection failed: ${message || 'Unknown error'}`);
         } finally {
             setTestingId('');
         }
@@ -188,7 +231,7 @@ export default function Mikrotiks() {
     const totalPages = pageSize === 'All' ? 1 : Math.max(1, Math.ceil(totalRouters / (pageSize as number)));
 
     const getVpnType = (router: Router) => {
-        const mode = (router as any).vpnMode || 'hybrid';
+        const mode = router.vpnMode || 'hybrid';
         if (mode === 'wireguard') return 'WireGuard';
         if (mode === 'openvpn') return 'OpenVPN';
         return 'Hybrid';

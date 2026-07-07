@@ -4,6 +4,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import { packagesApi, routersApi } from '../api';
+import { normalizeApiList } from '../utils/apiResponse';
 import type { Package, Router } from '../types';
 import { useAuth } from '../stores/authStore';
 
@@ -52,8 +53,8 @@ export default function GenerateVouchersModal({ onClose, onGenerate }: GenerateV
             routersApi.list(),
             packagesApi.list(),
         ]).then(([routers, packages]) => {
-            setRoutersList(routers as unknown as Router[]);
-            setPackagesList(packages as unknown as Package[]);
+            setRoutersList(normalizeApiList<Router>(routers));
+            setPackagesList(normalizeApiList<Package>(packages));
         }).catch(() => {
             setLoadError('Failed to load data. Check your network connection.');
         }).finally(() => setLoadingData(false));

@@ -4,6 +4,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import { packagesApi, routersApi } from '../api';
+import { normalizeApiList } from '../utils/apiResponse';
 import type { Package, Router } from '../types';
 import { useAuth } from '../stores/authStore';
 
@@ -51,9 +52,9 @@ export default function GenerateVouchersModal({ onClose, onGenerate }: GenerateV
         Promise.all([
             routersApi.list(),
             packagesApi.list(),
-        ]).then(([routers, packages]) => {
-            setRoutersList(routers as unknown as Router[]);
-            setPackagesList(packages as unknown as Package[]);
+        ]).then(([routersResponse, packagesResponse]) => {
+            setRoutersList(normalizeApiList<Router>(routersResponse));
+            setPackagesList(normalizeApiList<Package>(packagesResponse));
         }).catch(() => {
             setLoadError('Failed to load data. Check your network connection.');
         }).finally(() => setLoadingData(false));
@@ -203,7 +204,7 @@ export default function GenerateVouchersModal({ onClose, onGenerate }: GenerateV
                         <>
                             <div className="responsive-form-row" style={{ marginBottom: 20 }}>
                                 <label className="form-label" style={{ marginBottom: 0, fontWeight: 500 }}>Code Format</label>
-                                <select className="form-select" value={codeFormat} onChange={e => setCodeFormat(e.target.value as any)}>
+                                <select className="form-select" value={codeFormat} onChange={e => setCodeFormat(e.target.value as 'alphanumeric-upper' | 'alphanumeric-lower' | 'numeric')}>
                                     <option value="alphanumeric-upper">ABC123</option>
                                     <option value="alphanumeric-lower">abc123</option>
                                     <option value="numeric">123456</option>

@@ -4,6 +4,7 @@ import AddIcon from '@mui/icons-material/Add';
 import SearchIcon from '@mui/icons-material/Search';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import DeleteIcon from '@mui/icons-material/Delete';
+import { normalizeApiList } from '../utils/apiResponse';
 import { transactionsApi, voucherCodesApi } from '../api';
 import type { Transaction } from '../types';
 import AddTransactionModal from '../modals/AddTransactionModal';
@@ -50,8 +51,8 @@ export default function AllTransactions() {
                 voucherCodesApi.list()
             ]);
 
-            const txs = (txRes.data || []) as unknown as Transaction[];
-            const vs = (vRes.data || []) as unknown as Record<string, unknown>[];
+            const txs = normalizeApiList<Transaction>(txRes);
+            const vs = normalizeApiList<Record<string, unknown>>(vRes);
 
             // Map vouchers into Transaction shape
             const mappedVouchers: Transaction[] = vs.map((v: Record<string, unknown>) => {

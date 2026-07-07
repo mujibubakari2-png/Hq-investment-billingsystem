@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import PaymentIcon from '@mui/icons-material/Payment';
 import { useNavigate, Link } from 'react-router-dom';
+import { normalizeApiList } from '../utils/apiResponse';
 import { clientsApi, routersApi, packagesApi, subscriptionsApi } from '../api';
 
 export default function RechargeAccount() {
@@ -26,9 +27,9 @@ export default function RechargeAccount() {
                     routersApi.list(),
                     packagesApi.list(),
                 ]);
-                setClients(clientData.data as any);
-                setRouters(routerData as any);
-                setPackages(packageData as any);
+                setClients(normalizeApiList(clientData));
+                setRouters(normalizeApiList(routerData));
+                setPackages(normalizeApiList(packageData));
             } catch (err) {
                 console.error('Failed to load recharge data:', err);
             } finally {

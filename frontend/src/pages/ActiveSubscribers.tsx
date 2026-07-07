@@ -11,6 +11,7 @@ import CellTowerIcon from '@mui/icons-material/CellTower';
 import SyncIcon from '@mui/icons-material/Sync';
 
 import { useNavigate } from 'react-router-dom';
+import { normalizeApiList } from '../utils/apiResponse';
 import { activeSubscribersApi, subscriptionsApi, routersApi } from '../api';
 import { formatDate } from '../utils/formatters';
 import type { ActiveSubscriber, Router } from '../types';
@@ -52,7 +53,7 @@ export default function ActiveSubscribers() {
                 page: currentPage,
                 limit: entriesPerPage
             });
-            setSubs((res.data || []) as unknown as ActiveSubscriber[]);
+            setSubs(normalizeApiList<ActiveSubscriber>(res));
             setTotalSubs(res.total || 0);
             const summariesData = (res.summaries as unknown) as SubscriptionSummaries | undefined;
             setSummaries(summariesData || null);
@@ -66,7 +67,7 @@ export default function ActiveSubscribers() {
     const fetchRouters = async () => {
         try {
             const data = await routersApi.list();
-            setRoutersList(data as unknown as Router[]);
+            setRoutersList(normalizeApiList<Router>(data));
         } catch (err) {
             console.error('Failed to fetch routers:', err);
         }

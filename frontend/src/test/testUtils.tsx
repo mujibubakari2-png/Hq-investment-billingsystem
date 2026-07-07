@@ -103,7 +103,9 @@ export function makeSubscription(overrides: Partial<Record<string, unknown>> = {
 // ── API mock helper ───────────────────────────────────────────────────────────
 
 /** Creates a resolved-promise mock for an API function */
-export const mockResolve = <T>(data: T) => vi.fn().mockResolvedValue(data);
+export function mockResolve<T>(data: T) {
+    return vi.fn().mockResolvedValue(data);
+}
 
 /** Creates a rejected-promise mock for an API function */
 export const mockReject = (msg = 'API error') =>

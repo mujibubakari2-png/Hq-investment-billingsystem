@@ -5,6 +5,7 @@ import GroupIcon from '@mui/icons-material/Group';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { dashboardApi, expensesApi } from '../api';
+import { normalizeApiList } from '../utils/apiResponse';
 
 const COLORS = ['#e53935', '#4caf50', '#2196f3', '#ff9800', '#9c27b0'];
 
@@ -15,10 +16,12 @@ export default function Reports() {
     const fetchReports = async () => {
         setLoading(true);
         try {
-            const [dashData, expensesData] = await Promise.all([
+            const [dashData, expensesResponse] = await Promise.all([
                 dashboardApi.getStats(),
                 expensesApi.list()
             ]);
+
+            const expensesData = normalizeApiList<Record<string, unknown>>(expensesResponse);
 
             let totalExpenses = 0;
             let monthlyExpenses = 0;

@@ -45,7 +45,13 @@ export default function MikrotikScriptModal({ router, onClose }: MikrotikScriptM
         routerId: routerIdCode,
         apiHost,
         publicApiBase,
-        isWireGuard: false
+        isWireGuard: false,
+        lanIp: router.lanIp,
+        lanGateway: router.lanGateway,
+        hotspotPoolRange: router.hotspotPoolRange,
+        pppoePoolRange: router.pppoePoolRange,
+        dns: router.dns,
+        radiusSecret: router.radiusSecret,
     });
 
     const handleCopy = () => {

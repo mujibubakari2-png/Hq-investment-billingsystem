@@ -1,11 +1,32 @@
 // ── Network (Routers, VPN, Equipments) API ───────────────────────────────────
 import { get, post, put, del } from './httpClient';
+import type { Router } from '../types';
+
+export interface WireGuardConfig {
+    routerId: string;
+    routerName: string;
+    routerHost: string;
+    enabled: boolean;
+    configuredAt: string | null;
+    routerPrivateKey: string;
+    routerPublicKey: string;
+    serverPublicKey: string;
+    presharedKey: string;
+    routerTunnelIp: string;
+    serverTunnelIp: string;
+    listenPort: number;
+    serverEndpoint: string;
+    serverPort: number;
+    tunnelActive: boolean;
+    lastHandshakeSeconds: number | null;
+    tunnelStatusMessage: string;
+}
 
 export const routersApi = {
-    list:   ()                                          => get<Record<string, unknown>[]>('/routers'),
+    list:   ()                                          => get<Router[]>('/routers'),
     listPaginated: (params?: Record<string, string | number>) => {
         const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
-        return get<{ data: Record<string, unknown>[]; total: number }>(`/routers${qs}`);
+        return get<{ data: Router[]; total: number }>(`/routers${qs}`);
     },
     get:    (id: string)                                => get<Record<string, unknown>>(`/routers/${id}`),
     create: (data: Record<string, unknown>)             => post<Record<string, unknown>>('/routers', data),
@@ -32,7 +53,7 @@ export const routersApi = {
 
     // WireGuard VPN
     wireguard: {
-        getConfig: (id: string) => get<Record<string, unknown>>(`/routers/${id}/wireguard`),
+        getConfig: (id: string) => get<WireGuardConfig>(`/routers/${id}/wireguard`),
         activate: (id: string) => post<Record<string, unknown>>(`/routers/${id}/wireguard`, { action: 'activate' }),
         deactivate: (id: string) => post<Record<string, unknown>>(`/routers/${id}/wireguard`, { action: 'deactivate' }),
         pushConfig: (id: string) => post<Record<string, unknown>>(`/routers/${id}/wireguard`, { action: 'push-config' }),
@@ -50,8 +71,15 @@ export const routersApi = {
     generateVouchers:   (id: string, data: Record<string, unknown>)       => post<Record<string, unknown>>(`/routers/${id}/vouchers/generate`, data),
 };
 
+export interface VpnListResponse {
+    data: Record<string, unknown>[];
+    total: number;
+    page: number;
+    limit: number;
+}
+
 export const vpnApi = {
-    list:          ()                              => get<Record<string, unknown>[]>('/vpn'),
+    list:          ()                              => get<VpnListResponse>('/vpn'),
     create:        (data: Record<string, unknown>) => post<Record<string, unknown>>('/vpn', data),
     delete:        (id: string)                    => del<{ message: string }>(`/vpn/${encodeURIComponent(id)}`),
     getStatus:     ()                              => get<Record<string, unknown>>('/vpn/status'),

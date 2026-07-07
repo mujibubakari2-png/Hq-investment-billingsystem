@@ -11,7 +11,7 @@ export const smsApi = {
 };
 
 export const smsTemplatesApi = {
-    list:   ()                                          => get<Record<string, unknown>[]>('/sms/templates'),
+    list:   ()                                          => get<{ data: Record<string, unknown>[]; total?: number }>('/sms/templates'),
     create: (data: Record<string, unknown>)             => post<Record<string, unknown>>('/sms/templates', data),
     update: (id: string, data: Record<string, unknown>) => put<Record<string, unknown>>(`/sms/templates/${id}`, data),
     delete: (id: string)                                => del<{ message: string }>(`/sms/templates/${id}`),

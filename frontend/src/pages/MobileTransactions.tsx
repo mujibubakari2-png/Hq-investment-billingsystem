@@ -9,7 +9,24 @@ import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import BlockIcon from '@mui/icons-material/Block';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 import { mobileTransactionsApi, type MobileTransactionEntry } from '../api';
+import { normalizeApiList } from '../utils/apiResponse';
 import { formatDateTime } from '../utils/formatters';
+
+interface MobileTransactionsSummaries {
+    today?: {
+        total?: number;
+        paid?: number;
+        revenue?: number;
+    };
+    month?: {
+        total?: number;
+        paid?: number;
+        unpaid?: number;
+        expired?: number;
+        cancelled?: number;
+        revenue?: number;
+    };
+}
 
 export default function MobileTransactions() {
     const [searchTerm, setSearchTerm] = useState('');
@@ -18,7 +35,7 @@ export default function MobileTransactions() {
     const [transactions, setTransactions] = useState<MobileTransactionEntry[]>([]);
     const [totalTxs, setTotalTxs] = useState(0);
     const [loading, setLoading] = useState(true);
-    const [summaries, setSummaries] = useState<any>(null);
+    const [summaries, setSummaries] = useState<MobileTransactionsSummaries | null>(null);
 
     const [statusFilter, setStatusFilter] = useState('All');
     const [methodFilter, setMethodFilter] = useState('All');
@@ -30,7 +47,7 @@ export default function MobileTransactions() {
         const headers = ['User', 'Plan', 'Amount', 'Method', 'Transaction ID', 'Status', 'Date'];
         const csvContent = "data:text/csv;charset=utf-8,"
             + headers.join(',') + '\n'
-            + transactions.map((t: any) =>
+            + transactions.map((t: MobileTransactionEntry) =>
                 `${t.user},${t.planName || ''},${t.amount},${t.method || ''},${t.reference || t.transactionId || ''},${t.status},${formatDateTime(t.date)}`
             ).join('\n');
 
@@ -46,7 +63,6 @@ export default function MobileTransactions() {
     const fetchTransactions = useCallback(async () => {
         setLoading(true);
         try {
-            // Fetch dynamically aggregated stats & fully paginated/filtered data natively from backend
             const res = await mobileTransactionsApi.list({
                 search: searchTerm,
                 status: statusFilter,
@@ -54,11 +70,17 @@ export default function MobileTransactions() {
                 page: currentPage,
                 limit: entriesPerPage
             });
-            
-            setActiveGateways(res.activeGateways || []);
-            setTransactions(res.data || []);
-            setTotalTxs(res.total || 0);
-            setSummaries(res.summaries || null);
+            const result = res as {
+                data?: MobileTransactionEntry[];
+                total?: number;
+                activeGateways?: string[];
+                summaries?: Record<string, unknown>;
+            };
+
+            setActiveGateways(Array.isArray(result.activeGateways) ? result.activeGateways : []);
+            setTransactions(normalizeApiList<MobileTransactionEntry>(result));
+            setTotalTxs(result.total ?? 0);
+            setSummaries(result.summaries ?? null);
         } catch (err) {
             console.error('Failed to load mobile transactions:', err);
         } finally {
@@ -66,7 +88,9 @@ export default function MobileTransactions() {
         }
     }, [searchTerm, entriesPerPage, statusFilter, methodFilter, currentPage]);
 
-    useEffect(() => { fetchTransactions(); }, [fetchTransactions]);
+    useEffect(() => {
+        void Promise.resolve().then(fetchTransactions);
+    }, [fetchTransactions]);
 
     // Auto-refresh every 30 seconds for real-time payment transaction status
     useEffect(() => {
@@ -75,7 +99,9 @@ export default function MobileTransactions() {
     }, [fetchTransactions]);
 
     // Reset pagination on filter change
-    useEffect(() => { setCurrentPage(1); }, [searchTerm, entriesPerPage, statusFilter, methodFilter]);
+    useEffect(() => {
+        void Promise.resolve().then(() => setCurrentPage(1));
+    }, [searchTerm, entriesPerPage, statusFilter, methodFilter]);
 
     const todayTotal = summaries?.today?.total || 0;
     const todayPaid = summaries?.today?.paid || 0;
