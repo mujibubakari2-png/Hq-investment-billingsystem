@@ -53,7 +53,7 @@ async function updateRouterWgFields(db: ReturnType<typeof getTenantClient>, rout
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const guard = requirePermission(req, "vpn:read");
+        const guard = requirePermission(req, "routers:read");
         if (guard.error) return guard.error;
         const userPayload = guard.user;
         const db = getTenantClient(userPayload);

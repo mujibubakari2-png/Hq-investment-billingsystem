@@ -25,7 +25,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         const existing = await db.paymentChannel.findUnique({ where: { id } });
         if (!existing) return errorResponse("Payment channel not found", 404);
         if (!canAccessTenant(userPayload, existing.tenantId)) {
-            return errorResponse("Forbidden", 403);
+            return errorResponse("Payment channel not found", 404);
         }
 
         const encryptedFields = encryptPaymentChannelFields({
@@ -95,7 +95,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
         const existing = await db.paymentChannel.findUnique({ where: { id } });
         if (!existing) return errorResponse("Payment channel not found", 404);
         if (!canAccessTenant(userPayload, existing.tenantId)) {
-            return errorResponse("Forbidden", 403);
+            return errorResponse("Payment channel not found", 404);
         }
 
         await db.paymentChannel.delete({ where: { id } });

@@ -68,4 +68,56 @@ describe('payment channel routes', () => {
       where: { tenantId_provider: { tenantId: 'tenant-a', provider: 'ZENOPAY' } },
     }));
   });
+
+  it('denies a tenant-scoped admin from editing another tenant\'s payment channel', async () => {
+    const route = require('@/app/api/payment-channels/[id]/route');
+    mockRequirePermission.mockReturnValue({
+      error: null,
+      user: { id: 'admin-2', userId: 'admin-2', role: 'ADMIN', tenantId: 'tenant-b' },
+    });
+
+    const db = {
+      paymentChannel: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'ch-1',
+          tenantId: 'tenant-a',
+          provider: 'PALMPESA',
+        }),
+      },
+    };
+    mockGetTenantClient.mockReturnValue(db);
+
+    const req = new NextRequest('http://localhost/api/payment-channels/ch-1', {
+      method: 'PUT',
+      body: JSON.stringify({ provider: 'ZENOPAY', name: 'ZenoPay', status: 'ACTIVE' }),
+    });
+
+    const res = await route.PUT(req, { params: Promise.resolve({ id: 'ch-1' }) });
+
+    expect(res.status).toBe(404);
+  });
+
+  it('blocks non-super-admin access to the payment channel list for a different tenant', async () => {
+    const route = require('@/app/api/payment-channels/route');
+    mockRequirePermission.mockReturnValue({
+      error: null,
+      user: { id: 'agent-1', userId: 'agent-1', role: 'AGENT', tenantId: 'tenant-b' },
+    });
+
+    const db = {
+      paymentChannel: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+    };
+    mockGetTenantClient.mockReturnValue(db);
+
+    const req = new NextRequest('http://localhost/api/payment-channels', {
+      method: 'GET',
+    });
+
+    const res = await route.GET(req);
+
+    expect(res.status).toBe(200);
+    expect(db.paymentChannel.findMany).toHaveBeenCalled();
+  });
 });

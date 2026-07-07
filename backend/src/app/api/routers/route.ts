@@ -51,6 +51,16 @@ export async function GET(req: NextRequest) {
         const search = searchParams.get("search")?.toLowerCase() || "";
         const isPaginated = searchParams.has("page");
 
+        const where: any = {
+            ...tenantFilter,
+            ...(search ? {
+                OR: [
+                    { name: { contains: search, mode: 'insensitive' } },
+                    { host: { contains: search, mode: 'insensitive' } },
+                ],
+            } : {}),
+        };
+
         if (isPaginated) {
             // MEDIUM-PERF FIX: Paginate at the DB level, not in JS.
             // Previously ALL routers were loaded then sliced — unsafe at scale.
@@ -59,16 +69,6 @@ export async function GET(req: NextRequest) {
             const rawLimit = searchParams.get("limit");
             const limit = rawLimit === "All" ? 500 : Math.min(500, Math.max(1, parseInt(rawLimit || "25")));
             const skip  = (page - 1) * limit;
-
-            const where: any = {
-                ...tenantFilter,
-                ...(search ? {
-                    OR: [
-                        { name: { contains: search, mode: 'insensitive' } },
-                        { host: { contains: search, mode: 'insensitive' } },
-                    ],
-                } : {}),
-            };
 
             const [routers, total] = await Promise.all([
                 db.router.findMany({
@@ -87,7 +87,7 @@ export async function GET(req: NextRequest) {
 
         // Non-paginated: return all (for dropdowns etc.) — select only safe fields
         const routers = await db.router.findMany({
-            where: { ...tenantFilter },
+            where,
             include: { _count: { select: { packages: true, subscriptions: true, logs: true } } },
             orderBy: { createdAt: "desc" },
         });
@@ -208,7 +208,14 @@ export async function POST(req: NextRequest) {
         // RADIUS NAS secret MUST be stored in plaintext because the FreeRADIUS daemon
         // reads the database directly and does not support application-level AES-256-GCM.
         // However, the API automatically masks this field for non-admins to prevent leaks.
-        const decryptedRadiusSecret = decrypt(router.radiusSecret) || generateRadiusSecret();
+        let decryptedRadiusSecret: string;
+        try {
+            decryptedRadiusSecret = decrypt(router.radiusSecret) || generateRadiusSecret();
+        } catch (err) {
+            logger.warn("[ROUTER CREATE] Decryption failed, generating new radius secret:", { error: err instanceof Error ? err.message : String(err) });
+            decryptedRadiusSecret = generateRadiusSecret();
+        }
+        
         // Guard: if the router record still had no radiusSecret (legacy row not yet
         // migrated), persist the freshly generated one now instead of silently
         // reusing a fallback each time.

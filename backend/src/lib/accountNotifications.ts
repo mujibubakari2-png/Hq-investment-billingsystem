@@ -36,6 +36,7 @@ async function createSmsLog(recipient: string, message: string, tenantId?: strin
                 message,
                 type: "INDIVIDUAL",
                 status: "SENT",
+                tenantId,
             },
         });
     } catch (err) {
