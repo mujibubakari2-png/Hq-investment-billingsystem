@@ -149,7 +149,7 @@ export async function POST(req: NextRequest) {
 
         if (rId) {
             try {
-                const mikrotik = await getMikroTikService(rId);
+                const mikrotik = await getMikroTikService(rId, pkg.tenantId ?? null);
                 await mikrotik.activateService(client.username, code, pkg.name, "hotspot", expiresAt);
                 mikrotikSyncSuccess = true;
                 finalSyncStatus = "SYNCED";

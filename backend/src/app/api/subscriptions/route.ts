@@ -175,7 +175,7 @@ export async function POST(req: NextRequest) {
         // ── Activate on MikroTik router (if router is set) ────────────────────
         if (sub.routerId && sub.client && sub.package) {
             try {
-                const mikrotik = await getMikroTikService(sub.routerId);
+                const mikrotik = await getMikroTikService(sub.routerId, userPayload.tenantId ?? null);
                 const pwd = sub.client.phone || "123456";
                 const type = sub.client.serviceType === "HOTSPOT" ? "hotspot" : "pppoe";
                 await mikrotik.activateService(sub.client.username, pwd, sub.package.name, type);

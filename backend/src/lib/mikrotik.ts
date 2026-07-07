@@ -1012,12 +1012,14 @@ export class MikroTikService {
 // ── Factory Function ────────────────────────────────────────────────────────
 
 export async function getMikroTikService(routerId: string, tenantId?: string | null): Promise<MikroTikService> {
-    const db = getTenantClient(tenantId ?? null);
-    const router = await db.router.findUnique({ where: { id: routerId } });
+    // Use an unscoped tenant client for the lookup so we can distinguish
+    // "router does not exist" from "router exists but belongs to another tenant".
+    const unscopedDb = getTenantClient(null);
+    const router = await unscopedDb.router.findUnique({ where: { id: routerId } });
     if (!router) throw new Error("Router not found");
 
-    // Strict tenant isolation check
-    // Allow bypass when tenantId is undefined (internal calls) OR null (SUPER_ADMIN)
+    // Strict tenant isolation check.
+    // Tenant-scoped callers must never access a router from a different tenant.
     if (tenantId !== undefined && tenantId !== null && router.tenantId !== tenantId) {
         throw new Error("Unauthorized: This router belongs to another tenant");
     }

@@ -42,7 +42,7 @@ async function getService(routerId: string, expectedTenantId: string | null = nu
   const port = dec.port ?? 8728;
 
   // getMikroTikService takes a routerId string — it handles DB lookup internally
-  const service = await getMikroTikService(routerId);
+  const service = await getMikroTikService(routerId, expectedTenantId ?? null);
   return { service, host };
 }
 

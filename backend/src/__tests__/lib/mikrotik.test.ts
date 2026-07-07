@@ -1,5 +1,6 @@
-import { MikroTikService } from '@/lib/mikrotik';
+import { MikroTikService, getMikroTikService } from '@/lib/mikrotik';
 import { env } from '@/lib/env';
+import { getTenantClient } from '@/lib/tenantPrisma';
 
 // Mock env
 jest.mock('@/lib/env', () => ({
@@ -14,18 +15,9 @@ jest.mock('@/lib/env', () => ({
 const mockRouterLogCreate = jest.fn();
 const mockRouterUpdate = jest.fn();
 
-jest.mock('@/lib/tenantPrisma', () => {
-    return {
-        getTenantClient: jest.fn(() => ({
-            routerLog: {
-                create: mockRouterLogCreate
-            },
-            router: {
-                update: mockRouterUpdate
-            }
-        }))
-    };
-});
+jest.mock('@/lib/tenantPrisma', () => ({
+    getTenantClient: jest.fn(),
+}));
 
 describe('MikroTikService', () => {
     let originalFetch: typeof global.fetch;
@@ -34,6 +26,14 @@ describe('MikroTikService', () => {
         jest.clearAllMocks();
         originalFetch = global.fetch;
         global.fetch = jest.fn();
+
+        (getTenantClient as jest.Mock).mockImplementation((tenantId?: string | null) => ({
+            routerLog: { create: mockRouterLogCreate },
+            router: {
+                update: mockRouterUpdate,
+                findUnique: jest.fn().mockResolvedValue(null),
+            },
+        }));
     });
 
     afterEach(() => {
@@ -159,5 +159,29 @@ describe('MikroTikService', () => {
 
         // 1d01:02:00
         expect(body['limit-uptime']).toMatch(/^1d01:0[12]:\d\d$/); // Allow small variance due to execution time
+    });
+
+    it('should deny cross-tenant router access with an explicit tenant mismatch error', async () => {
+        const scopedFindUnique = jest.fn().mockResolvedValue(null);
+        const unscopedFindUnique = jest.fn().mockResolvedValue({
+            id: 'router-456',
+            tenantId: 'tenant-2',
+            host: '10.0.0.2',
+            port: 8728,
+            username: 'admin',
+            password: 'password',
+        });
+
+        (getTenantClient as jest.Mock).mockImplementation((tenantId?: string | null) => ({
+            routerLog: { create: mockRouterLogCreate },
+            router: {
+                update: mockRouterUpdate,
+                findUnique: tenantId === null ? unscopedFindUnique : scopedFindUnique,
+            },
+        }));
+
+        await expect(getMikroTikService('router-456', 'tenant-1')).rejects.toThrow(
+            'Unauthorized: This router belongs to another tenant'
+        );
     });
 });

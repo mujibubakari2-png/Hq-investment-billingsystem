@@ -4,7 +4,7 @@ import { requirePermission } from "@/lib/rbac";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import { toISOSafe } from "@/lib/dateUtils";
 import { encrypt, decrypt, encryptRouterFields } from "@/lib/encryption";
-import { generateRadiusSecret, generateAdminUsername } from "@/lib/routerProvisioning";
+import { generateRadiusSecret } from "@/lib/routerProvisioning";
 import logger from "@/lib/logger";
 
 // Safe projection: omit password, wgPrivateKey, wgPresharedKey, radiusSecret
@@ -180,7 +180,6 @@ export async function POST(req: NextRequest) {
             tenantId: tenantIdValue,
             ...(!existing && {
                 radiusSecret: generateRadiusSecret(),
-                adminUsername: generateAdminUsername(name),
             }),
         };
 

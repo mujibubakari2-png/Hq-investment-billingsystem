@@ -42,7 +42,7 @@ export async function GET(req: Request) {
 
       try {
         if (sub.routerId) {
-          const mikrotik = await getMikroTikService(sub.routerId);
+          const mikrotik = await getMikroTikService(sub.routerId, sub.tenantId ?? null);
           const serviceType = sub.client?.serviceType === "HOTSPOT" ? "hotspot" : "pppoe";
           await mikrotik.suspendService(username, serviceType);
         }

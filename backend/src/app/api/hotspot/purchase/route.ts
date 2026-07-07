@@ -379,7 +379,7 @@ async function completeHotspotPurchase(
   // MikroTik activation
   if (routerId) {
     try {
-      const mikrotik = await getMikroTikService(routerId);
+      const mikrotik = await getMikroTikService(routerId, pkg.tenantId ?? null);
       const db = getTenantClient(pkg.tenantId);
       const client = await db.client.findUnique({ where: { id: clientId } });
       const password = client?.phone || "123456";

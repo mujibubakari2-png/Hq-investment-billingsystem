@@ -75,7 +75,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         // Best-effort: sync MikroTik bandwidth profile when package changes
         if (pkg.routerId) {
             try {
-                const mikrotik = await getMikroTikService(pkg.routerId);
+                const mikrotik = await getMikroTikService(pkg.routerId, userPayload.tenantId ?? null);
                 await mikrotik.createProfileFromPackage(
                     pkg.name,
                     pkg.uploadSpeed,

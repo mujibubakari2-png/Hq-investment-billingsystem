@@ -401,7 +401,7 @@ export class PaymentService {
 
     if (pkg?.routerId) {
       try {
-        const mikrotik = await getMikroTikService(pkg.routerId);
+        const mikrotik = await getMikroTikService(pkg.routerId, pkg.tenantId ?? null);
         const client = transaction.client;
         const pwd = client.phone || "123456";
         const type = client.serviceType === "HOTSPOT" ? "hotspot" : "pppoe";
@@ -965,7 +965,7 @@ export class PaymentService {
     // 8. MikroTik activation
     if (pkg?.routerId) {
       try {
-        const mikrotik = await getMikroTikService(pkg.routerId);
+        const mikrotik = await getMikroTikService(pkg.routerId, pkg.tenantId ?? null);
         const client = transaction.client;
         const pwd = client.phone || "123456";
         const type = client.serviceType === "HOTSPOT" ? "hotspot" : "pppoe";
