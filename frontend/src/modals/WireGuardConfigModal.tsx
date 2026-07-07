@@ -10,8 +10,6 @@ import PowerSettingsNewIcon from '@mui/icons-material/PowerSettingsNew';
 import SyncIcon from '@mui/icons-material/Sync';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import { routersApi } from '../api';
-import { getPublicApiBase } from '../utils/config';
-import { generateMikrotikScript } from '../utils/mikrotikScriptGenerator';
 import { sanitizeMikroTikName } from '../utils/mikrotikUtils';
 import type { Router } from '../types';
 import RouterIcon from '@mui/icons-material/Router';
@@ -96,34 +94,12 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
         );
     }
 
-    // Always use the server public key returned from the backend (dynamically fetched via wg show)
-    const serverPubKey = config.serverPublicKey;
+    // Present WireGuard configuration in a neutral wg-quick style format for
+    // both server and client. We intentionally DO NOT generate the full
+    // MikroTik .rsc here; full router scripts are produced only by the
+    // Router Setup Wizard → Generate → Create Config step.
 
-
-    const publicApiBase = getPublicApiBase();
-
-    // Extract hostname for RADIUS / walled-garden config
-    const apiHost = publicApiBase.startsWith('http')
-        ? new URL(publicApiBase).hostname
-        : window.location.hostname;
-
-    const serverConfig = generateMikrotikScript({
-        routerName: config.routerName,
-        routerUsername: router.username,
-        routerPassword: router.password,
-        routerId: config.routerId,
-        apiHost,
-        publicApiBase,
-        isWireGuard: true,
-        listenPort: config.listenPort,
-        routerPrivateKey: config.routerPrivateKey,
-        serverPubKey,
-        presharedKey: config.presharedKey,
-        serverEndpoint: config.serverEndpoint,
-        serverPort: config.serverPort,
-        routerTunnelIp: config.routerTunnelIp,
-        serverTunnelIp: config.serverTunnelIp
-    });
+    const serverConfig = `# ═══════════════════════════════════════════════════════════════\n# WireGuard Server Config (wg-quick style)\n# For Router: ${config.routerName} (${config.routerId})\n# ═══════════════════════════════════════════════════════════════\n\n[Interface]\n# Replace <SERVER_PRIVATE_KEY> with your server's private key\nPrivateKey = <SERVER_PRIVATE_KEY>\nAddress = ${config.serverTunnelIp}/24\nListenPort = ${config.listenPort}\nDNS = 8.8.8.8, 1.1.1.1\n\n[Peer]\n# Router peer\nPublicKey = ${config.routerPublicKey}\nPresharedKey = ${config.presharedKey}\n# AllowedIPs: only the router's tunnel IP (management traffic only)\nAllowedIPs = ${config.routerTunnelIp}/32\nEndpoint = ${config.routerHost}:${config.listenPort}\nPersistentKeepalive = 25\n\n# Note: This is WireGuard config only. Full MikroTik .rsc is available from the Router Setup Wizard → Generate → Create Config.`;
 
     // Client config for the HQInvestment ISP server
     const clientConfig = `# ═══════════════════════════════════════════════════════════════
@@ -392,9 +368,7 @@ PersistentKeepalive = 25`;
                         <button className="btn" style={{ background: '#15803d', color: '#fff', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}
                             onClick={() => handleDownload(
                                 activeConfig,
-                                activeTab === 'server'
-                                    ? `wg-server-${sanitizeMikroTikName(router.name)}.rsc`
-                                    : `wg-client-${sanitizeMikroTikName(router.name)}.conf`
+                                `wg-${activeTab}-${sanitizeMikroTikName(router.name)}.conf`
                             )}
                         >
                             <DownloadIcon style={{ fontSize: 16 }} />

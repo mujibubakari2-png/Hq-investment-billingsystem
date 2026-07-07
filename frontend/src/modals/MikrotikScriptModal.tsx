@@ -38,29 +38,41 @@ export default function MikrotikScriptModal({ router, onClose }: MikrotikScriptM
         ? new URL(publicApiBase).hostname
         : window.location.hostname;
 
-    const mikrotikScript = generateMikrotikScript({
-        routerName: router.name,
-        routerUsername: router.username,
-        routerPassword: router.password,
-        routerId: routerIdCode,
-        apiHost,
-        publicApiBase,
-        isWireGuard: false,
-        lanIp: router.lanIp,
-        lanGateway: router.lanGateway,
-        hotspotPoolRange: router.hotspotPoolRange,
-        pppoePoolRange: router.pppoePoolRange,
-        dns: router.dns,
-        radiusSecret: router.radiusSecret,
-    });
+    // Safely generate the MikroTik script. The generator throws when
+    // required LAN/pool/DNS fields are missing; catch and surface a
+    // friendly message instead of letting the modal crash.
+    let mikrotikScript = '';
+    let generationError: string | null = null;
+    try {
+        mikrotikScript = generateMikrotikScript({
+            routerName: router.name,
+            routerUsername: router.username,
+            routerPassword: router.password,
+            routerId: routerIdCode,
+            apiHost,
+            publicApiBase,
+            isWireGuard: false,
+            lanIp: router.lanIp,
+            lanGateway: router.lanGateway,
+            hotspotPoolRange: router.hotspotPoolRange,
+            pppoePoolRange: router.pppoePoolRange,
+            dns: router.dns,
+            radiusSecret: router.radiusSecret,
+        });
+    } catch (err: any) {
+        generationError = err?.message || String(err);
+        mikrotikScript = `/* ${generationError} */`;
+    }
 
     const handleCopy = () => {
+        if (generationError) { alert(generationError); return; }
         navigator.clipboard.writeText(mikrotikScript);
         setCopied(true);
         setTimeout(() => setCopied(false), 2500);
     };
 
     const handleDownload = () => {
+        if (generationError) { alert(generationError); return; }
         const blob = new Blob([mikrotikScript], { type: 'text/plain' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');

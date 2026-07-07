@@ -222,6 +222,18 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
             alert('VPN IP not loaded yet. Please wait for WireGuard config to load, then try again.');
             return '';
         }
+        // Safe, namespaced resource names to avoid collisions on routers
+        const safeRouterName = sanitizeMikroTikName(routerName);
+        const hsPoolName = `hs-pool-${safeRouterName}`;
+        const pppoePoolName = `pppoe-pool-${safeRouterName}`;
+        const pppoeProfile = `pppoe-profile-${safeRouterName}`;
+        const hotspotProfile = `hq-hotspot-${safeRouterName}`;
+        const vpnPoolName = `vpn-pool-${safeRouterName}`;
+        const vpnProfile = `vpn-profile-${safeRouterName}`;
+        const targetBridge = `bridge-${safeRouterName}`;
+
+        // DNS servers: prefer routerData.dns if present, fallback to vpnDns or public DNS
+        const dnsServers = (routerData && (routerData.dns as string)) || vpnDns || '8.8.8.8,8.8.4.4';
         // SEC-ROUTER-001/003 FIX: block generation (same as the backend
         // validation layer) if required secrets are missing or still match a
         // known-insecure legacy static default, instead of silently shipping
@@ -278,7 +290,7 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
         ];
         if (selectedInterfaces.length > 0) {
             lines.push(
-                ':local targetBridge "radiax_bridge"',
+                `:local targetBridge "${targetBridge}"`,
                 `:if ([:len [/interface bridge find where name=$targetBridge]] = 0) do={ /interface bridge add name=$targetBridge comment="HQ Investment Bridge" }`,
             );
             selectedInterfaces.forEach(iface => {
@@ -290,34 +302,34 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
         if (serviceType === 'pppoe' || serviceType === 'both') {
             lines.push(
                 '', '# ===== PPPoE Server =====',
-                `:if ([:len [/ip pool find where name="pppoe-pool"]] = 0) do={ /ip pool add name="pppoe-pool" ranges=${pppoePoolStart}-${pppoePoolEnd} }`,
-                `/ppp profile add name="pppoe-profile" local-address=${pppoeLocalAddress} dns-server=8.8.8.8,8.8.4.4 use-compression=no use-encryption=no`,
-                `/interface pppoe-server server add service-name="hq-pppoe" interface=$targetBridge default-profile="pppoe-profile" authentication=mschapv2 disabled=no`,
+                `:if ([:len [/ip pool find where name="${pppoePoolName}"]] = 0) do={ /ip pool add name="${pppoePoolName}" ranges=${pppoePoolStart}-${pppoePoolEnd} }`,
+                `/ppp profile add name="${pppoeProfile}" local-address=${pppoeLocalAddress} dns-server=${dnsServers} use-compression=no use-encryption=no`,
+                `/interface pppoe-server server add service-name="hq-pppoe-${safeRouterName}" interface=$targetBridge default-profile="${pppoeProfile}" authentication=mschapv2 disabled=no`,
             );
         }
         if (serviceType === 'hotspot' || serviceType === 'both') {
             lines.push(
                 '', '# ===== Hotspot Server =====',
-                `:if ([:len [/ip pool find where name="hs-pool"]] = 0) do={ /ip pool add name="hs-pool" ranges=${hotspotPoolStart}-${hotspotPoolEnd} }`,
+                `:if ([:len [/ip pool find where name="${hsPoolName}"]] = 0) do={ /ip pool add name="${hsPoolName}" ranges=${hotspotPoolStart}-${hotspotPoolEnd} }`,
+                `:if ([:len [/ip hotspot profile find where name="${hotspotProfile}"]] = 0) do={ /ip hotspot profile add name="${hotspotProfile}" hotspot-address=${hotspotLocalAddress} html-directory=hotspot login-by=mac-cookie,http-chap use-radius=yes ssl-certificate="${certName}" }`,
                 `:if ([:len [/ip address find where interface=$targetBridge]] = 0) do={ /ip address add address=${hotspotCidr} interface=$targetBridge }`,
-                `:if ([:len [/ip hotspot find where interface=$targetBridge]] = 0) do={ /ip hotspot add name="hq-hotspot" interface=$targetBridge address-pool="hs-pool" profile="hq-hotspot" }`,
-                `/ip hotspot profile set [/ip hotspot profile find where name="default"] hotspot-address=${hotspotLocalAddress} html-directory=hotspot ssl-certificate="${certName}"`,
-                `/ip hotspot profile add name="hq-hotspot" hotspot-address=${hotspotLocalAddress} html-directory=hotspot login-by=mac-cookie,http-chap use-radius=yes ssl-certificate="${certName}"`,
-                `/ip dhcp-server network add address=${hotspotNetwork} gateway=${hotspotLocalAddress} dns-server=8.8.8.8,8.8.4.4`,
+                `:if ([:len [/ip hotspot find where interface=$targetBridge]] = 0) do={ /ip hotspot add name="hq-hotspot-${safeRouterName}" interface=$targetBridge address-pool="${hsPoolName}" profile="${hotspotProfile}" }`,
+                `/ip hotspot profile set [/ip hotspot profile find where name="${hotspotProfile}"] hotspot-address=${hotspotLocalAddress} html-directory=hotspot ssl-certificate="${certName}"`,
+                `:if ([:len [/ip dhcp-server network find where address="${hotspotNetwork}"]] = 0) do={ /ip dhcp-server network add address=${hotspotNetwork} gateway=${hotspotLocalAddress} dns-server=${dnsServers} }`,
             );
         }
         if (vpnEnabled) {
             lines.push('', '# ===== VPN Server =====');
             if (vpnProtocol === 'L2TP' || vpnMode === 'hybrid') {
                 lines.push(
-                    `/ip pool add name="vpn-pool" ranges=${vpnPoolStart}-${vpnPoolEnd}`,
-                    `/ppp profile add name="vpn-profile" local-address=${pppoeLocalAddress || hotspotLocalAddress} remote-address="vpn-pool" dns-server=${vpnDns}`,
-                    `/interface l2tp-server server set enabled=yes use-ipsec=yes ipsec-secret="${ipsecSecret}" default-profile="vpn-profile"`,
+                    `/ip pool add name="${vpnPoolName}" ranges=${vpnPoolStart}-${vpnPoolEnd}`,
+                    `/ppp profile add name="${vpnProfile}" local-address=${pppoeLocalAddress || hotspotLocalAddress} remote-address="${vpnPoolName}" dns-server=${vpnDns}`,
+                    `/interface l2tp-server server set enabled=yes use-ipsec=yes ipsec-secret="${ipsecSecret}" default-profile="${vpnProfile}"`,
                 );
             }
             if (vpnSecrets.length > 0) {
                 vpnSecrets.forEach(s => {
-                    lines.push(`/ppp secret add name="${s.username}" password="${s.password}" service=${s.protocol.toLowerCase()} profile="vpn-profile"${s.localAddress ? ` local-address=${s.localAddress}` : ''}${s.remoteAddress ? ` remote-address=${s.remoteAddress}` : ''}`);
+                    lines.push(`/ppp secret add name="${s.username}" password="${s.password}" service=${s.protocol.toLowerCase()} profile="${vpnProfile}"${s.localAddress ? ` local-address=${s.localAddress}` : ''}${s.remoteAddress ? ` remote-address=${s.remoteAddress}` : ''}`);
                 });
             }
         }
@@ -336,7 +348,9 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
             ':if ([:len [/ip firewall nat find where action=masquerade]] = 0) do={ /ip firewall nat add chain=srcnat out-interface=ether1 action=masquerade }',
             '', '# ===== System Scheduler =====',
             `:if ([:len [/system scheduler find name="billing-sync"]] > 0) do={ /system scheduler remove [find name="billing-sync"] }`,
-            `/system scheduler add name="billing-sync" interval=5m on-event=":tool fetch url=${publicApiBase}/api/sync/ keep-result=no" start-time=00:00:00`,
+            `:local syncUrl "${publicApiBase}/api/sync/${routerId}"`,
+            `:local syncScript "/tool fetch url=$syncUrl keep-result=no"`,
+            `/system scheduler add name="billing-sync" interval=5m on-event=$syncScript start-time=00:00:00 comment="HQ INVESTMENT Auto-Sync"`,
             '', '# ===== Logging =====',
             ':if ([:len [/system logging find topics=hotspot]] = 0) do={ /system logging add topics=hotspot action=memory }',
             ':if ([:len [/system logging find topics=radius]] = 0) do={ /system logging add topics=radius action=memory }',

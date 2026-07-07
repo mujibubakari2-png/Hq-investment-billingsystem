@@ -63,6 +63,12 @@ export default function RouterDetailModal({ router, onClose, onDelete }: RouterD
     }, [router.id]);
 
     const downloadScript = () => {
+        // Validate required router configuration before generating full .rsc
+        if (!router.lanIp || !router.lanGateway || !router.hotspotPoolRange || !router.pppoePoolRange || !router.dns) {
+            alert('Please configure LAN, Gateway, Pool ranges, and DNS on this router first (Router Setup Wizard → Generate → Create Config).');
+            return;
+        }
+
         const routerIdCode = `MYR-${router.id.padStart(3, '0')}VBHBC`;
         const safeRouterName = sanitizeMikroTikName(router.name);
         const publicApiBase = getPublicApiBase();
