@@ -51,7 +51,6 @@ import {
   httpPost,
   retryWithBackoff,
 } from "@/lib/payments/utils";
-import { normalizeHeader } from "@/lib/payments/utils";
 
 export class MongikeProvider implements PaymentProvider {
   readonly name = "MONGIKE" as const;
@@ -164,7 +163,8 @@ export class MongikeProvider implements PaymentProvider {
     _rawBody: string
   ): Promise<WebhookVerification> {
     // Primary: verify x-api-key matches our API key (per official docs)
-    const incomingApiKey = normalizeHeader(headers, "x-api-key") ?? "";
+    const incomingApiKey =
+      (headers["x-api-key"] as string | undefined) ?? "";
 
     if (!incomingApiKey) {
       return { verified: false, reason: "Missing x-api-key header" };

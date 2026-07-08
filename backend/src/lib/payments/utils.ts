@@ -137,23 +137,6 @@ export function timingSafeEqual(a: string, b: string): boolean {
   return crypto.timingSafeEqual(bufA, bufB);
 }
 
-/**
- * Normalize a header value from a headers record.
- * Accepts case-insensitive header names and returns the first value
- * when the header is an array. Returns `undefined` if not present.
- */
-export function normalizeHeader(
-  headers: Record<string, string | string[] | undefined> | undefined,
-  name: string
-): string | undefined {
-  if (!headers) return undefined;
-  const key = Object.keys(headers).find((k) => k.toLowerCase() === name.toLowerCase());
-  const val = key ? headers[key] : undefined;
-  if (Array.isArray(val)) return String(val[0] ?? undefined) || undefined;
-  if (typeof val === "string") return val || undefined;
-  return undefined;
-}
-
 // ─── Retry with Exponential Backoff ──────────────────────────────────────────
 
 /**

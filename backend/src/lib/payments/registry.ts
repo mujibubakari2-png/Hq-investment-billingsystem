@@ -114,17 +114,9 @@ function channelToConfig(channel: ChannelRecord): ProviderConfig {
 
 export function getPaymentProvider(
   providerName: string,
-  channel?: ChannelRecord | null,
-  opts?: { allowEnvFallback?: boolean }
+  channel?: ChannelRecord | null
 ): PaymentProvider {
   const name = providerName.toUpperCase() as ProviderName;
-  const allowEnvFallback = opts?.allowEnvFallback ?? true;
-
-  if (!channel && !allowEnvFallback) {
-    throw new Error(
-      `No payment channel provided for provider "${providerName}" and env fallback is disabled`
-    );
-  }
 
   const config: ProviderConfig = channel
     ? channelToConfig(channel)

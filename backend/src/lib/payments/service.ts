@@ -192,9 +192,7 @@ export class PaymentService {
       };
     }
 
-    const provider = effectiveCtx === "LICENSE"
-      ? getPaymentProvider(providerName, channel)
-      : getPaymentProvider(providerName, channel, { allowEnvFallback: false });
+    const provider = getPaymentProvider(providerName, channel);
     // SECURITY FIX: log only the channel id, not the full record (see getChannel() fix above).
     logger.info("[TRACE][PaymentService.initiatePayment] PROVIDER_SELECTED", { providerName, providerClass: provider.constructor?.name, channelId: (channel as any)?.id ?? null });
 
@@ -225,9 +223,7 @@ export class PaymentService {
       return { status: "FAILED" };
     }
 
-    const provider = tenantId === null
-      ? getPaymentProvider(providerName, channel)
-      : getPaymentProvider(providerName, channel, { allowEnvFallback: false });
+    const provider = getPaymentProvider(providerName, channel);
     return provider.checkStatus(providerRef);
   }
 
@@ -597,7 +593,7 @@ export class PaymentService {
           verification: { verified: false, reason: "No active payment channel for this tenant/provider" },
         };
       }
-      const provider = getPaymentProvider(providerName, channel, { allowEnvFallback: false });
+      const provider = getPaymentProvider(providerName, channel);
       const verification = await provider.verifyWebhook(headers, rawBody);
       return { channel: channel as any, provider, verification };
     }
@@ -618,7 +614,7 @@ export class PaymentService {
 
     let lastReason = "No active payment channel configured for this provider";
     for (const candidate of candidateChannels) {
-      const candidateProvider = getPaymentProvider(providerName, candidate as any, { allowEnvFallback: false });
+      const candidateProvider = getPaymentProvider(providerName, candidate as any);
       const verification = await candidateProvider.verifyWebhook(headers, rawBody);
       if (verification.verified) {
         logger.info("[TRACE][PaymentService.resolveWebhookChannel] MATCHED_CHANNEL", {

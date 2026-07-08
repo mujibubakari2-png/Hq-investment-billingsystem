@@ -44,7 +44,6 @@ import {
   retryWithBackoff,
   safeJsonParse,
 } from "@/lib/payments/utils";
-import { normalizeHeader } from "@/lib/payments/utils";
 
 export class PalmPesaProvider implements PaymentProvider {
   readonly name = "PALMPESA" as const;
@@ -232,8 +231,8 @@ export class PalmPesaProvider implements PaymentProvider {
     }
 
     const provided =
-      normalizeHeader(headers, "x-webhook-secret") ??
-      normalizeHeader(headers, "x-palmpesa-signature") ??
+      (headers["x-webhook-secret"]     as string | undefined) ??
+      (headers["x-palmpesa-signature"] as string | undefined) ??
       "";
 
     if (!provided) {

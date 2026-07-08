@@ -47,7 +47,6 @@ import {
   httpGet,
   retryWithBackoff,
 } from "@/lib/payments/utils";
-import { normalizeHeader } from "@/lib/payments/utils";
 
 export class ZenoPayProvider implements PaymentProvider {
   readonly name = "ZENOPAY" as const;
@@ -186,7 +185,7 @@ export class ZenoPayProvider implements PaymentProvider {
     }
 
     // Optional HMAC signature
-    const hmacHeader = normalizeHeader(headers, "x-zeno-signature");
+    const hmacHeader = headers["x-zeno-signature"] as string | undefined;
     if (hmacHeader && this.webhookSecret) {
       const expected = computeHmac(this.webhookSecret, rawBody);
       const valid = timingSafeEqual(hmacHeader, expected);
@@ -194,14 +193,14 @@ export class ZenoPayProvider implements PaymentProvider {
     }
 
     // Official docs: verify x-api-key header equals our API key
-    const apiKeyHeader = normalizeHeader(headers, "x-api-key");
+    const apiKeyHeader = headers["x-api-key"] as string | undefined;
     if (apiKeyHeader) {
       const valid = timingSafeEqual(apiKeyHeader, this.apiKey);
       return { verified: valid, reason: valid ? undefined : "API key mismatch" };
     }
 
     // Fallback: shared webhook secret in x-webhook-secret
-    const secretHeader = normalizeHeader(headers, "x-webhook-secret");
+    const secretHeader = headers["x-webhook-secret"] as string | undefined;
     if (secretHeader && this.webhookSecret) {
       const valid = timingSafeEqual(secretHeader, this.webhookSecret);
       return { verified: valid, reason: valid ? undefined : "Secret mismatch" };
