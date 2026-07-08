@@ -287,6 +287,101 @@ describe('PaymentService.initiatePayment — explicit production context', () =>
   );
 });
 
+describe('PaymentService — CRIT-PAY-001: no platform-env fallback for tenant payments', () => {
+  // Regression test for the isolation gap where getPaymentProvider(providerName, channel)
+  // silently fell back to PLATFORM .env credentials whenever `channel` was falsy
+  // (e.g. a tenant with no configured/active PaymentChannel). initiatePayment() and
+  // checkStatus() must now short-circuit BEFORE calling getPaymentProvider() in that case.
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it.each(['PALMPESA', 'ZENOPAY', 'MONGIKE', 'HARAKAPAY'] as const)(
+    'initiatePayment: TENANT context with no channel configured is rejected and NEVER calls getPaymentProvider (provider %s)',
+    async (provider) => {
+      const svc = new PaymentService();
+      jest.spyOn(svc, 'getChannel').mockResolvedValue(null as any);
+
+      const registry = require('@/lib/payments/registry');
+      (registry.getPaymentProvider as jest.Mock).mockClear();
+
+      const result = await svc.initiatePayment({
+        tenantId: 'tenant-no-channel',
+        amount: 1000,
+        phone: '0712345678',
+        providerName: provider,
+        reference: 'HP-TEST-001',
+        paymentContext: 'TENANT',
+      } as any);
+
+      expect(result.success).toBe(false);
+      expect(result.message).toMatch(/No active .* payment channel is configured for this tenant/i);
+      // The critical assertion: the platform-env fallback path must never be reached.
+      expect(registry.getPaymentProvider).not.toHaveBeenCalled();
+    }
+  );
+
+  it('initiatePayment: LICENSE context with no DB channel is still allowed to fall back (bootstrap case)', async () => {
+    const svc = new PaymentService();
+    jest.spyOn(svc, 'getChannel').mockResolvedValue(null as any);
+
+    const providerMock = {
+      initiatePayment: jest.fn().mockResolvedValue({ success: true, message: 'OK', providerRef: 'ref-license' }),
+    };
+    const registry = require('@/lib/payments/registry');
+    (registry.getPaymentProvider as jest.Mock).mockClear();
+    (registry.getPaymentProvider as jest.Mock).mockReturnValue(providerMock);
+
+    const result = await svc.initiatePayment({
+      tenantId: null,
+      amount: 1000,
+      phone: '0712345678',
+      providerName: 'PALMPESA',
+      reference: 'LIC-TEST-001',
+      paymentContext: 'LICENSE',
+    } as any);
+
+    // LICENSE context legitimately falls back to platform .env config when no
+    // PaymentChannel row exists yet — this call path must remain intact.
+    expect(registry.getPaymentProvider).toHaveBeenCalledWith('PALMPESA', null);
+    expect(result.success).toBe(true);
+  });
+
+  it.each(['PALMPESA', 'ZENOPAY', 'MONGIKE', 'HARAKAPAY'] as const)(
+    'checkStatus: tenant-scoped call with no channel configured returns FAILED and NEVER calls getPaymentProvider (provider %s)',
+    async (provider) => {
+      const svc = new PaymentService();
+      jest.spyOn(svc, 'getChannel').mockResolvedValue(null as any);
+
+      const registry = require('@/lib/payments/registry');
+      (registry.getPaymentProvider as jest.Mock).mockClear();
+
+      const result = await svc.checkStatus(provider, 'provider-ref-123', 'tenant-no-channel');
+
+      expect(result.status).toBe('FAILED');
+      expect(registry.getPaymentProvider).not.toHaveBeenCalled();
+    }
+  );
+
+  it('checkStatus: LICENSE (tenantId=null) call with no DB channel is still allowed to fall back', async () => {
+    const svc = new PaymentService();
+    jest.spyOn(svc, 'getChannel').mockResolvedValue(null as any);
+
+    const providerMock = {
+      checkStatus: jest.fn().mockResolvedValue({ status: 'PENDING' }),
+    };
+    const registry = require('@/lib/payments/registry');
+    (registry.getPaymentProvider as jest.Mock).mockClear();
+    (registry.getPaymentProvider as jest.Mock).mockReturnValue(providerMock);
+
+    const result = await svc.checkStatus('PALMPESA', 'provider-ref-license', null);
+
+    expect(registry.getPaymentProvider).toHaveBeenCalledWith('PALMPESA', null);
+    expect(result.status).toBe('PENDING');
+  });
+});
+
 describe('PaymentService.processWebhook — Route Fallback Isolation', () => {
   it('Tenant webhook with skipLicense=true should NEVER query license invoices', async () => {
     const prismaMock = require('@/lib/prisma').default;
