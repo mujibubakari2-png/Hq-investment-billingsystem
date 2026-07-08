@@ -456,6 +456,14 @@ model PaymentChannel {
   tenantId      String?
   tenant        Tenant?       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
+  // Ensure a tenant can only have one channel per provider.
+  // Note: tenantId is nullable to allow PLATFORM-scoped channels (tenantId = null).
+  // In Postgres NULLs are not considered equal, so multiple platform rows with
+  // tenantId=NULL could still be created; enforce a single platform channel per
+  // provider in the application layer or by adding a partial unique index via
+  // a migration if needed for extra safety.
+  @@unique([provider, tenantId])
+  @@index([tenantId, provider, status])
   @@map("payment_channels")
 }
 

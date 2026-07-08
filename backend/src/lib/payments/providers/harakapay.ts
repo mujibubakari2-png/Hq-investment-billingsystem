@@ -49,6 +49,7 @@ import {
   httpGet,
   retryWithBackoff,
 } from "@/lib/payments/utils";
+import { normalizeHeader } from "@/lib/payments/utils";
 
 export class HarakaPayProvider implements PaymentProvider {
   readonly name = "HARAKAPAY" as const;
@@ -178,8 +179,8 @@ export class HarakaPayProvider implements PaymentProvider {
     }
 
     const hmacSig =
-      (headers["x-haraka-signature"]  as string | undefined) ??
-      (headers["x-webhook-signature"] as string | undefined);
+      normalizeHeader(headers, "x-haraka-signature") ??
+      normalizeHeader(headers, "x-webhook-signature");
 
     if (hmacSig) {
       const expected = computeHmac(this.webhookSecret, rawBody);
@@ -188,9 +189,9 @@ export class HarakaPayProvider implements PaymentProvider {
     }
 
     const secretHeader =
-      (headers["x-webhook-secret"] as string | undefined) ??
-      (headers["x-haraka-secret"]  as string | undefined) ??
-      (headers["x-api-key"]        as string | undefined);
+      normalizeHeader(headers, "x-webhook-secret") ??
+      normalizeHeader(headers, "x-haraka-secret") ??
+      normalizeHeader(headers, "x-api-key");
 
     if (secretHeader) {
       const valid = timingSafeEqual(secretHeader, this.webhookSecret);
