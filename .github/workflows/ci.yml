@@ -339,6 +339,7 @@ jobs:
             DEPLOY_DIR="/var/www/Hq-investment-billingsystem"
 
             echo "Extracting artifacts..."
+            rm -rf $DEPLOY_DIR/backend/prisma/migrations
             tar -xzf /tmp/release.tar.gz -C $DEPLOY_DIR
             rm /tmp/release.tar.gz
 
