@@ -21,6 +21,9 @@ export default function ZenoPayConfig() {
     const [apiUrl, setApiUrl] = useState(ENV_BASE_URL);
     const [showKey, setShowKey] = useState(false);
     const [hasSavedApiKey, setHasSavedApiKey] = useState(false);
+    // FRONT-PAY-001 FIX: surface the masked saved key so it's not indistinguishable
+    // from "nothing saved" (see PalmPesaConfig.tsx for the same fix + rationale).
+    const [savedMasked, setSavedMasked] = useState<{ apiKey?: string | null }>({});
     const [saved, setSaved] = useState(false);
     const [saving, setSaving] = useState(false);
 
@@ -36,6 +39,7 @@ export default function ZenoPayConfig() {
         loadProviderChannel('ZENOPAY').then((channel: any) => {
             if (!channel) return;
             setHasSavedApiKey(!!channel.hasApiKey);
+            setSavedMasked({ apiKey: channel.apiKey });
             if (channel.config?.apiUrl) setApiUrl(channel.config.apiUrl);
         }).catch(console.error);
     }, []);
@@ -156,6 +160,11 @@ export default function ZenoPayConfig() {
                         </button>
                     </div>
                 </div>
+                {savedMasked.apiKey && (
+                    <div style={{ fontSize: '0.75rem', color: '#16a34a', marginTop: 4, fontWeight: 600 }}>
+                        ✓ Saved: {savedMasked.apiKey} — leave blank to keep it
+                    </div>
+                )}
                 <div className="form-hint" style={{ marginBottom: 24 }}>
                     <InfoOutlinedIcon style={{ fontSize: 12, marginRight: 4 }} />
                     Get your API key from ZenoPay dashboard. Also set <code>ZENOPAY_API_KEY</code> in <code>backend/.env</code>.

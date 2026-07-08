@@ -174,6 +174,24 @@ export class PaymentService {
     }
 
     const channel = await this.getChannel(tenantId, providerName, paymentContext);
+
+    // ISOLATION FIX (CRIT-PAY-001): getPaymentProvider() silently falls back to
+    // PLATFORM .env credentials whenever `channel` is falsy. That fallback exists
+    // ONLY to bootstrap the LICENSE (platform) context before a PaymentChannel row
+    // exists. It must NEVER fire for a TENANT-context payment, or a tenant with no
+    // (or a deactivated) PaymentChannel would silently transact using the
+    // platform's own gateway credentials — sending customer money to the wrong
+    // merchant account and violating the no-fallback isolation contract above.
+    const effectiveCtx = paymentContext ?? (tenantId === null ? "LICENSE" : "TENANT");
+    if (!channel && effectiveCtx === "TENANT") {
+      logger.error("[TRACE][PaymentService.initiatePayment] NO_TENANT_CHANNEL", { tenantId, providerName });
+      return {
+        success: false,
+        message: `No active ${providerName} payment channel is configured for this tenant. Configure it in Payment Settings before accepting payments.`,
+        reference,
+      };
+    }
+
     const provider = getPaymentProvider(providerName, channel);
     // SECURITY FIX: log only the channel id, not the full record (see getChannel() fix above).
     logger.info("[TRACE][PaymentService.initiatePayment] PROVIDER_SELECTED", { providerName, providerClass: provider.constructor?.name, channelId: (channel as any)?.id ?? null });
@@ -197,6 +215,14 @@ export class PaymentService {
       return { status: "FAILED" };
     }
     const channel = await this.getChannel(tenantId, providerName);
+
+    // ISOLATION FIX (CRIT-PAY-001): same guard as initiatePayment() — never let a
+    // tenant-scoped status check silently fall back to platform .env credentials.
+    if (!channel && tenantId !== null) {
+      logger.error("[TRACE][PaymentService.checkStatus] NO_TENANT_CHANNEL", { tenantId, providerName });
+      return { status: "FAILED" };
+    }
+
     const provider = getPaymentProvider(providerName, channel);
     return provider.checkStatus(providerRef);
   }

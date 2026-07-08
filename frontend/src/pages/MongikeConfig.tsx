@@ -25,6 +25,8 @@ export default function MongikeConfig() {
     const [showSecret, setShowSecret] = useState(false);
     const [showWebhookSecret, setShowWebhookSecret] = useState(false);
     const [hasSavedApiKey, setHasSavedApiKey] = useState(false);
+    // FRONT-PAY-001 FIX: surface the masked saved credentials (see PalmPesaConfig.tsx).
+    const [savedMasked, setSavedMasked] = useState<{ apiKey?: string | null; apiSecret?: string | null; webhookSecret?: string | null }>({});
     const [saved, setSaved] = useState(false);
     const [saving, setSaving] = useState(false);
 
@@ -40,6 +42,7 @@ export default function MongikeConfig() {
         loadProviderChannel('MONGIKE').then((channel: any) => {
             if (!channel) return;
             setHasSavedApiKey(!!channel.hasApiKey);
+            setSavedMasked({ apiKey: channel.apiKey, apiSecret: channel.apiSecret, webhookSecret: channel.webhookSecret });
             if (channel.hasApiSecret) setApiSecret('');
             if (channel.hasWebhookSecret) setWebhookSecret('');
             if (channel.config?.apiUrl) setApiUrl(channel.config.apiUrl);
@@ -209,6 +212,11 @@ export default function MongikeConfig() {
                                     <InfoOutlinedIcon style={{ fontSize: 12, marginRight: 4 }} />
                                     Backend env: <code>MONGIKE_API_KEY</code>
                                 </div>
+                                {savedMasked.apiKey && (
+                                    <div style={{ fontSize: '0.75rem', color: '#16a34a', marginTop: 4, fontWeight: 600 }}>
+                                        ✓ Saved: {savedMasked.apiKey} — leave blank to keep it
+                                    </div>
+                                )}
                             </div>
 
                             <div className="form-group" style={{ marginBottom: 16 }}>
@@ -229,6 +237,11 @@ export default function MongikeConfig() {
                                     <InfoOutlinedIcon style={{ fontSize: 12, marginRight: 4 }} />
                                     Backend env: <code>MONGIKE_API_SECRET</code>
                                 </div>
+                                {savedMasked.apiSecret && (
+                                    <div style={{ fontSize: '0.75rem', color: '#16a34a', marginTop: 4, fontWeight: 600 }}>
+                                        ✓ Saved: {savedMasked.apiSecret} — leave blank to keep it
+                                    </div>
+                                )}
                             </div>
 
                             <div className="form-group">
@@ -249,6 +262,11 @@ export default function MongikeConfig() {
                                     <InfoOutlinedIcon style={{ fontSize: 12, marginRight: 4 }} />
                                     Used to verify webhook requests. Backend env: <code>MONGIKE_WEBHOOK_SECRET</code>
                                 </div>
+                                {savedMasked.webhookSecret && (
+                                    <div style={{ fontSize: '0.75rem', color: '#16a34a', marginTop: 4, fontWeight: 600 }}>
+                                        ✓ Saved: {savedMasked.webhookSecret} — leave blank to keep it
+                                    </div>
+                                )}
                             </div>
                         </div>
 

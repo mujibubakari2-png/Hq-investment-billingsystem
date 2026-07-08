@@ -13,6 +13,13 @@ export interface ProviderChannel {
     hasApiKey?: boolean;
     hasApiSecret?: boolean;
     hasWebhookSecret?: boolean;
+    // FRONT-PAY-001 FIX: the backend GET /api/payment-channels already returns
+    // masked values (e.g. "****a1b2") in these same field names — they were
+    // being discarded because this interface didn't declare them, so callers
+    // never rendered any indication that a token was already saved.
+    apiKey?: string | null;
+    apiSecret?: string | null;
+    webhookSecret?: string | null;
 }
 
 export async function loadProviderChannel(provider: ChannelProvider): Promise<ProviderChannel | null> {

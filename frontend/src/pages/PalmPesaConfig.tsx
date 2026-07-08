@@ -24,6 +24,11 @@ export default function PalmPesaConfig() {
     const [showToken, setShowToken] = useState(false);
     const [showSecret, setShowSecret] = useState(false);
     const [hasSavedApiKey, setHasSavedApiKey] = useState(false);
+    // FRONT-PAY-001 FIX: previously fetched but never rendered anywhere, so a
+    // tenant reopening this page after saving credentials saw totally empty
+    // fields with no confirmation a token existed — indistinguishable from
+    // "nothing saved", which caused confusion ("my saved payment tokens don't show up").
+    const [savedMasked, setSavedMasked] = useState<{ apiKey?: string | null; apiSecret?: string | null; webhookSecret?: string | null }>({});
     const [saved, setSaved] = useState(false);
     const [saving, setSaving] = useState(false);
 
@@ -39,6 +44,7 @@ export default function PalmPesaConfig() {
         loadProviderChannel('PALMPESA').then((channel: any) => {
             if (!channel) return;
             setHasSavedApiKey(!!channel.hasApiKey);
+            setSavedMasked({ apiKey: channel.apiKey, apiSecret: channel.apiSecret, webhookSecret: channel.webhookSecret });
             if (channel.hasApiSecret) setApiToken('');
             if (channel.hasWebhookSecret) setSecretKey('');
             if (channel.config?.apiUrl) setApiUrl(channel.config.apiUrl);
@@ -154,6 +160,11 @@ export default function PalmPesaConfig() {
                             <InfoOutlinedIcon style={{ fontSize: 12, marginRight: 4 }} />
                             Your account ID from PalmPesa dashboard
                         </div>
+                        {savedMasked.apiKey && (
+                            <div style={{ fontSize: '0.75rem', color: '#16a34a', marginTop: 4, fontWeight: 600 }}>
+                                ✓ Saved: {savedMasked.apiKey} — leave blank to keep it
+                            </div>
+                        )}
                     </div>
                     <div className="form-group">
                         <label className="form-label" style={{ fontWeight: 600 }}>
@@ -182,6 +193,11 @@ export default function PalmPesaConfig() {
                             <InfoOutlinedIcon style={{ fontSize: 12, marginRight: 4 }} />
                             Your API Token from PalmPesa developer account
                         </div>
+                        {savedMasked.apiSecret && (
+                            <div style={{ fontSize: '0.75rem', color: '#16a34a', marginTop: 4, fontWeight: 600 }}>
+                                ✓ Saved: {savedMasked.apiSecret} — leave blank to keep it
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -207,6 +223,11 @@ export default function PalmPesaConfig() {
                         </button>
                     </div>
                 </div>
+                {savedMasked.webhookSecret && (
+                    <div style={{ fontSize: '0.75rem', color: '#16a34a', marginTop: -8, marginBottom: 8, fontWeight: 600 }}>
+                        ✓ Saved: {savedMasked.webhookSecret} — leave blank to keep it
+                    </div>
+                )}
                 <div className="form-hint" style={{ marginBottom: 20 }}>
                     <InfoOutlinedIcon style={{ fontSize: 12, marginRight: 4 }} />
                     Obtain credentials from PalmPesa. Backend env: <code>PALMPESA_API_KEY</code> · <code>PALMPESA_WEBHOOK_SECRET</code>

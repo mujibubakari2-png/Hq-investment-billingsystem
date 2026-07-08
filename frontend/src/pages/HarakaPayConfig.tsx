@@ -19,6 +19,8 @@ export default function HarakaPayConfig() {
     const [apiUrl, setApiUrl] = useState(ENV_BASE_URL);
     const [showKey, setShowKey] = useState(false);
     const [hasSavedApiKey, setHasSavedApiKey] = useState(false);
+    // FRONT-PAY-001 FIX: surface the masked saved key (see PalmPesaConfig.tsx).
+    const [savedMasked, setSavedMasked] = useState<{ apiKey?: string | null }>({});
     const [saved, setSaved] = useState(false);
     const [saving, setSaving] = useState(false);
 
@@ -34,6 +36,7 @@ export default function HarakaPayConfig() {
         loadProviderChannel('HARAKAPAY').then((channel: any) => {
             if (!channel) return;
             setHasSavedApiKey(!!channel.hasApiKey);
+            setSavedMasked({ apiKey: channel.apiKey });
             if (channel.config?.apiUrl) setApiUrl(channel.config.apiUrl);
         }).catch(console.error);
     }, []);
@@ -153,6 +156,11 @@ export default function HarakaPayConfig() {
                         <InfoOutlinedIcon style={{ fontSize: 12, marginRight: 4 }} />
                         Get your API key from <strong>HarakaPay Dashboard</strong> {'>'} Developer {'>'} API Keys. Backend env: <code>HARAKAPAY_API_KEY</code>
                     </div>
+                    {savedMasked.apiKey && (
+                        <div style={{ fontSize: '0.75rem', color: '#16a34a', marginTop: 4, fontWeight: 600 }}>
+                            ✓ Saved: {savedMasked.apiKey} — leave blank to keep it
+                        </div>
+                    )}
                 </div>
 
                 {/* Webhook Configuration */}
