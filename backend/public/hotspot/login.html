@@ -592,11 +592,86 @@
         var API_BASE = 'BILLING_API_URL';
         var ROUTER_ID = 'BILLING_ROUTER_ID';
         if (ROUTER_ID === 'BILLING_ROUTER_ID') ROUTER_ID = '';
+        if (API_BASE === 'BILLING_API_URL') API_BASE = '';
 
         var ACCENT = 'BILLING_ACCENT_COLOR';
         var PRIMARY = 'BILLING_PRIMARY_COLOR';
         var currentPkg = null;
         var pollInterval = null;
+        var portalConfigLoaded = false;
+
+        function resolveApiBase() {
+            if (API_BASE && API_BASE !== '') {
+                return API_BASE.replace(/\/$/, '');
+            }
+            return '';
+        }
+
+        function applyPortalSettings(settings) {
+            if (!settings) return;
+            if (settings.primaryColor) {
+                ACCENT = settings.primaryColor;
+            }
+            if (settings.accentColor) {
+                PRIMARY = settings.accentColor;
+            }
+        }
+
+        function loadPortalConfig() {
+            if (!ROUTER_ID || !resolveApiBase()) {
+                return Promise.resolve();
+            }
+
+            var configUrl = resolveApiBase() + '/api/hotspot/portal-config?routerId=' + encodeURIComponent(ROUTER_ID);
+            return fetch(configUrl, { mode: 'cors' })
+                .then(function (r) {
+                    if (!r.ok) {
+                        throw new Error('Portal config request failed: ' + r.status);
+                    }
+                    return r.json();
+                })
+                .then(function (d) {
+                    if (d && d.backendUrl) {
+                        API_BASE = d.backendUrl.replace(/\/$/, '');
+                    }
+                    if (d && d.settings) {
+                        applyPortalSettings(d.settings);
+                    }
+                    portalConfigLoaded = true;
+                })
+                .catch(function (err) {
+                    console.log('[Hotspot] Portal config load failed:', err.message || err);
+                });
+        }
+
+        function initializeHotspotPage() {
+            if (!ROUTER_ID) {
+                console.log('[Hotspot] No router ID configured. Hotspot page will only show baked packages.');
+            }
+
+            var userMac = '$(mac)';
+            if (userMac && userMac !== '' && userMac !== '$' + '(mac)') {
+                fetch(resolveApiBase() + '/api/hotspot/check-mac?mac=' + encodeURIComponent(userMac) + '&routerId=' + ROUTER_ID, { mode: 'cors' })
+                    .then(function (r) { return r.json(); })
+                    .then(function (d) {
+                        if (d.active && d.username) {
+                            alert('Your package is still active. Reconnecting you directly...');
+                            connectUser(d.username, d.password || '');
+                        }
+                    })
+                    .catch(function (err) {
+                        console.log('[Hotspot] MAC check failed:', err);
+                    });
+            }
+
+            fetch(resolveApiBase() + '/api/hotspot/packages?routerId=' + ROUTER_ID, { mode: 'cors' })
+                .then(function (r) { return r.json(); })
+                .then(function (d) {
+                    var pkgs = Array.isArray(d) ? d : (d.data || []);
+                    renderPackages(pkgs);
+                })
+                .catch(function (err) { console.log('[Hotspot] Package fetch failed:', err); });
+        }
 
         function renderPackages(packages) {
             var c = document.getElementById('packagesContainer');
@@ -660,8 +735,12 @@
 
         function startPolling(ref) {
             if (pollInterval) clearInterval(pollInterval);
+            var query = 'reference=' + encodeURIComponent(ref);
+            if (ROUTER_ID) {
+                query += '&routerId=' + encodeURIComponent(ROUTER_ID);
+            }
             pollInterval = setInterval(function () {
-                fetch(API_BASE + '/api/hotspot/status?reference=' + ref)
+                fetch(API_BASE + '/api/hotspot/status?' + query)
                     .then(function (r) { return r.json(); })
                     .then(function (d) {
                         if (d.status === 'COMPLETED') {
@@ -750,32 +829,11 @@
 
         // Init
         (function () {
-            if (!API_BASE || API_BASE === 'BILLING_API_URL') return;
-
-            // Auto-reconnect if package is still active
-            var userMac = '$(mac)';
-            // Check if userMac is resolved by Mikrotik (not the raw variable string)
-            if (userMac && userMac !== '' && userMac !== '$' + '(mac)') {
-                fetch(API_BASE + '/api/hotspot/check-mac?mac=' + encodeURIComponent(userMac) + '&routerId=' + ROUTER_ID)
-                    .then(function (r) { return r.json(); })
-                    .then(function (d) {
-                        if (d.active && d.username) {
-                            alert('Your package is still active. Reconnecting you directly...');
-                            connectUser(d.username, d.password || '');
-                        }
-                    })
-                    .catch(function (err) {
-                        console.log('MAC check failed:', err);
-                    });
-            }
-
-            fetch(API_BASE + '/api/hotspot/packages?routerId=' + ROUTER_ID)
-                .then(function (r) { return r.json(); })
-                .then(function (d) {
-                    var pkgs = Array.isArray(d) ? d : (d.data || []);
-                    renderPackages(pkgs);
-                })
-                .catch(function (err) { console.log('Package fetch failed:', err); });
+            renderPackages([]);
+            loadPortalConfig().finally(function () {
+                renderPackages(fallbackPackages);
+                initializeHotspotPage();
+            });
         })();
     </script>
 </body>

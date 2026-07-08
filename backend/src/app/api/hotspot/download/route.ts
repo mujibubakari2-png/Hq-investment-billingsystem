@@ -19,8 +19,10 @@ import logger from "@/lib/logger";
 export async function GET(req: NextRequest) {
     try {
         const { searchParams } = new URL(req.url);
-        const apiUrl = searchParams.get("apiUrl") || process.env.APP_URL || "https://your-droplet.digitalocean.com";
         const routerId = searchParams.get("routerId") || "";
+        let apiUrl = (searchParams.get("apiUrl") || process.env.APP_URL || "https://your-droplet.digitalocean.com")
+            .replace(/\/$/, '')
+            .replace(/\/api$/, '');
 
         let hotspotDir = join(process.cwd(), "public", "hotspot");
 
@@ -87,6 +89,10 @@ export async function GET(req: NextRequest) {
                     primaryColor: "#1a1a2e",
                     accentColor: "#6366f1"
                 };
+            }
+
+            if (hotspotSettings?.backendUrl) {
+                apiUrl = hotspotSettings.backendUrl.replace(/\/$/, '').replace(/\/api$/, '');
             }
 
             // Only populate the secret for Super Admins. Otherwise keep it null to avoid leakage.

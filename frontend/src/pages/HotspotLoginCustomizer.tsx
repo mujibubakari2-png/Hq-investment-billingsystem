@@ -472,7 +472,7 @@ export default function HotspotLoginCustomizer() {
     <script src="md5.js"></script>
     <script>
         // â”€â”€ Configuration (URL is BAKED IN at download time â€” never use window.location here) â”€â”€
-        var API_BASE = '${(backendUrl || CLEAN_API_URL || '').replace(/\/$/, '')}';
+        var API_BASE = '${(backendUrl || CLEAN_API_URL || '').replace(/\/$/, '').replace(/\/api$/, '')}';
         var ROUTER_ID = '${selectedRouterId}';
         var ACCENT = '${accentColor}';
         var PRIMARY = '${primaryColor}';
@@ -793,15 +793,14 @@ export default function HotspotLoginCustomizer() {
         try {
             // Fetch the base template files from backend
             const cleanUrl = backendUrl ? (backendUrl.endsWith('/') ? backendUrl.slice(0, -1) : backendUrl) : '';
-            const backendApi = cleanUrl ? (cleanUrl.endsWith('/api') ? cleanUrl : `${cleanUrl}/api`) : '/api';
-            const res = await fetch(`${backendApi}/hotspot/download?routerId=${selectedRouterId}`);
+            const frontendApiBase = cleanUrl || CLEAN_API_URL || '';
+            const backendApi = frontendApiBase ? (frontendApiBase.endsWith('/api') ? frontendApiBase : `${frontendApiBase}/api`) : '/api';
+            const apiUrl = frontendApiBase.replace(/\/api$/, '');
+            const res = await fetch(`${backendApi}/hotspot/download?routerId=${selectedRouterId}&apiUrl=${encodeURIComponent(apiUrl)}`);
             if (!res.ok) throw new Error('Failed to fetch hotspot files from backend');
 
             const data = await res.json();
             const zip = new JSZip();
-
-            // Debugging alert to help user
-            alert(`Debug Info:\nAPI: ${backendApi}\nFound Files: ${data.files ? data.files.length : 0}\nStatus: ${res.status}`);
 
             // Add all base files to JSZip (md5.js, assets/css, images, etc.)
             if (data.files && Array.isArray(data.files)) {
