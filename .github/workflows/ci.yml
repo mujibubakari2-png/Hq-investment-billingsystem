@@ -349,7 +349,6 @@ jobs:
 
             echo "Applying database migrations..."
             cd backend
-            pnpm prisma migrate resolve --rolled-back 20260708_add_platform_unique || true
             pnpm prisma migrate deploy
             pnpm prisma generate
             cd ..
