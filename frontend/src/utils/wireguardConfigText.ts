@@ -30,6 +30,7 @@ export function buildWireGuardConfigText(params: WireGuardConfigTextParams): str
     const serverPublicKey = params.serverPublicKey || '<SERVER_PUBLIC_KEY>';
     const routerPublicKey = params.routerPublicKey || '<ROUTER_PUBLIC_KEY>';
     const presharedKey = params.presharedKey || '<PRESHARED_KEY>';
+    const serverPeerSubnet = `${serverTunnelIp.split('.').slice(0, 3).join('.')}.0/24`;
 
     if (params.mode === 'server') {
         return `# ═══════════════════════════════════════════════════════════════
@@ -49,7 +50,7 @@ DNS = 8.8.8.8, 1.1.1.1
 PublicKey = ${serverPublicKey}
 PresharedKey = ${presharedKey}
 # Route the entire tunnel subnet through the ISP peer
-AllowedIPs = ${serverTunnelIp.split('.').slice(0, 3).join('.')}.0/24
+AllowedIPs = ${serverPeerSubnet}
 Endpoint = ${serverEndpoint}:${serverPort}
 PersistentKeepalive = 25
 
@@ -72,8 +73,8 @@ DNS = 8.8.8.8, 1.1.1.1
 # Router: ${params.routerName}
 PublicKey = ${routerPublicKey}
 PresharedKey = ${presharedKey}
-# Route the tunnel subnet through the router peer
-AllowedIPs = ${routerTunnelIp.split('.').slice(0, 3).join('.')}.0/24
+# Route the router's tunnel IP through the peer
+AllowedIPs = ${routerTunnelIp}/32
 Endpoint = ${serverEndpoint}:${serverPort}
 PersistentKeepalive = 25`;
 }

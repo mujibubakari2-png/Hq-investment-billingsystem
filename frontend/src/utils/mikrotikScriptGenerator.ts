@@ -47,7 +47,7 @@ export function generateMikrotikScript(params: MikrotikScriptParams): string {
 
     // subnetAddress: the VPN management subnet (used for firewall src-address restrictions)
     const subnetAddress = routerTunnelIp ? `${routerTunnelIp.split('.').slice(0, 3).join('.')}.0/24` : '10.200.0.0/24';
-    // serverSubnet: the server-side VPN subnet
+    // serverSubnet: the server-side VPN subnet used for the peer's allowed-address
     const serverSubnet = isWireGuard && serverTunnelIp ? `${serverTunnelIp.split('.').slice(0, 3).join('.')}.0/24` : (subnetAddress || '0.0.0.0/0');
     const radiusAddress = isWireGuard && serverTunnelIp ? serverTunnelIp : apiHost;
 
@@ -185,8 +185,8 @@ ${isWireGuard ? `# ── 8. WireGuard VPN Configuration ───────�
 } else={
     /interface wireguard peers set [find interface="wg-hq" public-key="${serverPubKey}"] endpoint-address=${serverEndpoint} endpoint-port=${serverPort} allowed-address=${serverSubnet} persistent-keepalive=25s
 }
-:if ([:len [/ip address find address="${routerTunnelIp}/24" interface="wg-hq"]] = 0) do={
-    /ip address add address=${routerTunnelIp}/24 interface="wg-hq" comment="HQInvestment VPN Address"
+:if ([:len [/ip address find address="${routerTunnelIp}/32" interface="wg-hq"]] = 0) do={
+    /ip address add address=${routerTunnelIp}/32 interface="wg-hq" comment="HQInvestment VPN Address"
 }
 ` : ''}
 # ── 9. Firewall & NAT ────────────────────────────────────────────

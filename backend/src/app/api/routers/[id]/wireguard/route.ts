@@ -617,9 +617,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
                 try {
                     await service.apiRequestPublic("/ip/address", "PUT", {
-                        address: `${tunnelIp}/24`,
+                        address: `${tunnelIp}/32`,
                         interface: "wg-hq",
-                        network: `${subnetPrefix}.0`,
                         comment: "HQInvestment VPN Address"
                     });
                 } catch (e: any) { if (!e.message?.includes("already")) logger.warn("WG IP note:", { error: e.message instanceof Error ? e.message.message : String(e.message) }); }

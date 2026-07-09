@@ -169,17 +169,19 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 }
 
 # 8. WireGuard IP Address
-:if ([:len [/ip address find interface="wg-hq"]] = 0) do={
-    /ip address add address="${router.wgTunnelIp}/24" interface=wg-hq network="${subnetPrefix}.0" comment="HQInvestment VPN Address"
+:if ([:len [/ip address find address="${router.wgTunnelIp}/32" interface="wg-hq"]] = 0) do={
+    /ip address add address="${router.wgTunnelIp}/32" interface=wg-hq comment="HQInvestment VPN Address"
 }
 
 # 9. WireGuard Peer (Server)
-:if ([:len [/interface wireguard peers find interface="wg-hq"]] = 0) do={
-    /interface wireguard peers add interface=wg-hq public-key="${router.wgPeerPublicKey}" allowed-address="0.0.0.0/0,::/0" endpoint-address="${serverEndpoint}" endpoint-port=51820 persistent-keepalive=25s comment="HQInvestment ISP Server"
+:if ([:len [/interface wireguard peers find interface="wg-hq" public-key="${router.wgPeerPublicKey}"]] = 0) do={
+    /interface wireguard peers add interface=wg-hq public-key="${router.wgPeerPublicKey}" allowed-address="${subnetPrefix}.0/24" endpoint-address="${serverEndpoint}" endpoint-port=${listenPort} persistent-keepalive=25s comment="HQInvestment ISP Server"
+} else={
+    /interface wireguard peers set [find interface="wg-hq" public-key="${router.wgPeerPublicKey}"] allowed-address="${subnetPrefix}.0/24" endpoint-address="${serverEndpoint}" endpoint-port=${listenPort} persistent-keepalive=25s
 }
 
 # 10. VPN Routing
-:if ([:len [/ip route find gateway="wg-hq"]] = 0) do={
+:if ([:len [/ip route find dst-address="${subnetPrefix}.0/24" gateway="wg-hq"]] = 0) do={
     /ip route add dst-address="${subnetPrefix}.0/24" gateway=wg-hq comment="WireGuard route - HQInvestment"
 }
 `;
