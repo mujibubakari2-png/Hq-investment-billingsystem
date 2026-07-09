@@ -20,10 +20,10 @@ BEGIN;
 -- CRIT-005: Soft Delete — users
 -- ─────────────────────────────────────────────────────────────────────────────
 ALTER TABLE users
-  ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+  ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMPTZ;
 
 CREATE INDEX IF NOT EXISTS users_deleted_at_idx
-  ON users (deleted_at);
+  ON users ("deletedAt");
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- CRIT-002: MFA fields — users
@@ -37,60 +37,60 @@ ALTER TABLE users
 -- CRIT-005: Soft Delete — clients
 -- ─────────────────────────────────────────────────────────────────────────────
 ALTER TABLE clients
-  ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+  ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMPTZ;
 
 CREATE INDEX IF NOT EXISTS clients_deleted_at_idx
-  ON clients (deleted_at);
+  ON clients ("deletedAt");
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- CRIT-005: Soft Delete — packages
 -- ─────────────────────────────────────────────────────────────────────────────
 ALTER TABLE packages
-  ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+  ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMPTZ;
 
 CREATE INDEX IF NOT EXISTS packages_deleted_at_idx
-  ON packages (deleted_at);
+  ON packages ("deletedAt");
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- CRIT-005 + Sync status: Soft Delete + lastSyncAttempt — subscriptions
 -- ─────────────────────────────────────────────────────────────────────────────
 ALTER TABLE subscriptions
-  ADD COLUMN IF NOT EXISTS deleted_at          TIMESTAMPTZ,
-  ADD COLUMN IF NOT EXISTS last_sync_attempt   TIMESTAMPTZ;
+  ADD COLUMN IF NOT EXISTS "deletedAt"          TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS "lastSyncAttempt"   TIMESTAMPTZ;
 
 CREATE INDEX IF NOT EXISTS subscriptions_deleted_at_idx
-  ON subscriptions (deleted_at);
+  ON subscriptions ("deletedAt");
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- CRIT-005: Soft Delete — transactions
 -- (Billing records: kept for compliance — never truly purged, just hidden)
 -- ─────────────────────────────────────────────────────────────────────────────
 ALTER TABLE transactions
-  ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+  ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMPTZ;
 
 CREATE INDEX IF NOT EXISTS transactions_deleted_at_idx
-  ON transactions (deleted_at);
+  ON transactions ("deletedAt");
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- CRIT-005: Soft Delete — routers
 -- ─────────────────────────────────────────────────────────────────────────────
 ALTER TABLE routers
-  ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+  ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMPTZ;
 
-CREATE INDEX IF NOT EXISTS routers_tenant_id_idx
-  ON routers (tenant_id);
+CREATE INDEX IF NOT EXISTS routers_tenantId_idx
+  ON routers ("tenantId");
 
 CREATE INDEX IF NOT EXISTS routers_deleted_at_idx
-  ON routers (deleted_at);
+  ON routers ("deletedAt");
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- DB-003: Missing indexes on router_logs
 -- ─────────────────────────────────────────────────────────────────────────────
 CREATE INDEX IF NOT EXISTS router_logs_router_id_idx
-  ON router_logs (router_id);
+  ON router_logs ("routerId");
 
 CREATE INDEX IF NOT EXISTS router_logs_tenant_id_created_at_idx
-  ON router_logs (tenant_id, created_at DESC);
+  ON router_logs ("tenantId", "createdAt" DESC);
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- Update Prisma _prisma_migrations table so Prisma tracks this as applied
