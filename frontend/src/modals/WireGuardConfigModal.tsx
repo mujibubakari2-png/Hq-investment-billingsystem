@@ -11,6 +11,7 @@ import SyncIcon from '@mui/icons-material/Sync';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import { routersApi } from '../api';
 import { sanitizeMikroTikName } from '../utils/mikrotikUtils';
+import { buildWireGuardConfigText } from '../utils/wireguardConfigText';
 import type { Router } from '../types';
 import RouterIcon from '@mui/icons-material/Router';
 
@@ -99,33 +100,32 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
     // MikroTik .rsc here; full router scripts are produced only by the
     // Router Setup Wizard → Generate → Create Config step.
 
-    const routerPrivateKey = config.routerPrivateKey || '<ROUTER_PRIVATE_KEY>';
-    const serverPrivateKey = (config as any).serverPrivateKey || '<SERVER_PRIVATE_KEY>';
+    const serverConfig = buildWireGuardConfigText({
+        mode: 'server',
+        routerName: config.routerName,
+        routerId: config.routerId,
+        routerPrivateKey: config.routerPrivateKey,
+        serverPublicKey: config.serverPublicKey,
+        presharedKey: config.presharedKey,
+        routerTunnelIp: config.routerTunnelIp,
+        serverTunnelIp: config.serverTunnelIp,
+        listenPort: config.listenPort,
+        serverEndpoint: config.serverEndpoint,
+        serverPort: config.serverPort,
+    });
 
-    const serverConfig = `# ═══════════════════════════════════════════════════════════════\n# WireGuard Server Config (wg-quick style)\n# For Router: ${config.routerName} (${config.routerId})\n# ═══════════════════════════════════════════════════════════════\n\n[Interface]\n# The router's private key (kept on the device)\nPrivateKey = ${routerPrivateKey}\nAddress = ${config.serverTunnelIp}/24\nListenPort = ${config.listenPort}\nDNS = 8.8.8.8, 1.1.1.1\n\n[Peer]\n# ISP Server peer\nPublicKey = ${config.serverPublicKey}\nPresharedKey = ${config.presharedKey}\n# AllowedIPs: only the router's tunnel IP (management traffic only)\nAllowedIPs = ${config.routerTunnelIp}/32\nEndpoint = ${config.routerHost}:${config.listenPort}\nPersistentKeepalive = 25\n\n# Note: This is WireGuard config only. Full MikroTik .rsc is available from the Router Setup Wizard → Generate → Create Config.`;
-
-    // Client config for the HQInvestment ISP server
-    const clientConfig = `# ═══════════════════════════════════════════════════════════════
-# WireGuard Client Config — HQInvestment ISP Server
-# For Router: ${config.routerName} (${config.routerId})
-# Keys are PERSISTENT — install this on the HQInvestment VPN server
-# ═══════════════════════════════════════════════════════════════
-
-[Interface]
-# HQInvestment ISP Server side — server private key (KEEP SECRET)
-PrivateKey = ${serverPrivateKey}
-Address = ${config.serverTunnelIp}/24
-DNS = 8.8.8.8, 1.1.1.1
-
-[Peer]
-# Router: ${config.routerName}
-PublicKey = ${config.routerPublicKey}
-PresharedKey = ${config.presharedKey}
-# AllowedIPs: only the router's tunnel IP — do NOT add 0.0.0.0/0 here.
-# We only want management/RADIUS traffic to flow through the tunnel.
-AllowedIPs = ${config.routerTunnelIp}/32
-Endpoint = ${config.routerHost}:${config.listenPort}
-PersistentKeepalive = 25`;
+    const clientConfig = buildWireGuardConfigText({
+        mode: 'client',
+        routerName: config.routerName,
+        routerId: config.routerId,
+        routerPublicKey: config.routerPublicKey,
+        presharedKey: config.presharedKey,
+        routerTunnelIp: config.routerTunnelIp,
+        serverTunnelIp: config.serverTunnelIp,
+        serverEndpoint: config.serverEndpoint,
+        serverPort: config.serverPort,
+        serverPrivateKey: (config as any).serverPrivateKey,
+    });
 
     const handleCopy = (text: string, label: string) => {
         if (navigator.clipboard && window.isSecureContext) {
