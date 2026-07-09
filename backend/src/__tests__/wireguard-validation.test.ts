@@ -133,7 +133,7 @@ describe('WireGuard Validation', () => {
 
     it('should validate server endpoint configuration', () => {
       const validateEndpoint = (endpoint: string) => {
-        return endpoint && endpoint.length > 0 && /^[\w.-]+$/.test(endpoint);
+        return Boolean(endpoint && endpoint.length > 0 && /^[\w.-]+$/.test(endpoint));
       };
 
       expect(validateEndpoint('vpn.example.com')).toBe(true);
