@@ -12,8 +12,10 @@
 -- deletes nothing) so Step 2 can succeed. If no duplicates exist, Step 1 is
 -- a no-op.
 
--- Step 1: keep only the most-recently-updated platform channel per provider
--- ACTIVE; deactivate any older duplicates instead of deleting them.
+-- Step 1: keep exactly one active platform channel per provider.
+-- Deactivate any older duplicates instead of deleting them, and ensure the
+-- newest platform channel remains ACTIVE so the partial unique index can be
+-- created successfully even when duplicates already existed.
 WITH ranked AS (
   SELECT id,
          ROW_NUMBER() OVER (
@@ -24,12 +26,14 @@ WITH ranked AS (
   WHERE "tenantId" IS NULL
 )
 UPDATE "payment_channels" pc
-SET status = 'INACTIVE'
+SET status = CASE
+  WHEN ranked.rn = 1 THEN 'ACTIVE'
+  ELSE 'INACTIVE'
+END
 FROM ranked
-WHERE pc.id = ranked.id
-  AND ranked.rn > 1;
+WHERE pc.id = ranked.id;
 
--- Step 2: enforce the invariant going forward.
+-- Step 2: enforce the invariant going forward for ACTIVE platform channels only.
 CREATE UNIQUE INDEX IF NOT EXISTS "payment_channels_platform_provider_unique"
 ON "payment_channels" ("provider")
-WHERE "tenantId" IS NULL;
+WHERE "tenantId" IS NULL AND status = 'ACTIVE';
