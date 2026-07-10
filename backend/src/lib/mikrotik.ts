@@ -198,6 +198,12 @@ export class MikroTikService {
 
     // ── Internal HTTP helper for RouterOS REST API ───────────────────────────
 
+    private shouldTryHttpFallback(err?: unknown): boolean {
+        if (!this.baseUrl.startsWith('https')) return false;
+        if (process.env.MIKROTIK_ALLOW_HTTP_FALLBACK === 'true') return true;
+        return PRIVATE_RE.test(this.conn.host);
+    }
+
     private async apiRequest(path: string, method: string = "GET", body?: unknown): Promise<any> {
         const url = `${this.baseUrl}/rest${path}`;
         const headers: Record<string, string> = {
@@ -233,15 +239,18 @@ export class MikroTikService {
             try {
                 res = await fetch(url, fetchOptions);
             } catch (firstErr: any) {
-                // Only allow HTTPS→HTTP fallback when explicitly opted-in.
-                // Without this guard, a network adversary can force cleartext communication
-                // by dropping HTTPS connections, exposing RouterOS credentials.
-                // Set MIKROTIK_ALLOW_HTTP_FALLBACK=true only in dev/lab environments.
-                const allowHttpFallback = process.env.MIKROTIK_ALLOW_HTTP_FALLBACK === 'true';
+                // Allow HTTPS→HTTP fallback for private/WireGuard management hosts when
+                // HTTPS times out or is refused. This keeps tunnel-based management working
+                // while still requiring an explicit opt-in for public hosts.
+                const allowHttpFallback = this.shouldTryHttpFallback(firstErr);
                 if (this.baseUrl.startsWith('https') && allowHttpFallback) {
                     clearTimeout(timeout);
-                    logger.warn(`[MikroTik] HTTPS failed for ${this.conn.host}, falling back to HTTP. MIKROTIK_ALLOW_HTTP_FALLBACK=true — disable in production.`);
-                    const httpUrl = url.replace('https://', 'http://');
+                    logger.warn(`[MikroTik] HTTPS failed for ${this.conn.host}, falling back to HTTP. ${PRIVATE_RE.test(this.conn.host) ? 'Private/WireGuard management host detected.' : 'MIKROTIK_ALLOW_HTTP_FALLBACK=true.'}`);
+
+                    const fallbackUrl = new URL(url);
+                    fallbackUrl.protocol = 'http:';
+                    const fallbackPort = PRIVATE_RE.test(this.conn.host) ? '80' : (fallbackUrl.port || '443');
+                    fallbackUrl.port = fallbackPort;
 
                     // Create a fresh controller for the fallback attempt
                     const fallbackController = new AbortController();
@@ -253,7 +262,7 @@ export class MikroTikService {
                     };
 
                     try {
-                        res = await fetch(httpUrl, fallbackOptions);
+                        res = await fetch(fallbackUrl.toString(), fallbackOptions);
                         clearTimeout(fallbackTimeout);
                     } catch (secondErr) {
                         clearTimeout(fallbackTimeout);

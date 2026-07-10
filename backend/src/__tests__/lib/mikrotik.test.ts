@@ -45,7 +45,7 @@ describe('MikroTikService', () => {
         process.env.MIKROTIK_ALLOW_HTTP_FALLBACK = 'true';
 
         const service = new MikroTikService({
-            host: '10.0.0.1',
+            host: 'router.example.com',
             port: 8728, // API port, should map to 443 with HTTPS
             username: 'admin',
             password: 'password'
@@ -68,7 +68,7 @@ describe('MikroTikService', () => {
         expect(global.fetch).toHaveBeenCalledTimes(3);
         
         // Ensure the second call was HTTP (for system/identity)
-        expect((global.fetch as jest.Mock).mock.calls[1][0]).toContain('http://10.0.0.1:443/rest/system/identity');
+        expect((global.fetch as jest.Mock).mock.calls[1][0]).toContain('http://router.example.com:443/rest/system/identity');
         expect(result.success).toBe(true);
     });
 
@@ -76,7 +76,7 @@ describe('MikroTikService', () => {
         process.env.MIKROTIK_ALLOW_HTTP_FALLBACK = 'false';
 
         const service = new MikroTikService({
-            host: '10.0.0.1',
+            host: 'router.example.com',
             port: 8728,
             username: 'admin',
             password: 'password'
@@ -87,6 +87,32 @@ describe('MikroTikService', () => {
         const result = await service.testConnection();
         expect(global.fetch).toHaveBeenCalledTimes(1);
         expect(result.success).toBe(false);
+    });
+
+    it('should retry over HTTP on port 80 when HTTPS times out for a RouterOS management endpoint', async () => {
+        const service = new MikroTikService({
+            host: '10.0.0.200',
+            port: 8728,
+            username: 'admin',
+            password: 'password'
+        }, 'router-123', 'tenant-1');
+
+        (global.fetch as jest.Mock)
+            .mockRejectedValueOnce(new Error('timeout'))
+            .mockResolvedValueOnce({
+                ok: true,
+                text: async () => JSON.stringify([{ name: 'mikrotik-test' }])
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                text: async () => JSON.stringify([{ version: '7.12' }])
+            });
+
+        const result = await service.testConnection();
+
+        expect(result.success).toBe(true);
+        expect((global.fetch as jest.Mock).mock.calls[0][0]).toContain('https://10.0.0.200:443/rest/system/identity');
+        expect((global.fetch as jest.Mock).mock.calls[1][0]).toContain('http://10.0.0.200/rest/system/identity');
     });
 
     it('should log correctly with tenantId on successful action', async () => {
