@@ -27,8 +27,8 @@ WITH ranked AS (
 )
 UPDATE "payment_channels" pc
 SET status = CASE
-  WHEN ranked.rn = 1 THEN 'ACTIVE'
-  ELSE 'INACTIVE'
+  WHEN ranked.rn = 1 THEN 'ACTIVE'::"ChannelStatus"
+  ELSE 'INACTIVE'::"ChannelStatus"
 END
 FROM ranked
 WHERE pc.id = ranked.id;
@@ -36,4 +36,4 @@ WHERE pc.id = ranked.id;
 -- Step 2: enforce the invariant going forward for ACTIVE platform channels only.
 CREATE UNIQUE INDEX IF NOT EXISTS "payment_channels_platform_provider_unique"
 ON "payment_channels" ("provider")
-WHERE "tenantId" IS NULL AND status = 'ACTIVE';
+WHERE "tenantId" IS NULL AND status = 'ACTIVE'::"ChannelStatus";
