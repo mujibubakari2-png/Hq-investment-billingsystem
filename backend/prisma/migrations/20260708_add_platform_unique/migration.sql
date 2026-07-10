@@ -1,21 +1,15 @@
--- add_platform_unique
--- Enforces exactly one platform-scoped (tenantId IS NULL) PaymentChannel per
--- provider. Postgres does not treat NULL = NULL as a duplicate under the
--- existing UNIQUE(provider, tenantId) constraint, so multiple PLATFORM-level
--- channels for the same provider could otherwise exist (ambiguous which one
--- is "the" platform gateway for License/Hotspot/PPPoE payments).
+-- Formal migration: ensure single PLATFORM channel per provider
+-- Creates a partial unique index on payment_channels(provider) where tenantId IS NULL
 --
--- RECOVERY NOTE: this migration previously failed partway on production,
--- almost certainly because duplicate platform rows already existed for at
--- least one provider (which blocks CREATE UNIQUE INDEX). Step 1 below
--- resolves that defensively and non-destructively (deactivates extras,
--- deletes nothing) so Step 2 can succeed. If no duplicates exist, Step 1 is
--- a no-op.
+-- RECOVERY NOTE: this migration previously failed on production because
+-- duplicate platform rows already existed (which blocks CREATE UNIQUE INDEX).
+-- Step 1 below resolves that defensively and non-destructively (deactivates
+-- extras, deletes nothing) so Step 2 can succeed. If no duplicates exist,
+-- Step 1 is a no-op.
 
 -- Step 1: keep exactly one active platform channel per provider.
--- Deactivate any older duplicates instead of deleting them, and ensure the
--- newest platform channel remains ACTIVE so the partial unique index can be
--- created successfully even when duplicates already existed.
+-- Deactivate older duplicates instead of deleting them, so the newest
+-- platform channel remains ACTIVE and the unique index can be created.
 WITH ranked AS (
   SELECT id,
          ROW_NUMBER() OVER (
@@ -34,6 +28,6 @@ FROM ranked
 WHERE pc.id = ranked.id;
 
 -- Step 2: enforce the invariant going forward for ACTIVE platform channels only.
-CREATE UNIQUE INDEX IF NOT EXISTS "payment_channels_platform_provider_unique"
-ON "payment_channels" ("provider")
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_payment_channel_provider_platform
+ON public.payment_channels (provider)
 WHERE "tenantId" IS NULL AND status = 'ACTIVE'::"ChannelStatus";
