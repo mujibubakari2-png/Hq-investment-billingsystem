@@ -189,7 +189,7 @@ ALTER TABLE "routers" ALTER COLUMN "wgListenPort" SET DEFAULT 51820;
 ALTER TABLE "saas_plans" ALTER COLUMN "price" SET DATA TYPE DECIMAL(12,2);
 
 -- AlterTable
-ALTER TABLE "subscriptions" DROP COLUMN "lastSyncAttempt";
+ALTER TABLE "subscriptions" DROP COLUMN IF EXISTS "lastSyncAttempt";
 
 -- AlterTable
 ALTER TABLE "tenant_branding" ALTER COLUMN "updatedAt" DROP DEFAULT;
