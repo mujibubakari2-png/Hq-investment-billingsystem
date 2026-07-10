@@ -3,12 +3,18 @@
 import "dotenv/config";
 import { defineConfig } from "prisma/config";
 
+const dbUrl = process.env["DATABASE_URL"] || "";
+// Prisma CLI requires a direct connection to acquire advisory locks for migrations.
+// We strip the PgBouncer/pooler suffix from the Neon URL so migrations use the direct endpoint,
+// avoiding P1002 connection timeouts, while the app continues using the pooler.
+const directUrl = dbUrl.replace('-pooler.', '.');
+
 export default defineConfig({
   schema: "prisma/schema.prisma",
   migrations: {
     path: "prisma/migrations",
   },
   datasource: {
-    url: process.env["DATABASE_URL"]!,
+    url: directUrl,
   },
 });
