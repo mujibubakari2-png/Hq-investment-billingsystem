@@ -198,12 +198,12 @@ ALTER TABLE "tenant_branding" ALTER COLUMN "updatedAt" DROP DEFAULT;
 ALTER TABLE "tenant_invoices" ALTER COLUMN "amount" SET DATA TYPE DECIMAL(12,2);
 
 -- AlterTable
-ALTER TABLE "tenant_licenses" DROP COLUMN "status",
+ALTER TABLE "tenant_licenses" DROP COLUMN IF EXISTS "status",
 ADD COLUMN     "status" "TenantInvoiceStatus" NOT NULL DEFAULT 'PENDING',
 ALTER COLUMN "updatedAt" DROP DEFAULT;
 
 -- AlterTable
-ALTER TABLE "tenant_payment_gateways" DROP COLUMN "status",
+ALTER TABLE "tenant_payment_gateways" DROP COLUMN IF EXISTS "status",
 ADD COLUMN     "status" "ChannelStatus" NOT NULL DEFAULT 'INACTIVE',
 ALTER COLUMN "updatedAt" DROP DEFAULT;
 
@@ -217,9 +217,9 @@ ALTER TABLE "tenant_settings" ALTER COLUMN "updatedAt" DROP DEFAULT;
 ALTER TABLE "transactions" ALTER COLUMN "amount" SET DATA TYPE DECIMAL(12,2);
 
 -- AlterTable
-ALTER TABLE "users" DROP COLUMN "mfa_backup_codes",
-DROP COLUMN "mfa_enabled",
-DROP COLUMN "mfa_secret";
+ALTER TABLE "users" DROP COLUMN IF EXISTS "mfa_backup_codes",
+DROP COLUMN IF EXISTS "mfa_enabled",
+DROP COLUMN IF EXISTS "mfa_secret";
 
 -- CreateIndex (idempotent)
 CREATE INDEX IF NOT EXISTS "audit_logs_tenantId_createdAt_idx" ON "audit_logs"("tenantId", "createdAt");
