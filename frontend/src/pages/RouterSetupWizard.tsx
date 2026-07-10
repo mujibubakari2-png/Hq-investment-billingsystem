@@ -19,6 +19,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { routersApi, vpnApi } from '../api';
 import { getPublicApiBase } from '../utils/config';
 import { sanitizeMikroTikName } from '../utils/mikrotikUtils';
+import { buildRouterSetupWizardScript, validateRouterSetupWizardServiceInputs } from '../utils/routerSetupWizardScript';
 
 import {
     WIZARD_STEPS, NEXT_BUTTON_LABELS,
@@ -188,14 +189,35 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
         setServiceVerifyStatus('checking'); setVpnVerifyStatus('checking');
         if (!routerId) { setServiceVerifyStatus('failed'); setVpnVerifyStatus('failed'); return; }
         try {
-            const res = await routersApi.testConnection(routerId);
-            if (res.success) {
-                try {
-                    await (routersApi as any).listInterfaces(routerId);
-                    setServiceVerifyStatus('success');
-                } catch { setServiceVerifyStatus('failed'); }
-            } else { setServiceVerifyStatus('failed'); }
-            if (vpnEnabled) setVpnVerifyStatus(res.success ? 'success' : 'failed');
+            const connRes = await routersApi.testConnection(routerId);
+            if (!connRes.success) { setServiceVerifyStatus('failed'); setVpnVerifyStatus('failed'); return; }
+
+            // Service-specific verification: check for hotspot/PPPoE presence on the router
+            let serviceVerified = false;
+            try {
+                if (serviceType === 'pppoe') {
+                    // PPPoE-only: verify PPPoE users endpoint is accessible
+                    await routersApi.getPPPoEUsers(routerId);
+                    serviceVerified = true;
+                } else if (serviceType === 'hotspot') {
+                    // Hotspot-only: verify hotspot users endpoint is accessible
+                    await routersApi.getHotspotUsers(routerId);
+                    serviceVerified = true;
+                } else if (serviceType === 'both') {
+                    // Both: verify both endpoints are accessible
+                    await Promise.all([
+                        routersApi.getPPPoEUsers(routerId),
+                        routersApi.getHotspotUsers(routerId),
+                    ]);
+                    serviceVerified = true;
+                }
+                setServiceVerifyStatus(serviceVerified ? 'success' : 'failed');
+            } catch (err) {
+                setServiceVerifyStatus('failed');
+            }
+
+            // VPN verification
+            if (vpnEnabled) setVpnVerifyStatus(connRes.success ? 'success' : 'failed');
             else setVpnVerifyStatus('success');
         } catch { setServiceVerifyStatus('failed'); setVpnVerifyStatus('failed'); }
     };
@@ -218,22 +240,21 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
     const certName = 'hq-hotspot-cert';
 
     const getGeneratedScript = (): string => {
-        if (!hotspotLocalAddress || !pppoeLocalAddress) {
-            alert('VPN IP not loaded yet. Please wait for WireGuard config to load, then try again.');
+        const serviceValidation = validateRouterSetupWizardServiceInputs({
+            serviceType,
+            hotspotLocalAddress,
+            pppoeLocalAddress,
+            hotspotPoolStart,
+            hotspotPoolEnd,
+            pppoePoolStart,
+            pppoePoolEnd,
+        });
+
+        if (!serviceValidation.ok) {
+            alert(`Missing required PPPoE/Hotspot values: ${serviceValidation.missingFields.join(', ')}. Please fill them in before generating the script.`);
             return '';
         }
-        // Safe, namespaced resource names to avoid collisions on routers
-        const safeRouterName = sanitizeMikroTikName(routerName);
-        const hsPoolName = `hs-pool-${safeRouterName}`;
-        const pppoePoolName = `pppoe-pool-${safeRouterName}`;
-        const pppoeProfile = `pppoe-profile-${safeRouterName}`;
-        const hotspotProfile = `hq-hotspot-${safeRouterName}`;
-        const vpnPoolName = `vpn-pool-${safeRouterName}`;
-        const vpnProfile = `vpn-profile-${safeRouterName}`;
-        const targetBridge = `bridge-${safeRouterName}`;
 
-        // DNS servers: prefer routerData.dns if present, fallback to vpnDns or public DNS
-        const dnsServers = (routerData && (routerData.dns as string)) || vpnDns || '8.8.8.8,8.8.4.4';
         // SEC-ROUTER-001/003 FIX: block generation (same as the backend
         // validation layer) if required secrets are missing or still match a
         // known-insecure legacy static default, instead of silently shipping
@@ -250,113 +271,42 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
             alert('Baadhi ya VPN secrets zina password dhaifu (chini ya herufi 8). Rekebisha kwenye Hatua 3 kabla ya kuendelea.');
             return '';
         }
-        const hotspotPrefix  = hotspotLocalAddress.split('.').slice(0, 3).join('.');
-        const hotspotNetwork = `${hotspotPrefix}.0/24`;
-        const hotspotCidr    = `${hotspotLocalAddress}/24`;
-        const lines: string[] = [
-            `# RSC Configuration for ${routerName}`,
-            `# Generated: ${new Date().toISOString()}`,
-            `# Service: ${serviceType === 'pppoe' ? 'PPPoE' : serviceType === 'hotspot' ? 'Hotspot' : 'PPPoE + Hotspot'}`,
-            `# VPN Mode: ${vpnEnabled ? vpnMode : 'Disabled'}`,
-            '', '# ===== Management Safety =====',
-            '/tool mac-server set allowed-interface-list=all',
-            '/tool mac-server mac-winbox set allowed-interface-list=all',
-            '/ip neighbor discovery-settings set discover-interface-list=all',
-            '', '# ===== TLS Certificate (SEC-ROUTER-005 FIX) =====',
-            `:if ([:len [/certificate find name="${certName}"]] = 0) do={`,
-            `    /certificate add name="${certName}" common-name="${sanitizeMikroTikName(routerName)}.hqinvestment.local" days-valid=3650 key-size=2048 key-usage=tls-server`,
-            `    /certificate sign [find name="${certName}"]`,
-            '}',
-            `/ip service set www-ssl disabled=no certificate="${certName}"`,
-            '', '# ===== Firewall: Management Ports (SEC-ROUTER-002 FIX) =====',
-            '# Winbox/Web/API must never be reachable from the open WAN.',
-            ...(vpnManagementSubnet ? [
-                `:if ([:len [/ip firewall filter find where comment="Allow HQInvestment API Access (VPN only)"]] = 0) do={`,
-                `    /ip firewall filter add chain=input action=accept protocol=tcp dst-port=80,443,8291 src-address=${vpnManagementSubnet} comment="Allow HQInvestment API Access (VPN only)"`,
-                '}',
-                `:if ([:len [/ip firewall filter find where comment="Block HQInvestment Management Ports (non-VPN)"]] = 0) do={`,
-                `    /ip firewall filter add chain=input action=drop protocol=tcp dst-port=80,443,8291 comment="Block HQInvestment Management Ports (non-VPN)"`,
-                '}',
-            ] : [
-                '# No WireGuard tunnel IP detected yet — management ports are fully',
-                '# blocked from every source until VPN is set up and this script is',
-                '# regenerated.',
-                `:if ([:len [/ip firewall filter find where comment="Block HQInvestment Management Ports (no VPN yet)"]] = 0) do={`,
-                `    /ip firewall filter add chain=input action=drop protocol=tcp dst-port=80,443,8291 comment="Block HQInvestment Management Ports (no VPN yet)"`,
-                '}',
-                '/log warning "HQInvestment: Router HAINA WireGuard VPN -- Winbox/Web/API zimefungwa. Sanidi VPN kisha zalisha script upya."',
-            ]),
-            '', '# ===== Bridge Setup =====',
-        ];
-        if (selectedInterfaces.length > 0) {
-            lines.push(
-                `:local targetBridge "${targetBridge}"`,
-                `:if ([:len [/interface bridge find where name=$targetBridge]] = 0) do={ /interface bridge add name=$targetBridge comment="HQ Investment Bridge" }`,
-            );
-            selectedInterfaces.forEach(iface => {
-                lines.push(
-                    `:if ([:len [/interface bridge port find where interface="${iface}"]] = 0) do={ /interface bridge port add bridge=$targetBridge interface=${iface} }`,
-                );
-            });
-        }
-        if (serviceType === 'pppoe' || serviceType === 'both') {
-            lines.push(
-                '', '# ===== PPPoE Server =====',
-                `:if ([:len [/ip pool find where name="${pppoePoolName}"]] = 0) do={ /ip pool add name="${pppoePoolName}" ranges=${pppoePoolStart}-${pppoePoolEnd} }`,
-                `/ppp profile add name="${pppoeProfile}" local-address=${pppoeLocalAddress} dns-server=${dnsServers} use-compression=no use-encryption=no`,
-                `/interface pppoe-server server add service-name="hq-pppoe-${safeRouterName}" interface=$targetBridge default-profile="${pppoeProfile}" authentication=mschapv2 disabled=no`,
-            );
-        }
-        if (serviceType === 'hotspot' || serviceType === 'both') {
-            lines.push(
-                '', '# ===== Hotspot Server =====',
-                `:if ([:len [/ip pool find where name="${hsPoolName}"]] = 0) do={ /ip pool add name="${hsPoolName}" ranges=${hotspotPoolStart}-${hotspotPoolEnd} }`,
-                `:if ([:len [/ip hotspot profile find where name="${hotspotProfile}"]] = 0) do={ /ip hotspot profile add name="${hotspotProfile}" hotspot-address=${hotspotLocalAddress} html-directory=hotspot login-by=mac-cookie,http-chap use-radius=yes ssl-certificate="${certName}" }`,
-                `:if ([:len [/ip address find where interface=$targetBridge]] = 0) do={ /ip address add address=${hotspotCidr} interface=$targetBridge }`,
-                `:if ([:len [/ip hotspot find where interface=$targetBridge]] = 0) do={ /ip hotspot add name="hq-hotspot-${safeRouterName}" interface=$targetBridge address-pool="${hsPoolName}" profile="${hotspotProfile}" }`,
-                `/ip hotspot profile set [/ip hotspot profile find where name="${hotspotProfile}"] hotspot-address=${hotspotLocalAddress} html-directory=hotspot ssl-certificate="${certName}"`,
-                `:if ([:len [/ip dhcp-server network find where address="${hotspotNetwork}"]] = 0) do={ /ip dhcp-server network add address=${hotspotNetwork} gateway=${hotspotLocalAddress} dns-server=${dnsServers} }`,
-            );
-        }
-        if (vpnEnabled) {
-            lines.push('', '# ===== VPN Server =====');
-            if (vpnProtocol === 'L2TP' || vpnMode === 'hybrid') {
-                lines.push(
-                    `/ip pool add name="${vpnPoolName}" ranges=${vpnPoolStart}-${vpnPoolEnd}`,
-                    `/ppp profile add name="${vpnProfile}" local-address=${pppoeLocalAddress || hotspotLocalAddress} remote-address="${vpnPoolName}" dns-server=${vpnDns}`,
-                    `/interface l2tp-server server set enabled=yes use-ipsec=yes ipsec-secret="${ipsecSecret}" default-profile="${vpnProfile}"`,
-                );
-            }
-            if (vpnSecrets.length > 0) {
-                vpnSecrets.forEach(s => {
-                    lines.push(`/ppp secret add name="${s.username}" password="${s.password}" service=${s.protocol.toLowerCase()} profile="${vpnProfile}"${s.localAddress ? ` local-address=${s.localAddress}` : ''}${s.remoteAddress ? ` remote-address=${s.remoteAddress}` : ''}`);
-                });
-            }
-        }
-        lines.push(
-            '', '# ===== RADIUS Client =====',
-            `:if ([:len [/radius find where address="${radiusAddress}"]] = 0) do={`,
-            `  /radius add service=hotspot,ppp address=${radiusAddress} secret="${radiusSecret}" authentication-port=1812 accounting-port=1813 timeout=3s`,
-            `}`,
-            `/radius incoming set accept=yes port=3799`,
-            '/ppp aaa set use-radius=yes accounting=yes',
-            '', '# ===== Walled Garden =====',
-            `:if ([:len [/ip hotspot walled-garden find where dst-host="${apiHost}"]] = 0) do={ /ip hotspot walled-garden add dst-host="${apiHost}" action=allow comment="Billing Portal" }`,
-            `:if ([:len [/ip hotspot walled-garden ip find where dst-address="${radiusAddress}"]] = 0) do={ /ip hotspot walled-garden ip add dst-address="${radiusAddress}" action=accept comment="Billing Portal IP" }`,
-            ...(wgConfig?.routerTunnelIp ? [`:if ([:len [/ip hotspot walled-garden ip find where dst-address="${wgConfig.routerTunnelIp.split('.').slice(0,3).join('.')}.0/24"]] = 0) do={ /ip hotspot walled-garden ip add dst-address="${wgConfig.routerTunnelIp.split('.').slice(0,3).join('.')}.0/24" action=accept comment="VPN Subnet" }`] : []),
-            '', '# ===== NAT (Masquerade) =====',
-            ':if ([:len [/ip firewall nat find where action=masquerade]] = 0) do={ /ip firewall nat add chain=srcnat out-interface=ether1 action=masquerade }',
-            '', '# ===== System Scheduler =====',
-            `:if ([:len [/system scheduler find name="billing-sync"]] > 0) do={ /system scheduler remove [find name="billing-sync"] }`,
-            `:local syncUrl "${publicApiBase}/api/sync/${routerId}"`,
-            `:local syncScript "/tool fetch url=$syncUrl keep-result=no"`,
-            `/system scheduler add name="billing-sync" interval=5m on-event=$syncScript start-time=00:00:00 comment="HQ INVESTMENT Auto-Sync"`,
-            '', '# ===== Logging =====',
-            ':if ([:len [/system logging find topics=hotspot]] = 0) do={ /system logging add topics=hotspot action=memory }',
-            ':if ([:len [/system logging find topics=radius]] = 0) do={ /system logging add topics=radius action=memory }',
-            '', '# Configuration complete',
-        );
-        return lines.join('\n');
+
+        return buildRouterSetupWizardScript({
+            routerName,
+            routerId: routerId || '',
+            publicApiBase,
+            apiHost,
+            serviceType,
+            selectedInterfaces,
+            vpnEnabled,
+            vpnProtocol,
+            vpnPoolStart,
+            vpnPoolEnd,
+            vpnSecrets: vpnSecrets.map((s) => ({
+                username: s.username,
+                password: s.password,
+                protocol: s.protocol,
+                profile: s.profile,
+                localAddress: s.localAddress,
+                remoteAddress: s.remoteAddress,
+            })),
+            hotspotLocalAddress,
+            hotspotPoolStart,
+            hotspotPoolEnd,
+            pppoeLocalAddress,
+            pppoePoolStart,
+            pppoePoolEnd,
+            radiusAddress,
+            radiusSecret,
+            vpnMode,
+            vpnDns,
+            ipsecSecret,
+            wgConfig,
+            certName,
+            vpnManagementSubnet,
+            dnsServers: (routerData && (routerData.dns as string)) || vpnDns || '8.8.8.8,8.8.4.4',
+        });
     };
 
     const handleDownloadConfig = () => {

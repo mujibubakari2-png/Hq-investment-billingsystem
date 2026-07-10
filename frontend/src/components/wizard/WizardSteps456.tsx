@@ -208,6 +208,16 @@ export function Step5Generate(p: Step5Props) {
                 )}
             </div>
 
+            <div style={{ maxWidth: 600, margin: '0 auto 16px', padding: 20, background: '#ecfeff', border: '1px solid #67e8f9', borderRadius: 'var(--radius-sm)', textAlign: 'left' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                    <InfoOutlinedIcon style={{ fontSize: 18, color: '#0f766e' }} />
+                    <strong style={{ fontSize: '0.9rem' }}>Why this order matters</strong>
+                </div>
+                <div style={{ fontSize: '0.85rem', color: '#115e59', lineHeight: 1.7 }}>
+                    The generated script intentionally places the “drop unauthenticated LAN forward” rule after the walled-garden rules. That keeps the hotspot login portal reachable so customers can still open the login page, pay, and authenticate.
+                </div>
+            </div>
+
             <div style={{ maxWidth: 600, margin: '0 auto', padding: 20, background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 'var(--radius-sm)', textAlign: 'left' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
                     <WarningAmberIcon style={{ fontSize: 18, color: '#d97706' }} />
@@ -250,7 +260,7 @@ export function Step6Verify(p: Step6Props) {
         : p.serviceType === 'hotspot' ? 'Hotspot Server Status'
         : 'PPPoE & Hotspot Status';
 
-    const overallOk = p.serviceVerifyStatus !== 'failed';
+    const overallOk = p.serviceVerifyStatus === 'success' && (!p.vpnEnabled || p.vpnVerifyStatus === 'success');
 
     return (
         <div style={{ textAlign: 'center', padding: '30px 0' }}>
