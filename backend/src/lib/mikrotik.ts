@@ -198,10 +198,27 @@ export class MikroTikService {
 
     // ── Internal HTTP helper for RouterOS REST API ───────────────────────────
 
-    private shouldTryHttpFallback(err?: unknown): boolean {
-        if (!this.baseUrl.startsWith('https')) return false;
-        if (process.env.MIKROTIK_ALLOW_HTTP_FALLBACK === 'true') return true;
-        return PRIVATE_RE.test(this.conn.host);
+    private getFallbackUrls(originalUrl: string): string[] {
+        const urls: string[] = [];
+        const parsed = new URL(originalUrl);
+        const isPrivateHost = PRIVATE_RE.test(this.conn.host);
+        const allowHttpFallback = process.env.MIKROTIK_ALLOW_HTTP_FALLBACK === 'true';
+
+        if (parsed.protocol === 'https:') {
+            if (isPrivateHost || allowHttpFallback) {
+                const fallback = new URL(originalUrl);
+                fallback.protocol = 'http:';
+                fallback.port = '80';
+                urls.push(fallback.toString());
+            }
+        } else if (parsed.protocol === 'http:' && isPrivateHost) {
+            const fallback = new URL(originalUrl);
+            fallback.protocol = 'https:';
+            fallback.port = '443';
+            urls.push(fallback.toString());
+        }
+
+        return urls;
     }
 
     private async apiRequest(path: string, method: string = "GET", body?: unknown): Promise<any> {
@@ -239,34 +256,32 @@ export class MikroTikService {
             try {
                 res = await fetch(url, fetchOptions);
             } catch (firstErr: any) {
-                // Allow HTTPS→HTTP fallback for private/WireGuard management hosts when
-                // HTTPS times out or is refused. This keeps tunnel-based management working
-                // while still requiring an explicit opt-in for public hosts.
-                const allowHttpFallback = this.shouldTryHttpFallback(firstErr);
-                if (this.baseUrl.startsWith('https') && allowHttpFallback) {
+                const fallbackUrls = this.getFallbackUrls(url);
+                if (fallbackUrls.length > 0) {
                     clearTimeout(timeout);
-                    logger.warn(`[MikroTik] HTTPS failed for ${this.conn.host}, falling back to HTTP. ${PRIVATE_RE.test(this.conn.host) ? 'Private/WireGuard management host detected.' : 'MIKROTIK_ALLOW_HTTP_FALLBACK=true.'}`);
+                    logger.warn(`[MikroTik] Initial REST API request failed for ${this.conn.host}, trying protocol fallback. ${PRIVATE_RE.test(this.conn.host) ? 'Private/WireGuard management host detected.' : 'MIKROTIK_ALLOW_HTTP_FALLBACK=true.'}`);
 
-                    const fallbackUrl = new URL(url);
-                    fallbackUrl.protocol = 'http:';
-                    const fallbackPort = PRIVATE_RE.test(this.conn.host) ? '80' : (fallbackUrl.port || '443');
-                    fallbackUrl.port = fallbackPort;
+                    let fallbackError: any = firstErr;
+                    for (const fallbackUrl of fallbackUrls) {
+                        const fallbackController = new AbortController();
+                        const fallbackTimeout = setTimeout(() => fallbackController.abort(), timeoutMs);
+                        const fallbackOptions = {
+                            ...fetchOptions,
+                            signal: fallbackController.signal,
+                        };
 
-                    // Create a fresh controller for the fallback attempt
-                    const fallbackController = new AbortController();
-                    const fallbackTimeout = setTimeout(() => fallbackController.abort(), timeoutMs);
+                        try {
+                            res = await fetch(fallbackUrl, fallbackOptions);
+                            clearTimeout(fallbackTimeout);
+                            break;
+                        } catch (secondErr) {
+                            clearTimeout(fallbackTimeout);
+                            fallbackError = secondErr;
+                        }
+                    }
 
-                    const fallbackOptions = {
-                        ...fetchOptions,
-                        signal: fallbackController.signal
-                    };
-
-                    try {
-                        res = await fetch(fallbackUrl.toString(), fallbackOptions);
-                        clearTimeout(fallbackTimeout);
-                    } catch (secondErr) {
-                        clearTimeout(fallbackTimeout);
-                        throw firstErr; // Throw original error if fallback also fails
+                    if (!res) {
+                        throw fallbackError;
                     }
                 } else {
                     clearTimeout(timeout);

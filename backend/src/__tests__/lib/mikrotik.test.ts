@@ -68,7 +68,7 @@ describe('MikroTikService', () => {
         expect(global.fetch).toHaveBeenCalledTimes(3);
         
         // Ensure the second call was HTTP (for system/identity)
-        expect((global.fetch as jest.Mock).mock.calls[1][0]).toContain('http://router.example.com:443/rest/system/identity');
+        expect((global.fetch as jest.Mock).mock.calls[1][0]).toContain('http://router.example.com/rest/system/identity');
         expect(result.success).toBe(true);
     });
 
