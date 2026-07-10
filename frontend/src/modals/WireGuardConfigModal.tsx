@@ -94,7 +94,7 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
         );
     }
 
-    // Present WireGuard configuration in a neutral wg-quick style format for
+    // Present WireGuard configuration as RouterOS-native commands for
     // both server and client. We intentionally DO NOT generate the full
     // MikroTik .rsc here; full router scripts are produced only by the
     // Router Setup Wizard → Generate → Create Config step.

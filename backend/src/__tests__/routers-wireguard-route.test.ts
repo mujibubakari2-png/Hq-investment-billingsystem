@@ -169,6 +169,68 @@ describe('WireGuard route', () => {
     expect(res.status).toBe(403);
   });
 
+  it('uses the public server endpoint when activating WireGuard from the app', async () => {
+    const route = require('@/app/api/routers/[id]/wireguard/route');
+    mockRequirePermission.mockReturnValue({
+      error: null,
+      user: { id: 'admin-4', tenantId: 'tenant-a', role: 'ADMIN' },
+    });
+    mockCanAccessTenant.mockReturnValue(true);
+    mockGetServerIp.mockResolvedValue('10.200.0.1');
+    mockGetServerPublicKey.mockResolvedValue('server-public-key');
+    process.env.APP_URL = 'https://vpn.example.com';
+    mockDecryptRouterFields.mockReturnValue({
+      id: 'router-3',
+      name: 'Router C',
+      host: '10.0.0.3',
+      tenantId: 'tenant-a',
+      wgPrivateKey: 'router-private-key',
+      wgPublicKey: 'router-public-key',
+      wgPeerPublicKey: 'server-public-key',
+      wgPresharedKey: 'preshared-key',
+      wgTunnelIp: '10.200.0.200',
+      wgServerEndpoint: null,
+      wgListenPort: 51820,
+      wgEnabled: false,
+      wgConfiguredAt: null,
+      username: 'admin',
+      password: 'admin',
+      port: 8728,
+      apiPort: 8728,
+    });
+
+    const service = {
+      apiRequestPublic: jest.fn().mockResolvedValue([]),
+    };
+    mockGetMikroTikService.mockResolvedValue(service);
+
+    const db = {
+      router: {
+        findFirst: jest.fn().mockResolvedValue({}),
+        findMany: jest.fn().mockResolvedValue([]),
+        update: jest.fn().mockResolvedValue({}),
+      },
+      routerLog: {
+        create: jest.fn().mockResolvedValue({}),
+      },
+    };
+    mockGetTenantClient.mockReturnValue(db);
+
+    const req = new NextRequest('http://localhost/api/routers/router-3/wireguard', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'push-config' }),
+    });
+
+    await route.POST(req, { params: Promise.resolve({ id: 'router-3' }) });
+
+    const peerCall = service.apiRequestPublic.mock.calls.find((call: any) =>
+      call[0] === '/interface/wireguard/peers' && call[1] === 'PUT'
+    );
+
+    expect(peerCall).toBeDefined();
+    expect(peerCall?.[2]?.['endpoint-address']).toBe('vpn.example.com');
+  });
+
   it('uses a /32 tunnel address when pushing WireGuard config to MikroTik', async () => {
     const route = require('@/app/api/routers/[id]/wireguard/route');
     mockRequirePermission.mockReturnValue({

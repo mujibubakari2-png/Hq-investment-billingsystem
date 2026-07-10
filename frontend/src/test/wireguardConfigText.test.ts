@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { buildWireGuardConfigText } from '../utils/wireguardConfigText';
 
 describe('buildWireGuardConfigText', () => {
-    it('uses the backend tunnel IPs and server endpoint for the downloaded config', () => {
+    it('uses RouterOS-native commands for the server-side config', () => {
         const config = buildWireGuardConfigText({
             mode: 'server',
             routerName: 'HQ Router',
@@ -19,13 +19,16 @@ describe('buildWireGuardConfigText', () => {
             serverPrivateKey: 'server-private',
         });
 
-        expect(config).toContain('Address = 10.0.0.200/32');
-        expect(config).toContain('AllowedIPs = 10.0.0.0/24');
-        expect(config).toContain('Endpoint = vpn.example.com:51820');
-        expect(config).not.toContain('Endpoint = 10.0.0.1:51820');
+        expect(config).toContain('/interface wireguard');
+        expect(config).toContain('add name="wg-hq"');
+        expect(config).toContain('private-key="router-private"');
+        expect(config).toContain('allowed-address=10.0.0.0/24');
+        expect(config).toContain('add address=10.0.0.200/32 interface="wg-hq"');
+        expect(config).not.toContain('[Interface]');
+        expect(config).not.toContain('PrivateKey =');
     });
 
-    it('uses a /32 route for the client-side peer and the server endpoint for the client config', () => {
+    it('uses RouterOS-native commands for the client-side config', () => {
         const config = buildWireGuardConfigText({
             mode: 'client',
             routerName: 'HQ Router',
@@ -40,8 +43,10 @@ describe('buildWireGuardConfigText', () => {
             serverPrivateKey: 'server-private',
         });
 
-        expect(config).toContain('Address = 10.0.0.1/32');
-        expect(config).toContain('AllowedIPs = 10.0.0.200/32');
-        expect(config).toContain('Endpoint = vpn.example.com:51820');
+        expect(config).toContain('/interface wireguard');
+        expect(config).toContain('private-key="server-private"');
+        expect(config).toContain('allowed-address=10.0.0.200/32');
+        expect(config).toContain('add address=10.0.0.1/32 interface="wg-hq"');
+        expect(config).not.toContain('[Peer]');
     });
 });

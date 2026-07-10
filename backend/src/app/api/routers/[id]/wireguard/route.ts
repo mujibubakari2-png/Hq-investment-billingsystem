@@ -133,9 +133,25 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         const serverTunnelIp = wgServerIp; // Use actual interface IP
         const listenPort = router.wgListenPort || 51820;
 
-        // Use request host as fallback if no endpoint is configured
-        const requestHost = process.env.SERVER_PUBLIC_IP || req.headers.get("host")?.split(":")[0] || "localhost";
-        const serverEndpoint = router.wgServerEndpoint || process.env.WG_SERVER_ENDPOINT || requestHost || "vpn.billing-system.local";
+        // Resolve the public WireGuard endpoint from the configured values.
+        // Prefer an explicit router setting, then WG_SERVER_ENDPOINT, then APP_URL/host, and finally the public IP env.
+        const requestHost = req.headers.get("host")?.split(":")[0] || "localhost";
+        const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL;
+        let resolvedEndpoint = router.wgServerEndpoint || process.env.WG_SERVER_ENDPOINT || "";
+
+        if (!resolvedEndpoint && appUrl) {
+            try {
+                resolvedEndpoint = new URL(appUrl).hostname;
+            } catch {
+                resolvedEndpoint = appUrl.replace(/^https?:\/\//, '').split('/')[0];
+            }
+        }
+
+        if (!resolvedEndpoint) {
+            resolvedEndpoint = process.env.SERVER_PUBLIC_IP || requestHost || "vpn.billing-system.local";
+        }
+
+        const serverEndpoint = resolvedEndpoint;
         const serverPort = parseInt(process.env.WG_SERVER_PORT || "51820");
 
         // Live tunnel status — check if the MikroTik peer has an active WireGuard handshake
@@ -277,9 +293,25 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         const lanPoolEnd = `${lanPrefix2}.254`;
         const listenPort = router.wgListenPort || 51820;
 
-        // Use request host as fallback if no endpoint is configured (match GET logic)
-        const requestHost = process.env.SERVER_PUBLIC_IP || req.headers.get("host")?.split(":")[0] || "localhost";
-        const serverEndpoint = router.wgServerEndpoint || process.env.WG_SERVER_ENDPOINT || requestHost || "vpn.billing-system.local";
+        // Resolve the public WireGuard endpoint from the configured values.
+        // Prefer an explicit router setting, then WG_SERVER_ENDPOINT, then APP_URL/host, and finally the public IP env.
+        const requestHost = req.headers.get("host")?.split(":")[0] || "localhost";
+        const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL;
+        let resolvedEndpoint = router.wgServerEndpoint || process.env.WG_SERVER_ENDPOINT || "";
+
+        if (!resolvedEndpoint && appUrl) {
+            try {
+                resolvedEndpoint = new URL(appUrl).hostname;
+            } catch {
+                resolvedEndpoint = appUrl.replace(/^https?:\/\//, '').split('/')[0];
+            }
+        }
+
+        if (!resolvedEndpoint) {
+            resolvedEndpoint = process.env.SERVER_PUBLIC_IP || requestHost || "vpn.billing-system.local";
+        }
+
+        const serverEndpoint = resolvedEndpoint;
         const serverPort = parseInt(process.env.WG_SERVER_PORT || "51820");
 
         if (action === "push-config") {

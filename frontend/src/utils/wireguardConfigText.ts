@@ -34,47 +34,47 @@ export function buildWireGuardConfigText(params: WireGuardConfigTextParams): str
 
     if (params.mode === 'server') {
         return `# ═══════════════════════════════════════════════════════════════
-# WireGuard Server Config (wg-quick style)
+# MikroTik RouterOS WireGuard config
 # For Router: ${params.routerName} (${params.routerId})
+# Paste into a RouterOS terminal or a .rsc script.
 # ═══════════════════════════════════════════════════════════════
 
-[Interface]
-# The router's private key (kept on the device)
-PrivateKey = ${routerPrivateKey}
-Address = ${routerTunnelIp}/32
-ListenPort = ${listenPort}
-DNS = 8.8.8.8, 1.1.1.1
+/interface wireguard
+:if ([:len [/interface wireguard find name="wg-hq"]] = 0) do={
+    /interface wireguard add name="wg-hq" listen-port=${listenPort} private-key="${routerPrivateKey}" comment="HQInvestment VPN Interface"
+} else={
+    /interface wireguard set [find name="wg-hq"] listen-port=${listenPort} private-key="${routerPrivateKey}"
+}
+:if ([:len [/interface wireguard peers find interface="wg-hq" public-key="${serverPublicKey}"]] = 0) do={
+    /interface wireguard peers add interface="wg-hq" public-key="${serverPublicKey}" preshared-key="${presharedKey}" endpoint-address=${serverEndpoint} endpoint-port=${serverPort} allowed-address=${serverPeerSubnet} persistent-keepalive=25s comment="HQInvestment ISP Server"
+} else={
+    /interface wireguard peers set [find interface="wg-hq" public-key="${serverPublicKey}"] endpoint-address=${serverEndpoint} endpoint-port=${serverPort} allowed-address=${serverPeerSubnet} persistent-keepalive=25s
+}
+:if ([:len [/ip address find address="${routerTunnelIp}/32" interface="wg-hq"]] = 0) do={
+    /ip address add address=${routerTunnelIp}/32 interface="wg-hq" comment="HQInvestment VPN Address"
+}
 
-[Peer]
-# ISP Server peer
-PublicKey = ${serverPublicKey}
-PresharedKey = ${presharedKey}
-# Route the entire tunnel subnet through the ISP peer
-AllowedIPs = ${serverPeerSubnet}
-Endpoint = ${serverEndpoint}:${serverPort}
-PersistentKeepalive = 25
-
-# Note: This is WireGuard config only. Full MikroTik .rsc is available from the Router Setup Wizard → Generate → Create Config.`;
+# Note: This is RouterOS-native syntax for MikroTik. The full .rsc script is also available from the Router Setup Wizard → Generate → Create Config.`;
     }
 
     return `# ═══════════════════════════════════════════════════════════════
-# WireGuard Client Config — HQInvestment ISP Server
+# MikroTik RouterOS WireGuard client config
 # For Router: ${params.routerName} (${params.routerId})
-# Keys are PERSISTENT — install this on the HQInvestment VPN server
+# Paste into a RouterOS terminal or a .rsc script.
 # ═══════════════════════════════════════════════════════════════
 
-[Interface]
-# HQInvestment ISP Server side — server private key (KEEP SECRET)
-PrivateKey = ${serverPrivateKey}
-Address = ${serverTunnelIp}/32
-DNS = 8.8.8.8, 1.1.1.1
-
-[Peer]
-# Router: ${params.routerName}
-PublicKey = ${routerPublicKey}
-PresharedKey = ${presharedKey}
-# Route the router's tunnel IP through the peer
-AllowedIPs = ${routerTunnelIp}/32
-Endpoint = ${serverEndpoint}:${serverPort}
-PersistentKeepalive = 25`;
+/interface wireguard
+:if ([:len [/interface wireguard find name="wg-hq"]] = 0) do={
+    /interface wireguard add name="wg-hq" listen-port=${listenPort} private-key="${serverPrivateKey}" comment="HQInvestment VPN Interface"
+} else={
+    /interface wireguard set [find name="wg-hq"] listen-port=${listenPort} private-key="${serverPrivateKey}"
+}
+:if ([:len [/interface wireguard peers find interface="wg-hq" public-key="${routerPublicKey}"]] = 0) do={
+    /interface wireguard peers add interface="wg-hq" public-key="${routerPublicKey}" preshared-key="${presharedKey}" endpoint-address=${serverEndpoint} endpoint-port=${serverPort} allowed-address=${routerTunnelIp}/32 persistent-keepalive=25s comment="Router ${params.routerName}"
+} else={
+    /interface wireguard peers set [find interface="wg-hq" public-key="${routerPublicKey}"] endpoint-address=${serverEndpoint} endpoint-port=${serverPort} allowed-address=${routerTunnelIp}/32 persistent-keepalive=25s
+}
+:if ([:len [/ip address find address="${serverTunnelIp}/32" interface="wg-hq"]] = 0) do={
+    /ip address add address=${serverTunnelIp}/32 interface="wg-hq" comment="HQInvestment VPN Address"
+}`;
 }
