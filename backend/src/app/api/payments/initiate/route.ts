@@ -108,7 +108,7 @@ export async function POST(req: NextRequest) {
       return errorResponse("Transaction claim lost — concurrent request won the race", 409);
     }
 
-    if (Math.round(existingTransaction.amount) !== Math.round(amountNum)) {
+    if (Math.round(existingTransaction.amount.toNumber()) !== Math.round(amountNum)) {
       // Roll back the status claim before rejecting
       await db.transaction.updateMany({
         where: { id: existingTransaction.id },

@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
       return errorResponse("Package not found or inactive", 404);
     }
 
-    const amount = pkg.price;
+    const amount = pkg.price.toNumber();
     if (amount < 100) {
       return errorResponse("Package price is too low (minimum 100 TZS)", 402);
     }
@@ -118,7 +118,7 @@ export async function POST(req: NextRequest) {
         clientId,
         planName: pkg.name,
         packageId: pkg.id,
-        amount: pkg.price,
+        amount: pkg.price.toNumber(),
         type: "MOBILE",
         method: "MOBILE_MONEY",
         status: "PENDING",
@@ -169,7 +169,7 @@ export async function POST(req: NextRequest) {
     try {
       const result = await paymentService.initiatePayment({
         tenantId: pkg.tenantId ?? null,
-        amount: pkg.price,
+        amount: pkg.price.toNumber(),
         phone: paymentPhone,
         providerName: provider,
         reference,
@@ -209,7 +209,7 @@ export async function POST(req: NextRequest) {
       checkoutRequestId: providerRef ?? null,
       status: "PENDING",
       packageName: pkg.name,
-      amount: pkg.price,
+      amount: pkg.price.toNumber(),
       provider,
       initiated: paymentInitiated,
       username: existingClient.username

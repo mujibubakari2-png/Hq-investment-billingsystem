@@ -49,7 +49,7 @@ export async function GET(req: NextRequest) {
             id: string;
             category: string;
             description: string;
-            amount: number;
+            amount: any;
             date: Date;
             reference: string | null;
             createdBy: { username: string };
@@ -58,7 +58,7 @@ export async function GET(req: NextRequest) {
             id: e.id,
             category: e.category,
             description: e.description,
-            amount: e.amount,
+            amount: Number(e.amount),
             date: toISOSafe(e.date),
             reference: e.reference,
             createdBy: e.createdBy.username,

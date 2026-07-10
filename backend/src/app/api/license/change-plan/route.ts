@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
                 where: { id: inv.id },
                 data: {
                     planId: newPlan.id,
-                    amount: newPlan.price * months
+                    amount: newPlan.price.toNumber() * months
                 }
             });
         }

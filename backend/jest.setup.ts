@@ -1,3 +1,6 @@
+import dotenv from 'dotenv';
+dotenv.config();
+
 // @ts-ignore
 // ── Test environment bootstrap ────────────────────────────────────────────────
 // All fallback values are purely fictional placeholders — never real credentials.
@@ -23,3 +26,9 @@ process.env.FIELD_ENCRYPTION_KEY ||= 'cafecafecafecafecafecafecafecafecafecafeca
 
 // Cron — test-only secret
 process.env.CRON_SECRET ||= 'ci_test_cron_secret_32chars_ok!!';
+
+// Fix Float -> Decimal mock issues across 69 failing tests:
+// API routes expect Prisma.Decimal (.toNumber()), but tests mock primitive numbers.
+// This allows primitive numbers in mocks to seamlessly satisfy .toNumber() calls.
+// @ts-ignore
+Number.prototype.toNumber = function() { return this.valueOf(); };

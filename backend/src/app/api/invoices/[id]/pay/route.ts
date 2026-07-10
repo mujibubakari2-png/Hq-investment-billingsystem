@@ -92,7 +92,7 @@ export async function POST(
         // Initiate payment (external) — not part of DB transaction
         const result = await paymentService.initiatePayment({
             tenantId: invoice.tenantId,
-            amount: invoice.amount,
+            amount: invoice.amount.toNumber(),
             phone: client.phone,
             reference,
             providerName: channel.provider,

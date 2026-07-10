@@ -58,10 +58,10 @@ export async function GET(req: NextRequest) {
                     }),
                 ]);
 
-                const totalRevenue = agg._sum.amount ?? 0;
+                const totalRevenue = agg._sum.amount ? Number(agg._sum.amount) : 0;
                 const byMethod: Record<string, number> = {};
                 for (const g of byMethodGroups) {
-                    byMethod[g.method] = g._sum.amount ?? 0;
+                    byMethod[g.method] = g._sum.amount ? Number(g._sum.amount) : 0;
                 }
 
                 data = {

@@ -54,10 +54,10 @@ export async function POST(req: NextRequest) {
 
             // Use invoice's existing packageMonths when caller passes 0
             const effectiveMonths = requestedMonths > 0 ? requestedMonths : (invoice.packageMonths ?? 1);
-            const expectedAmount = tenant.plan ? tenant.plan.price * effectiveMonths : invoice.amount;
+            const expectedAmount = tenant.plan ? tenant.plan.price.toNumber() * effectiveMonths : invoice.amount.toNumber();
 
             // If the plan changed or the amount changed, update the invoice
-            if (invoice.amount !== expectedAmount || invoice.planId !== tenant.planId || effectiveMonths !== invoice.packageMonths) {
+            if (invoice.amount.toNumber() !== expectedAmount || invoice.planId !== tenant.planId || effectiveMonths !== invoice.packageMonths) {
                 invoice = await db.tenantInvoice.update({
                     where: { id: invoice.id },
                     data: {
@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
                 },
             });
 
-            const expectedAmount = tenant.plan ? tenant.plan.price * requestedMonths : 0;
+            const expectedAmount = tenant.plan ? tenant.plan.price.toNumber() * requestedMonths : 0;
 
             const invoiceNumber = `INV-${new Date().getFullYear()}-${randomUUID()
                 .replace(/-/g, "")
@@ -127,7 +127,7 @@ export async function POST(req: NextRequest) {
 
             const result = await paymentService.initiatePayment({
                 tenantId: null,
-                amount: invoice.amount,
+                amount: invoice.amount.toNumber(),
                 phone: cleanPhone,
                 reference: invoice.invoiceNumber,
                 description: `SaaS License Renewal - ${packageMonths} Month(s)`,
@@ -144,7 +144,7 @@ export async function POST(req: NextRequest) {
                     data: {
                         invoiceId: invoice.id,
                         tenantId: invoice.tenantId,
-                        amount: invoice.amount,
+                        amount: invoice.amount.toNumber(),
                         paymentMethod: providerName,
                         status: 'PENDING',
                     },
@@ -157,7 +157,7 @@ export async function POST(req: NextRequest) {
                 // For PalmPesa require a providerRef (order id / checkout id) to ensure STK push was created.
                 if (providerName.toUpperCase() === 'PALMPESA' && !result.providerRef) {
                     console.error('[LICENSE/RENEW] PalmPesa accepted request but did not return providerRef', {
-                        request: { amount: invoice.amount, phone: cleanPhone, reference: invoice.invoiceNumber, callbackUrl },
+                        request: { amount: invoice.amount.toNumber(), phone: cleanPhone, reference: invoice.invoiceNumber, callbackUrl },
                         providerResponse: result,
                     });
                     // Mark tenantPayment as FAILED if created

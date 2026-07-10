@@ -126,7 +126,7 @@ export async function POST(req: NextRequest) {
     try {
       await tenantDb.$transaction(async (tx: any) => {
         // Amount verification — only if HarakaPay included amount
-        if (amount !== null && amount < invoice.amount) {
+        if (amount !== null && amount < invoice.amount.toNumber()) {
           await tx.tenantPayment.create({
             data: {
               invoiceId:     invoice.id,

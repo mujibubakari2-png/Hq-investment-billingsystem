@@ -59,7 +59,7 @@ export async function GET(req: NextRequest) {
             uploadUnit: string;
             downloadSpeed: number;
             downloadUnit: string;
-            price: number;
+            price: any;
             router: { name: string } | null;
             duration: number;
             durationUnit: string;

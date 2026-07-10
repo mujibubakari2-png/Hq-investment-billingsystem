@@ -8,35 +8,35 @@ datasource db {
 }
 
 model User {
-  id        String     @id @default(cuid())
-  username  String     @unique
-  fullName  String?
-  email     String     @unique
-  password  String
-  phone     String?
-  role      Role       @default(AGENT)
-  status    UserStatus @default(ACTIVE)
-  lastLogin DateTime?
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
-  tenantId  String?
-  createdById String?
+  id              String     @id @default(uuid())
+  username        String     @unique
+  fullName        String?
+  email           String     @unique
+  password        String
+  phone           String?
+  role            Role       @default(AGENT)
+  status          UserStatus @default(ACTIVE)
+  lastLogin       DateTime?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  tenantId        String?
+  createdById     String?
   // isPlatformAdmin: true for HQ INVESTMENT platform operators (no tenantId).
   // false (default) for all tenant owners and sub-users.
-  isPlatformAdmin Boolean @default(false)
+  isPlatformAdmin Boolean    @default(false)
   // CRIT-005 FIX: Soft delete — prevents permanent data loss on user deletion
-  deletedAt DateTime?
+  deletedAt       DateTime?
   // CRIT-002 FIX: TOTP-based MFA fields
-  mfaEnabled      Boolean  @default(false)
-  mfaSecret       String?  // AES-256-GCM encrypted TOTP secret
+  mfaEnabled      Boolean    @default(false)
+  mfaSecret       String? // AES-256-GCM encrypted TOTP secret
   mfaBackupCodes  String[] // bcrypt-hashed one-time backup codes
-  auditLogs    AuditLog[]
-  createdUsers User[]  @relation("UserCreatedBy")
-  ownedTenants Tenant[] @relation("TenantOwner")
-  expenses  Expense[]
-  createdBy User?      @relation("UserCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  tenant    Tenant?    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  vouchers  Voucher[]
+  auditLogs       AuditLog[]
+  createdUsers    User[]     @relation("UserCreatedBy")
+  ownedTenants    Tenant[]   @relation("TenantOwner")
+  expenses        Expense[]
+  createdBy       User?      @relation("UserCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  tenant          Tenant?    @relation(fields: [tenantId], references: [id])
+  vouchers        Voucher[]
 
   @@index([tenantId])
   @@index([createdById])
@@ -47,20 +47,20 @@ model User {
 }
 
 model UserOtp {
-  id        String   @id @default(cuid())
+  id        String   @id @default(uuid())
   email     String?
   otp       String
   expiresAt DateTime
   createdAt DateTime @default(now())
   used      Boolean  @default(false)
   tenantId  String?
-  tenant    Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant    Tenant?  @relation(fields: [tenantId], references: [id])
 
   @@map("user_otps")
 }
 
 model Client {
-  id            String         @id @default(cuid())
+  id            String         @id @default(uuid())
   username      String
   fullName      String
   phone         String?
@@ -74,22 +74,23 @@ model Client {
   updatedAt     DateTime       @updatedAt
   deletedAt     DateTime?
   tenantId      String?
-  tenant        Tenant?        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant        Tenant?        @relation(fields: [tenantId], references: [id])
   invoices      Invoice[]
   smsMessages   SmsMessage[]
   subscriptions Subscription[]
   transactions  Transaction[]
 
+  @@unique([username, tenantId])
   @@index([tenantId])
   @@index([status])
   @@index([serviceType])
   @@index([createdAt])
-  @@unique([username, tenantId])
+  @@index([tenantId, createdAt])
   @@map("clients")
 }
 
 model Package {
-  id            String         @id @default(cuid())
+  id            String         @id @default(uuid())
   name          String
   type          ServiceType
   category      AccountType    @default(PERSONAL)
@@ -97,7 +98,7 @@ model Package {
   uploadUnit    String         @default("Mbps")
   downloadSpeed Float
   downloadUnit  String         @default("Mbps")
-  price         Float
+  price         Decimal        @db.Decimal(12, 2)
   duration      Int
   durationUnit  DurationUnit
   status        PackageStatus  @default(ACTIVE)
@@ -111,7 +112,7 @@ model Package {
   routerId      String?
   tenantId      String?
   router        Router?        @relation(fields: [routerId], references: [id])
-  tenant        Tenant?        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant        Tenant?        @relation(fields: [tenantId], references: [id])
   subscriptions Subscription[]
   vouchers      Voucher[]
 
@@ -123,7 +124,7 @@ model Package {
 }
 
 model Subscription {
-  id           String             @id @default(cuid())
+  id           String             @id @default(uuid())
   clientId     String
   packageId    String
   routerId     String?
@@ -141,7 +142,7 @@ model Subscription {
   client       Client             @relation(fields: [clientId], references: [id], onDelete: Cascade)
   package      Package            @relation(fields: [packageId], references: [id], onDelete: Cascade)
   router       Router?            @relation(fields: [routerId], references: [id])
-  tenant       Tenant?            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant       Tenant?            @relation(fields: [tenantId], references: [id])
 
   @@index([tenantId])
   @@index([clientId])
@@ -150,30 +151,31 @@ model Subscription {
   @@index([tenantId, status])
   @@index([tenantId, expiresAt])
   @@index([routerId])
+  @@index([tenantId, activatedAt])
   @@map("subscriptions")
 }
 
 model Transaction {
-  id         String            @id @default(cuid())
-  clientId   String
-  planName   String?
-  packageId  String?
-  amount     Float
-  type       TransactionType   @default(MOBILE)
-  method     String
-  status     TransactionStatus @default(PENDING)
-  reference  String            @unique
+  id          String            @id @default(uuid())
+  clientId    String
+  planName    String?
+  packageId   String?
+  amount      Decimal           @db.Decimal(12, 2)
+  type        TransactionType   @default(MOBILE)
+  method      String
+  status      TransactionStatus @default(PENDING)
+  reference   String            @unique
   providerRef String?
-  expiryDate DateTime?
-  createdAt  DateTime          @default(now())
-  updatedAt  DateTime          @updatedAt
-  deletedAt  DateTime?
-  tenantId   String?
+  expiryDate  DateTime?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  deletedAt   DateTime?
+  tenantId    String?
   // INV-001/PAY-002: Link transaction back to the invoice that triggered the payment
-  invoiceId  String?
-  client     Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  tenant     Tenant?           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  invoice    Invoice?          @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  invoiceId   String?
+  client      Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  tenant      Tenant?           @relation(fields: [tenantId], references: [id])
+  invoice     Invoice?          @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
 
   // DB-001: Indexes for common query patterns (status filtering, tenant scoping, date sorting)
   @@index([tenantId, status])
@@ -182,72 +184,73 @@ model Transaction {
   @@index([status, createdAt])
   @@index([invoiceId])
   @@index([providerRef])
+  @@index([tenantId, createdAt])
   @@map("transactions")
 }
 
 model Router {
-  id               String           @id @default(cuid())
-  name             String
-  host             String
+  id                String           @id @default(uuid())
+  name              String
+  host              String
   // SEC-ROUTER-004 FIX: New routers now get a unique, randomly-generated
   // username at creation time (see generateAdminUsername() in
   // routerProvisioning.ts) instead of always defaulting to the literal
   // "admin" — the @default("admin") below only applies to rows/paths that
   // bypass the application layer (e.g. raw SQL, legacy rows).
-  username         String?          @default("admin")
-  password         String?
+  username          String?          @default("admin")
+  password          String?
   // SEC-ROUTER-003 FIX: RADIUS shared secret is now a field SEPARATE from the
   // admin password (previously the admin password was reused as the RADIUS
   // secret for every router, and defaulted to a static "hqsecret" string when
   // missing). Generated per-router at creation time, AES-256-GCM encrypted at
   // rest via encryptRouterFields()/decryptRouterFields().
-  radiusSecret     String?
-  port             Int?             @default(8728)
-  type             String           @default("MikroTik")
-  status           RouterStatus     @default(OFFLINE)
-  activeUsers      Int              @default(0)
-  cpuLoad          Float            @default(0)
-  memoryUsed       Float            @default(0)
-  uptime           String?
-  lastSeen         DateTime?
+  radiusSecret      String?
+  port              Int?             @default(8728)
+  type              String           @default("MikroTik")
+  status            RouterStatus     @default(OFFLINE)
+  activeUsers       Int              @default(0)
+  cpuLoad           Float            @default(0)
+  memoryUsed        Float            @default(0)
+  uptime            String?
+  lastSeen          DateTime?
   accountingEnabled Boolean          @default(true)
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime         @updatedAt
-  deletedAt        DateTime?
-  tenantId         String?
-  apiPort          Int?             @default(8728)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  deletedAt         DateTime?
+  tenantId          String?
+  apiPort           Int?             @default(8728)
   // Optional REST API port, separate from the terminal/Winbox port (8728).
   // RouterOS REST API runs on 80 (HTTP) or 443 (HTTPS) by default, but can be custom.
   // If null, getMikroTikService() auto-maps port 8728/8729 → 80/443 as before.
-  restPort         Int?
-  description      String?
-  vpnMode          String?          @default("hybrid")
+  restPort          Int?
+  description       String?
+  vpnMode           String?          @default("hybrid")
   // ── Network configuration fields (used by /api/routers/[id]/script) ──────────
   // These were present in route code but missing from the schema, causing TS errors.
   // All optional — existing routers without these values get null (script endpoint
   // validates them and returns a 400 with the specific missing field names).
-  lanIp            String?          // e.g. "192.168.88.1"
-  lanGateway       String?          // e.g. "192.168.88.1"
-  hotspotPoolRange String?          // e.g. "192.168.88.10-192.168.88.254"
-  pppoePoolRange   String?          // e.g. "10.0.0.10-10.0.0.254"
-  dns              String?          // e.g. "8.8.8.8,8.8.4.4"
-  wgConfiguredAt   DateTime?
-  wgEnabled        Boolean          @default(false)
-  wgListenPort     Int?             @default(51820)
-  wgPeerPublicKey  String?
-  wgPresharedKey   String?
-  wgPrivateKey     String?
-  wgPublicKey      String?
-  wgServerEndpoint String?
-  wgTunnelIp       String?          @default("10.200.0.1")
-  equipments       Equipment[]
-  hotspotSettings  HotspotSettings?
-  packages         Package[]
-  logs             RouterLog[]
-  tenant           Tenant?          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  subscriptions    Subscription[]
-  vouchers         Voucher[]
-  vpnUsers         VpnUser[]
+  lanIp             String? // e.g. "192.168.88.1"
+  lanGateway        String? // e.g. "192.168.88.1"
+  hotspotPoolRange  String? // e.g. "192.168.88.10-192.168.88.254"
+  pppoePoolRange    String? // e.g. "10.0.0.10-10.0.0.254"
+  dns               String? // e.g. "8.8.8.8,8.8.4.4"
+  wgConfiguredAt    DateTime?
+  wgEnabled         Boolean          @default(false)
+  wgListenPort      Int?             @default(51820)
+  wgPeerPublicKey   String?
+  wgPresharedKey    String?
+  wgPrivateKey      String?
+  wgPublicKey       String?
+  wgServerEndpoint  String?
+  wgTunnelIp        String?          @default("10.200.0.1")
+  equipments        Equipment[]
+  hotspotSettings   HotspotSettings?
+  packages          Package[]
+  logs              RouterLog[]
+  tenant            Tenant?          @relation(fields: [tenantId], references: [id])
+  subscriptions     Subscription[]
+  vouchers          Voucher[]
+  vpnUsers          VpnUser[]
 
   @@unique([name, tenantId])
   // Add tenantId index — findMany({ where: { tenantId } }) was doing a full table scan
@@ -256,7 +259,7 @@ model Router {
 }
 
 model RouterLog {
-  id        String   @id @default(cuid())
+  id        String   @id @default(uuid())
   routerId  String
   action    String
   details   String?
@@ -266,17 +269,18 @@ model RouterLog {
   createdAt DateTime @default(now())
   tenantId  String?
   router    Router   @relation(fields: [routerId], references: [id], onDelete: Cascade)
-  tenant    Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant    Tenant?  @relation(fields: [tenantId], references: [id])
 
   // Add tenantId and routerId indexes for common log query patterns
   @@index([routerId])
   @@index([tenantId])
   @@index([createdAt])
+  @@index([tenantId, createdAt])
   @@map("router_logs")
 }
 
 model HotspotSettings {
-  id                 String   @id @default(cuid())
+  id                 String   @id @default(uuid())
   routerId           String   @unique
   primaryColor       String   @default("#1a1a2e")
   accentColor        String   @default("#6366f1")
@@ -293,13 +297,13 @@ model HotspotSettings {
   adMessage          String?  @default("🎉 Special offer! Get extra data on all packages today!")
   backendUrl         String?
   router             Router   @relation(fields: [routerId], references: [id], onDelete: Cascade)
-  tenant             Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant             Tenant?  @relation(fields: [tenantId], references: [id])
 
   @@map("hotspot_settings")
 }
 
 model Equipment {
-  id           String          @id @default(cuid())
+  id           String          @id @default(uuid())
   name         String
   type         String
   serialNumber String          @unique
@@ -313,7 +317,7 @@ model Equipment {
   updatedAt    DateTime        @updatedAt
   tenantId     String?
   router       Router?         @relation(fields: [routerId], references: [id])
-  tenant       Tenant?         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant       Tenant?         @relation(fields: [tenantId], references: [id])
 
   // Add tenantId index — equipment listing by tenant was doing full table scan
   @@index([tenantId])
@@ -322,7 +326,7 @@ model Equipment {
 }
 
 model Voucher {
-  id          String        @id @default(cuid())
+  id          String        @id @default(uuid())
   code        String
   packageId   String
   routerId    String?
@@ -337,7 +341,7 @@ model Voucher {
   createdBy   User          @relation(fields: [createdById], references: [id])
   package     Package       @relation(fields: [packageId], references: [id], onDelete: Cascade)
   router      Router?       @relation(fields: [routerId], references: [id])
-  tenant      Tenant?       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant      Tenant?       @relation(fields: [tenantId], references: [id])
 
   @@unique([code, tenantId])
   // Add tenantId index for voucher listing queries
@@ -347,10 +351,10 @@ model Voucher {
 }
 
 model Expense {
-  id          String   @id @default(cuid())
+  id          String   @id @default(uuid())
   category    String
   description String
-  amount      Float
+  amount      Decimal  @db.Decimal(12, 2)
   date        DateTime
   reference   String?
   receipt     String?
@@ -359,19 +363,20 @@ model Expense {
   updatedAt   DateTime @updatedAt
   tenantId    String?
   createdBy   User     @relation(fields: [createdById], references: [id])
-  tenant      Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant      Tenant?  @relation(fields: [tenantId], references: [id])
 
   // Add tenantId and date indexes for expense reporting queries
   @@index([tenantId])
   @@index([date])
+  @@index([tenantId, date])
   @@map("expenses")
 }
 
 model Invoice {
-  id            String        @id @default(cuid())
+  id            String        @id @default(uuid())
   invoiceNumber String        @unique
   clientId      String
-  amount        Float
+  amount        Decimal       @db.Decimal(12, 2)
   status        InvoiceStatus @default(DRAFT)
   dueDate       DateTime
   issuedDate    DateTime
@@ -384,33 +389,34 @@ model Invoice {
   items         InvoiceItem[]
   transactions  Transaction[]
   client        Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  tenant        Tenant?       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant        Tenant?       @relation(fields: [tenantId], references: [id])
 
   // DB-002: Indexes for common query patterns
   @@index([tenantId, status])
   @@index([dueDate])
   @@index([clientId])
+  @@index([tenantId, dueDate])
+  @@index([tenantId, issuedDate])
   @@map("invoices")
 }
 
 model InvoiceItem {
-  id          String  @id @default(cuid())
+  id          String  @id @default(uuid())
   invoiceId   String
   description String
   quantity    Int
-  unitPrice   Float
-  total       Float
+  unitPrice   Decimal @db.Decimal(12, 2)
+  total       Decimal @db.Decimal(12, 2)
   invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   tenantId    String?
-  tenant      Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant      Tenant? @relation(fields: [tenantId], references: [id])
 
   @@index([tenantId])
-
   @@map("invoice_items")
 }
 
 model SmsMessage {
-  id        String    @id @default(cuid())
+  id        String    @id @default(uuid())
   clientId  String?
   recipient String
   message   String
@@ -421,13 +427,13 @@ model SmsMessage {
   updatedAt DateTime  @updatedAt
   tenantId  String?
   client    Client?   @relation(fields: [clientId], references: [id])
-  tenant    Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant    Tenant?   @relation(fields: [tenantId], references: [id])
 
   @@map("sms_messages")
 }
 
 model MessageTemplate {
-  id        String       @id @default(cuid())
+  id        String       @id @default(uuid())
   name      String
   content   String
   type      TemplateType @default(CUSTOM)
@@ -435,13 +441,13 @@ model MessageTemplate {
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
   tenantId  String?
-  tenant    Tenant?      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant    Tenant?      @relation(fields: [tenantId], references: [id])
 
   @@map("message_templates")
 }
 
 model PaymentChannel {
-  id            String        @id @default(cuid())
+  id            String        @id @default(uuid())
   name          String
   provider      String
   accountNumber String?
@@ -454,7 +460,7 @@ model PaymentChannel {
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
   tenantId      String?
-  tenant        Tenant?       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant        Tenant?       @relation(fields: [tenantId], references: [id])
 
   // Ensure a tenant can only have one channel per provider.
   // Note: tenantId is nullable to allow PLATFORM-scoped channels (tenantId = null).
@@ -468,7 +474,7 @@ model PaymentChannel {
 }
 
 model WebhookLog {
-  id             String    @id @default(cuid())
+  id             String    @id @default(uuid())
   provider       String
   event          String    @default("PAYMENT_CALLBACK")
   payload        Json
@@ -482,126 +488,127 @@ model WebhookLog {
   processedAt    DateTime?
   createdAt      DateTime  @default(now())
   tenantId       String?
-  tenant         Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant         Tenant?   @relation(fields: [tenantId], references: [id])
 
   @@index([provider])
   @@index([transactionRef])
   @@index([providerRef])
   @@index([tenantId])
   @@index([createdAt])
+  @@index([tenantId, createdAt])
   @@map("webhook_logs")
 }
 
 model SystemSetting {
-  id       String  @id @default(cuid())
+  id       String  @id @default(uuid())
   key      String
   value    String
   group    String  @default("general")
   tenantId String?
-  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant? @relation(fields: [tenantId], references: [id])
 
   @@unique([key, tenantId])
   @@map("system_settings")
 }
 
 model Tenant {
-  id               String            @id @default(cuid())
-  name             String
-  email            String            @unique
-  phone            String?
-  slug             String            @unique
-  logoUrl          String?
-  ownerUserId      String?
-  status           TenantStatus      @default(ACTIVE)
-  planId           String
-  trialStart       DateTime?
-  trialEnd         DateTime?
-  licenseExpiresAt DateTime?
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
-  branding         TenantBranding?
-  clients          Client[]
-  equipments       Equipment[]
-  expenses         Expense[]
-  hotspotSettings  HotspotSettings[]
-  invoices         Invoice[]
-  invoiceItems     InvoiceItem[]
-  messageTemplates MessageTemplate[]
-  packages         Package[]
-  paymentChannels  PaymentChannel[]
-  radaccts         RadAcct[]
-  radchecks        RadCheck[]
-  radReplies       RadReply[]
-  radGroupChecks   RadGroupCheck[]
-  radGroupReplies  RadGroupReply[]
-  radUserGroups    RadUserGroup[]
-  radPostAuths     RadPostAuth[]
-  radiusNas        RadiusNas[]
-  radiusUsers      RadiusUser[]
-  routerLogs       RouterLog[]
-  routers          Router[]
-  smsMessages      SmsMessage[]
-  subscriptions    Subscription[]
-  systemSettings   SystemSetting[]
-  settings         TenantSettings?
-  tenantInvoices   TenantInvoice[]
-  tenantLicenses   TenantLicense[]
-  tenantPayments   TenantPayment[]
+  id                    String                 @id @default(uuid())
+  name                  String
+  email                 String                 @unique
+  phone                 String?
+  slug                  String                 @unique
+  logoUrl               String?
+  ownerUserId           String?
+  status                TenantStatus           @default(ACTIVE)
+  planId                String
+  trialStart            DateTime?
+  trialEnd              DateTime?
+  licenseExpiresAt      DateTime?
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  branding              TenantBranding?
+  clients               Client[]
+  equipments            Equipment[]
+  expenses              Expense[]
+  hotspotSettings       HotspotSettings[]
+  invoices              Invoice[]
+  invoiceItems          InvoiceItem[]
+  messageTemplates      MessageTemplate[]
+  packages              Package[]
+  paymentChannels       PaymentChannel[]
+  radaccts              RadAcct[]
+  radchecks             RadCheck[]
+  radReplies            RadReply[]
+  radGroupChecks        RadGroupCheck[]
+  radGroupReplies       RadGroupReply[]
+  radUserGroups         RadUserGroup[]
+  radPostAuths          RadPostAuth[]
+  radiusNas             RadiusNas[]
+  radiusUsers           RadiusUser[]
+  routerLogs            RouterLog[]
+  routers               Router[]
+  smsMessages           SmsMessage[]
+  subscriptions         Subscription[]
+  systemSettings        SystemSetting[]
+  settings              TenantSettings?
+  tenantInvoices        TenantInvoice[]
+  tenantLicenses        TenantLicense[]
+  tenantPayments        TenantPayment[]
   tenantPaymentGateways TenantPaymentGateway[]
-  owner            User?             @relation("TenantOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
-  plan             SaasPlan          @relation(fields: [planId], references: [id])
-  transactions     Transaction[]
-  userOtps         UserOtp[]
-  users            User[]
-  vouchers         Voucher[]
-  vpnUsers         VpnUser[]
-  webhookLogs      WebhookLog[]
-  auditLogs        AuditLog[]
+  owner                 User?                  @relation("TenantOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+  plan                  SaasPlan               @relation(fields: [planId], references: [id])
+  transactions          Transaction[]
+  userOtps              UserOtp[]
+  users                 User[]
+  vouchers              Voucher[]
+  vpnUsers              VpnUser[]
+  webhookLogs           WebhookLog[]
+  auditLogs             AuditLog[]
 
   @@index([ownerUserId])
   @@map("tenants")
 }
 
 model TenantBranding {
-  id           String   @id @default(cuid())
+  id           String   @id @default(uuid())
   tenantId     String   @unique
   companyName  String
   companyLogo  String?
   companyEmail String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
-  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant       Tenant   @relation(fields: [tenantId], references: [id])
 
   @@map("tenant_branding")
 }
 
 model TenantSettings {
-  id                 String   @id @default(cuid())
-  tenantId           String   @unique
-  defaultLocale      String   @default("en")
-  defaultTimezone    String   @default("Africa/Dar_es_Salaam")
-  enableSubdomain    Boolean  @default(true)
-  hotspotAutoSync    Boolean  @default(true)
-  settings           Json?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-  tenant             Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id              String   @id @default(uuid())
+  tenantId        String   @unique
+  defaultLocale   String   @default("en")
+  defaultTimezone String   @default("Africa/Dar_es_Salaam")
+  enableSubdomain Boolean  @default(true)
+  hotspotAutoSync Boolean  @default(true)
+  settings        Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  tenant          Tenant   @relation(fields: [tenantId], references: [id])
 
   @@map("tenant_settings")
 }
 
 model AuditLog {
-  id         String   @id @default(cuid())
+  id         String   @id @default(uuid())
   tenantId   String
   userId     String
-  action     String   // e.g. "CREATE_USER", "DELETE_SUBSCRIBER", "UPDATE_SETTINGS"
-  resource   String   // e.g. "User", "Client", "Package"
-  resourceId String?  // ID of the affected resource
-  details    Json?    // Extra context (old values, new values, etc.)
+  action     String // e.g. "CREATE_USER", "DELETE_SUBSCRIBER", "UPDATE_SETTINGS"
+  resource   String // e.g. "User", "Client", "Package"
+  resourceId String? // ID of the affected resource
+  details    Json? // Extra context (old values, new values, etc.)
   ipAddress  String?
   userAgent  String?
   createdAt  DateTime @default(now())
-  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, createdAt])
@@ -610,25 +617,24 @@ model AuditLog {
   @@map("audit_logs")
 }
 
-
 model TenantPaymentGateway {
-  id          String        @id @default(cuid())
-  tenantId    String
-  provider    String
-  name        String
-  enabled     Boolean       @default(false)
-  status      ChannelStatus @default(INACTIVE)
-  config      Json?
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-  tenant      Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id        String        @id @default(uuid())
+  tenantId  String
+  provider  String
+  name      String
+  enabled   Boolean       @default(false)
+  status    ChannelStatus @default(INACTIVE)
+  config    Json?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  tenant    Tenant        @relation(fields: [tenantId], references: [id])
 
   @@unique([tenantId, provider])
   @@map("tenant_payment_gateways")
 }
 
 model TenantLicense {
-  id        String              @id @default(cuid())
+  id        String              @id @default(uuid())
   tenantId  String
   planId    String
   status    TenantInvoiceStatus @default(PENDING)
@@ -636,7 +642,7 @@ model TenantLicense {
   expiresAt DateTime?
   createdAt DateTime            @default(now())
   updatedAt DateTime            @updatedAt
-  tenant    Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant    Tenant              @relation(fields: [tenantId], references: [id])
   plan      SaasPlan            @relation(fields: [planId], references: [id])
 
   @@index([tenantId, status])
@@ -644,35 +650,35 @@ model TenantLicense {
 }
 
 model SaasPlan {
-  id          String          @id @default(cuid())
-  name        String
-  price       Float
-  pppoeLimit  Int             @default(100)
+  id           String          @id @default(uuid())
+  name         String
+  price        Decimal         @db.Decimal(12, 2)
+  pppoeLimit   Int             @default(100)
   hotspotLimit Int?
-  maxRouters  Int             @default(1)
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
-  invoices    TenantInvoice[]
-  licenses    TenantLicense[]
-  tenants     Tenant[]
+  maxRouters   Int             @default(1)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  invoices     TenantInvoice[]
+  licenses     TenantLicense[]
+  tenants      Tenant[]
 
   @@map("saas_plans")
 }
 
 model TenantInvoice {
-  id            String              @id @default(cuid())
+  id            String              @id @default(uuid())
   invoiceNumber String              @unique
   tenantId      String
   planId        String
   packageMonths Int?
-  amount        Float
+  amount        Decimal             @db.Decimal(12, 2)
   providerRef   String?
   status        TenantInvoiceStatus @default(PENDING)
   dueDate       DateTime
   createdAt     DateTime            @default(now())
   updatedAt     DateTime            @updatedAt
   plan          SaasPlan            @relation(fields: [planId], references: [id])
-  tenant        Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant        Tenant              @relation(fields: [tenantId], references: [id])
   payments      TenantPayment[]
 
   @@index([providerRef])
@@ -680,10 +686,10 @@ model TenantInvoice {
 }
 
 model TenantPayment {
-  id            String        @id @default(cuid())
+  id            String        @id @default(uuid())
   invoiceId     String
   tenantId      String
-  amount        Float
+  amount        Decimal       @db.Decimal(12, 2)
   transactionId String?       @unique
   paymentMethod String        @default("PALMPESA")
   status        PaymentStatus @default(PENDING)
@@ -691,13 +697,13 @@ model TenantPayment {
   updatedAt     DateTime      @updatedAt
   deletedAt     DateTime?
   invoice       TenantInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  tenant        Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant        Tenant        @relation(fields: [tenantId], references: [id])
 
   @@map("tenant_payments")
 }
 
 model VpnUser {
-  id            String    @id @default(cuid())
+  id            String    @id @default(uuid())
   username      String
   password      String
   fullName      String?
@@ -716,14 +722,14 @@ model VpnUser {
   updatedAt     DateTime  @updatedAt
   tenantId      String?
   router        Router    @relation(fields: [routerId], references: [id])
-  tenant        Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant        Tenant?   @relation(fields: [tenantId], references: [id])
 
   @@unique([username, tenantId])
   @@map("vpn_users")
 }
 
 model RadiusUser {
-  id              String    @id @default(cuid())
+  id              String    @id @default(uuid())
   username        String
   password        String
   fullName        String?
@@ -740,15 +746,15 @@ model RadiusUser {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   tenantId        String?
-  tenant          Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant          Tenant?   @relation(fields: [tenantId], references: [id])
 
-  @@index([tenantId])
   @@unique([username, tenantId])
+  @@index([tenantId])
   @@map("radius_users")
 }
 
 model RadiusNas {
-  id          String   @id @default(cuid())
+  id          String   @id @default(uuid())
   nasName     String
   shortName   String?
   type        String   @default("other")
@@ -759,7 +765,7 @@ model RadiusNas {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   tenantId    String?
-  tenant      Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant      Tenant?  @relation(fields: [tenantId], references: [id])
 
   @@index([tenantId])
   @@index([nasName, tenantId])
@@ -773,12 +779,12 @@ model RadCheck {
   op        String  @default(":=") @db.VarChar(2)
   value     String  @db.VarChar(253)
   tenantId  String?
-  tenant    Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant    Tenant? @relation(fields: [tenantId], references: [id])
 
+  @@unique([username, tenantId, attribute], name: "username_tenantId_attribute")
   @@index([username])
   @@index([tenantId])
   @@index([tenantId, username])
-  @@unique([username, tenantId, attribute], name: "username_tenantId_attribute")
   @@map("radcheck")
 }
 
@@ -791,62 +797,62 @@ model RadReply {
   op        String  @default("=") @db.VarChar(2)
   value     String  @db.VarChar(253)
   tenantId  String?
-  tenant    Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant    Tenant? @relation(fields: [tenantId], references: [id])
 
+  @@unique([username, tenantId, attribute], name: "username_tenantId_attribute")
   @@index([username])
   @@index([tenantId])
   @@index([tenantId, username])
-  @@unique([username, tenantId, attribute], name: "username_tenantId_attribute")
   @@map("radreply")
 }
 
 // radgroupcheck — FreeRADIUS group-level check attributes
 model RadGroupCheck {
-  id        Int    @id @default(autoincrement())
-  groupname String @db.VarChar(64)
-  attribute String @db.VarChar(64)
-  op        String @default(":=") @db.VarChar(2)
-  value     String @db.VarChar(253)
+  id        Int     @id @default(autoincrement())
+  groupname String  @db.VarChar(64)
+  attribute String  @db.VarChar(64)
+  op        String  @default(":=") @db.VarChar(2)
+  value     String  @db.VarChar(253)
   tenantId  String?
-  tenant    Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant    Tenant? @relation(fields: [tenantId], references: [id])
 
+  @@unique([groupname, tenantId, attribute], name: "groupname_tenant_attribute")
   @@index([groupname])
   @@index([tenantId])
   @@index([tenantId, groupname])
-  @@unique([groupname, tenantId, attribute], name: "groupname_tenant_attribute")
   @@map("radgroupcheck")
 }
 
 // radgroupreply — FreeRADIUS group-level reply attributes
 model RadGroupReply {
-  id        Int    @id @default(autoincrement())
-  groupname String @db.VarChar(64)
-  attribute String @db.VarChar(64)
-  op        String @default("=") @db.VarChar(2)
-  value     String @db.VarChar(253)
+  id        Int     @id @default(autoincrement())
+  groupname String  @db.VarChar(64)
+  attribute String  @db.VarChar(64)
+  op        String  @default("=") @db.VarChar(2)
+  value     String  @db.VarChar(253)
   tenantId  String?
-  tenant    Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant    Tenant? @relation(fields: [tenantId], references: [id])
 
+  @@unique([groupname, tenantId, attribute], name: "groupname_tenant_attribute_reply")
   @@index([groupname])
   @@index([tenantId])
   @@index([tenantId, groupname])
-  @@unique([groupname, tenantId, attribute], name: "groupname_tenant_attribute_reply")
   @@map("radgroupreply")
 }
 
 // radusergroup — maps users to groups for FreeRADIUS
 model RadUserGroup {
-  id        Int    @id @default(autoincrement())
-  username  String @db.VarChar(64)
-  groupname String @db.VarChar(64)
-  priority  Int    @default(1)
+  id        Int     @id @default(autoincrement())
+  username  String  @db.VarChar(64)
+  groupname String  @db.VarChar(64)
+  priority  Int     @default(1)
   tenantId  String?
-  tenant    Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant    Tenant? @relation(fields: [tenantId], references: [id])
 
+  @@unique([username, tenantId, groupname], name: "username_tenant_group")
   @@index([username])
   @@index([tenantId])
   @@index([tenantId, username])
-  @@unique([username, tenantId, groupname], name: "username_tenant_group")
   @@map("radusergroup")
 }
 
@@ -876,7 +882,7 @@ model RadAcct {
   framedprotocol     String?   @db.VarChar(32)
   framedipaddress    String?   @db.VarChar(15)
   tenantId           String?
-  tenant             Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant             Tenant?   @relation(fields: [tenantId], references: [id])
 
   @@index([username])
   @@index([acctsessionid])
@@ -898,7 +904,7 @@ model RadPostAuth {
   reply    String   @db.VarChar(32)
   authdate DateTime @default(now()) @db.Timestamptz()
   tenantId String?
-  tenant   Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant?  @relation(fields: [tenantId], references: [id])
 
   @@index([username])
   @@index([tenantId])
@@ -906,7 +912,7 @@ model RadPostAuth {
 }
 
 model RateLimit {
-  id        String   @id @default(cuid())
+  id        String   @id @default(uuid())
   key       String
   count     Int      @default(0)
   resetAt   DateTime

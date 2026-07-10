@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
       return errorResponse("Package not found or inactive", 404);
     }
 
-    const amount = pkg.price;
+    const amount = pkg.price.toNumber();
     if (amount < 100) {
       return errorResponse("Package price is too low (minimum 100 TZS)", 402);
     }
@@ -234,7 +234,7 @@ export async function POST(req: NextRequest) {
 
       const result = await paymentService.initiatePayment({
         tenantId: pkg.tenantId ?? null,
-        amount: pkg.price,
+        amount: pkg.price.toNumber(),
         phone: cleanPhone,
         providerName: provider,
         reference,

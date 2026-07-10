@@ -128,7 +128,7 @@ export async function POST(req: NextRequest) {
     try {
       await tenantDb.$transaction(async (tx: any) => {
         // Amount verification — only if Mongike included amount
-        if (amount !== null && amount < resolvedInvoice.amount) {
+        if (amount !== null && amount < resolvedInvoice.amount.toNumber()) {
           await tx.tenantPayment.create({
             data: {
               invoiceId:     resolvedInvoice.id,

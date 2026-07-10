@@ -233,22 +233,22 @@ export async function GET(req: NextRequest) {
         // real percentage change IS -100% (a full drop) — that is correct and expected,
         // not a bug. The only bug case to guard against is 0 -> 0 (no data either period),
         // which should read as "0% / no change" rather than leaking a stray value.
-        const currRev = monthlyRevenue._sum.amount || 0;
-        const prevRev = lastMonthRevenue._sum.amount || 0;
+        const currRev = Number(monthlyRevenue._sum.amount || 0);
+        const prevRev = Number(lastMonthRevenue._sum.amount || 0);
         const monthlyRevenueTrend = prevRev === 0 ? (currRev > 0 ? 100 : 0) : ((currRev - prevRev) / prevRev) * 100;
 
-        const currVoucherRev = monthlyVoucherRev._sum.amount || 0;
-        const prevVoucherRev = lastMonthVoucherRev._sum.amount || 0;
+        const currVoucherRev = Number(monthlyVoucherRev._sum.amount || 0);
+        const prevVoucherRev = Number(lastMonthVoucherRev._sum.amount || 0);
         const monthlyVoucherRevTrend = prevVoucherRev === 0 ? (currVoucherRev > 0 ? 100 : 0) : ((currVoucherRev - prevVoucherRev) / prevVoucherRev) * 100;
 
         // Today's Revenue vs Yesterday
-        const currTodayRev = todayRevenue._sum.amount || 0;
-        const prevTodayRev = yesterdayRevenue._sum.amount || 0;
+        const currTodayRev = Number(todayRevenue._sum.amount || 0);
+        const prevTodayRev = Number(yesterdayRevenue._sum.amount || 0);
         const todayRevenueTrend = prevTodayRev === 0 ? (currTodayRev > 0 ? 100 : 0) : ((currTodayRev - prevTodayRev) / prevTodayRev) * 100;
 
         // Today's Voucher Revenue vs Yesterday
-        const currTodayVoucherRev = todayVoucherRev._sum.amount || 0;
-        const prevTodayVoucherRev = yesterdayVoucherRev._sum.amount || 0;
+        const currTodayVoucherRev = Number(todayVoucherRev._sum.amount || 0);
+        const prevTodayVoucherRev = Number(yesterdayVoucherRev._sum.amount || 0);
         const todayVoucherRevTrend = prevTodayVoucherRev === 0 ? (currTodayVoucherRev > 0 ? 100 : 0) : ((currTodayVoucherRev - prevTodayVoucherRev) / prevTodayVoucherRev) * 100;
 
         let revenueChartData: any[] = [];

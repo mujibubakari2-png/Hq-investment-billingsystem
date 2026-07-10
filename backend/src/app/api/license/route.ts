@@ -108,7 +108,7 @@ export async function GET(req: NextRequest) {
         // Calculate Paid This Month
         const paidThisMonth = tenant.tenantInvoices
             .filter(i => i.status === "PAID" && i.createdAt.getTime() >= startOfMonth)
-            .reduce((acc, curr) => acc + (curr.amount || 0), 0);
+            .reduce((acc, curr) => acc + (curr.amount ? curr.amount.toNumber() : 0), 0);
 
         // outstandingInvoices: PENDING invoices whose due date has already passed
         const outstandingInvoices = tenant.tenantInvoices.filter(
@@ -184,7 +184,7 @@ export async function GET(req: NextRequest) {
             })),
             hasOutstanding: pendingInvoices.length > 0,
             hasPending: pendingInvoices.length > 0,
-            totalOutstanding: pendingInvoices.reduce((sum, i) => sum + (i.amount || 0), 0),
+            totalOutstanding: pendingInvoices.reduce((sum, i) => sum + (i.amount ? i.amount.toNumber() : 0), 0),
         };
 
         return jsonResponse(payload);
