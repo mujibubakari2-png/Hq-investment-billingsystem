@@ -10,115 +10,115 @@ ALTER TABLE "tenant_invoices" ALTER COLUMN "amount" TYPE DECIMAL(12, 2);
 ALTER TABLE "tenant_payments" ALTER COLUMN "amount" TYPE DECIMAL(12, 2);
 
 -- DropForeignKey
-ALTER TABLE "audit_logs" DROP CONSTRAINT "audit_logs_tenantId_fkey";
+ALTER TABLE "audit_logs" DROP CONSTRAINT IF EXISTS "audit_logs_tenantId_fkey";
 
 -- DropForeignKey
-ALTER TABLE "clients" DROP CONSTRAINT "clients_tenantId_fkey";
+ALTER TABLE "clients" DROP CONSTRAINT IF EXISTS "clients_tenantId_fkey";
 
 -- DropForeignKey
-ALTER TABLE "equipments" DROP CONSTRAINT "equipments_tenantId_fkey";
+ALTER TABLE "equipments" DROP CONSTRAINT IF EXISTS "equipments_tenantId_fkey";
 
 -- DropForeignKey
-ALTER TABLE "expenses" DROP CONSTRAINT "expenses_tenantId_fkey";
+ALTER TABLE "expenses" DROP CONSTRAINT IF EXISTS "expenses_tenantId_fkey";
 
 -- DropForeignKey
-ALTER TABLE "hotspot_settings" DROP CONSTRAINT "hotspot_settings_tenantId_fkey";
+ALTER TABLE "hotspot_settings" DROP CONSTRAINT IF EXISTS "hotspot_settings_tenantId_fkey";
 
 -- DropForeignKey
-ALTER TABLE "invoice_items" DROP CONSTRAINT "invoice_items_tenantId_fkey";
+ALTER TABLE "invoice_items" DROP CONSTRAINT IF EXISTS "invoice_items_tenantId_fkey";
 
 -- DropForeignKey
-ALTER TABLE "invoices" DROP CONSTRAINT "invoices_tenantId_fkey";
+ALTER TABLE "invoices" DROP CONSTRAINT IF EXISTS "invoices_tenantId_fkey";
 
 -- DropForeignKey
-ALTER TABLE "message_templates" DROP CONSTRAINT "message_templates_tenantId_fkey";
+ALTER TABLE "message_templates" DROP CONSTRAINT IF EXISTS "message_templates_tenantId_fkey";
 
 -- DropForeignKey
-ALTER TABLE "packages" DROP CONSTRAINT "packages_tenantId_fkey";
+ALTER TABLE "packages" DROP CONSTRAINT IF EXISTS "packages_tenantId_fkey";
 
 -- DropForeignKey
-ALTER TABLE "payment_channels" DROP CONSTRAINT "payment_channels_tenantId_fkey";
+ALTER TABLE "payment_channels" DROP CONSTRAINT IF EXISTS "payment_channels_tenantId_fkey";
 
 -- DropForeignKey
-ALTER TABLE "radacct" DROP CONSTRAINT "radacct_tenantId_fkey";
+ALTER TABLE "radacct" DROP CONSTRAINT IF EXISTS "radacct_tenantId_fkey";
 
 -- DropForeignKey
-ALTER TABLE "radcheck" DROP CONSTRAINT "radcheck_tenantId_fkey";
+ALTER TABLE "radcheck" DROP CONSTRAINT IF EXISTS "radcheck_tenantId_fkey";
 
 -- DropForeignKey
-ALTER TABLE "radgroupcheck" DROP CONSTRAINT "radgroupcheck_tenantId_fkey";
+ALTER TABLE "radgroupcheck" DROP CONSTRAINT IF EXISTS "radgroupcheck_tenantId_fkey";
 
 -- DropForeignKey
-ALTER TABLE "radgroupreply" DROP CONSTRAINT "radgroupreply_tenantId_fkey";
+ALTER TABLE "radgroupreply" DROP CONSTRAINT IF EXISTS "radgroupreply_tenantId_fkey";
 
 -- DropForeignKey
-ALTER TABLE "radius_nas" DROP CONSTRAINT "radius_nas_tenantId_fkey";
+ALTER TABLE "radius_nas" DROP CONSTRAINT IF EXISTS "radius_nas_tenantId_fkey";
 
 -- DropForeignKey
-ALTER TABLE "radius_users" DROP CONSTRAINT "radius_users_tenantId_fkey";
+ALTER TABLE "radius_users" DROP CONSTRAINT IF EXISTS "radius_users_tenantId_fkey";
 
 -- DropForeignKey
-ALTER TABLE "radpostauth" DROP CONSTRAINT "radpostauth_tenantId_fkey";
+ALTER TABLE "radpostauth" DROP CONSTRAINT IF EXISTS "radpostauth_tenantId_fkey";
 
 -- DropForeignKey
-ALTER TABLE "radusergroup" DROP CONSTRAINT "radusergroup_tenantId_fkey";
+ALTER TABLE "radusergroup" DROP CONSTRAINT IF EXISTS "radusergroup_tenantId_fkey";
 
 -- DropForeignKey
-ALTER TABLE "router_logs" DROP CONSTRAINT "router_logs_tenantId_fkey";
+ALTER TABLE "router_logs" DROP CONSTRAINT IF EXISTS "router_logs_tenantId_fkey";
 
 -- DropForeignKey
-ALTER TABLE "routers" DROP CONSTRAINT "routers_tenantId_fkey";
+ALTER TABLE "routers" DROP CONSTRAINT IF EXISTS "routers_tenantId_fkey";
 
 -- DropForeignKey
-ALTER TABLE "sms_messages" DROP CONSTRAINT "sms_messages_tenantId_fkey";
+ALTER TABLE "sms_messages" DROP CONSTRAINT IF EXISTS "sms_messages_tenantId_fkey";
 
 -- DropForeignKey
-ALTER TABLE "subscriptions" DROP CONSTRAINT "subscriptions_packageId_fkey";
+ALTER TABLE "subscriptions" DROP CONSTRAINT IF EXISTS "subscriptions_packageId_fkey";
 
 -- DropForeignKey
-ALTER TABLE "subscriptions" DROP CONSTRAINT "subscriptions_tenantId_fkey";
+ALTER TABLE "subscriptions" DROP CONSTRAINT IF EXISTS "subscriptions_tenantId_fkey";
 
 -- DropForeignKey
-ALTER TABLE "system_settings" DROP CONSTRAINT "system_settings_tenantId_fkey";
+ALTER TABLE "system_settings" DROP CONSTRAINT IF EXISTS "system_settings_tenantId_fkey";
 
 -- DropForeignKey
-ALTER TABLE "tenant_branding" DROP CONSTRAINT "tenant_branding_tenantId_fkey";
+ALTER TABLE "tenant_branding" DROP CONSTRAINT IF EXISTS "tenant_branding_tenantId_fkey";
 
 -- DropForeignKey
-ALTER TABLE "tenant_invoices" DROP CONSTRAINT "tenant_invoices_tenantId_fkey";
+ALTER TABLE "tenant_invoices" DROP CONSTRAINT IF EXISTS "tenant_invoices_tenantId_fkey";
 
 -- DropForeignKey
-ALTER TABLE "tenant_licenses" DROP CONSTRAINT "tenant_licenses_tenantId_fkey";
+ALTER TABLE "tenant_licenses" DROP CONSTRAINT IF EXISTS "tenant_licenses_tenantId_fkey";
 
 -- DropForeignKey
-ALTER TABLE "tenant_payment_gateways" DROP CONSTRAINT "tenant_payment_gateways_tenantId_fkey";
+ALTER TABLE "tenant_payment_gateways" DROP CONSTRAINT IF EXISTS "tenant_payment_gateways_tenantId_fkey";
 
 -- DropForeignKey
-ALTER TABLE "tenant_payments" DROP CONSTRAINT "tenant_payments_tenantId_fkey";
+ALTER TABLE "tenant_payments" DROP CONSTRAINT IF EXISTS "tenant_payments_tenantId_fkey";
 
 -- DropForeignKey
-ALTER TABLE "tenant_settings" DROP CONSTRAINT "tenant_settings_tenantId_fkey";
+ALTER TABLE "tenant_settings" DROP CONSTRAINT IF EXISTS "tenant_settings_tenantId_fkey";
 
 -- DropForeignKey
-ALTER TABLE "transactions" DROP CONSTRAINT "transactions_tenantId_fkey";
+ALTER TABLE "transactions" DROP CONSTRAINT IF EXISTS "transactions_tenantId_fkey";
 
 -- DropForeignKey
-ALTER TABLE "user_otps" DROP CONSTRAINT "user_otps_tenantId_fkey";
+ALTER TABLE "user_otps" DROP CONSTRAINT IF EXISTS "user_otps_tenantId_fkey";
 
 -- DropForeignKey
-ALTER TABLE "users" DROP CONSTRAINT "users_tenantId_fkey";
+ALTER TABLE "users" DROP CONSTRAINT IF EXISTS "users_tenantId_fkey";
 
 -- DropForeignKey
-ALTER TABLE "vouchers" DROP CONSTRAINT "vouchers_packageId_fkey";
+ALTER TABLE "vouchers" DROP CONSTRAINT IF EXISTS "vouchers_packageId_fkey";
 
 -- DropForeignKey
-ALTER TABLE "vouchers" DROP CONSTRAINT "vouchers_tenantId_fkey";
+ALTER TABLE "vouchers" DROP CONSTRAINT IF EXISTS "vouchers_tenantId_fkey";
 
 -- DropForeignKey
-ALTER TABLE "vpn_users" DROP CONSTRAINT "vpn_users_tenantId_fkey";
+ALTER TABLE "vpn_users" DROP CONSTRAINT IF EXISTS "vpn_users_tenantId_fkey";
 
 -- DropForeignKey
-ALTER TABLE "webhook_logs" DROP CONSTRAINT "webhook_logs_tenantId_fkey";
+ALTER TABLE "webhook_logs" DROP CONSTRAINT IF EXISTS "webhook_logs_tenantId_fkey";
 
 -- DropIndex
 DROP INDEX IF EXISTS "audit_logs_tenantId_createdAt_idx";
