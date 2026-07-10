@@ -248,11 +248,6 @@ ${isWireGuard ? `:if ([:len [/ip firewall filter find where comment="Allow WireG
     /ip firewall filter add chain=input in-interface=$wanInterface action=drop comment="Drop WAN input - HQInvestment"
 }
 
-# SECURITY: Block unauthenticated LAN/bridge clients from bypassing Hotspot portal.
-:if ([:len [/ip firewall filter find where comment="Drop unauthenticated LAN forward - HQInvestment"]] = 0) do={
-    /ip firewall filter add chain=forward in-interface=$lanBridge out-interface=$wanInterface action=drop comment="Drop unauthenticated LAN forward - HQInvestment"
-}
-
 # ── 8. RADIUS & Walled Garden ──────────────────────────────────
 # Configure per-router/tenant RADIUS secret (TATIZO 3 RADIUS secret fix)
 :if ([:len [/radius find address="${radiusAddress}"]] = 0) do={
@@ -273,6 +268,13 @@ ${isWireGuard ? `:if ([:len [/ip firewall filter find where comment="Allow WireG
 ${subnetAddress ? `:if ([:len [/ip hotspot walled-garden ip find dst-address="${subnetAddress}"]] = 0) do={
     /ip hotspot walled-garden ip add dst-address="${subnetAddress}" action=accept comment="VPN Subnet - HQInvestment"
 }` : ''}
+
+# ── CRITICAL: Drop unauthenticated LAN forward LAST (after walled-garden setup)
+# This must come AFTER walled-garden rules so clients can reach the login portal!
+:if ([:len [/ip firewall filter find where comment="Drop unauthenticated LAN forward - HQInvestment"]] = 0) do={
+    /ip firewall filter add chain=forward in-interface=$lanBridge out-interface=$wanInterface action=drop comment="Drop unauthenticated LAN forward - HQInvestment"
+}
+
 # ── 9. System Scheduler (Auto-sync with HQInvestment) ────────
 :if ([:len [/system scheduler find name="billing-sync"]] > 0) do={ /system scheduler remove [find name="billing-sync"] }
 :local syncUrl "${publicApiBase}/api/sync/${routerId}"
