@@ -13,7 +13,6 @@ import { routersApi } from '../api';
 import { getPublicApiBase } from '../utils/config';
 import { generateMikrotikScript } from '../utils/mikrotikScriptGenerator';
 import { sanitizeMikroTikName } from '../utils/mikrotikUtils';
-import { buildWireGuardConfigText } from '../utils/wireguardConfigText';
 import type { Router } from '../types';
 import RouterIcon from '@mui/icons-material/Router';
 
@@ -44,7 +43,6 @@ interface WgConfig {
 
 export default function WireGuardConfigModal({ router, onClose }: WireGuardConfigModalProps) {
     const [copied, setCopied] = useState<string | null>(null);
-    const [activeTab, setActiveTab] = useState<'server' | 'client'>('server');
     const [loading, setLoading] = useState(true);
     const [config, setConfig] = useState<WgConfig | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -126,19 +124,6 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
         serverTunnelIp: config.serverTunnelIp
     });
 
-    const clientConfig = buildWireGuardConfigText({
-        mode: 'client',
-        routerName: config.routerName,
-        routerId: config.routerId,
-        routerPublicKey: config.routerPublicKey,
-        presharedKey: config.presharedKey,
-        routerTunnelIp: config.routerTunnelIp,
-        serverTunnelIp: config.serverTunnelIp,
-        listenPort: config.listenPort,
-        serverEndpoint: config.serverEndpoint,
-        serverPort: config.serverPort,
-    });
-
     const handleCopy = (text: string, label: string) => {
         if (navigator.clipboard && window.isSecureContext) {
             navigator.clipboard.writeText(text);
@@ -200,8 +185,8 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
         }
     };
 
-    const activeConfig = activeTab === 'server' ? serverConfig : clientConfig;
-    const activeLabel = activeTab === 'server' ? 'Server (MikroTik)' : 'Client (HQInvestment)';
+    const activeConfig = serverConfig;
+    const activeLabel = 'MikroTik Script';
 
     return (
         <div className="modal-overlay" onClick={onClose}>
@@ -293,34 +278,16 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
                     </div>
                 )}
 
-                {/* Tabs */}
-                <div style={{ display: 'flex', flexWrap: 'wrap', borderBottom: '1px solid var(--border-light)' }}>
-                    <button
-                        onClick={() => setActiveTab('server')}
-                        style={{
-                            flex: 1, padding: '12px 16px', border: 'none', cursor: 'pointer',
-                            fontWeight: 600, fontSize: '0.85rem',
-                            background: activeTab === 'server' ? '#f0fdf4' : 'transparent',
-                            color: activeTab === 'server' ? '#15803d' : 'var(--text-secondary)',
-                            borderBottom: activeTab === 'server' ? '2px solid #15803d' : '2px solid transparent',
-                        }}
-                    >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}>
-                            <RouterIcon style={{ fontSize: 18 }} /> Server Config (MikroTik)
-                        </div>
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('client')}
-                        style={{
-                            flex: 1, padding: '12px 16px', border: 'none', cursor: 'pointer',
-                            fontWeight: 600, fontSize: '0.85rem',
-                            background: activeTab === 'client' ? '#f0fdf4' : 'transparent',
-                            color: activeTab === 'client' ? '#15803d' : 'var(--text-secondary)',
-                            borderBottom: activeTab === 'client' ? '2px solid #15803d' : '2px solid transparent',
-                        }}
-                    >
-                        🌐 Client Config (HQInvestment Server)
-                    </button>
+                {/* Config Type Header */}
+                <div style={{
+                    padding: '12px 16px', borderBottom: '1px solid var(--border-light)',
+                    background: '#f0fdf4', display: 'flex', alignItems: 'center', gap: 8,
+                }}>
+                    <RouterIcon style={{ fontSize: 18, color: '#15803d' }} />
+                    <div>
+                        <div style={{ fontWeight: 600, fontSize: '0.85rem', color: '#15803d' }}>MikroTik Router Configuration</div>
+                        <div style={{ fontSize: '0.75rem', color: '#65a30d' }}>Auto-push to router or copy & paste into MikroTik terminal</div>
+                    </div>
                 </div>
 
                 {/* Key Info Bar */}
@@ -328,8 +295,8 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
                     padding: '12px 16px', background: '#f8fafc', borderBottom: '1px solid var(--border-light)', gap: 12
                 }}>
                     <div>
-                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 2 }}>Tunnel Address</div>
-                        <div style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '0.85rem' }}>{activeTab === 'server' ? `${config.routerTunnelIp}/32` : `${config.serverTunnelIp}/32`}</div>
+                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 2 }}>Router Tunnel IP</div>
+                        <div style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '0.85rem' }}>{config.routerTunnelIp}/32</div>
                     </div>
                     <div>
                         <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 2 }}>Listen Port</div>
@@ -361,14 +328,9 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
                 }}>
                     <InfoOutlinedIcon style={{ fontSize: 16, marginTop: 2, flexShrink: 0 }} />
                     <div>
-                        {activeTab === 'server'
-                            ? <>
-                                <strong>Option 1:</strong> Click "Auto-Push to Router" to configure automatically via API.<br />
-                                <strong>Option 2:</strong> Copy and paste this script into MikroTik Terminal, then click "I Pasted It — Activate".<br />
-                                The system will switch to the WireGuard tunnel IP ({config.routerTunnelIp}) for all future API connections.
-                            </>
-                            : 'Install this config on your HQInvestment VPN server to complete the tunnel. Replace <SERVER_PRIVATE_KEY> with your actual server private key.'
-                        }
+                        <strong>Option 1:</strong> Click "Auto-Push to Router" to configure automatically via API.<br />
+                        <strong>Option 2:</strong> Copy and paste this script into MikroTik Terminal, then click "I Pasted It — Activate".<br />
+                        The system will switch to the WireGuard tunnel IP ({config.routerTunnelIp}) for all future API connections.
                     </div>
                 </div>
 
@@ -378,18 +340,16 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
                     <div className="modal-footer-right modal-footer--wrap">
                         <button className="btn btn-secondary" onClick={() => handleCopy(activeConfig, activeLabel)} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                             {copied === activeLabel ? <CheckCircleIcon style={{ fontSize: 16, color: '#16a34a' }} /> : <ContentCopyIcon style={{ fontSize: 16 }} />}
-                            {copied === activeLabel ? 'Copied!' : `Copy ${activeTab === 'server' ? 'Script' : 'Config'}`}
+                            {copied === activeLabel ? 'Copied!' : `Copy Script`}
                         </button>
                         <button className="btn" style={{ background: '#15803d', color: '#fff', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}
                             onClick={() => handleDownload(
                                 activeConfig,
-                                activeTab === 'server'
-                                    ? `wg-server-${sanitizeMikroTikName(router.name)}.rsc`
-                                    : `wg-client-${sanitizeMikroTikName(router.name)}.conf`
+                                `wg-router-${sanitizeMikroTikName(router.name)}.rsc`
                             )}
                         >
                             <DownloadIcon style={{ fontSize: 16 }} />
-                            Download {activeTab === 'server' ? '.rsc' : '.conf'}
+                            Download Script
                         </button>
                     </div>
                 </div>
