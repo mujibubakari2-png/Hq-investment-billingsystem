@@ -10,9 +10,12 @@ const mockGeneratePrivateKey = jest.fn();
 const mockDerivePublicKey = jest.fn();
 const mockGetServerPublicKey = jest.fn();
 const mockListPeers = jest.fn();
+const mockAddPeer = jest.fn();
+const mockCheckPeerHandshake = jest.fn();
 const mockDecryptRouterFields = jest.fn();
 const mockEncryptRouterFields = jest.fn((data) => data);
 const mockGetMikroTikService = jest.fn();
+const mockCheckWireGuardReachability = jest.fn();
 
 jest.mock('@/lib/rbac', () => ({
   requirePermission: jest.fn((...args: any[]) => mockRequirePermission.apply(null, args as any[])),
@@ -33,6 +36,8 @@ jest.mock('@/lib/wireguard', () => ({
     derivePublicKey: jest.fn((...args: any[]) => mockDerivePublicKey.apply(null, args as any[])),
     getServerPublicKey: jest.fn((...args: any[]) => mockGetServerPublicKey.apply(null, args as any[])),
     listPeers: jest.fn((...args: any[]) => mockListPeers.apply(null, args as any[])),
+    addPeer: jest.fn((...args: any[]) => mockAddPeer.apply(null, args as any[])),
+    checkPeerHandshake: jest.fn((...args: any[]) => mockCheckPeerHandshake.apply(null, args as any[])),
   },
 }));
 
@@ -46,6 +51,10 @@ jest.mock('@/lib/encryption', () => ({
   encryptRouterFields: jest.fn((...args: any[]) => mockEncryptRouterFields.apply(null, args as any[])),
 }));
 
+jest.mock('@/lib/wireguardConnectivity', () => ({
+  checkWireGuardReachability: jest.fn((...args: any[]) => mockCheckWireGuardReachability.apply(null, args as any[])),
+}));
+
 describe('WireGuard route', () => {
   jest.setTimeout(20000);
   beforeEach(() => {
@@ -54,6 +63,7 @@ describe('WireGuard route', () => {
     process.env.WG_SERVER_ENDPOINT = '';
     process.env.WG_SERVER_PORT = '';
     process.env.SERVER_PUBLIC_IP = '';
+    mockCheckWireGuardReachability.mockResolvedValue({ ok: false, output: 'Request timed out', reason: 'failed' });
   });
 
   it('uses routers:read guard for GET wireguard config', async () => {
@@ -350,5 +360,64 @@ describe('WireGuard route', () => {
 
     expect(wgAddressCall).toBeDefined();
     expect(wgAddressCall?.[2]).not.toHaveProperty('network');
+  });
+
+  it('treats a verified WireGuard handshake as success even when ICMP ping fails', async () => {
+    const route = require('@/app/api/routers/[id]/wireguard/route');
+    mockRequirePermission.mockReturnValue({
+      error: null,
+      user: { id: 'admin-5', tenantId: 'tenant-a', role: 'ADMIN' },
+    });
+    mockCanAccessTenant.mockReturnValue(true);
+    mockGetServerIp.mockResolvedValue('10.200.0.1');
+    mockGetServerPublicKey.mockResolvedValue('server-public-key');
+    mockCheckPeerHandshake.mockResolvedValue(true);
+    mockAddPeer.mockResolvedValue({ success: true });
+    mockCheckWireGuardReachability.mockResolvedValue({ ok: false, output: 'Request timed out', reason: 'failed' });
+    mockDecryptRouterFields.mockReturnValue({
+      id: 'router-5',
+      name: 'Router E',
+      host: '10.0.0.5',
+      tenantId: 'tenant-a',
+      wgPrivateKey: 'router-private-key',
+      wgPublicKey: 'router-public-key',
+      wgPeerPublicKey: 'server-public-key',
+      wgPresharedKey: 'preshared-key',
+      wgTunnelIp: '10.200.0.200',
+      wgServerEndpoint: 'vpn.example.com',
+      wgListenPort: 51820,
+      wgEnabled: false,
+      wgConfiguredAt: null,
+      username: 'admin',
+      password: 'admin',
+      port: 8728,
+      apiPort: 8728,
+    });
+
+    const db = {
+      router: {
+        findFirst: jest.fn().mockResolvedValue({}),
+        findMany: jest.fn().mockResolvedValue([]),
+        update: jest.fn().mockResolvedValue({}),
+      },
+      routerLog: {
+        create: jest.fn().mockResolvedValue({}),
+      },
+    };
+    mockGetTenantClient.mockReturnValue(db);
+
+    const req = new NextRequest('http://localhost/api/routers/router-5/wireguard', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'activate' }),
+    });
+
+    const res = await route.POST(req, { params: Promise.resolve({ id: 'router-5' }) });
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(body.tunnelVerified).toBe(true);
+    expect(body.message).toContain('WireGuard tunnel established');
+    expect(body.message).toContain('WireGuard handshake');
   });
 });

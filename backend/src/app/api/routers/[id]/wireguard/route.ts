@@ -947,15 +947,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
         if (peerConnected) {
             // Only switch host to tunnel IP once tunnel is actually confirmed.
-            // ICMP may be blocked by the router or runtime, so we report the handshake result
-            // and include ping output only when it is available.
+            // ICMP may be blocked by the router or runtime, so the handshake remains the
+            // authoritative success signal and ping output is reported separately.
             activateData.host = tunnelIp;
             const connectivity = await checkWireGuardReachability(tunnelIp);
             pingResult = connectivity.output;
             responseMessage = connectivity.ok
                 ? `WireGuard tunnel established! Router is now accessible via tunnel IP ${tunnelIp}.\n\nPing result:\n${pingResult.substring(0, 180)}`
-                : `WireGuard tunnel established! Router is reachable through the WireGuard handshake, but ICMP ping did not succeed.\n\n${pingResult.substring(0, 220)}`;
-            logger.info(`[WireGuard] Activate: peer ${tunnelIp} connected. Switching host to tunnel IP.`);
+                : `WireGuard tunnel established! Router is reachable through the WireGuard handshake, and the tunnel is active on ${tunnelIp}. ICMP ping did not succeed, which commonly means the router or firewall is blocking ICMP or ping is disabled.\n\n${pingResult.substring(0, 220)}`;
+            logger.info(`[WireGuard] Activate: peer ${tunnelIp} connected via handshake. Switching host to tunnel IP.`, {
+                connectivityReason: connectivity.reason,
+            });
         } else {
             // Handshake not confirmed — keep original host to preserve connectivity
             logger.warn(`[WireGuard] Activate: peer ${tunnelIp} has NOT completed a WireGuard handshake. Keeping original host IP to preserve connectivity.`);
