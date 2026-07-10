@@ -27,7 +27,11 @@ const LINK_LOCAL_RE    = /^169\.254\./;          // AWS/GCP/Azure metadata
 const PRIVATE_RE       = /^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/;
 const IPV6_SPECIAL_RE  = /^(fc|fd|fe80)/i;       // ULA + link-local IPv6
 
-export function validateOutboundHost(host: string): void {
+interface ValidateOutboundHostOptions {
+    allowPrivate?: boolean;
+}
+
+export function validateOutboundHost(host: string, options?: ValidateOutboundHostOptions): void {
     const h = host.trim().toLowerCase();
 
     if (LOOPBACK_RE.test(h)) {
@@ -40,12 +44,13 @@ export function validateOutboundHost(host: string): void {
         throw new Error(`[SSRF] Blocked outbound request to IPv6 special address: ${host}`);
     }
 
-    // Private ranges allowed when running in VPN mode (routers behind WireGuard)
-    const allowPrivate = process.env.MIKROTIK_ALLOW_PRIVATE === 'true';
+    // Private ranges are only allowed when explicitly permitted, such as for
+    // routers that are already configured to use a WireGuard tunnel IP.
+    const allowPrivate = options?.allowPrivate ?? process.env.MIKROTIK_ALLOW_PRIVATE === 'true';
     if (!allowPrivate && PRIVATE_RE.test(h)) {
         throw new Error(
             `[SSRF] Blocked outbound request to private IP ${host}. ` +
-            `If routers are on a VPN/LAN, set MIKROTIK_ALLOW_PRIVATE=true.`
+            `If routers are on a VPN/LAN, set MIKROTIK_ALLOW_PRIVATE=true or configure the router to use WireGuard.`
         );
     }
 }
@@ -1028,8 +1033,15 @@ export async function getMikroTikService(routerId: string, tenantId?: string | n
     const decryptedRouter = decryptRouterFields(router);
 
     // HIGH-SEC SSRF FIX: Validate the host before making any outbound connection.
-    // Blocks loopback, link-local (metadata), and private IPs (unless VPN mode).
-    validateOutboundHost(decryptedRouter.host);
+    // Blocks loopback, link-local (metadata), and private IPs unless the router is
+    // explicitly configured to use WireGuard for management.
+    const allowPrivateForWireGuardRouter = Boolean(
+        process.env.MIKROTIK_ALLOW_PRIVATE === 'true' ||
+        (router.wgEnabled && decryptedRouter.host && PRIVATE_RE.test(decryptedRouter.host)) ||
+        (router.wgTunnelIp && decryptedRouter.host === router.wgTunnelIp)
+    );
+
+    validateOutboundHost(decryptedRouter.host, { allowPrivate: allowPrivateForWireGuardRouter });
 
     return new MikroTikService(
         {

@@ -161,6 +161,31 @@ describe('MikroTikService', () => {
         expect(body['limit-uptime']).toMatch(/^1d01:0[12]:\d\d$/); // Allow small variance due to execution time
     });
 
+    it('should allow a WireGuard tunnel IP when the router is already configured for WireGuard', async () => {
+        const unscopedFindUnique = jest.fn().mockResolvedValue({
+            id: 'router-789',
+            tenantId: 'tenant-1',
+            host: '10.0.0.200',
+            wgTunnelIp: '10.0.0.200',
+            wgEnabled: true,
+            port: 8728,
+            username: 'admin',
+            password: 'password',
+        });
+
+        (getTenantClient as jest.Mock).mockImplementation((tenantId?: string | null) => ({
+            routerLog: { create: mockRouterLogCreate },
+            router: {
+                update: mockRouterUpdate,
+                findUnique: tenantId === null ? unscopedFindUnique : jest.fn().mockResolvedValue(null),
+            },
+        }));
+
+        const service = await getMikroTikService('router-789', 'tenant-1');
+
+        expect(service).toBeInstanceOf(MikroTikService);
+    });
+
     it('should deny cross-tenant router access with an explicit tenant mismatch error', async () => {
         const scopedFindUnique = jest.fn().mockResolvedValue(null);
         const unscopedFindUnique = jest.fn().mockResolvedValue({
