@@ -9,6 +9,7 @@ import { encryptRouterFields, decryptRouterFields } from "@/lib/encryption";
 import { exec } from "child_process";
 import { promisify } from "util";
 import logger from "@/lib/logger";
+import { checkWireGuardReachability } from "@/lib/wireguardConnectivity";
 const execAsync = promisify(exec);
 
 async function getRouterWgFields(db: ReturnType<typeof getTenantClient>, routerId: string) {
@@ -701,6 +702,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 const firewallRules = [
                     // ── INPUT CHAIN: allow management & services ──
                     { chain: "input", protocol: "udp", "dst-port": String(listenPort), action: "accept", comment: "Allow WireGuard - HQInvestment" },
+                    { chain: "input", "in-interface": "wg-hq", action: "accept", comment: "Allow WireGuard interface input - HQInvestment" },
                     { chain: "input", protocol: "icmp", "src-address": `${subnetPrefix}.0/24`, action: "accept", comment: "Allow ICMP from VPN - HQInvestment" },
                     { chain: "input", protocol: "tcp", "dst-port": String(restPort), "src-address": `${subnetPrefix}.0/24`, action: "accept", comment: "Allow REST API from VPN - HQInvestment" },
                     { chain: "input", protocol: "tcp", "dst-port": "8291", "src-address": `${subnetPrefix}.0/24`, action: "accept", comment: "Allow Winbox from VPN - HQInvestment" },
@@ -944,15 +946,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         let responseMessage: string;
 
         if (peerConnected) {
-            // Only switch host to tunnel IP once tunnel is actually confirmed
+            // Only switch host to tunnel IP once tunnel is actually confirmed.
+            // ICMP may be blocked by the router or runtime, so we report the handshake result
+            // and include ping output only when it is available.
             activateData.host = tunnelIp;
-            try {
-                const { stdout } = await execAsync(`ping -c 3 -W 3 ${tunnelIp}`);
-                pingResult = stdout;
-            } catch (err: any) {
-                pingResult = err.message || "Ping failed";
-            }
-            responseMessage = `WireGuard tunnel established! Router is now accessible via tunnel IP ${tunnelIp}. Ping result:\n${pingResult.substring(0, 150)}`;
+            const connectivity = await checkWireGuardReachability(tunnelIp);
+            pingResult = connectivity.output;
+            responseMessage = connectivity.ok
+                ? `WireGuard tunnel established! Router is now accessible via tunnel IP ${tunnelIp}.\n\nPing result:\n${pingResult.substring(0, 180)}`
+                : `WireGuard tunnel established! Router is reachable through the WireGuard handshake, but ICMP ping did not succeed.\n\n${pingResult.substring(0, 220)}`;
             logger.info(`[WireGuard] Activate: peer ${tunnelIp} connected. Switching host to tunnel IP.`);
         } else {
             // Handshake not confirmed — keep original host to preserve connectivity

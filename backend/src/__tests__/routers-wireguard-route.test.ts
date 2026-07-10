@@ -15,35 +15,35 @@ const mockEncryptRouterFields = jest.fn((data) => data);
 const mockGetMikroTikService = jest.fn();
 
 jest.mock('@/lib/rbac', () => ({
-  requirePermission: jest.fn((...args: any[]) => mockRequirePermission(...args)),
+  requirePermission: jest.fn((...args: any[]) => mockRequirePermission.apply(null, args as any[])),
 }));
 
 jest.mock('@/lib/tenantPrisma', () => ({
-  getTenantClient: jest.fn((...args: any[]) => mockGetTenantClient(...args)),
+  getTenantClient: jest.fn((...args: any[]) => mockGetTenantClient.apply(null, args as any[])),
 }));
 
 jest.mock('@/lib/tenant', () => ({
-  canAccessTenant: jest.fn((...args: any[]) => mockCanAccessTenant(...args)),
+  canAccessTenant: jest.fn((...args: any[]) => mockCanAccessTenant.apply(null, args as any[])),
 }));
 
 jest.mock('@/lib/wireguard', () => ({
   wireguardManager: {
-    getServerIp: jest.fn((...args: any[]) => mockGetServerIp(...args)),
-    generatePrivateKey: jest.fn((...args: any[]) => mockGeneratePrivateKey(...args)),
-    derivePublicKey: jest.fn((...args: any[]) => mockDerivePublicKey(...args)),
-    getServerPublicKey: jest.fn((...args: any[]) => mockGetServerPublicKey(...args)),
-    listPeers: jest.fn((...args: any[]) => mockListPeers(...args)),
+    getServerIp: jest.fn((...args: any[]) => mockGetServerIp.apply(null, args as any[])),
+    generatePrivateKey: jest.fn((...args: any[]) => mockGeneratePrivateKey.apply(null, args as any[])),
+    derivePublicKey: jest.fn((...args: any[]) => mockDerivePublicKey.apply(null, args as any[])),
+    getServerPublicKey: jest.fn((...args: any[]) => mockGetServerPublicKey.apply(null, args as any[])),
+    listPeers: jest.fn((...args: any[]) => mockListPeers.apply(null, args as any[])),
   },
 }));
 
 jest.mock('@/lib/mikrotik', () => ({
-  getMikroTikService: jest.fn((...args: any[]) => mockGetMikroTikService(...args)),
+  getMikroTikService: jest.fn((...args: any[]) => mockGetMikroTikService.apply(null, args as any[])),
   sanitizeMikroTikName: jest.fn((name: string) => name),
 }));
 
 jest.mock('@/lib/encryption', () => ({
-  decryptRouterFields: jest.fn((...args: any[]) => mockDecryptRouterFields(...args)),
-  encryptRouterFields: jest.fn((...args: any[]) => mockEncryptRouterFields(...args)),
+  decryptRouterFields: jest.fn((...args: any[]) => mockDecryptRouterFields.apply(null, args as any[])),
+  encryptRouterFields: jest.fn((...args: any[]) => mockEncryptRouterFields.apply(null, args as any[])),
 }));
 
 describe('WireGuard route', () => {
@@ -229,6 +229,66 @@ describe('WireGuard route', () => {
 
     expect(peerCall).toBeDefined();
     expect(peerCall?.[2]?.['endpoint-address']).toBe('vpn.example.com');
+  });
+
+  it('allows input traffic from the WireGuard interface so the tunnel can respond to ping and management traffic', async () => {
+    const route = require('@/app/api/routers/[id]/wireguard/route');
+    mockRequirePermission.mockReturnValue({
+      error: null,
+      user: { id: 'admin-4', tenantId: 'tenant-a', role: 'ADMIN' },
+    });
+    mockCanAccessTenant.mockReturnValue(true);
+    mockGetServerIp.mockResolvedValue('10.200.0.1');
+    mockGetServerPublicKey.mockResolvedValue('server-public-key');
+    mockDecryptRouterFields.mockReturnValue({
+      id: 'router-4',
+      name: 'Router D',
+      host: '10.0.0.4',
+      tenantId: 'tenant-a',
+      wgPrivateKey: 'router-private-key',
+      wgPublicKey: 'router-public-key',
+      wgPeerPublicKey: 'server-public-key',
+      wgPresharedKey: 'preshared-key',
+      wgTunnelIp: '10.200.0.200',
+      wgServerEndpoint: 'vpn.example.com',
+      wgListenPort: 51820,
+      wgEnabled: false,
+      wgConfiguredAt: null,
+      username: 'admin',
+      password: 'admin',
+      port: 8728,
+      apiPort: 8728,
+    });
+
+    const service = {
+      apiRequestPublic: jest.fn().mockResolvedValue([]),
+    };
+    mockGetMikroTikService.mockResolvedValue(service);
+
+    const db = {
+      router: {
+        findFirst: jest.fn().mockResolvedValue({}),
+        findMany: jest.fn().mockResolvedValue([]),
+        update: jest.fn().mockResolvedValue({}),
+      },
+      routerLog: {
+        create: jest.fn().mockResolvedValue({}),
+      },
+    };
+    mockGetTenantClient.mockReturnValue(db);
+
+    const req = new NextRequest('http://localhost/api/routers/router-4/wireguard', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'push-config' }),
+    });
+
+    await route.POST(req, { params: Promise.resolve({ id: 'router-4' }) });
+
+    const wgInputRule = service.apiRequestPublic.mock.calls.find((call: any) =>
+      call[0] === '/ip/firewall/filter' && call[1] === 'PUT' && call[2]?.chain === 'input' && call[2]?.['in-interface'] === 'wg-hq' && call[2]?.action === 'accept'
+    );
+
+    expect(wgInputRule).toBeDefined();
   });
 
   it('uses a /32 tunnel address when pushing WireGuard config to MikroTik', async () => {
