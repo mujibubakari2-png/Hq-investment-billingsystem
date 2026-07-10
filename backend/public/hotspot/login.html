@@ -298,12 +298,33 @@
         .login-row {
             display: flex;
             gap: 8px;
-            align-items: center;
+            align-items: stretch;
+            flex-wrap: wrap;
         }
 
         .login-row .field-input {
             flex: 1;
+            min-width: 0;
             margin-bottom: 0;
+        }
+
+        .login-row .btn-connect {
+            flex-shrink: 0;
+        }
+
+        @media (max-width: 420px) {
+            .login-row {
+                flex-wrap: wrap;
+            }
+
+            .login-row .field-input {
+                width: 100%;
+            }
+
+            .login-row .btn-connect {
+                width: 100%;
+                padding: 10px;
+            }
         }
 
         /* ── Remember me / MAC ── */
