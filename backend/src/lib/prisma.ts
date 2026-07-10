@@ -1,5 +1,14 @@
 import "dotenv/config";
-import { PrismaClient } from "../generated/prisma";
+import { PrismaClient, Prisma } from "../generated/prisma";
+
+// Float to Decimal Conversion Safe-Guard for Frontend
+// Ensures that Decimal types are serialized to Numbers in JSON responses
+// instead of strings, preventing the frontend UI from crashing when performing math.
+Object.defineProperty(Prisma.Decimal.prototype, 'toJSON', {
+  value: function () {
+    return this.toNumber();
+  }
+});
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
 import logger from "@/lib/logger";
