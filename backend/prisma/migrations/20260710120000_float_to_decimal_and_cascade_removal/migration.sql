@@ -121,34 +121,34 @@ ALTER TABLE "vpn_users" DROP CONSTRAINT "vpn_users_tenantId_fkey";
 ALTER TABLE "webhook_logs" DROP CONSTRAINT "webhook_logs_tenantId_fkey";
 
 -- DropIndex
-DROP INDEX "audit_logs_tenantId_createdAt_idx";
+DROP INDEX IF EXISTS "audit_logs_tenantId_createdAt_idx";
 
 -- DropIndex
-DROP INDEX "idx_audit_logs_tenant_created";
+DROP INDEX IF EXISTS "idx_audit_logs_tenant_created";
 
 -- DropIndex
-DROP INDEX "clients_deleted_at_idx";
+DROP INDEX IF EXISTS "clients_deleted_at_idx";
 
 -- DropIndex
-DROP INDEX "clients_username_key";
+DROP INDEX IF EXISTS "clients_username_key";
 
 -- DropIndex
-DROP INDEX "packages_deleted_at_idx";
+DROP INDEX IF EXISTS "packages_deleted_at_idx";
 
 -- DropIndex
-DROP INDEX "router_logs_tenant_id_created_at_idx";
+DROP INDEX IF EXISTS "router_logs_tenant_id_created_at_idx";
 
 -- DropIndex
-DROP INDEX "routers_deleted_at_idx";
+DROP INDEX IF EXISTS "routers_deleted_at_idx";
 
 -- DropIndex
-DROP INDEX "subscriptions_deleted_at_idx";
+DROP INDEX IF EXISTS "subscriptions_deleted_at_idx";
 
 -- DropIndex
-DROP INDEX "transactions_deleted_at_idx";
+DROP INDEX IF EXISTS "transactions_deleted_at_idx";
 
 -- DropIndex
-DROP INDEX "vouchers_code_key";
+DROP INDEX IF EXISTS "vouchers_code_key";
 
 -- AlterTable
 ALTER TABLE "expenses" ALTER COLUMN "amount" SET DATA TYPE DECIMAL(12,2);
