@@ -221,192 +221,226 @@ ALTER TABLE "users" DROP COLUMN "mfa_backup_codes",
 DROP COLUMN "mfa_enabled",
 DROP COLUMN "mfa_secret";
 
--- CreateIndex
-CREATE INDEX "audit_logs_tenantId_createdAt_idx" ON "audit_logs"("tenantId", "createdAt");
+-- CreateIndex (idempotent)
+CREATE INDEX IF NOT EXISTS "audit_logs_tenantId_createdAt_idx" ON "audit_logs"("tenantId", "createdAt");
 
--- CreateIndex
-CREATE INDEX "clients_tenantId_createdAt_idx" ON "clients"("tenantId", "createdAt");
+-- CreateIndex (idempotent)
+CREATE INDEX IF NOT EXISTS "clients_tenantId_createdAt_idx" ON "clients"("tenantId", "createdAt");
 
--- CreateIndex
-CREATE UNIQUE INDEX "clients_username_tenantId_key" ON "clients"("username", "tenantId");
+-- CreateIndex (idempotent)
+CREATE UNIQUE INDEX IF NOT EXISTS "clients_username_tenantId_key" ON "clients"("username", "tenantId");
 
--- CreateIndex
-CREATE INDEX "expenses_tenantId_date_idx" ON "expenses"("tenantId", "date");
+-- CreateIndex (idempotent)
+CREATE INDEX IF NOT EXISTS "expenses_tenantId_date_idx" ON "expenses"("tenantId", "date");
 
--- CreateIndex
-CREATE INDEX "invoices_tenantId_dueDate_idx" ON "invoices"("tenantId", "dueDate");
+-- CreateIndex (idempotent)
+CREATE INDEX IF NOT EXISTS "invoices_tenantId_dueDate_idx" ON "invoices"("tenantId", "dueDate");
 
--- CreateIndex
-CREATE INDEX "invoices_tenantId_issuedDate_idx" ON "invoices"("tenantId", "issuedDate");
+-- CreateIndex (idempotent)
+CREATE INDEX IF NOT EXISTS "invoices_tenantId_issuedDate_idx" ON "invoices"("tenantId", "issuedDate");
 
--- CreateIndex
-CREATE INDEX "payment_channels_tenantId_provider_status_idx" ON "payment_channels"("tenantId", "provider", "status");
+-- CreateIndex (idempotent)
+CREATE INDEX IF NOT EXISTS "payment_channels_tenantId_provider_status_idx" ON "payment_channels"("tenantId", "provider", "status");
 
--- CreateIndex
-CREATE UNIQUE INDEX "payment_channels_provider_tenantId_key" ON "payment_channels"("provider", "tenantId");
+-- CreateIndex (idempotent)
+CREATE UNIQUE INDEX IF NOT EXISTS "payment_channels_provider_tenantId_key" ON "payment_channels"("provider", "tenantId");
 
--- CreateIndex
-CREATE INDEX "router_logs_tenantId_createdAt_idx" ON "router_logs"("tenantId", "createdAt");
+-- CreateIndex (idempotent)
+CREATE INDEX IF NOT EXISTS "router_logs_tenantId_createdAt_idx" ON "router_logs"("tenantId", "createdAt");
 
--- CreateIndex
-CREATE INDEX "subscriptions_tenantId_activatedAt_idx" ON "subscriptions"("tenantId", "activatedAt");
+-- CreateIndex (idempotent)
+CREATE INDEX IF NOT EXISTS "subscriptions_tenantId_activatedAt_idx" ON "subscriptions"("tenantId", "activatedAt");
 
--- CreateIndex
-CREATE INDEX "tenant_licenses_tenantId_status_idx" ON "tenant_licenses"("tenantId", "status");
+-- CreateIndex (idempotent)
+CREATE INDEX IF NOT EXISTS "tenant_licenses_tenantId_status_idx" ON "tenant_licenses"("tenantId", "status");
 
--- CreateIndex
-CREATE INDEX "transactions_tenantId_createdAt_idx" ON "transactions"("tenantId", "createdAt");
+-- CreateIndex (idempotent)
+CREATE INDEX IF NOT EXISTS "transactions_tenantId_createdAt_idx" ON "transactions"("tenantId", "createdAt");
 
--- CreateIndex
-CREATE UNIQUE INDEX "vouchers_code_tenantId_key" ON "vouchers"("code", "tenantId");
+-- CreateIndex (idempotent)
+CREATE UNIQUE INDEX IF NOT EXISTS "vouchers_code_tenantId_key" ON "vouchers"("code", "tenantId");
 
--- CreateIndex
-CREATE INDEX "webhook_logs_tenantId_createdAt_idx" ON "webhook_logs"("tenantId", "createdAt");
+-- CreateIndex (idempotent)
+CREATE INDEX IF NOT EXISTS "webhook_logs_tenantId_createdAt_idx" ON "webhook_logs"("tenantId", "createdAt");
 
--- AddForeignKey
-ALTER TABLE "users" ADD CONSTRAINT "users_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+-- AddForeignKey (idempotent)
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'users_tenantId_fkey') THEN
+  ALTER TABLE "users" ADD CONSTRAINT "users_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE SET NULL ON UPDATE CASCADE; END IF; END $$;
 
--- AddForeignKey
-ALTER TABLE "user_otps" ADD CONSTRAINT "user_otps_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'user_otps_tenantId_fkey') THEN
+  ALTER TABLE "user_otps" ADD CONSTRAINT "user_otps_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE SET NULL ON UPDATE CASCADE; END IF; END $$;
 
--- AddForeignKey
-ALTER TABLE "clients" ADD CONSTRAINT "clients_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'clients_tenantId_fkey') THEN
+  ALTER TABLE "clients" ADD CONSTRAINT "clients_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE SET NULL ON UPDATE CASCADE; END IF; END $$;
 
--- AddForeignKey
-ALTER TABLE "packages" ADD CONSTRAINT "packages_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'packages_tenantId_fkey') THEN
+  ALTER TABLE "packages" ADD CONSTRAINT "packages_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE SET NULL ON UPDATE CASCADE; END IF; END $$;
 
--- AddForeignKey
-ALTER TABLE "subscriptions" ADD CONSTRAINT "subscriptions_packageId_fkey" FOREIGN KEY ("packageId") REFERENCES "packages"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'subscriptions_packageId_fkey') THEN
+  ALTER TABLE "subscriptions" ADD CONSTRAINT "subscriptions_packageId_fkey" FOREIGN KEY ("packageId") REFERENCES "packages"("id") ON DELETE CASCADE ON UPDATE CASCADE; END IF; END $$;
 
--- AddForeignKey
-ALTER TABLE "subscriptions" ADD CONSTRAINT "subscriptions_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'subscriptions_tenantId_fkey') THEN
+  ALTER TABLE "subscriptions" ADD CONSTRAINT "subscriptions_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE SET NULL ON UPDATE CASCADE; END IF; END $$;
 
--- AddForeignKey
-ALTER TABLE "transactions" ADD CONSTRAINT "transactions_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'transactions_tenantId_fkey') THEN
+  ALTER TABLE "transactions" ADD CONSTRAINT "transactions_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE SET NULL ON UPDATE CASCADE; END IF; END $$;
 
--- AddForeignKey
-ALTER TABLE "routers" ADD CONSTRAINT "routers_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'routers_tenantId_fkey') THEN
+  ALTER TABLE "routers" ADD CONSTRAINT "routers_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE SET NULL ON UPDATE CASCADE; END IF; END $$;
 
--- AddForeignKey
-ALTER TABLE "router_logs" ADD CONSTRAINT "router_logs_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'router_logs_tenantId_fkey') THEN
+  ALTER TABLE "router_logs" ADD CONSTRAINT "router_logs_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE SET NULL ON UPDATE CASCADE; END IF; END $$;
 
--- AddForeignKey
-ALTER TABLE "hotspot_settings" ADD CONSTRAINT "hotspot_settings_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'hotspot_settings_tenantId_fkey') THEN
+  ALTER TABLE "hotspot_settings" ADD CONSTRAINT "hotspot_settings_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE SET NULL ON UPDATE CASCADE; END IF; END $$;
 
--- AddForeignKey
-ALTER TABLE "equipments" ADD CONSTRAINT "equipments_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'equipments_tenantId_fkey') THEN
+  ALTER TABLE "equipments" ADD CONSTRAINT "equipments_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE SET NULL ON UPDATE CASCADE; END IF; END $$;
 
--- AddForeignKey
-ALTER TABLE "vouchers" ADD CONSTRAINT "vouchers_packageId_fkey" FOREIGN KEY ("packageId") REFERENCES "packages"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'vouchers_packageId_fkey') THEN
+  ALTER TABLE "vouchers" ADD CONSTRAINT "vouchers_packageId_fkey" FOREIGN KEY ("packageId") REFERENCES "packages"("id") ON DELETE CASCADE ON UPDATE CASCADE; END IF; END $$;
 
--- AddForeignKey
-ALTER TABLE "vouchers" ADD CONSTRAINT "vouchers_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'vouchers_tenantId_fkey') THEN
+  ALTER TABLE "vouchers" ADD CONSTRAINT "vouchers_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE SET NULL ON UPDATE CASCADE; END IF; END $$;
 
--- AddForeignKey
-ALTER TABLE "expenses" ADD CONSTRAINT "expenses_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'expenses_tenantId_fkey') THEN
+  ALTER TABLE "expenses" ADD CONSTRAINT "expenses_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE SET NULL ON UPDATE CASCADE; END IF; END $$;
 
--- AddForeignKey
-ALTER TABLE "invoices" ADD CONSTRAINT "invoices_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'invoices_tenantId_fkey') THEN
+  ALTER TABLE "invoices" ADD CONSTRAINT "invoices_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE SET NULL ON UPDATE CASCADE; END IF; END $$;
 
--- AddForeignKey
-ALTER TABLE "invoice_items" ADD CONSTRAINT "invoice_items_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'invoice_items_tenantId_fkey') THEN
+  ALTER TABLE "invoice_items" ADD CONSTRAINT "invoice_items_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE SET NULL ON UPDATE CASCADE; END IF; END $$;
 
--- AddForeignKey
-ALTER TABLE "sms_messages" ADD CONSTRAINT "sms_messages_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'sms_messages_tenantId_fkey') THEN
+  ALTER TABLE "sms_messages" ADD CONSTRAINT "sms_messages_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE SET NULL ON UPDATE CASCADE; END IF; END $$;
 
--- AddForeignKey
-ALTER TABLE "message_templates" ADD CONSTRAINT "message_templates_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'message_templates_tenantId_fkey') THEN
+  ALTER TABLE "message_templates" ADD CONSTRAINT "message_templates_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE SET NULL ON UPDATE CASCADE; END IF; END $$;
 
--- AddForeignKey
-ALTER TABLE "payment_channels" ADD CONSTRAINT "payment_channels_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'payment_channels_tenantId_fkey') THEN
+  ALTER TABLE "payment_channels" ADD CONSTRAINT "payment_channels_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE SET NULL ON UPDATE CASCADE; END IF; END $$;
 
--- AddForeignKey
-ALTER TABLE "webhook_logs" ADD CONSTRAINT "webhook_logs_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'webhook_logs_tenantId_fkey') THEN
+  ALTER TABLE "webhook_logs" ADD CONSTRAINT "webhook_logs_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE SET NULL ON UPDATE CASCADE; END IF; END $$;
 
--- AddForeignKey
-ALTER TABLE "system_settings" ADD CONSTRAINT "system_settings_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'system_settings_tenantId_fkey') THEN
+  ALTER TABLE "system_settings" ADD CONSTRAINT "system_settings_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE SET NULL ON UPDATE CASCADE; END IF; END $$;
 
--- AddForeignKey
-ALTER TABLE "tenant_branding" ADD CONSTRAINT "tenant_branding_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'tenant_branding_tenantId_fkey') THEN
+  ALTER TABLE "tenant_branding" ADD CONSTRAINT "tenant_branding_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE RESTRICT ON UPDATE CASCADE; END IF; END $$;
 
--- AddForeignKey
-ALTER TABLE "tenant_settings" ADD CONSTRAINT "tenant_settings_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'tenant_settings_tenantId_fkey') THEN
+  ALTER TABLE "tenant_settings" ADD CONSTRAINT "tenant_settings_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE RESTRICT ON UPDATE CASCADE; END IF; END $$;
 
--- AddForeignKey
-ALTER TABLE "audit_logs" ADD CONSTRAINT "audit_logs_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'audit_logs_tenantId_fkey') THEN
+  ALTER TABLE "audit_logs" ADD CONSTRAINT "audit_logs_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE RESTRICT ON UPDATE CASCADE; END IF; END $$;
 
--- AddForeignKey
-ALTER TABLE "tenant_payment_gateways" ADD CONSTRAINT "tenant_payment_gateways_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'tenant_payment_gateways_tenantId_fkey') THEN
+  ALTER TABLE "tenant_payment_gateways" ADD CONSTRAINT "tenant_payment_gateways_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE RESTRICT ON UPDATE CASCADE; END IF; END $$;
 
--- AddForeignKey
-ALTER TABLE "tenant_licenses" ADD CONSTRAINT "tenant_licenses_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'tenant_licenses_tenantId_fkey') THEN
+  ALTER TABLE "tenant_licenses" ADD CONSTRAINT "tenant_licenses_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE RESTRICT ON UPDATE CASCADE; END IF; END $$;
 
--- AddForeignKey
-ALTER TABLE "tenant_invoices" ADD CONSTRAINT "tenant_invoices_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'tenant_invoices_tenantId_fkey') THEN
+  ALTER TABLE "tenant_invoices" ADD CONSTRAINT "tenant_invoices_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE RESTRICT ON UPDATE CASCADE; END IF; END $$;
 
--- AddForeignKey
-ALTER TABLE "tenant_payments" ADD CONSTRAINT "tenant_payments_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'tenant_payments_tenantId_fkey') THEN
+  ALTER TABLE "tenant_payments" ADD CONSTRAINT "tenant_payments_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE RESTRICT ON UPDATE CASCADE; END IF; END $$;
 
--- AddForeignKey
-ALTER TABLE "vpn_users" ADD CONSTRAINT "vpn_users_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'vpn_users_tenantId_fkey') THEN
+  ALTER TABLE "vpn_users" ADD CONSTRAINT "vpn_users_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE SET NULL ON UPDATE CASCADE; END IF; END $$;
 
--- AddForeignKey
-ALTER TABLE "radius_users" ADD CONSTRAINT "radius_users_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'radius_users_tenantId_fkey') THEN
+  ALTER TABLE "radius_users" ADD CONSTRAINT "radius_users_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE SET NULL ON UPDATE CASCADE; END IF; END $$;
 
--- AddForeignKey
-ALTER TABLE "radius_nas" ADD CONSTRAINT "radius_nas_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'radius_nas_tenantId_fkey') THEN
+  ALTER TABLE "radius_nas" ADD CONSTRAINT "radius_nas_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE SET NULL ON UPDATE CASCADE; END IF; END $$;
 
--- AddForeignKey
-ALTER TABLE "radcheck" ADD CONSTRAINT "radcheck_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'radcheck_tenantId_fkey') THEN
+  ALTER TABLE "radcheck" ADD CONSTRAINT "radcheck_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE SET NULL ON UPDATE CASCADE; END IF; END $$;
 
--- AddForeignKey
-ALTER TABLE "radreply" ADD CONSTRAINT "radreply_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'radreply_tenantId_fkey') THEN
+  ALTER TABLE "radreply" ADD CONSTRAINT "radreply_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE SET NULL ON UPDATE CASCADE; END IF; END $$;
 
--- AddForeignKey
-ALTER TABLE "radgroupcheck" ADD CONSTRAINT "radgroupcheck_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'radgroupcheck_tenantId_fkey') THEN
+  ALTER TABLE "radgroupcheck" ADD CONSTRAINT "radgroupcheck_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE SET NULL ON UPDATE CASCADE; END IF; END $$;
 
--- AddForeignKey
-ALTER TABLE "radgroupreply" ADD CONSTRAINT "radgroupreply_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'radgroupreply_tenantId_fkey') THEN
+  ALTER TABLE "radgroupreply" ADD CONSTRAINT "radgroupreply_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE SET NULL ON UPDATE CASCADE; END IF; END $$;
 
--- AddForeignKey
-ALTER TABLE "radusergroup" ADD CONSTRAINT "radusergroup_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'radusergroup_tenantId_fkey') THEN
+  ALTER TABLE "radusergroup" ADD CONSTRAINT "radusergroup_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE SET NULL ON UPDATE CASCADE; END IF; END $$;
 
--- AddForeignKey
-ALTER TABLE "radacct" ADD CONSTRAINT "radacct_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'radacct_tenantId_fkey') THEN
+  ALTER TABLE "radacct" ADD CONSTRAINT "radacct_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE SET NULL ON UPDATE CASCADE; END IF; END $$;
 
--- AddForeignKey
-ALTER TABLE "radpostauth" ADD CONSTRAINT "radpostauth_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'radpostauth_tenantId_fkey') THEN
+  ALTER TABLE "radpostauth" ADD CONSTRAINT "radpostauth_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE SET NULL ON UPDATE CASCADE; END IF; END $$;
 
--- RenameIndex
-ALTER INDEX "username_tenantId_attribute" RENAME TO "radcheck_username_tenantId_attribute_key";
+-- RenameIndex (safe: only rename if old name exists AND new name does not)
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'username_tenantId_attribute')
+  AND NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'radcheck_username_tenantId_attribute_key')
+  THEN ALTER INDEX "username_tenantId_attribute" RENAME TO "radcheck_username_tenantId_attribute_key"; END IF;
+END $$;
 
--- RenameIndex
-ALTER INDEX "idx_radgroupcheck_groupname" RENAME TO "radgroupcheck_groupname_idx";
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_radgroupcheck_groupname')
+  AND NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'radgroupcheck_groupname_idx')
+  THEN ALTER INDEX "idx_radgroupcheck_groupname" RENAME TO "radgroupcheck_groupname_idx"; END IF;
+END $$;
 
--- RenameIndex
-ALTER INDEX "radgroupcheck_groupname_tenant_attribute" RENAME TO "radgroupcheck_groupname_tenantId_attribute_key";
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'radgroupcheck_groupname_tenant_attribute')
+  AND NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'radgroupcheck_groupname_tenantId_attribute_key')
+  THEN ALTER INDEX "radgroupcheck_groupname_tenant_attribute" RENAME TO "radgroupcheck_groupname_tenantId_attribute_key"; END IF;
+END $$;
 
--- RenameIndex
-ALTER INDEX "idx_radgroupreply_groupname" RENAME TO "radgroupreply_groupname_idx";
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_radgroupreply_groupname')
+  AND NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'radgroupreply_groupname_idx')
+  THEN ALTER INDEX "idx_radgroupreply_groupname" RENAME TO "radgroupreply_groupname_idx"; END IF;
+END $$;
 
--- RenameIndex
-ALTER INDEX "radgroupreply_groupname_tenant_attribute_reply" RENAME TO "radgroupreply_groupname_tenantId_attribute_key";
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'radgroupreply_groupname_tenant_attribute_reply')
+  AND NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'radgroupreply_groupname_tenantId_attribute_key')
+  THEN ALTER INDEX "radgroupreply_groupname_tenant_attribute_reply" RENAME TO "radgroupreply_groupname_tenantId_attribute_key"; END IF;
+END $$;
 
--- RenameIndex
-ALTER INDEX "idx_radreply_tenant_usr" RENAME TO "radreply_tenantId_username_idx";
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_radreply_tenant_usr')
+  AND NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'radreply_tenantId_username_idx')
+  THEN ALTER INDEX "idx_radreply_tenant_usr" RENAME TO "radreply_tenantId_username_idx"; END IF;
+END $$;
 
--- RenameIndex
-ALTER INDEX "idx_radreply_tenantid" RENAME TO "radreply_tenantId_idx";
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_radreply_tenantid')
+  AND NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'radreply_tenantId_idx')
+  THEN ALTER INDEX "idx_radreply_tenantid" RENAME TO "radreply_tenantId_idx"; END IF;
+END $$;
 
--- RenameIndex
-ALTER INDEX "idx_radreply_username" RENAME TO "radreply_username_idx";
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_radreply_username')
+  AND NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'radreply_username_idx')
+  THEN ALTER INDEX "idx_radreply_username" RENAME TO "radreply_username_idx"; END IF;
+END $$;
 
--- RenameIndex
-ALTER INDEX "radreply_username_tenantId_attribute" RENAME TO "radreply_username_tenantId_attribute_key";
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'radreply_username_tenantId_attribute')
+  AND NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'radreply_username_tenantId_attribute_key')
+  THEN ALTER INDEX "radreply_username_tenantId_attribute" RENAME TO "radreply_username_tenantId_attribute_key"; END IF;
+END $$;
 
--- RenameIndex
-ALTER INDEX "idx_radusergroup_username" RENAME TO "radusergroup_username_idx";
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_radusergroup_username')
+  AND NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'radusergroup_username_idx')
+  THEN ALTER INDEX "idx_radusergroup_username" RENAME TO "radusergroup_username_idx"; END IF;
+END $$;
 
--- RenameIndex
-ALTER INDEX "radusergroup_username_tenant_group" RENAME TO "radusergroup_username_tenantId_groupname_key";
-
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'radusergroup_username_tenant_group')
+  AND NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'radusergroup_username_tenantId_groupname_key')
+  THEN ALTER INDEX "radusergroup_username_tenant_group" RENAME TO "radusergroup_username_tenantId_groupname_key"; END IF;
+END $$;
