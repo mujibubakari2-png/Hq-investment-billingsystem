@@ -11,11 +11,13 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import PowerSettingsNewIcon from '@mui/icons-material/PowerSettingsNew';
 import SyncIcon from '@mui/icons-material/Sync';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
+import BugReportIcon from '@mui/icons-material/BugReport';
 import { normalizeApiList } from '../utils/apiResponse';
 import { routersApi } from '../api';
 import AddRouterModal from '../modals/AddRouterModal';
 import RouterDetailModal from '../modals/RouterDetailModal';
 import ConfirmDeleteModal from '../modals/ConfirmDeleteModal';
+import RouterDiagnosticsModal from '../modals/RouterDiagnosticsModal';
 import RouterSetupWizard from './RouterSetupWizard';
 import LanguageIcon from '@mui/icons-material/Language';
 import CellTowerIcon from '@mui/icons-material/CellTower';
@@ -64,6 +66,7 @@ export default function Mikrotiks() {
     const [connectingId, setConnectingId] = useState<string | null>(null);
     const [downloadProgress, setDownloadProgress] = useState<{ id: string; percent: number } | null>(null);
     const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
+    const [diagnosisRouter, setDiagnosisRouter] = useState<Router | null>(null);
     const menuRef = useRef<HTMLDivElement>(null);
 
     // Close action menu on outside click
@@ -320,6 +323,7 @@ export default function Mikrotiks() {
             {showAddModal && <AddRouterModal onClose={() => setShowAddModal(false)} onSave={handleAddRouter} />}
             {selectedRouterToEdit && <AddRouterModal onClose={() => setSelectedRouterToEdit(null)} onSave={handleEditRouter} initialData={selectedRouterToEdit} />}
             {selectedRouter && <RouterDetailModal router={selectedRouter} onClose={() => setSelectedRouter(null)} onDelete={(r) => { setSelectedRouter(null); setDeleteRouter(r); }} />}
+            {diagnosisRouter && <RouterDiagnosticsModal router={diagnosisRouter} onClose={() => setDiagnosisRouter(null)} />}
             {deleteRouter && (
                 <ConfirmDeleteModal
                     title="Delete Router"
@@ -614,6 +618,26 @@ export default function Mikrotiks() {
                     minWidth: 175, animation: 'fadeIn 0.15s ease-out',
                 }}>
                     <div style={{ padding: '6px 0' }}>
+                        <button
+                            onMouseDown={(e) => { 
+                                e.preventDefault();
+                                const r = routers.find(r => r.id === actionMenuId);
+                                if (r) setDiagnosisRouter(r); 
+                                setActionMenuId(null); 
+                                setMenuPosition(null);
+                            }}
+                            style={{
+                                display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+                                padding: '9px 16px', border: 'none', background: 'transparent',
+                                cursor: 'pointer', fontSize: '0.82rem', color: '#374151',
+                                transition: 'background 0.15s',
+                            }}
+                            onMouseOver={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#f5f3ff'; }}
+                            onMouseOut={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
+                        >
+                            <BugReportIcon style={{ fontSize: 15, color: '#7c3aed' }} />
+                            <span>Diagnose</span>
+                        </button>
                         <button
                             onMouseDown={(e) => { 
                                 e.preventDefault();
