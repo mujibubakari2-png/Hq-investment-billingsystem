@@ -1,4 +1,4 @@
-/**
+Ôªø/**
  * RouterDiagnosticsModal
  * A live diagnostic checklist for MikroTik routers based on the 20-cause RCA.
  */
@@ -66,7 +66,7 @@ function buildDiagnostics(data: Record<string, unknown>): DiagnosticCheck[] {
           fixCommand: '/interface bridge set [find] arp=enabled' },
 
         { id: 'bridge-stp', category: 'Bridge', label: 'STP disabled (protocol-mode=none)',
-          description: 'STP blocks ports for 30-50 seconds ó clients time out before getting IP.',
+          description: 'STP blocks ports for 30-50 seconds ÔøΩ clients time out before getting IP.',
           status: val('bridgeStp') === 'none' ? 'pass' : val('bridgeStp') ? 'fail' : 'unknown',
           detail: val('bridgeStp') ? `STP mode: ${val('bridgeStp')}` : 'Unknown STP state.',
           fixCommand: '/interface bridge set [find] protocol-mode=none' },
@@ -84,7 +84,7 @@ function buildDiagnostics(data: Record<string, unknown>): DiagnosticCheck[] {
           fixCommand: ':if ([:len [/interface bridge port find where interface=wlan1]] = 0) do={\n    /interface bridge port add interface=wlan1 bridge=[/interface bridge get [find] name] edge=yes\n}' },
 
         { id: 'wlan-bridge-mode', category: 'Bridge', label: 'wlan1 bridge-mode=enabled',
-          description: 'Client isolation active when bridge-mode disabled ó blocks DHCP broadcasts.',
+          description: 'Client isolation active when bridge-mode disabled ÔøΩ blocks DHCP broadcasts.',
           status: val('wlanBridgeMode') === 'enabled' ? 'pass' : val('wlanBridgeMode') ? 'fail' : 'unknown',
           detail: val('wlanBridgeMode') ? `bridge-mode: ${val('wlanBridgeMode')}` : 'Unknown.',
           fixCommand: '/interface wireless set [find default-name=wlan1] bridge-mode=enabled' },
@@ -105,7 +105,7 @@ function buildDiagnostics(data: Record<string, unknown>): DiagnosticCheck[] {
         { id: 'dhcp-pool', category: 'DHCP', label: 'IP pool not exhausted',
           description: 'Exhausted pool = new clients get "Couldn\'t get IP address".',
           status: val('poolExhausted') === 'no' ? 'pass' : val('poolExhausted') === 'yes' ? 'fail' : 'unknown',
-          detail: val('poolExhausted') === 'yes' ? '?? IP pool is FULL!' : 'Pool has free addresses.',
+          detail: val('poolExhausted') === 'yes' ? '‚ö†Ô∏è IP pool is FULL!' : 'Pool has free addresses.',
           fixCommand: '/ip pool set [find] ranges=192.168.88.10-192.168.88.250\n/ip dhcp-server set [find] lease-time=1h' },
 
         // -- FIREWALL ----------------------------------------------
@@ -124,7 +124,7 @@ function buildDiagnostics(data: Record<string, unknown>): DiagnosticCheck[] {
         { id: 'mss-clamp', category: 'Firewall', label: 'MSS clamping (mangle) rule exists',
           description: 'Without MSS clamping, HTTPS/large downloads silently fail on PPPoE/WAN.',
           status: has('mssClamp') ? 'pass' : 'warn',
-          detail: has('mssClamp') ? 'MSS clamp rule found ?' : 'No MSS clamp ó HTTPS issues may occur.',
+          detail: has('mssClamp') ? 'MSS clamp rule found ?' : 'No MSS clamp ÔøΩ HTTPS issues may occur.',
           fixCommand: ':if ([:len [/ip firewall mangle find where comment="MSS Clamp - HQInvestment"]] = 0) do={\n    /ip firewall mangle add chain=forward protocol=tcp tcp-flags=syn action=change-mss new-mss=clamp-to-pmtu passthrough=yes comment="MSS Clamp - HQInvestment"\n}' },
 
         // -- WIRELESS ----------------------------------------------
@@ -135,7 +135,7 @@ function buildDiagnostics(data: Record<string, unknown>): DiagnosticCheck[] {
           fixCommand: '/interface wireless enable [find default-name=wlan1]' },
 
         { id: 'wlan-security', category: 'Wireless', label: 'Wireless security profile configured',
-          description: 'Missing WPA2 profile causes 4-way handshake failure ó clients disconnect at L2.',
+          description: 'Missing WPA2 profile causes 4-way handshake failure ÔøΩ clients disconnect at L2.',
           status: has('wlanSecProfile') ? 'pass' : 'warn',
           detail: has('wlanSecProfile') ? `Security profile: ${val('wlanSecProfile')}` : 'No custom security profile.',
           fixCommand: ':if ([:len [/interface wireless security-profiles find name="hq-wifi-sec"]] = 0) do={\n    /interface wireless security-profiles add name="hq-wifi-sec" mode=dynamic-keys authentication-types=wpa2-psk wpa2-pre-shared-key="ChangeMe2026!"\n}\n/interface wireless set [find default-name=wlan1] security-profile="hq-wifi-sec"' },
@@ -150,7 +150,7 @@ function buildDiagnostics(data: Record<string, unknown>): DiagnosticCheck[] {
         { id: 'hotspot-ip-binding', category: 'Hotspot', label: 'No blocked IP bindings',
           description: 'A "blocked" IP binding prevents that client MAC from getting any IP.',
           status: val('blockedBindings') === '0' ? 'pass' : val('blockedBindings') ? 'warn' : 'unknown',
-          detail: val('blockedBindings') && val('blockedBindings') !== '0' ? `?? ${val('blockedBindings')} blocked IP bindings!` : 'No blocked bindings.',
+          detail: val('blockedBindings') && val('blockedBindings') !== '0' ? `‚ö†Ô∏è ${val('blockedBindings')} blocked IP bindings!` : 'No blocked bindings.',
           fixCommand: '/ip hotspot ip-binding print where type=blocked\n/ip hotspot ip-binding remove [find type=blocked]' },
 
         // -- RADIUS ------------------------------------------------
@@ -243,12 +243,12 @@ export default function RouterDiagnosticsModal({ router, onClose }: RouterDiagno
                     </div>
                     <div style={{ flex: 1 }}>
                         <div style={{ fontWeight: 700, fontSize: '1rem', color: '#111' }}>Router Diagnostics</div>
-                        <div style={{ fontSize: '0.78rem', color: '#6b7280' }}>{router.name} ó {router.host}</div>
+                        <div style={{ fontSize: '0.78rem', color: '#6b7280' }}>{router.name} ÔøΩ {router.host}</div>
                     </div>
                     {!loading && (
                         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                             {failCount > 0    && <span style={{ padding: '3px 10px', borderRadius: 20, background: '#fef2f2', color: '#dc2626', fontSize: '0.72rem', fontWeight: 700 }}>? {failCount} Failed</span>}
-                            {warnCount > 0    && <span style={{ padding: '3px 10px', borderRadius: 20, background: '#fef3c7', color: '#d97706', fontSize: '0.72rem', fontWeight: 700 }}>?? {warnCount} Warn</span>}
+                            {warnCount > 0    && <span style={{ padding: '3px 10px', borderRadius: 20, background: '#fef3c7', color: '#d97706', fontSize: '0.72rem', fontWeight: 700 }}>‚ö†Ô∏è {warnCount} Warn</span>}
                             {passCount > 0    && <span style={{ padding: '3px 10px', borderRadius: 20, background: '#f0fdf4', color: '#16a34a', fontSize: '0.72rem', fontWeight: 700 }}>? {passCount} Pass</span>}
                             {unknownCount > 0 && <span style={{ padding: '3px 10px', borderRadius: 20, background: '#f8fafc', color: '#64748b', fontSize: '0.72rem', fontWeight: 700 }}>? {unknownCount}</span>}
                         </div>
@@ -327,7 +327,7 @@ export default function RouterDiagnosticsModal({ router, onClose }: RouterDiagno
                 {/* -- Footer ------------------------------------------- */}
                 <div style={{ padding: '12px 24px', borderTop: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fafafa', borderRadius: '0 0 16px 16px' }}>
                     <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
-                        ?? Run fix commands in <strong>WinBox Terminal</strong> or <strong>SSH</strong>. Re-run after applying.
+                        üí° Run fix commands in <strong>WinBox Terminal</strong> or <strong>SSH</strong>. Re-run after applying.
                     </div>
                     <button onClick={onClose} style={{ padding: '7px 18px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600, color: '#374151' }}>Close</button>
                 </div>

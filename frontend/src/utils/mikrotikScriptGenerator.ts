@@ -122,7 +122,7 @@ ${isWireGuard ? `# VPN IP: ${routerTunnelIp}\n` : ''}# Generated: ${new Date().t
 
 # FIX CAUSE #4: Add LAN interfaces (ether2+) to bridge if not already members.
 # Skips ether1 (WAN). Covers ether2–ether5.
-:foreach ethIface in=["ether2", "ether3", "ether4", "ether5"] do={
+:foreach ethIface in=[:toarray "ether2,ether3,ether4,ether5"] do={
     :if ([:len [/interface find name=$ethIface]] > 0) do={
         :if ([:len [/interface bridge port find where interface=$ethIface]] = 0) do={
             /interface bridge port add interface=$ethIface bridge=$lanBridge comment="HQInvestment LAN port"
