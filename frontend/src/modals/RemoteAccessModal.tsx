@@ -49,8 +49,19 @@ export default function RemoteAccessModal({ router, onClose }: RemoteAccessModal
 
     // Tunnel IP is the address Winbox should connect to via VPN
     const tunnelHost = wgStatus?.routerTunnelIp || router.host;
-    const winboxUrl = `winbox://${router.username || 'admin'}:${router.password || ''}@${tunnelHost}`;
-    const webFigUrl = `http://${tunnelHost}`;
+
+    // Prefer explicit management ports when available: `apiPort` (Web/API) then `port` (legacy).
+    const mgmtPort = router.apiPort || router.port || undefined;
+
+    const hostWithPort = (host: string, port?: number) => port ? `${host}:${port}` : host;
+
+    const winboxPort = router.port || 8291; // Winbox default 8291 if not specified
+    const safeUser = encodeURIComponent(router.username || 'admin');
+    const safePass = encodeURIComponent(router.password || '');
+    const winboxUrl = `winbox://${safeUser}:${safePass}@${hostWithPort(tunnelHost, winboxPort)}`;
+    
+    const isHttps = mgmtPort === 443;
+    const webFigUrl = `${isHttps ? 'https' : 'http'}://${hostWithPort(tunnelHost, mgmtPort)}`;
 
     const isTunnelActive = wgStatus?.tunnelActive === true;
     const isTunnelConfigured = wgStatus?.enabled === true;

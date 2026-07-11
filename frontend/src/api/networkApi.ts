@@ -38,6 +38,7 @@ export const routersApi = {
     getActiveSessions:  (id: string)                                      => get<Record<string, unknown>[]>(`/routers/${id}/active-sessions`),
     disconnectSession:  (id: string, data: { sessionId: string; service: string }) => post<{ message: string }>(`/routers/${id}/disconnect-session`, data),
     getSystemInfo:      (id: string)                                      => get<Record<string, unknown>>(`/routers/${id}/system-info`),
+    listInterfaces:     (id: string)                                      => get<any[]>(`/routers/${id}/interfaces`),
     getLogs:            (id: string, params?: Record<string, string>)     => {
         const qs = params ? '?' + new URLSearchParams(params).toString() : '';
         return get<Record<string, unknown>[]>(`/routers/${id}/logs${qs}`);

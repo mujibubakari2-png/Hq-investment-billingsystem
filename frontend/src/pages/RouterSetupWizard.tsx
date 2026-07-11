@@ -180,7 +180,7 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
     const fetchInterfaces = async () => {
         if (!routerId) return;
         setLoadingInterfaces(true);
-        try { setInterfaces(await (routersApi as any).listInterfaces(routerId)); }
+        try { setInterfaces(await routersApi.listInterfaces(routerId)); }
         catch (err) { console.error('Failed to fetch interfaces:', err); }
         finally { setLoadingInterfaces(false); }
     };
