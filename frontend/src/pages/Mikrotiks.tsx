@@ -271,35 +271,16 @@ export default function Mikrotiks() {
                 const username = encodeURIComponent(rawUser);
                 const password = encodeURIComponent(rawPass);
                 const winboxUrl = `winbox://${username}:${password}@${ip}:8291`;
+                
                 // Attempt to launch
-                let hasBlurred = false;
-                const onBlur = () => { hasBlurred = true; };
-                window.addEventListener('blur', onBlur);
-
                 window.location.href = winboxUrl;
                 
-                // Fallback: If not installed, it won't trigger OS protocol prompt (no blur)
+                // Fallback for missing protocol handler
                 setTimeout(() => {
-                    window.removeEventListener('blur', onBlur);
-                    if (!hasBlurred && document.hasFocus()) {
-                        const ua = navigator.userAgent;
-                        if (/Android/i.test(ua)) {
-                            // Redirect to Google Play Store
-                            window.location.href = 'https://play.google.com/store/apps/details?id=com.mikrotik.android.tikapp';
-                        } else if (/iPhone|iPad|iPod/i.test(ua)) {
-                            // Redirect to Apple App Store
-                            window.location.href = 'https://apps.apple.com/us/app/mikrotik/id1323064830';
-                        } else {
-                            // Automatically download .exe without asking on Desktop Web
-                            const link = document.createElement('a');
-                            link.href = 'https://mt.lv/winbox64';
-                            link.setAttribute('download', '');
-                            document.body.appendChild(link);
-                            link.click();
-                            link.remove();
-                        }
+                    if (confirm("If WinBox did not open, it may not be installed. Download it from the official MikroTik website?")) {
+                        window.open('https://mt.lv/winbox64', '_blank');
                     }
-                }, 1500);
+                }, 2000);
             }
         } catch (err: any) {
             alert(`Failed to connect: ${err.message}`);
