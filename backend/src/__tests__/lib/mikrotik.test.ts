@@ -235,4 +235,91 @@ describe('MikroTikService', () => {
             'Unauthorized: This router belongs to another tenant'
         );
     });
+
+    // ── BUG FIX REGRESSION TESTS ─────────────────────────────────────────────
+
+    it('[BUG-FIX] 401 response should throw clear auth error, NOT "Failed to connect"', async () => {
+        // When RouterOS returns HTTP 401, the old code wrapped it with "Failed to connect to X"
+        // making it look like a network problem. Now it should throw a clear authentication error.
+        const service = new MikroTikService({
+            host: '10.0.0.200',
+            port: 8728,
+            username: 'admin',
+            password: 'wrong-password',
+            restPort: 80,
+        }, 'router-401', 'tenant-1');
+
+        // testConnection calls apiRequest twice (identity + resource).
+        // Both should fail with 401 — we only need to mock one since testConnection
+        // catches errors and returns { success: false, message }.
+        (global.fetch as jest.Mock).mockResolvedValue({
+            ok: false,
+            status: 401,
+            text: async () => JSON.stringify({ error: 401, message: 'Unauthorized' }),
+        });
+
+        const result = await service.testConnection();
+
+        // Must fail with auth-specific message
+        expect(result.success).toBe(false);
+        expect(result.message).toContain('Authentication failed (401)');
+        // Must include the host and username for actionable debugging
+        expect(result.message).toContain('10.0.0.200');
+        expect(result.message).toContain('admin');
+        // Must NOT say "Failed to connect" — that's misleading for a credential error
+        expect(result.message).not.toContain('Failed to connect');
+    });
+
+    it('[BUG-FIX] HTTP 401 error should NOT be wrapped with "Failed to connect" prefix', async () => {
+        // apiRequest must re-throw RouterOS HTTP errors without the misleading network-error prefix
+        const service = new MikroTikService({
+            host: '10.0.0.200',
+            port: 80,
+            username: 'admin',
+            password: '',
+            restPort: 80,
+        }, 'router-401b', 'tenant-1');
+
+        (global.fetch as jest.Mock).mockResolvedValueOnce({
+            ok: false,
+            status: 401,
+            text: async () => '{"error":401,"message":"Unauthorized"}',
+        });
+
+        // apiRequestPublic should throw the auth error directly
+        await expect(service.apiRequestPublic('/system/identity')).rejects.toThrow(
+            /Authentication failed \(401\)/
+        );
+    });
+
+    it('[BUG-FIX] getMikroTikService warns when router has no password in DB', async () => {
+        const loggerWarnSpy = jest.spyOn(require('@/lib/logger').default, 'warn').mockImplementation(() => {});
+        const unscopedFindUnique = jest.fn().mockResolvedValue({
+            id: 'router-nopass',
+            tenantId: 'tenant-1',
+            host: '10.0.0.50',
+            wgTunnelIp: '10.0.0.50',
+            wgEnabled: true,
+            port: 8728,
+            username: 'admin',
+            password: null,   // ← no password in DB
+        });
+
+        (getTenantClient as jest.Mock).mockImplementation((tenantId?: string | null) => ({
+            routerLog: { create: mockRouterLogCreate },
+            router: {
+                update: mockRouterUpdate,
+                findUnique: tenantId === null ? unscopedFindUnique : jest.fn().mockResolvedValue(null),
+            },
+        }));
+
+        await getMikroTikService('router-nopass', 'tenant-1');
+
+        // Should warn about missing password that will cause 401
+        expect(loggerWarnSpy).toHaveBeenCalledWith(
+            expect.stringContaining('no password set in the database')
+        );
+        loggerWarnSpy.mockRestore();
+    });
 });
+

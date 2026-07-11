@@ -379,27 +379,48 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 // ──────────────────────────────────────────────────────────
                 // STEP 1: BASIC SETUP (User, Identity, DNS, NTP
                 // ──────────────────────────────────────────────────────────
-                try {
-                    // Get current users
-                    const users = await service.apiRequestPublic("/user");
-                    if (Array.isArray(users)) {
-                        const existingUser = users.find((u: any) => u.name === "admin" || u.name === (router.username || "admin"));
-                        if (existingUser) {
-                            await service.apiRequestPublic("/user", "PATCH", {
-                                ".id": existingUser[".id"],
-                                name: router.username || "admin",
-                                password: router.password || "admin"
-                            });
-                        } else {
-                            await service.apiRequestPublic("/user", "PUT", {
-                                name: router.username || "admin",
-                                password: router.password || "admin",
-                                group: "full",
-                                comment: "Management User - DO NOT DELETE"
-                            });
+                // BUG-FIX: Only push credentials to RouterOS if BOTH username AND password are
+                // stored in the DB. Previously the code fell back to "admin"/"admin" when the DB
+                // had no password, which silently changed the RouterOS admin password to "admin"
+                // WITHOUT updating the DB record. The next getMikroTikService call would then use
+                // the empty DB password ("") → 401 Unauthorized on every subsequent operation.
+                if (router.username && router.password) {
+                    try {
+                        const users = await service.apiRequestPublic("/user");
+                        if (Array.isArray(users)) {
+                            const existingUser = users.find((u: any) =>
+                                u.name === router.username || u.name === "admin"
+                            );
+                            if (existingUser) {
+                                await service.apiRequestPublic("/user", "PATCH", {
+                                    ".id": existingUser[".id"],
+                                    name: router.username,
+                                    password: router.password,
+                                });
+                            } else {
+                                await service.apiRequestPublic("/user", "PUT", {
+                                    name: router.username,
+                                    password: router.password,
+                                    group: "full",
+                                    comment: "Management User - DO NOT DELETE",
+                                });
+                            }
+                        }
+                    } catch (e: any) {
+                        if (!e.message?.includes("already")) {
+                            logger.warn("User note:", { error: e.message instanceof Error ? e.message.message : String(e.message) });
                         }
                     }
-                } catch (e: any) { if (!e.message?.includes("already")) logger.warn("User note:", { error: e.message instanceof Error ? e.message.message : String(e.message) }); }
+                } else {
+                    // Credentials not stored in DB — skip user update entirely.
+                    // Falling back to "admin"/"admin" would change the RouterOS password without
+                    // updating the DB, causing a 401 on every subsequent connection.
+                    logger.warn(
+                        "[PUSH-CONFIG] Router has no username/password in DB. " +
+                        "Skipping RouterOS user credential update to avoid credential drift. " +
+                        "Set credentials in Settings → Routers → Edit, then re-run push-config."
+                    );
+                }
 
                 try {
                     await service.apiRequestPublic("/system/identity", "PATCH", { name: router.name });

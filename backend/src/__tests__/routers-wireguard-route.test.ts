@@ -420,4 +420,144 @@ describe('WireGuard route', () => {
     expect(body.message).toContain('WireGuard tunnel established');
     expect(body.message).toContain('WireGuard handshake');
   });
+
+  // ── BUG FIX REGRESSION TESTS ────────────────────────────────────────────────
+
+  it('[BUG-FIX] push-config must NOT call /user PATCH when DB has no password (prevents credential drift → 401)', async () => {
+    // ROOT CAUSE: old code used `password: router.password || "admin"`.
+    // When DB password is null, this changed RouterOS admin password to "admin"
+    // WITHOUT updating the DB, so next connection used "" → 401 forever.
+    const route = require('@/app/api/routers/[id]/wireguard/route');
+    mockRequirePermission.mockReturnValue({
+      error: null,
+      user: { id: 'admin-drift', tenantId: 'tenant-a', role: 'ADMIN' },
+    });
+    mockCanAccessTenant.mockReturnValue(true);
+    mockGetServerIp.mockResolvedValue('10.200.0.1');
+    mockGetServerPublicKey.mockResolvedValue('server-public-key');
+
+    // Router has NO password in DB — the bug scenario
+    mockDecryptRouterFields.mockReturnValue({
+      id: 'router-nodrift',
+      name: 'Router NoDrift',
+      host: '10.0.0.10',
+      tenantId: 'tenant-a',
+      wgPrivateKey: 'router-private-key',
+      wgPublicKey: 'router-public-key',
+      wgPeerPublicKey: 'server-public-key',
+      wgPresharedKey: 'preshared-key',
+      wgTunnelIp: '10.200.0.200',
+      wgServerEndpoint: 'vpn.example.com',
+      wgListenPort: 51820,
+      wgEnabled: false,
+      wgConfiguredAt: null,
+      username: null,    // ← no username in DB
+      password: null,    // ← no password in DB — the bug scenario
+      port: 8728,
+      apiPort: 8728,
+    });
+
+    const service = {
+      apiRequestPublic: jest.fn().mockResolvedValue([]),
+    };
+    mockGetMikroTikService.mockResolvedValue(service);
+
+    const db = {
+      router: {
+        findFirst: jest.fn().mockResolvedValue({}),
+        findMany: jest.fn().mockResolvedValue([]),
+        update: jest.fn().mockResolvedValue({}),
+      },
+      routerLog: { create: jest.fn().mockResolvedValue({}) },
+    };
+    mockGetTenantClient.mockReturnValue(db);
+
+    const req = new NextRequest('http://localhost/api/routers/router-nodrift/wireguard', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'push-config' }),
+    });
+
+    await route.POST(req, { params: Promise.resolve({ id: 'router-nodrift' }) });
+
+    // CRITICAL: /user PATCH or PUT must NOT be called when DB has no credentials
+    // Calling it with "admin"/"admin" fallback would change RouterOS password
+    // without updating DB → permanent 401 on next connection
+    const userPatchCall = service.apiRequestPublic.mock.calls.find((call: any) =>
+      call[0] === '/user' && (call[1] === 'PATCH' || call[1] === 'PUT')
+    );
+    expect(userPatchCall).toBeUndefined();
+  });
+
+  it('[BUG-FIX] push-config DOES update /user when DB has valid username AND password', async () => {
+    // When credentials exist in DB, push-config should push them to RouterOS
+    const route = require('@/app/api/routers/[id]/wireguard/route');
+    mockRequirePermission.mockReturnValue({
+      error: null,
+      user: { id: 'admin-creds', tenantId: 'tenant-a', role: 'ADMIN' },
+    });
+    mockCanAccessTenant.mockReturnValue(true);
+    mockGetServerIp.mockResolvedValue('10.200.0.1');
+    mockGetServerPublicKey.mockResolvedValue('server-public-key');
+
+    // Router HAS valid credentials in DB
+    mockDecryptRouterFields.mockReturnValue({
+      id: 'router-withcreds',
+      name: 'Router WithCreds',
+      host: '10.0.0.20',
+      tenantId: 'tenant-a',
+      wgPrivateKey: 'router-private-key',
+      wgPublicKey: 'router-public-key',
+      wgPeerPublicKey: 'server-public-key',
+      wgPresharedKey: 'preshared-key',
+      wgTunnelIp: '10.200.0.200',
+      wgServerEndpoint: 'vpn.example.com',
+      wgListenPort: 51820,
+      wgEnabled: false,
+      wgConfiguredAt: null,
+      username: 'hq_admin_abc123',   // ← valid username
+      password: 'SecurePass!99',     // ← valid password
+      port: 8728,
+      apiPort: 8728,
+    });
+
+    // Mock /user GET to return an existing "admin" user
+    const service = {
+      apiRequestPublic: jest.fn().mockImplementation((path: string, method: string) => {
+        if (path === '/user' && (!method || method === 'GET')) {
+          return Promise.resolve([{ '.id': '*1', name: 'admin' }]);
+        }
+        return Promise.resolve([]);
+      }),
+    };
+    mockGetMikroTikService.mockResolvedValue(service);
+
+    const db = {
+      router: {
+        findFirst: jest.fn().mockResolvedValue({}),
+        findMany: jest.fn().mockResolvedValue([]),
+        update: jest.fn().mockResolvedValue({}),
+      },
+      routerLog: { create: jest.fn().mockResolvedValue({}) },
+    };
+    mockGetTenantClient.mockReturnValue(db);
+
+    const req = new NextRequest('http://localhost/api/routers/router-withcreds/wireguard', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'push-config' }),
+    });
+
+    await route.POST(req, { params: Promise.resolve({ id: 'router-withcreds' }) });
+
+    // /user PATCH should have been called with the DB credentials (no fallback)
+    const userPatchCall = service.apiRequestPublic.mock.calls.find((call: any) =>
+      call[0] === '/user' && call[1] === 'PATCH'
+    );
+    expect(userPatchCall).toBeDefined();
+    expect(userPatchCall?.[2]?.name).toBe('hq_admin_abc123');
+    expect(userPatchCall?.[2]?.password).toBe('SecurePass!99');
+    // Must NOT fall back to "admin" for either field
+    expect(userPatchCall?.[2]?.name).not.toBe('admin');
+    expect(userPatchCall?.[2]?.password).not.toBe('admin');
+  });
 });
+

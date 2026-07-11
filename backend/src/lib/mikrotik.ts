@@ -296,12 +296,30 @@ export class MikroTikService {
                 if (errText.trim().toLowerCase().startsWith('<!doctype html>') || errText.trim().toLowerCase().startsWith('<html')) {
                     errText = "Received unexpected HTML response. Ensure the router REST API is enabled and the port is correct.";
                 }
+                // BUG-FIX: Handle 401 specifically with an actionable auth error instead of a generic one.
+                // Previously, the 401 was thrown here and then re-caught below and wrapped with the
+                // misleading "Failed to connect to X" prefix — hiding the real cause (wrong credentials).
+                if (res.status === 401) {
+                    throw new Error(
+                        `Authentication failed (401) for router at ${this.conn.host}. ` +
+                        `The username "${this.conn.username}" or password stored in the system is incorrect. ` +
+                        `Please update router credentials in Settings → Routers → Edit, ` +
+                        `or reset the RouterOS admin password to match what is stored.`
+                    );
+                }
                 throw new Error(`RouterOS API error (${res.status}): ${errText}`);
             }
 
             const text = await res.text();
             return text ? JSON.parse(text) : {};
         } catch (err: any) {
+            // BUG-FIX: Re-throw RouterOS HTTP-level errors (401, 4xx, 5xx) WITHOUT wrapping them
+            // with the misleading "Failed to connect" prefix. These errors mean the TCP connection
+            // SUCCEEDED — the router sent back an HTTP error response. Only network-level failures
+            // (AbortError, ECONNREFUSED, EHOSTUNREACH) should use the "Failed to connect" message.
+            if (!err.cause && err.name !== 'AbortError') {
+                throw err;
+            }
             if (err.name === "AbortError") {
                 throw new Error(`Connection to ${this.conn.host} timed out after ${timeoutMs / 1000}s. Ensure the router is reachable, REST API service (www/www-ssl) is enabled, and firewall allows inbound traffic on port ${this.baseUrl.includes('https') ? '443' : '80'}.`);
             }
@@ -1067,12 +1085,23 @@ export async function getMikroTikService(routerId: string, tenantId?: string | n
 
     validateOutboundHost(decryptedRouter.host, { allowPrivate: allowPrivateForWireGuardRouter });
 
+    // BUG-FIX: Use decryptedRouter for ALL credential fields (username, password, host) to be
+    // consistent. username is not encrypted but using decryptedRouter (which spreads all fields
+    // from router) ensures both come from the same decrypted record.
+    if (!decryptedRouter.password) {
+        logger.warn(
+            `[MikroTik] Router ${routerId} has no password set in the database. ` +
+            `An empty password will be sent — this will cause a 401 if the RouterOS admin ` +
+            `account has a password. Set the password in Settings → Routers → Edit.`
+        );
+    }
+
     return new MikroTikService(
         {
             host: decryptedRouter.host,
             port: router.apiPort || router.port || 8728,
             restPort: (router as any).restPort ?? undefined,
-            username: router.username || "admin",
+            username: decryptedRouter.username || "admin",   // BUG-FIX: use decryptedRouter consistently
             password: decryptedRouter.password || "",
         },
         routerId,
