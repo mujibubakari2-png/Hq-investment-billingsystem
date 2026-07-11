@@ -18,6 +18,7 @@
  */
 
 import crypto from "crypto";
+import { isIP } from "net";
 
 // ── Secret generation (TATIZO 3 & 4) ────────────────────────────────────────
 
@@ -62,6 +63,11 @@ export interface RouterForScriptGeneration {
     username?: string | null;
     password?: string | null;
     radiusSecret?: string | null;
+    lanIp?: string | null;
+    lanGateway?: string | null;
+    hotspotPoolRange?: string | null;
+    pppoePoolRange?: string | null;
+    dns?: string | null;
     wgPrivateKey?: string | null;
     wgPeerPublicKey?: string | null;
     wgTunnelIp?: string | null;
@@ -75,6 +81,35 @@ export interface ValidationError {
 export interface ValidationResult {
     ok: boolean;
     errors: ValidationError[];
+}
+
+function isValidIpv4(value: string | null | undefined): boolean {
+    return !!value && isIP(value) === 4;
+}
+
+function isValidLanIp(value: string | null | undefined): boolean {
+    if (!value) return false;
+    const [address] = value.split('/');
+    return isValidIpv4(address);
+}
+
+function parsePoolRange(value: string | null | undefined): { start: string; end: string } | null {
+    if (!value) return null;
+    const parts = value.split('-').map((p) => p.trim()).filter(Boolean);
+    if (parts.length !== 2) return null;
+    if (!parts.every((p) => isValidIpv4(p))) return null;
+    const [start, end] = parts;
+    const toNum = (ip: string) => ip.split('.').map((segment) => Number(segment));
+    const startNum = toNum(start);
+    const endNum = toNum(end);
+    const isReversed = startNum.some((value, idx) => value !== endNum[idx] ? value > endNum[idx] : false);
+    return isReversed ? null : { start, end };
+}
+
+function isValidDnsValue(value: string | null | undefined): boolean {
+    if (!value) return false;
+    const servers = value.split(',').map((s) => s.trim()).filter(Boolean);
+    return servers.length > 0 && servers.every((server) => isValidIpv4(server));
 }
 
 /**
@@ -103,6 +138,26 @@ export function validateRouterForScriptGeneration(router: RouterForScriptGenerat
                 "Admin password haijawekwa kwa router hii. Weka au zalisha password kabla ya " +
                 "kuzalisha script (bila hii, script ingeweka password=\"\" kwenye router — hatari kubwa).",
         });
+    }
+
+    if (!isValidLanIp(router.lanIp)) {
+        errors.push({ field: "lanIp", reason: "LAN IP lazima iwe IPv4 sahihi, mfano 192.168.88.1/24." });
+    }
+
+    if (!isValidIpv4(router.lanGateway)) {
+        errors.push({ field: "lanGateway", reason: "LAN gateway lazima iwe IPv4 sahihi." });
+    }
+
+    if (!parsePoolRange(router.hotspotPoolRange)) {
+        errors.push({ field: "hotspotPoolRange", reason: "Hotspot pool range lazima iwe katika umbizo 192.168.88.10-192.168.88.100." });
+    }
+
+    if (!parsePoolRange(router.pppoePoolRange)) {
+        errors.push({ field: "pppoePoolRange", reason: "PPPoE pool range lazima iwe katika umbizo 192.168.88.200-192.168.88.250." });
+    }
+
+    if (!isValidDnsValue(router.dns)) {
+        errors.push({ field: "dns", reason: "DNS lazima iwe IPv4 moja au zaidi, iliyotenganishwa na koma." });
     }
 
     if (!router.radiusSecret) {

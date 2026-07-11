@@ -18,6 +18,11 @@ function baseRouter(overrides: Partial<RouterForScriptGeneration> = {}): RouterF
         username: 'adm_testrouter_ab12',
         password: 'AbCdEfGhIjKlMnOpQrSt12',
         radiusSecret: 'ZyXwVuTsRqPoNmLkJiHgFeDcBa987654',
+        lanIp: '192.168.88.1/24',
+        lanGateway: '192.168.88.1',
+        hotspotPoolRange: '192.168.88.10-192.168.88.100',
+        pppoePoolRange: '192.168.88.200-192.168.88.250',
+        dns: '8.8.8.8,1.1.1.1',
         wgPrivateKey: null,
         wgPeerPublicKey: null,
         wgTunnelIp: null,
@@ -124,6 +129,21 @@ describe('validateRouterForScriptGeneration (TATIZO 1)', () => {
     it('passes when WireGuard fields are all absent (VPN optional as a group)', () => {
         const result = validateRouterForScriptGeneration(baseRouter());
         expect(result.ok).toBe(true);
+    });
+
+    it('fails when LAN IP is malformed', () => {
+        const result = validateRouterForScriptGeneration(baseRouter({ lanIp: 'not-an-ip' }));
+        expect(result.ok).toBe(false);
+        expect(result.errors.some((e) => e.field === 'lanIp')).toBe(true);
+    });
+
+    it('fails when a pool range is malformed or reversed', () => {
+        const malformed = validateRouterForScriptGeneration(baseRouter({ hotspotPoolRange: '192.168.88.100-192.168.88.10' }));
+        const missing = validateRouterForScriptGeneration(baseRouter({ pppoePoolRange: 'not-a-range' }));
+        expect(malformed.ok).toBe(false);
+        expect(malformed.errors.some((e) => e.field === 'hotspotPoolRange')).toBe(true);
+        expect(missing.ok).toBe(false);
+        expect(missing.errors.some((e) => e.field === 'pppoePoolRange')).toBe(true);
     });
 });
 

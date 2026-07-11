@@ -143,10 +143,10 @@ export function buildRouterSetupWizardScript(params: RouterSetupWizardScriptPara
           '',
           '# ===== Hotspot Server =====',
           `:if ([:len [/ip pool find where name="${hsPoolName}"]] = 0) do={ /ip pool add name="${hsPoolName}" ranges=${params.hotspotPoolStart}-${params.hotspotPoolEnd} }`,
-          `:if ([:len [/ip hotspot profile find where name="${hotspotProfile}"]] = 0) do={ /ip hotspot profile add name="${hotspotProfile}" hotspot-address=${params.hotspotLocalAddress} html-directory=hotspot login-by=mac-cookie,http-chap use-radius=yes ssl-certificate=auto }`,
+          `:if ([:len [/ip hotspot profile find where name="${hotspotProfile}"]] = 0) do={ /ip hotspot profile add name="${hotspotProfile}" hotspot-address=${params.hotspotLocalAddress} html-directory=hotspot login-by=http-chap,http-pap,https,cookie ssl-certificate=auto use-radius=yes }`,
           `:if ([:len [/ip address find where interface=$targetBridge]] = 0) do={ /ip address add address=${hotspotCidr} interface=$targetBridge }`,
-          `:if ([:len [/ip hotspot find where interface=$targetBridge]] = 0) do={ /ip hotspot add name="hq-hotspot-${safeRouterName}" interface=$targetBridge address-pool="${hsPoolName}" profile="${hotspotProfile}" }`,
-          `/ip hotspot profile set [/ip hotspot profile find where name="${hotspotProfile}"] hotspot-address=${params.hotspotLocalAddress} html-directory=hotspot ssl-certificate=auto`,
+          `:if ([:len [/ip hotspot find where name="hq-hotspot-${safeRouterName}"]] = 0) do={ /ip hotspot add name="hq-hotspot-${safeRouterName}" interface=$targetBridge address-pool="${hsPoolName}" profile="${hotspotProfile}" disabled=no } else={ /ip hotspot set [find name="hq-hotspot-${safeRouterName}"] interface=$targetBridge address-pool="${hsPoolName}" profile="${hotspotProfile}" disabled=no }`,
+          `/ip hotspot profile set [/ip hotspot profile find where name="${hotspotProfile}"] hotspot-address=${params.hotspotLocalAddress} html-directory=hotspot ssl-certificate=auto use-radius=yes`,
           `:if ([:len [/ip dhcp-server network find where address="${hotspotNetwork}"]] = 0) do={ /ip dhcp-server network add address=${hotspotNetwork} gateway=${params.hotspotLocalAddress} dns-server=${dnsServers} }`,
         ]
       : []),
@@ -172,6 +172,7 @@ export function buildRouterSetupWizardScript(params: RouterSetupWizardScriptPara
     '',
     '# ===== Walled Garden =====',
     `:if ([:len [/ip hotspot walled-garden find where dst-host="${params.apiHost}"]] = 0) do={ /ip hotspot walled-garden add dst-host="${params.apiHost}" action=allow comment="Billing Portal" }`,
+    `:if ([:len [/ip hotspot walled-garden ip find where dst-address="${params.hotspotLocalAddress}"]] = 0) do={ /ip hotspot walled-garden ip add dst-address="${params.hotspotLocalAddress}" action=accept comment="Hotspot Gateway" }`,
     `:if ([:len [/ip hotspot walled-garden ip find where dst-address="${params.radiusAddress}"]] = 0) do={ /ip hotspot walled-garden ip add dst-address="${params.radiusAddress}" action=accept comment="Billing Portal IP" }`,
     params.wgConfig?.routerTunnelIp
       ? `:if ([:len [/ip hotspot walled-garden ip find where dst-address="${params.wgConfig.routerTunnelIp.split('.').slice(0, 3).join('.')}.0/24"]] = 0) do={ /ip hotspot walled-garden ip add dst-address="${params.wgConfig.routerTunnelIp.split('.').slice(0, 3).join('.')}.0/24" action=accept comment="VPN Subnet" }`

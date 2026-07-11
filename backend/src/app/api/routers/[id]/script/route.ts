@@ -87,6 +87,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         const serverUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || "";
 
         const cleanName = router.name.trim().replace(/^-+|-+$/g, '');
+        const hotspotProfileName = `hq-hotspot-${cleanName.toLowerCase()}`;
+        const hotspotServerName = `hotspot-${cleanName.toLowerCase()}`;
+        const hotspotPoolName = `hs-pool-${cleanName.toLowerCase()}`;
+        const pppoePoolName = `pppoe-pool-${cleanName.toLowerCase()}`;
+        const lanBridgeName = 'bridge-lan';
 
         // Resolve VPN Subnet and VPN IP based on actual WireGuard Tunnel IP to prevent multi-tenant conflicts
         const subnetPrefix = router.wgTunnelIp ? router.wgTunnelIp.split('.').slice(0, 3).join('.') : "10.200.0";
@@ -136,7 +141,38 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     /system ntp client servers add address=pool.ntp.org
 }
 
-# 6. Firewall Rules (TATIZO 2 fix: Enforce vpnSubnet src-address restriction for management ports)
+# 6. LAN Bridge, IP Address, Hotspot, and PPPoE Setup
+:local lanBridge "${lanBridgeName}"
+:if ([:len [/interface bridge find name=$lanBridge]] = 0) do={
+    /interface bridge add name=$lanBridge protocol-mode=none comment="HQInvestment Hotspot LAN"
+}
+:if ([:len [/ip pool find name="${hotspotPoolName}"]] = 0) do={
+    /ip pool add name="${hotspotPoolName}" ranges=${router.hotspotPoolRange}
+}
+:if ([:len [/ip pool find name="${pppoePoolName}"]] = 0) do={
+    /ip pool add name="${pppoePoolName}" ranges=${router.pppoePoolRange}
+}
+:if ([:len [/ip address find where address="${router.lanIp}" interface=$lanBridge]] = 0) do={
+    /ip address add address="${router.lanIp}" interface=$lanBridge comment="HQInvestment Hotspot LAN"
+}
+:if ([:len [/ip hotspot profile find name="${hotspotProfileName}"]] = 0) do={
+    /ip hotspot profile add name="${hotspotProfileName}" hotspot-address=${router.lanGateway} dns-name="${cleanName.toLowerCase()}.hotspot" html-directory=hotspot login-by=http-chap,http-pap,https,cookie ssl-certificate=auto http-cookie-lifetime=3d use-radius=yes
+} else={
+    /ip hotspot profile set [find name="${hotspotProfileName}"] hotspot-address=${router.lanGateway} dns-name="${cleanName.toLowerCase()}.hotspot" login-by=http-chap,http-pap,https,cookie ssl-certificate=auto use-radius=yes
+}
+:if ([:len [/ip hotspot find name="${hotspotServerName}"]] = 0) do={
+    /ip hotspot add name="${hotspotServerName}" interface=$lanBridge address-pool="${hotspotPoolName}" profile="${hotspotProfileName}" disabled=no
+} else={
+    /ip hotspot set [find name="${hotspotServerName}"] interface=$lanBridge address-pool="${hotspotPoolName}" profile="${hotspotProfileName}" disabled=no
+}
+:if ([:len [/ppp profile find name="hq-pppoe-${cleanName.toLowerCase()}"]] = 0) do={
+    /ppp profile add name="hq-pppoe-${cleanName.toLowerCase()}" local-address=${router.lanGateway} remote-address="${pppoePoolName}" dns-server=${router.dns} use-encryption=yes
+}
+:if ([:len [/interface pppoe-server server find service-name="hq-pppoe-${cleanName.toLowerCase()}"]] = 0) do={
+    /interface pppoe-server server add service-name="hq-pppoe-${cleanName.toLowerCase()}" interface=$lanBridge default-profile="hq-pppoe-${cleanName.toLowerCase()}" authentication=pap,chap,mschap1,mschap2 one-session-per-host=yes disabled=no
+}
+
+# 7. Firewall Rules (TATIZO 2 fix: Enforce vpnSubnet src-address restriction for management ports)
 :if ([:len [/ip firewall filter find where comment="Allow HQInvestment API Access"]] = 0) do={
     /ip firewall filter add chain=input action=accept protocol=tcp dst-port=${apiPort},443,8291 src-address=${vpnSubnet} comment="Allow HQInvestment API Access"
 }
@@ -145,6 +181,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 }
 :if ([:len [/ip firewall filter find where comment="Allow RADIUS CoA"]] = 0) do={
     /ip firewall filter add chain=input action=accept protocol=udp dst-port=3799 src-address=${vpnIp} comment="Allow RADIUS CoA"
+}
+:if ([:len [/ip firewall filter find where comment="Allow Hotspot Portal Access"]] = 0) do={
+    /ip firewall filter add chain=forward action=accept in-interface=$lanBridge out-interface=ether1 dst-address=${router.lanGateway} comment="Allow Hotspot Portal Access"
+}
+:if ([:len [/ip firewall filter find where comment="Allow Hotspot Walled Garden"]] = 0) do={
+    /ip firewall filter add chain=forward action=accept in-interface=$lanBridge out-interface=ether1 dst-address=${router.lanGateway} comment="Allow Hotspot Walled Garden"
 }
 `;
 
