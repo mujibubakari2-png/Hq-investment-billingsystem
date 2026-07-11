@@ -50,18 +50,18 @@ export default function RemoteAccessModal({ router, onClose }: RemoteAccessModal
     // Tunnel IP is the address Winbox should connect to via VPN
     const tunnelHost = wgStatus?.routerTunnelIp || router.host;
 
-    // Prefer explicit management ports when available: `apiPort` (Web/API) or legacy `port`.
+    // Prefer explicit management ports when available: `apiPort` (Web/API) then `port` (legacy).
     const mgmtPort = router.apiPort || router.port || undefined;
 
     const hostWithPort = (host: string, port?: number) => port ? `${host}:${port}` : host;
 
-    const winboxPort = 8291; // Winbox default port
+    const winboxPort = router.port || 8291; // Winbox default 8291 if not specified
     const safeUser = encodeURIComponent(router.username || 'admin');
-    const safePass = router.password ? encodeURIComponent(router.password) : '';
-    const winboxUrl = `winbox://${safeUser}${safePass ? `:${safePass}` : ''}@${hostWithPort(tunnelHost, winboxPort)}`;
-    
+    const safePass = encodeURIComponent(router.password || '');
+    const winboxUrl = `winbox://${safeUser}:${safePass}@${hostWithPort(tunnelHost, winboxPort)}`;
+
     const isHttps = mgmtPort === 443;
-    const webFigUrl = mgmtPort ? `${isHttps ? 'https' : 'http'}://${hostWithPort(tunnelHost, mgmtPort)}` : `http://${tunnelHost}`;
+    const webFigUrl = `${isHttps ? 'https' : 'http'}://${hostWithPort(tunnelHost, mgmtPort)}`;
 
     const isTunnelActive = wgStatus?.tunnelActive === true;
     const isTunnelConfigured = wgStatus?.enabled === true;
@@ -171,35 +171,24 @@ export default function RemoteAccessModal({ router, onClose }: RemoteAccessModal
                         {/* Launch Winbox Button */}
                         <div style={{ marginTop: 14 }}>
                             {isTunnelActive ? (
-                                <>
-                                    <a
-                                        href={winboxUrl}
-                                        className="btn"
-                                        style={{
-                                            background: 'linear-gradient(135deg, #be185d, #9f1239)',
-                                            color: '#fff',
-                                            textDecoration: 'none',
-                                            width: '100%',
-                                            justifyContent: 'center',
-                                            display: 'flex',
-                                            gap: 8,
-                                            fontWeight: 600,
-                                            padding: '10px 0',
-                                        }}
-                                        onClick={(_e) => {
-                                            // Fallback: Copy the IP to clipboard just in case the link fails quietly
-                                            navigator.clipboard.writeText(tunnelHost).catch(() => {});
-                                        }}
-                                    >
-                                        <RouterIcon style={{ fontSize: 18 }} />
-                                        Launch Winbox (via VPN Tunnel)
-                                    </a>
-                                    
-                                    <div style={{ fontSize: '0.78rem', color: '#be185d', marginTop: 12, textAlign: 'center', background: '#fdf2f8', padding: '8px', borderRadius: '4px', border: '1px solid #fbcfe8' }}>
-                                        <strong>⚠️ Kama button haifanyi kazi:</strong> Kompyuta yako haina <code>winbox://</code> protocol.<br/>
-                                        Fungua programu ya Winbox kisha <strong>Copy & Paste</strong> IP, Username, na Password hapo juu.
-                                    </div>
-                                </>
+                                <a
+                                    href={winboxUrl}
+                                    className="btn"
+                                    style={{
+                                        background: 'linear-gradient(135deg, #be185d, #9f1239)',
+                                        color: '#fff',
+                                        textDecoration: 'none',
+                                        width: '100%',
+                                        justifyContent: 'center',
+                                        display: 'flex',
+                                        gap: 8,
+                                        fontWeight: 600,
+                                        padding: '10px 0',
+                                    }}
+                                >
+                                    <RouterIcon style={{ fontSize: 18 }} />
+                                    Launch Winbox (via VPN Tunnel)
+                                </a>
                             ) : (
                                 <div style={{ background: '#f1f5f9', borderRadius: 8, padding: '10px 14px', textAlign: 'center', color: '#64748b', fontSize: '0.83rem' }}>
                                     <LockIcon style={{ fontSize: 16, verticalAlign: 'middle', marginRight: 6 }} />
