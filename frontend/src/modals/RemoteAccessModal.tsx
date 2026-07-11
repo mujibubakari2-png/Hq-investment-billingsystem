@@ -22,6 +22,45 @@ export default function RemoteAccessModal({ router, onClose }: RemoteAccessModal
     const [wgStatus, setWgStatus] = useState<WireGuardConfig | null>(null);
     const [loadingWg, setLoadingWg] = useState(true);
     const [copied, setCopied] = useState('');
+    
+    // Electron Desktop App State
+    const [isDesktop] = useState(!!window.mikrotikApi);
+    const [desktopStatus, setDesktopStatus] = useState<'idle' | 'checking' | 'downloading' | 'launching' | 'error'>('idle');
+    const [downloadProgress, setDownloadProgress] = useState(0);
+    const [desktopError, setDesktopError] = useState('');
+
+    useEffect(() => {
+        if (isDesktop) {
+            window.mikrotikApi?.onDownloadProgress((progress) => setDownloadProgress(progress));
+        }
+    }, [isDesktop]);
+
+    const handleDesktopLaunch = async () => {
+        setDesktopError('');
+        const ip = tunnelHost;
+        const user = router.username || 'admin';
+        
+        try {
+            setDesktopStatus('checking');
+            const installed = await window.mikrotikApi!.checkWinBoxInstalled();
+            
+            if (!installed) {
+                setDesktopStatus('downloading');
+                const dlRes = await window.mikrotikApi!.downloadWinBox('64');
+                if (!dlRes.success) throw new Error(dlRes.error);
+            }
+            
+            setDesktopStatus('launching');
+            const launchRes = await window.mikrotikApi!.launchWinBox(ip, user);
+            if (!launchRes.success) throw new Error(launchRes.error);
+            
+            setTimeout(() => setDesktopStatus('idle'), 2000);
+        } catch (error: any) {
+            setDesktopStatus('error');
+            setDesktopError(error.message);
+        }
+    };
+
 
     // Fetch live WireGuard / VPN status on open
     useEffect(() => {
@@ -171,24 +210,56 @@ export default function RemoteAccessModal({ router, onClose }: RemoteAccessModal
                         {/* Launch Winbox Button */}
                         <div style={{ marginTop: 14 }}>
                             {isTunnelActive ? (
-                                <a
-                                    href={winboxUrl}
-                                    className="btn"
-                                    style={{
-                                        background: 'linear-gradient(135deg, #be185d, #9f1239)',
-                                        color: '#fff',
-                                        textDecoration: 'none',
-                                        width: '100%',
-                                        justifyContent: 'center',
-                                        display: 'flex',
-                                        gap: 8,
-                                        fontWeight: 600,
-                                        padding: '10px 0',
-                                    }}
-                                >
-                                    <RouterIcon style={{ fontSize: 18 }} />
-                                    Launch Winbox (via VPN Tunnel)
-                                </a>
+                                isDesktop ? (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                        <button
+                                            onClick={handleDesktopLaunch}
+                                            disabled={desktopStatus === 'checking' || desktopStatus === 'downloading'}
+                                            className="btn"
+                                            style={{
+                                                background: 'linear-gradient(135deg, #be185d, #9f1239)',
+                                                color: '#fff',
+                                                border: 'none',
+                                                width: '100%',
+                                                justifyContent: 'center',
+                                                display: 'flex',
+                                                gap: 8,
+                                                fontWeight: 600,
+                                                padding: '10px 0',
+                                                cursor: desktopStatus === 'downloading' ? 'wait' : 'pointer',
+                                            }}
+                                        >
+                                            <RouterIcon style={{ fontSize: 18 }} />
+                                            {desktopStatus === 'downloading' ? `Downloading WinBox (${downloadProgress}%)...` :
+                                             desktopStatus === 'launching' ? 'Launching WinBox...' :
+                                             'Launch WinBox (Desktop Client)'}
+                                        </button>
+                                        {desktopStatus === 'error' && (
+                                            <div style={{ fontSize: '0.8rem', color: '#dc2626', textAlign: 'center' }}>
+                                                Error: {desktopError}
+                                            </div>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <a
+                                        href={winboxUrl}
+                                        className="btn"
+                                        style={{
+                                            background: 'linear-gradient(135deg, #be185d, #9f1239)',
+                                            color: '#fff',
+                                            textDecoration: 'none',
+                                            width: '100%',
+                                            justifyContent: 'center',
+                                            display: 'flex',
+                                            gap: 8,
+                                            fontWeight: 600,
+                                            padding: '10px 0',
+                                        }}
+                                    >
+                                        <RouterIcon style={{ fontSize: 18 }} />
+                                        Launch Winbox (via VPN Tunnel)
+                                    </a>
+                                )
                             ) : (
                                 <div style={{ background: '#f1f5f9', borderRadius: 8, padding: '10px 14px', textAlign: 'center', color: '#64748b', fontSize: '0.83rem' }}>
                                     <LockIcon style={{ fontSize: 16, verticalAlign: 'middle', marginRight: 6 }} />

@@ -20,7 +20,8 @@
     "workspaces": [
         "backend",
         "frontend",
-        "landing-page"
+        "landing-page",
+        "desktop"
     ],
     "keywords": [
         "isp",

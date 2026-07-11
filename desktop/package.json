@@ -1,0 +1,23 @@
+{
+  "name": "desktop",
+  "version": "1.0.0",
+  "description": "Intelligent MikroTik Remote Access Electron Client",
+  "main": "dist/main/index.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "tsc -w & electron .",
+    "build": "tsc",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder"
+  },
+  "dependencies": {
+    "keytar": "^7.9.0"
+  },
+  "devDependencies": {
+    "@types/keytar": "^4.4.2",
+    "@types/node": "^24.10.1",
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8",
+    "typescript": "~5.9.3"
+  }
+}
