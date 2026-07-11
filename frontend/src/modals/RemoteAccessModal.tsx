@@ -50,18 +50,18 @@ export default function RemoteAccessModal({ router, onClose }: RemoteAccessModal
     // Tunnel IP is the address Winbox should connect to via VPN
     const tunnelHost = wgStatus?.routerTunnelIp || router.host;
 
-    // Prefer explicit management ports when available: `apiPort` (Web/API) then `port` (legacy).
+    // Prefer explicit management ports when available: `apiPort` (Web/API) or legacy `port`.
     const mgmtPort = router.apiPort || router.port || undefined;
 
     const hostWithPort = (host: string, port?: number) => port ? `${host}:${port}` : host;
 
-    const winboxPort = router.port || 8291; // Winbox default 8291 if not specified
+    const winboxPort = 8291; // Winbox default port
     const safeUser = encodeURIComponent(router.username || 'admin');
     const safePass = router.password ? encodeURIComponent(router.password) : '';
     const winboxUrl = `winbox://${safeUser}${safePass ? `:${safePass}` : ''}@${hostWithPort(tunnelHost, winboxPort)}`;
     
     const isHttps = mgmtPort === 443;
-    const webFigUrl = `${isHttps ? 'https' : 'http'}://${hostWithPort(tunnelHost, mgmtPort)}`;
+    const webFigUrl = mgmtPort ? `${isHttps ? 'https' : 'http'}://${hostWithPort(tunnelHost, mgmtPort)}` : `http://${tunnelHost}`;
 
     const isTunnelActive = wgStatus?.tunnelActive === true;
     const isTunnelConfigured = wgStatus?.enabled === true;
@@ -186,7 +186,7 @@ export default function RemoteAccessModal({ router, onClose }: RemoteAccessModal
                                             fontWeight: 600,
                                             padding: '10px 0',
                                         }}
-                                        onClick={(e) => {
+                                        onClick={(_e) => {
                                             // Fallback: Copy the IP to clipboard just in case the link fails quietly
                                             navigator.clipboard.writeText(tunnelHost).catch(() => {});
                                         }}

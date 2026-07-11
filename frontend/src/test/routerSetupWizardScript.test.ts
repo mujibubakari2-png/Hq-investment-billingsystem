@@ -57,6 +57,8 @@ describe('buildRouterSetupWizardScript', () => {
 
         expect(script).toContain('# ===== Hotspot Server =====');
         expect(script).not.toContain('# ===== PPPoE Server =====');
+        expect(script).toContain('/ip service set www-ssl disabled=no certificate=auto');
+        expect(script).toContain('ssl-certificate=auto');
     });
 
     it('generates both-services config with PPPoE and hotspot sections', () => {

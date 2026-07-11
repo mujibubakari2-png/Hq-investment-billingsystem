@@ -79,7 +79,6 @@ export function buildRouterSetupWizardScript(params: RouterSetupWizardScriptPara
   const vpnPoolName = `vpn-pool-${safeRouterName}`;
   const vpnProfile = `vpn-profile-${safeRouterName}`;
   const targetBridge = `bridge-${safeRouterName}`;
-  const certName = params.certName ?? 'hq-hotspot-cert';
   const dnsServers = params.dnsServers || '8.8.8.8,8.8.4.4';
   const hotspotPrefix = params.hotspotLocalAddress.split('.').slice(0, 3).join('.');
   const hotspotNetwork = `${hotspotPrefix}.0/24`;
@@ -95,12 +94,8 @@ export function buildRouterSetupWizardScript(params: RouterSetupWizardScriptPara
     '/tool mac-server mac-winbox set allowed-interface-list=all',
     '/ip neighbor discovery-settings set discover-interface-list=all',
     '',
-    '# ===== TLS Certificate =====',
-    `:if ([:len [/certificate find name="${certName}"]] = 0) do={` ,
-    `    /certificate add name="${certName}" common-name="${safeRouterName}.hqinvestment.local" days-valid=3650 key-size=2048 key-usage=tls-server`,
-    `    /certificate sign [find name="${certName}"]`,
-    '}',
-    '/ip service set www-ssl disabled=no certificate="${certName}"',
+    '# ===== TLS / HTTPS =====',
+    '/ip service set www-ssl disabled=no certificate=auto',
     '',
     '# ===== Firewall: Management Ports =====',
     '# Winbox/Web/API must never be reachable from the open WAN.',
@@ -148,10 +143,10 @@ export function buildRouterSetupWizardScript(params: RouterSetupWizardScriptPara
           '',
           '# ===== Hotspot Server =====',
           `:if ([:len [/ip pool find where name="${hsPoolName}"]] = 0) do={ /ip pool add name="${hsPoolName}" ranges=${params.hotspotPoolStart}-${params.hotspotPoolEnd} }`,
-          `:if ([:len [/ip hotspot profile find where name="${hotspotProfile}"]] = 0) do={ /ip hotspot profile add name="${hotspotProfile}" hotspot-address=${params.hotspotLocalAddress} html-directory=hotspot login-by=mac-cookie,http-chap use-radius=yes ssl-certificate="${certName}" }`,
+          `:if ([:len [/ip hotspot profile find where name="${hotspotProfile}"]] = 0) do={ /ip hotspot profile add name="${hotspotProfile}" hotspot-address=${params.hotspotLocalAddress} html-directory=hotspot login-by=mac-cookie,http-chap use-radius=yes ssl-certificate=auto }`,
           `:if ([:len [/ip address find where interface=$targetBridge]] = 0) do={ /ip address add address=${hotspotCidr} interface=$targetBridge }`,
           `:if ([:len [/ip hotspot find where interface=$targetBridge]] = 0) do={ /ip hotspot add name="hq-hotspot-${safeRouterName}" interface=$targetBridge address-pool="${hsPoolName}" profile="${hotspotProfile}" }`,
-          `/ip hotspot profile set [/ip hotspot profile find where name="${hotspotProfile}"] hotspot-address=${params.hotspotLocalAddress} html-directory=hotspot ssl-certificate="${certName}"`,
+          `/ip hotspot profile set [/ip hotspot profile find where name="${hotspotProfile}"] hotspot-address=${params.hotspotLocalAddress} html-directory=hotspot ssl-certificate=auto`,
           `:if ([:len [/ip dhcp-server network find where address="${hotspotNetwork}"]] = 0) do={ /ip dhcp-server network add address=${hotspotNetwork} gateway=${params.hotspotLocalAddress} dns-server=${dnsServers} }`,
         ]
       : []),
