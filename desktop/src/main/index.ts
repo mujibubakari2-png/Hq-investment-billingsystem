@@ -6,6 +6,7 @@ function createWindow() {
   const mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
+    title: 'HQ Investment — ISP Manager',
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
       nodeIntegration: false,
@@ -13,16 +14,15 @@ function createWindow() {
     }
   });
 
-  // Load the Vite dev server in development, or the built files in production
+  // Dev: load Vite dev server. Production: load the compiled frontend bundle.
   const isDev = process.env.NODE_ENV !== 'production';
   if (isDev) {
     mainWindow.loadURL('http://localhost:5175');
     mainWindow.webContents.openDevTools();
   } else {
-    // In production, assuming the frontend is built and copied somewhere,
-    // or we can serve it statically.
-    // mainWindow.loadFile(path.join(__dirname, '../../frontend/dist/index.html'));
-    mainWindow.loadURL('http://localhost:5175'); // Fallback for now
+    // Load the built frontend from the standard Vite output location.
+    // Run `pnpm --filter frontend build` first to generate the dist/ folder.
+    mainWindow.loadFile(path.join(__dirname, '../../frontend/dist/index.html'));
   }
 }
 

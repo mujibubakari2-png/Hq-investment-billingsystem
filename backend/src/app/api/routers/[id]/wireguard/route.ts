@@ -191,11 +191,22 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
             // Live tunnel health
             tunnelActive,
             lastHandshakeSeconds,
-            tunnelStatusMessage: tunnelActive
-                ? `Tunnel active (last handshake ${lastHandshakeSeconds}s ago)`
-                : router.wgEnabled
-                    ? `Tunnel configured but MikroTik has not connected yet. Apply config on MikroTik and ensure WireGuard UDP 51820 is open.`
-                    : `WireGuard not yet activated`,
+            tunnelStatusMessage: (() => {
+                if (tunnelActive) {
+                    const age = lastHandshakeSeconds!;
+                    const display = age < 60 ? `${age}s` : age < 3600 ? `${Math.floor(age / 60)}m` : `${Math.floor(age / 3600)}h`;
+                    return `Secure tunnel active — last handshake ${display} ago. WinBox and WebFig are accessible via VPN.`;
+                }
+                if (lastHandshakeSeconds !== null) {
+                    const age = lastHandshakeSeconds;
+                    const display = age < 60 ? `${age}s` : age < 3600 ? `${Math.floor(age / 60)}m` : `${Math.floor(age / 3600)}h`;
+                    return `Last handshake was ${display} ago (>3 min). MikroTik may have disconnected. Check WireGuard on the router.`;
+                }
+                if (router.wgEnabled) {
+                    return `Tunnel configured but no handshake detected yet. On MikroTik: open WireGuard peers list and verify the server endpoint (${serverEndpoint}:${serverPort}) is reachable. Ensure UDP port ${serverPort} is open on the VPS firewall.`;
+                }
+                return `WireGuard not yet activated. Use Setup Wizard → WireGuard tab to push the config to this router.`;
+            })(),
         });
     } catch (err: any) {
         logger.error("WireGuard config error:", { error: err instanceof Error ? err.message : String(err) });
