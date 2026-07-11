@@ -24,6 +24,65 @@ import { getMikroTikService } from "@/lib/mikrotik";
 import { syncRadiusUser } from "@/lib/radius";
 import logger from "@/lib/logger";
 
+// ── PII-safe logging helpers (SECURITY FIX: PII-LOG-001) ──────────────────────
+//
+// The [TRACE] logs below run at the `info` level — lib/logger.ts has no
+// dedicated "trace" level, so anything tagged [TRACE] is actually logged at
+// `info` and, in production with LOGTAIL_SOURCE_TOKEN set, is forwarded to
+// BetterStack (a third-party log aggregator). Previously these calls logged
+// the raw `opts`/`request` objects, which carry customer phone numbers,
+// emails, and names in plaintext — shipping customer PII off our
+// infrastructure on every single payment initiation.
+//
+// redactPII() walks an object (shallow + nested, bounded depth) and masks
+// known PII fields before the object is ever handed to the logger. Only the
+// masked/derived values are logged; the original object passed to providers
+// and stored in the DB is untouched.
+
+const PII_PHONE_KEYS = new Set(["phone", "customerPhone", "msisdn"]);
+const PII_EMAIL_KEYS = new Set(["buyerEmail", "email"]);
+const PII_NAME_KEYS = new Set(["buyerName", "fullName"]);
+
+function maskPhone(phone?: string | null): string | undefined {
+  if (!phone) return undefined;
+  const digits = String(phone).replace(/\D/g, "");
+  if (digits.length < 4) return "***";
+  return `***${digits.slice(-4)}`;
+}
+
+function maskEmail(email?: string | null): string | undefined {
+  if (!email) return undefined;
+  const [user, domain] = String(email).split("@");
+  if (!domain) return "***";
+  return `${user.slice(0, 1)}***@${domain}`;
+}
+
+function redactValue(value: unknown, depth: number): unknown {
+  if (depth > 4 || value === null || value === undefined) return value;
+  if (Array.isArray(value)) return value.map((v) => redactValue(v, depth + 1));
+  if (typeof value !== "object") return value;
+  const out: Record<string, unknown> = {};
+  for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
+    if (PII_PHONE_KEYS.has(key) && typeof val === "string") {
+      out[key] = maskPhone(val);
+    } else if (PII_EMAIL_KEYS.has(key) && typeof val === "string") {
+      out[key] = maskEmail(val);
+    } else if (PII_NAME_KEYS.has(key) && val) {
+      out[key] = "[REDACTED]";
+    } else if (val && typeof val === "object") {
+      out[key] = redactValue(val, depth + 1);
+    } else {
+      out[key] = val;
+    }
+  }
+  return out;
+}
+
+/** Mask customer PII (phone/email/name) in an object before logging it. */
+function redactPII(obj: Record<string, unknown>): Record<string, unknown> {
+  return redactValue(obj, 0) as Record<string, unknown>;
+}
+
 // â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /**
@@ -129,7 +188,7 @@ export class PaymentService {
   // â”€â”€ Initiate Payment â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   async initiatePayment(opts: InitiatePaymentOptions): Promise<PaymentResponse & { reference: string }> {
-    logger.info("[TRACE][PaymentService.initiatePayment] ENTER", { opts });
+    logger.info("[TRACE][PaymentService.initiatePayment] ENTER", redactPII({ opts }));
     const { tenantId, amount, phone, providerName, description, buyerName, buyerEmail, paymentContext } = opts;
 
     if (!isSupportedProvider(providerName)) {
@@ -144,7 +203,7 @@ export class PaymentService {
     const reference = opts.reference ?? generateReference(providerName.slice(0, 2));
     const cleanPhone = formatPhoneTZ(phone);
     const callbackUrl = opts.callbackUrl ?? buildCallbackUrl(providerName);
-    logger.info("[TRACE][PaymentService.initiatePayment] CALLBACK", { providerName, callbackUrl, phone: cleanPhone });
+    logger.info("[TRACE][PaymentService.initiatePayment] CALLBACK", { providerName, callbackUrl, phone: maskPhone(cleanPhone) });
 
     const globalDb = getTenantClient(null);
     let db = getTenantClient(tenantId);
@@ -198,9 +257,9 @@ export class PaymentService {
 
     const request: PaymentRequest = { amount, phone: cleanPhone, reference, description, callbackUrl, buyerName, buyerEmail };
 
-    logger.info("[TRACE][PaymentService.initiatePayment] CALLING_PROVIDER", { providerName, request });
+    logger.info("[TRACE][PaymentService.initiatePayment] CALLING_PROVIDER", redactPII({ providerName, request }));
     const response = await provider.initiatePayment(request);
-    logger.info("[TRACE][PaymentService.initiatePayment] EXIT", { providerName, response, reference });
+    logger.info("[TRACE][PaymentService.initiatePayment] EXIT", redactPII({ providerName, response, reference }));
     return { ...response, reference };
   }
 

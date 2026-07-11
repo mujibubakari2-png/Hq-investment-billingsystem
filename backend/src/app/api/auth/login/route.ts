@@ -23,6 +23,19 @@ function issueMfaTempToken(userId: string): string {
     });
 }
 
+// SECURITY FIX (PII-LOG-002): `username` is frequently an email address.
+// logger.info(...) is forwarded to BetterStack in production, so log a
+// masked identifier instead of the raw value on every login attempt.
+function maskIdentifier(id?: string | null): string | undefined {
+    if (!id) return undefined;
+    if (id.includes("@")) {
+        const [user, domain] = id.split("@");
+        return domain ? `${user.slice(0, 1)}***@${domain}` : "***";
+    }
+    if (id.length <= 3) return "***";
+    return `${id.slice(0, 2)}***${id.slice(-1)}`;
+}
+
 export async function GET() {
     return jsonResponse({ message: "Login endpoint is reachable. Please use POST to authenticate." });
 }
@@ -45,7 +58,7 @@ export async function POST(req: NextRequest) {
         const username = body.username || body.email;
         const password = body.password;
 
-        logger.info("Login attempt", { username });
+        logger.info("Login attempt", { username: maskIdentifier(username) });
 
         if (!username || !password) {
             return errorResponse("Username and password are required", 400, "MISSING_CREDENTIALS", "Both 'username' and 'password' fields must be provided.");
@@ -99,7 +112,7 @@ export async function POST(req: NextRequest) {
         }
 
         const valid = await comparePassword(password, user.password);
-        logger.info("Login result", { username, success: valid });
+        logger.info("Login result", { username: maskIdentifier(username), success: valid });
         if (!valid) {
             // Increment failed attempts counter
             try {
@@ -119,7 +132,7 @@ export async function POST(req: NextRequest) {
         // If user has MFA enabled, do NOT issue real tokens yet.
         // Return a short-lived temp token; client must complete /api/auth/mfa/verify.
         if (user.mfaEnabled) {
-            logger.info("MFA challenge issued", { username });
+            logger.info("MFA challenge issued", { username: maskIdentifier(username) });
             const tempToken = issueMfaTempToken(user.id);
             // Reset failed attempts on successful password validation
             try { await cacheSet(failedKey, 0, 60); } catch { }
