@@ -647,9 +647,24 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                     }
                 }
 
+                // NOTE: /24 (not /32) is required so RouterOS creates a connected subnet route
+                // for 10.0.0.0/24 via wg-hq automatically. Without this, ICMP replies and TCP
+                // responses from the router have no route back through the tunnel and fall through
+                // to the default WAN gateway, causing 100% packet loss from the server side.
+                try {
+                    // Remove any old /32 address first to avoid duplicate-address conflicts
+                    const existingAddrs = await service.apiRequestPublic("/ip/address");
+                    if (Array.isArray(existingAddrs)) {
+                        for (const addr of existingAddrs) {
+                            if (addr.interface === "wg-hq" && (addr.address === `${tunnelIp}/32` || addr.address === `${tunnelIp}/24`)) {
+                                try { await service.apiRequestPublic(`/ip/address/${addr[".id"]}`, "DELETE"); } catch { }
+                            }
+                        }
+                    }
+                } catch { }
                 try {
                     await service.apiRequestPublic("/ip/address", "PUT", {
-                        address: `${tunnelIp}/32`,
+                        address: `${tunnelIp}/24`,
                         interface: "wg-hq",
                         comment: "HQInvestment VPN Address"
                     });
@@ -954,7 +969,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             pingResult = connectivity.output;
             responseMessage = connectivity.ok
                 ? `WireGuard tunnel established! Router is now accessible via tunnel IP ${tunnelIp}.\n\nPing result:\n${pingResult.substring(0, 180)}`
-                : `WireGuard tunnel established! Router is reachable through the WireGuard handshake, and the tunnel is active on ${tunnelIp}. ICMP ping did not succeed, which commonly means the router or firewall is blocking ICMP or ping is disabled.\n\n${pingResult.substring(0, 220)}`;
+                : `WireGuard tunnel established! Router is reachable through the WireGuard handshake, and the tunnel is active on ${tunnelIp}. ICMP ping did not succeed.\n\nCommon causes:\n• WireGuard IP assigned as /32 instead of /24 (no subnet route — replies exit via WAN). Fix: re-run push-config or set /24 manually.\n• MikroTik firewall INPUT chain dropping ICMP from wg-hq.\n• REST API (www/www-ssl service) not enabled on the router.\n\n${pingResult.substring(0, 220)}`;
             logger.info(`[WireGuard] Activate: peer ${tunnelIp} connected via handshake. Switching host to tunnel IP.`, {
                 connectivityReason: connectivity.reason,
             });

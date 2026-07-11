@@ -301,7 +301,7 @@ describe('WireGuard route', () => {
     expect(wgInputRule).toBeDefined();
   });
 
-  it('uses a /32 tunnel address when pushing WireGuard config to MikroTik', async () => {
+  it('uses a /24 tunnel address when pushing WireGuard config to MikroTik', async () => {
     const route = require('@/app/api/routers/[id]/wireguard/route');
     mockRequirePermission.mockReturnValue({
       error: null,
@@ -355,7 +355,7 @@ describe('WireGuard route', () => {
     await route.POST(req, { params: Promise.resolve({ id: 'router-3' }) });
 
     const wgAddressCall = service.apiRequestPublic.mock.calls.find((call: any) =>
-      call[0] === '/ip/address' && call[1] === 'PUT' && call[2]?.address === '10.200.0.200/32'
+      call[0] === '/ip/address' && call[1] === 'PUT' && call[2]?.address === '10.200.0.200/24'
     );
 
     expect(wgAddressCall).toBeDefined();

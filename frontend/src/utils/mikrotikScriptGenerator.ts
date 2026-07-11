@@ -185,9 +185,10 @@ ${isWireGuard ? `# ── 8. WireGuard VPN Configuration ───────�
 } else={
     /interface wireguard peers set [find interface="wg-hq" public-key="${serverPubKey}"] endpoint-address=${serverEndpoint} endpoint-port=${serverPort} allowed-address=${serverSubnet} persistent-keepalive=25s
 }
-:if ([:len [/ip address find address="${routerTunnelIp}/32" interface="wg-hq"]] = 0) do={
-    /ip address add address=${routerTunnelIp}/32 interface="wg-hq" comment="HQInvestment VPN Address"
-}
+# /24 required so RouterOS creates a connected 10.0.0.0/24 route via wg-hq.
+# Without this, ICMP/TCP replies from the router exit via WAN and are lost.
+:foreach addr in=[/ip address find interface="wg-hq"] do={ /ip address remove $addr }
+/ip address add address=${routerTunnelIp}/24 interface="wg-hq" comment="HQInvestment VPN Address"
 ` : ''}
 # ── 9. Firewall & NAT ────────────────────────────────────────────
 :if ([:len [/ip firewall nat find action=masquerade chain=srcnat out-interface=$wanInterface]] = 0) do={

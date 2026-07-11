@@ -296,7 +296,7 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
                 }}>
                     <div>
                         <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 2 }}>Router Tunnel IP</div>
-                        <div style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '0.85rem' }}>{config.routerTunnelIp}/32</div>
+                        <div style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '0.85rem' }}>{config.routerTunnelIp}/24</div>
                     </div>
                     <div>
                         <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 2 }}>Listen Port</div>

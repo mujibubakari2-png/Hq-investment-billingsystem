@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { generateMikrotikScript } from '../utils/mikrotikScriptGenerator';
 
 describe('generateMikrotikScript', () => {
-    it('uses a /32 tunnel address for the router and the server subnet for allowed-address', () => {
+    it('uses a /24 tunnel address for the router interface (creates subnet route) and the server subnet for allowed-address', () => {
         const script = generateMikrotikScript({
             routerName: 'Router 1',
             routerId: 'router-1',
@@ -25,7 +25,9 @@ describe('generateMikrotikScript', () => {
             radiusSecret: 'secret',
         });
 
-        expect(script).toContain('/ip address add address=10.0.0.200/32 interface="wg-hq"');
+        // Interface address must be /24 so RouterOS creates a connected subnet route via wg-hq.
+        // Without /24, return traffic exits via the WAN gateway and the server cannot reach the router.
+        expect(script).toContain('/ip address add address=10.0.0.200/24 interface="wg-hq"');
         expect(script).toContain('allowed-address=10.0.0.0/24');
     });
 });

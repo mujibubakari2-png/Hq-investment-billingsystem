@@ -59,7 +59,10 @@ export async function checkWireGuardReachability(
 
     for (const currentTarget of targets) {
         try {
-            const { stdout, stderr } = await runner('ping', ['-c', '3', '-W', '3', currentTarget], { timeout: 10000 });
+            const pingArgs = process.platform === 'win32'
+                ? ['-n', '3', '-w', '3000', currentTarget]
+                : ['-c', '3', '-W', '3', currentTarget];
+            const { stdout, stderr } = await runner('ping', pingArgs, { timeout: 10000 });
             const output = `${stdout ?? ''}${stderr ?? ''}`.trim();
             return {
                 ok: true,

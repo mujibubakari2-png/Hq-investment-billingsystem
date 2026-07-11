@@ -168,10 +168,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     /interface wireguard set [find name="wg-hq"] private-key="${router.wgPrivateKey}"
 }
 
-# 8. WireGuard IP Address
-:if ([:len [/ip address find address="${router.wgTunnelIp}/32" interface="wg-hq"]] = 0) do={
-    /ip address add address="${router.wgTunnelIp}/32" interface=wg-hq comment="HQInvestment VPN Address"
-}
+# 8. WireGuard IP Address (/24 required for subnet routing — /32 breaks server→router replies)
+# Remove stale /32 if present, then add /24
+:foreach addr in=[/ip address find interface="wg-hq"] do={ /ip address remove $addr }
+/ip address add address="${router.wgTunnelIp}/24" interface=wg-hq comment="HQInvestment VPN Address"
 
 # 9. WireGuard Peer (Server)
 :if ([:len [/interface wireguard peers find interface="wg-hq" public-key="${router.wgPeerPublicKey}"]] = 0) do={

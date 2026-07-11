@@ -31,6 +31,9 @@ export function buildWireGuardConfigText(params: WireGuardConfigTextParams): str
     const routerPublicKey = params.routerPublicKey || '<ROUTER_PUBLIC_KEY>';
     const presharedKey = params.presharedKey || '<PRESHARED_KEY>';
     const serverPeerSubnet = `${serverTunnelIp.split('.').slice(0, 3).join('.')}.0/24`;
+    // NOTE: AllowedIPs on the peer entries remain /32 — that restricts which
+    // inner-tunnel IPs each peer may send. It is the INTERFACE address that
+    // must be /24 so RouterOS creates a connected subnet route via wg-hq.
 
     if (params.mode === 'server') {
         return `# ═══════════════════════════════════════════════════════════════
@@ -50,9 +53,9 @@ export function buildWireGuardConfigText(params: WireGuardConfigTextParams): str
 } else={
     /interface wireguard peers set [find interface="wg-hq" public-key="${serverPublicKey}"] endpoint-address=${serverEndpoint} endpoint-port=${serverPort} allowed-address=${serverPeerSubnet} persistent-keepalive=25s
 }
-:if ([:len [/ip address find address="${routerTunnelIp}/32" interface="wg-hq"]] = 0) do={
-    /ip address add address=${routerTunnelIp}/32 interface="wg-hq" comment="HQInvestment VPN Address"
-}
+# Remove stale /32 if present (causes routing issues), then set /24
+:foreach addr in=[/ip address find interface="wg-hq"] do={ /ip address remove $addr }
+/ip address add address=${routerTunnelIp}/24 interface="wg-hq" comment="HQInvestment VPN Address"
 
 # Note: This is RouterOS-native syntax for MikroTik. The full .rsc script is also available from the Router Setup Wizard → Generate → Create Config.`;
     }
@@ -74,7 +77,8 @@ export function buildWireGuardConfigText(params: WireGuardConfigTextParams): str
 } else={
     /interface wireguard peers set [find interface="wg-hq" public-key="${routerPublicKey}"] endpoint-address=${serverEndpoint} endpoint-port=${serverPort} allowed-address=${routerTunnelIp}/32 persistent-keepalive=25s
 }
-:if ([:len [/ip address find address="${serverTunnelIp}/32" interface="wg-hq"]] = 0) do={
-    /ip address add address=${serverTunnelIp}/32 interface="wg-hq" comment="HQInvestment VPN Address"
+# Remove stale /32 if present (causes routing issues), then set /24
+:foreach addr in=[/ip address find interface="wg-hq"] do={ /ip address remove $addr }
+/ip address add address=${serverTunnelIp}/24 interface="wg-hq" comment="HQInvestment VPN Address"
 }`;
 }
