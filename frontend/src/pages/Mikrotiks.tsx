@@ -282,13 +282,22 @@ export default function Mikrotiks() {
                 setTimeout(() => {
                     window.removeEventListener('blur', onBlur);
                     if (!hasBlurred && document.hasFocus()) {
-                        // Automatically download without asking
-                        const link = document.createElement('a');
-                        link.href = 'https://mt.lv/winbox64';
-                        link.setAttribute('download', '');
-                        document.body.appendChild(link);
-                        link.click();
-                        link.remove();
+                        const ua = navigator.userAgent;
+                        if (/Android/i.test(ua)) {
+                            // Redirect to Google Play Store
+                            window.location.href = 'https://play.google.com/store/apps/details?id=com.mikrotik.android.tikapp';
+                        } else if (/iPhone|iPad|iPod/i.test(ua)) {
+                            // Redirect to Apple App Store
+                            window.location.href = 'https://apps.apple.com/us/app/mikrotik/id1323064830';
+                        } else {
+                            // Automatically download .exe without asking on Desktop Web
+                            const link = document.createElement('a');
+                            link.href = 'https://mt.lv/winbox64';
+                            link.setAttribute('download', '');
+                            document.body.appendChild(link);
+                            link.click();
+                            link.remove();
+                        }
                     }
                 }, 1500);
             }
