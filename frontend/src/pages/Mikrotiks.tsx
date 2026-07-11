@@ -17,7 +17,6 @@ import AddRouterModal from '../modals/AddRouterModal';
 import RouterDetailModal from '../modals/RouterDetailModal';
 import ConfirmDeleteModal from '../modals/ConfirmDeleteModal';
 import RouterSetupWizard from './RouterSetupWizard';
-import RemoteAccessModal from '../modals/RemoteAccessModal';
 import LanguageIcon from '@mui/icons-material/Language';
 import CellTowerIcon from '@mui/icons-material/CellTower';
 import type { Router } from '../types';
@@ -54,7 +53,6 @@ export default function Mikrotiks() {
     const [selectedRouter, setSelectedRouter] = useState<Router | null>(null);
     const [selectedRouterToEdit, setSelectedRouterToEdit] = useState<Router | null>(null);
     const [deleteRouter, setDeleteRouter] = useState<Router | null>(null);
-    const [remoteRouter, setRemoteRouter] = useState<Router | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [loading, setLoading] = useState(false);
     const [pageSize, setPageSize] = useState<number | 'All'>(25);
@@ -63,6 +61,8 @@ export default function Mikrotiks() {
     const [currentPage, setCurrentPage] = useState(1);
     const [totalRouters, setTotalRouters] = useState(0);
     const [actionMenuId, setActionMenuId] = useState<string | null>(null);
+    const [connectingId, setConnectingId] = useState<string | null>(null);
+    const [downloadProgress, setDownloadProgress] = useState<{ id: string; percent: number } | null>(null);
     const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
     const menuRef = useRef<HTMLDivElement>(null);
 
@@ -105,6 +105,14 @@ export default function Mikrotiks() {
     useEffect(() => {
         void Promise.resolve().then(() => setCurrentPage(1));
     }, [searchTerm, pageSize]);
+
+    useEffect(() => {
+        if (window.mikrotikApi) {
+            window.mikrotikApi.onDownloadProgress((p) => {
+                setDownloadProgress(prev => prev ? { ...prev, percent: p } : null);
+            });
+        }
+    }, []);
 
     // Background live stats sync (halisi CPU load)
     const routerIds = useMemo(() => routers.map(r => r.id).join(','), [routers]);
@@ -228,6 +236,59 @@ export default function Mikrotiks() {
         }
     };
 
+    const handleDirectConnect = async (router: Router) => {
+        setConnectingId(router.id);
+        try {
+            // 1. Determine IP (prefer active VPN tunnel)
+            let ip = router.host;
+            if (router.vpnMode === 'wireguard') {
+                try {
+                    const wgConfig = await routersApi.wireguard.getConfig(router.id);
+                    if (wgConfig.tunnelActive && wgConfig.routerTunnelIp) {
+                        ip = wgConfig.routerTunnelIp;
+                    }
+                } catch (e) {
+                    console.warn("Failed to check WG status", e);
+                }
+            }
+
+            const rawUser = router.username || 'admin';
+            const rawPass = router.password || '';
+
+            if (window.mikrotikApi) {
+                // Desktop App: Check, auto-download, and auto-login
+                const installed = await window.mikrotikApi.checkWinBoxInstalled();
+                if (!installed) {
+                    setDownloadProgress({ id: router.id, percent: 0 });
+                    const dlRes = await window.mikrotikApi.downloadWinBox('64');
+                    setDownloadProgress(null);
+                    if (!dlRes.success) throw new Error(dlRes.error);
+                }
+                const launchRes = await window.mikrotikApi.launchWinBox(ip, rawUser, rawPass || undefined);
+                if (!launchRes.success) throw new Error(launchRes.error);
+            } else {
+                // Web Browser: Use winbox:// scheme
+                const username = encodeURIComponent(rawUser);
+                const password = encodeURIComponent(rawPass);
+                const winboxUrl = `winbox://${username}:${password}@${ip}:8291`;
+                
+                // Attempt to launch
+                window.location.href = winboxUrl;
+                
+                // Fallback for missing protocol handler
+                setTimeout(() => {
+                    if (confirm("If WinBox did not open, it may not be installed. Download it from the official MikroTik website?")) {
+                        window.open('https://mt.lv/winbox64', '_blank');
+                    }
+                }, 2000);
+            }
+        } catch (err: any) {
+            alert(`Failed to connect: ${err.message}`);
+        } finally {
+            setConnectingId(null);
+        }
+    };
+
     const totalPages = pageSize === 'All' ? 1 : Math.max(1, Math.ceil(totalRouters / (pageSize as number)));
 
     const getVpnType = (router: Router) => {
@@ -267,7 +328,6 @@ export default function Mikrotiks() {
                     onConfirm={() => handleDelete(deleteRouter.id)}
                 />
             )}
-            {remoteRouter && <RemoteAccessModal router={remoteRouter} onClose={() => setRemoteRouter(null)} />}
 
             {/* Page Header */}
             <div className="page-header">
@@ -402,32 +462,38 @@ export default function Mikrotiks() {
                                         {router.status === 'Online' ? (
                                             <button
                                                 className="btn"
-                                                onClick={() => setRemoteRouter(router)}
+                                                onClick={() => handleDirectConnect(router)}
+                                                disabled={connectingId === router.id}
                                                 style={{
                                                     display: 'inline-flex', alignItems: 'center', gap: 6,
                                                     padding: '4px 12px', borderRadius: 20, fontWeight: 600, fontSize: '0.75rem',
                                                     background: '#e0e7ff', color: '#4338ca', border: '1px solid #c7d2fe',
-                                                    transition: 'all 0.2s', cursor: 'pointer'
+                                                    transition: 'all 0.2s', cursor: connectingId === router.id ? 'wait' : 'pointer'
                                                 }}
-                                                onMouseOver={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#c7d2fe'; }}
-                                                onMouseOut={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#e0e7ff'; }}
+                                                onMouseOver={(e) => { if (connectingId !== router.id) (e.currentTarget as HTMLButtonElement).style.background = '#c7d2fe'; }}
+                                                onMouseOut={(e) => { if (connectingId !== router.id) (e.currentTarget as HTMLButtonElement).style.background = '#e0e7ff'; }}
                                             >
-                                                <LanguageIcon style={{ fontSize: 13 }} /> Connect
+                                                {connectingId === router.id ? <SyncIcon style={{ fontSize: 13, animation: 'spin 1s linear infinite' }} /> : <LanguageIcon style={{ fontSize: 13 }} />} 
+                                                {connectingId === router.id 
+                                                    ? (downloadProgress?.id === router.id ? `Downloading ${downloadProgress.percent}%` : 'Connecting...') 
+                                                    : 'Connect'}
                                             </button>
                                         ) : (
                                             <button
                                                 className="btn"
-                                                onClick={() => setRemoteRouter(router)}
+                                                onClick={() => handleDirectConnect(router)}
+                                                disabled={connectingId === router.id}
                                                 style={{
                                                     display: 'inline-flex', alignItems: 'center', gap: 6,
                                                     padding: '4px 12px', borderRadius: 20, fontWeight: 500, fontSize: '0.75rem',
                                                     background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca',
-                                                    transition: 'all 0.2s', cursor: 'pointer'
+                                                    transition: 'all 0.2s', cursor: connectingId === router.id ? 'wait' : 'pointer'
                                                 }}
-                                                onMouseOver={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#fecaca'; }}
-                                                onMouseOut={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#fef2f2'; }}
+                                                onMouseOver={(e) => { if (connectingId !== router.id) (e.currentTarget as HTMLButtonElement).style.background = '#fecaca'; }}
+                                                onMouseOut={(e) => { if (connectingId !== router.id) (e.currentTarget as HTMLButtonElement).style.background = '#fef2f2'; }}
                                             >
-                                                <CellTowerIcon style={{ fontSize: 13 }} /> Details
+                                                {connectingId === router.id ? <SyncIcon style={{ fontSize: 13, animation: 'spin 1s linear infinite' }} /> : <CellTowerIcon style={{ fontSize: 13 }} />}
+                                                {connectingId === router.id ? 'Connecting...' : 'Offline'}
                                             </button>
                                         )}
                                     </td>

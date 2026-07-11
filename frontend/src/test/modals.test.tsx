@@ -21,7 +21,6 @@ import EditVoucherModal from '../modals/EditVoucherModal';
 import ExtendSubscriberModal from '../modals/ExtendSubscriberModal';
 import GenerateVouchersModal from '../modals/GenerateVouchersModal';
 import MikrotikScriptModal from '../modals/MikrotikScriptModal';
-import RemoteAccessModal from '../modals/RemoteAccessModal';
 import RouterDetailModal from '../modals/RouterDetailModal';
 import SendSmsModal from '../modals/SendSmsModal';
 import ViewClientModal from '../modals/ViewClientModal';
@@ -272,12 +271,7 @@ describe('Frontend modals', () => {
         expect(onClose).toHaveBeenCalled();
     });
 
-    it('renders RemoteAccessModal and closes', () => {
-        const { container } = render(<RemoteAccessModal router={router} onClose={onClose} />);
-        expect(getModalTitle(container, /Remote Access/i)).toBeInTheDocument();
-        clickClose(container);
-        expect(onClose).toHaveBeenCalled();
-    });
+
 
     it('renders RouterDetailModal and closes', () => {
         const { container } = render(
