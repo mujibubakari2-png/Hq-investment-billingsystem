@@ -630,21 +630,20 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                         comment: "HQInvestment VPN Interface"
                     });
                 } catch (e: any) {
-                    if (!e.message?.includes("already")) {
+                    if (e.message?.includes("already")) {
                         try {
                             const wgInterfaces = await service.apiRequestPublic("/interface/wireguard");
                             if (Array.isArray(wgInterfaces)) {
                                 const existing = wgInterfaces.find((i: any) => i.name === "wg-hq");
                                 if (existing?.[".id"]) {
-                                    await service.apiRequestPublic("/interface/wireguard", "PATCH", {
-                                        ".id": existing[".id"],
+                                    await service.apiRequestPublic(`/interface/wireguard/${existing[".id"]}`, "PATCH", {
                                         "private-key": router.wgPrivateKey
                                     });
                                 }
                             }
                         } catch { }
                     } else {
-                        throw e;
+                        logger.warn("WG Interface note:", { error: e.message instanceof Error ? e.message.message : String(e.message) });
                     }
                 }
 
@@ -708,6 +707,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                     { chain: "input", protocol: "tcp", "dst-port": "8291", "src-address": `${subnetPrefix}.0/24`, action: "accept", comment: "Allow Winbox from VPN - HQInvestment" },
                     { chain: "input", protocol: "udp", "dst-port": "3799", "src-address": `${subnetPrefix}.0/24`, action: "accept", comment: "Allow RADIUS CoA from VPN - HQInvestment" },
                     { chain: "input", protocol: "tcp", "dst-port": "80,443", "src-address": `${subnetPrefix}.0/24`, action: "accept", comment: "Allow Web from VPN - HQInvestment" },
+                    { chain: "input", protocol: "tcp", "dst-port": "8728,8729", "src-address": `${subnetPrefix}.0/24`, action: "accept", comment: "Allow API from VPN - HQInvestment" },
                     { chain: "input", protocol: "udp", "dst-port": "53,67", "in-interface": lanBridgeName, action: "accept", comment: "Allow DNS & DHCP from LAN - HQInvestment" },
                     { chain: "input", protocol: "icmp", action: "accept", comment: "Allow Ping - HQInvestment" },
                     { chain: "input", "connection-state": "established,related", action: "accept", comment: "Allow Established Input - HQInvestment" },
