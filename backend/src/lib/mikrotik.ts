@@ -171,6 +171,19 @@ export function sanitizeMikroTikName(name: string): string {
 
 // ── MikroTik API Service Class ──────────────────────────────────────────────
 
+// Rate-limit repeated warnings to prevent log spam.
+// Warns are suppressed for the same host+message until WARN_SUPPRESS_MS has passed.
+const WARN_SUPPRESS_MS = 5 * 60 * 1000; // 5 minutes
+const warnSuppressMap = new Map<string, number>();
+function warnOnce(key: string, message: string): void {
+    const now = Date.now();
+    const lastWarn = warnSuppressMap.get(key) ?? 0;
+    if (now - lastWarn >= WARN_SUPPRESS_MS) {
+        warnSuppressMap.set(key, now);
+        logger.warn(message);
+    }
+}
+
 export class MikroTikService {
     private conn: MikroTikConnection;
     private routerId: string;
@@ -247,7 +260,10 @@ export class MikroTikService {
             // It only works if node-fetch is used as the fetch implementation.
             // For production, prefer a valid TLS cert instead of using MIKROTIK_INSECURE.
             if (this.baseUrl.startsWith('https') && env.MIKROTIK_INSECURE) {
-                logger.warn(`[MikroTik] MIKROTIK_INSECURE enabled for ${this.conn.host}. TLS verification disabled. Development/isolated networks only.`);
+                warnOnce(
+                    `insecure:${this.conn.host}`,
+                    `[MikroTik] MIKROTIK_INSECURE enabled for ${this.conn.host}. TLS verification disabled. Development/isolated networks only.`
+                );
                 fetchOptions.agent = new https.Agent({ rejectUnauthorized: false });
             }
 
@@ -259,8 +275,10 @@ export class MikroTikService {
                 const fallbackUrls = this.getFallbackUrls(url);
                 if (fallbackUrls.length > 0) {
                     clearTimeout(timeout);
-                    logger.warn(`[MikroTik] Initial REST API request failed for ${this.conn.host}, trying protocol fallback. ${PRIVATE_RE.test(this.conn.host) ? 'Private/WireGuard management host detected.' : 'MIKROTIK_ALLOW_HTTP_FALLBACK=true.'}`);
-
+                    warnOnce(
+                        `fallback:${this.conn.host}`,
+                        `[MikroTik] Initial REST API request failed for ${this.conn.host}, trying protocol fallback. ${PRIVATE_RE.test(this.conn.host) ? 'Private/WireGuard management host detected.' : 'MIKROTIK_ALLOW_HTTP_FALLBACK=true.'}`
+                    );
                     let fallbackError: any = firstErr;
                     for (const fallbackUrl of fallbackUrls) {
                         const fallbackController = new AbortController();
