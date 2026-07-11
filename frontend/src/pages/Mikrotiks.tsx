@@ -271,16 +271,26 @@ export default function Mikrotiks() {
                 const username = encodeURIComponent(rawUser);
                 const password = encodeURIComponent(rawPass);
                 const winboxUrl = `winbox://${username}:${password}@${ip}:8291`;
-                
                 // Attempt to launch
+                let hasBlurred = false;
+                const onBlur = () => { hasBlurred = true; };
+                window.addEventListener('blur', onBlur);
+
                 window.location.href = winboxUrl;
                 
-                // Fallback for missing protocol handler
+                // Fallback: If not installed, it won't trigger OS protocol prompt (no blur)
                 setTimeout(() => {
-                    if (confirm("If WinBox did not open, it may not be installed. Download it from the official MikroTik website?")) {
-                        window.open('https://mt.lv/winbox64', '_blank');
+                    window.removeEventListener('blur', onBlur);
+                    if (!hasBlurred && document.hasFocus()) {
+                        // Automatically download without asking
+                        const link = document.createElement('a');
+                        link.href = 'https://mt.lv/winbox64';
+                        link.setAttribute('download', '');
+                        document.body.appendChild(link);
+                        link.click();
+                        link.remove();
                     }
-                }, 2000);
+                }, 1500);
             }
         } catch (err: any) {
             alert(`Failed to connect: ${err.message}`);
