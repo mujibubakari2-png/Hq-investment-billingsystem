@@ -4,15 +4,8 @@ import { errorResponse } from "@/lib/auth";
 import { requirePermission } from "@/lib/rbac";
 import { canAccessTenant } from "@/lib/tenant";
 import { decryptRouterFields, encrypt } from "@/lib/encryption";
-import crypto from "crypto";
+import { generateRouterAdminPassword, generateRadiusSecret } from "@/lib/routerProvisioning";
 import logger from "@/lib/logger";
-
-function generateSecureRandomString(length: number = 24): string {
-    return crypto.randomBytes(length)
-        .toString("base64")
-        .replace(/[^a-zA-Z0-9]/g, "")
-        .substring(0, length);
-}
 
 /**
  * GET /api/routers/[id]/script
@@ -54,11 +47,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         let updatedUsername = routerRaw.username;
 
         if (!routerRaw.password) {
-            updatedPassword = encrypt(generateSecureRandomString(24));
+            updatedPassword = encrypt(generateRouterAdminPassword());
             needsUpdate = true;
         }
         if (!routerRaw.radiusSecret) {
-            updatedRadiusSecret = encrypt(generateSecureRandomString(24));
+            updatedRadiusSecret = encrypt(generateRadiusSecret());
             needsUpdate = true;
         }
         if (!routerRaw.username || routerRaw.username === "admin") {
@@ -98,6 +91,17 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         const vpnSubnet = `${subnetPrefix}.0/24`;
         const vpnIp = `${subnetPrefix}.1`;
 
+        // Billing portal hostname, used for the Walled Garden rule so unauthenticated
+        // hotspot clients can still reach the payment/voucher page before login.
+        let walledGardenHost = "";
+        try {
+            if (serverUrl) walledGardenHost = new URL(serverUrl).hostname;
+        } catch (e) {
+            logger.warn('[Script] Failed to parse APP_URL for walled garden host', {
+                error: e instanceof Error ? e.message : String(e),
+            });
+        }
+
         let script = `# HQInvestment ISP Billing System - Router Setup Script
 # Generated for: ${cleanName}
 # Date: ${new Date().toISOString()}
@@ -106,6 +110,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 # ⚠️ SECURITY WARNING: This script contains plaintext passwords and VPN keys!
 # After pasting this script into your router, please DELETE this file from your 
 # computer immediately to prevent credential theft.
+#
+# ⚠️ PASTE THIS VIA A LOCAL/CONSOLE CONNECTION (physical cable or existing
+# trusted Winbox/terminal session) — NOT over an untrusted network. Once this
+# script runs, remote management (Winbox/WebFig/REST API) is firewalled to the
+# HQInvestment VPN subnet only. If WireGuard has not yet completed a handshake
+# when you run this, you may temporarily lose remote access to this router
+# until the VPN tunnel comes up — keep a local/console connection available.
 # ==============================================================================
 
 /log info "Starting HQInvestment Auto-Configuration..."
@@ -129,10 +140,25 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     }
 }
 
-# 4. Keep Winbox MAC and neighbor discovery reachable
-/tool mac-server set allowed-interface-list=all
-/tool mac-server mac-winbox set allowed-interface-list=all
-/ip neighbor discovery-settings set discover-interface-list=all
+# 4. Restrict MAC-Winbox / neighbor discovery to LAN + VPN only (NOT WAN).
+# SECURITY FIX: allowed-interface-list=all previously exposed MAC-Winbox/mac-telnet
+# and MNDP neighbor discovery on ether1 (WAN), a well-known L2 attack vector that
+# lets anyone on the same broadcast segment as the WAN uplink discover and attempt
+# to log into the router bypassing the IP-layer firewall entirely.
+:if ([:len [/interface list find name="hq-mgmt"]] = 0) do={
+    /interface list add name="hq-mgmt" comment="HQInvestment management interfaces (LAN+VPN only)"
+}
+:if ([:len [/interface list member find list="hq-mgmt" interface="${lanBridgeName}"]] = 0) do={
+    /interface list member add list="hq-mgmt" interface="${lanBridgeName}"
+}
+:if ([:len [/interface wireguard find name="wg-hq"]] > 0) do={
+    :if ([:len [/interface list member find list="hq-mgmt" interface="wg-hq"]] = 0) do={
+        /interface list member add list="hq-mgmt" interface="wg-hq"
+    }
+}
+/tool mac-server set allowed-interface-list=hq-mgmt
+/tool mac-server mac-winbox set allowed-interface-list=hq-mgmt
+/ip neighbor discovery-settings set discover-interface-list=hq-mgmt
 
 # 5. DNS and NTP (Critical for handshakes)
 /ip dns set servers=${router.dns} allow-remote-requests=yes
@@ -155,6 +181,20 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 :if ([:len [/ip address find where address="${router.lanIp}" interface=$lanBridge]] = 0) do={
     /ip address add address="${router.lanIp}" interface=$lanBridge comment="HQInvestment Hotspot LAN"
 }
+
+# 6a. DHCP Server (REQUIRED: without this, hotspot clients never receive an IP
+# address from the router and can never reach the captive-portal login page.)
+:if ([:len [/ip dhcp-server network find where address="${router.lanIp}"]] = 0) do={
+    /ip dhcp-server network add address="${router.lanIp}" gateway="${router.lanGateway}" dns-server=${router.dns} comment="HQInvestment Hotspot Network"
+} else={
+    /ip dhcp-server network set [find where address="${router.lanIp}"] gateway="${router.lanGateway}" dns-server=${router.dns}
+}
+:if ([:len [/ip dhcp-server find name="dhcp-${cleanName.toLowerCase()}"]] = 0) do={
+    /ip dhcp-server add name="dhcp-${cleanName.toLowerCase()}" interface=$lanBridge address-pool="${hotspotPoolName}" lease-time=1h disabled=no
+} else={
+    /ip dhcp-server set [find name="dhcp-${cleanName.toLowerCase()}"] interface=$lanBridge address-pool="${hotspotPoolName}" disabled=no
+}
+
 :if ([:len [/ip hotspot profile find name="${hotspotProfileName}"]] = 0) do={
     /ip hotspot profile add name="${hotspotProfileName}" hotspot-address=${router.lanGateway} dns-name="${cleanName.toLowerCase()}.hotspot" html-directory=hotspot login-by=http-chap,http-pap,https,cookie ssl-certificate=auto http-cookie-lifetime=3d use-radius=yes
 } else={
@@ -182,11 +222,38 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 :if ([:len [/ip firewall filter find where comment="Allow RADIUS CoA"]] = 0) do={
     /ip firewall filter add chain=input action=accept protocol=udp dst-port=3799 src-address=${vpnIp} comment="Allow RADIUS CoA"
 }
-:if ([:len [/ip firewall filter find where comment="Allow Hotspot Portal Access"]] = 0) do={
-    /ip firewall filter add chain=forward action=accept in-interface=$lanBridge out-interface=ether1 dst-address=${router.lanGateway} comment="Allow Hotspot Portal Access"
+# IMPORTANT: PPPoE clients terminate on dynamic pppoe-<user> interfaces, not on
+# $lanBridge, so they are NOT affected by the LAN-forward drop rule below — but
+# they DO need an explicit accept rule of their own, or they get no internet.
+:if ([:len [/ip firewall filter find where comment="Allow PPPoE to Internet"]] = 0) do={
+    /ip firewall filter add chain=forward in-interface=all-ppp out-interface=ether1 action=accept comment="Allow PPPoE to Internet"
 }
-:if ([:len [/ip firewall filter find where comment="Allow Hotspot Walled Garden"]] = 0) do={
-    /ip firewall filter add chain=forward action=accept in-interface=$lanBridge out-interface=ether1 dst-address=${router.lanGateway} comment="Allow Hotspot Walled Garden"
+# SECURITY: blocks unauthenticated Hotspot/LAN clients on $lanBridge from reaching
+# the internet directly. The MikroTik Hotspot engine intercepts and authenticates
+# traffic from this bridge BEFORE it reaches this rule, so already-authenticated
+# Hotspot users are expected to pass through untouched. VERIFY THIS on your setup
+# after a real client logs in: run "/ip firewall filter print stats" and confirm
+# the authenticated client's traffic is being counted as accepted, not dropped,
+# before relying on this in production — do not assume, check.
+:if ([:len [/ip firewall filter find where comment="Drop unauthenticated LAN forward"]] = 0) do={
+    /ip firewall filter add chain=forward in-interface=$lanBridge action=drop comment="Drop unauthenticated LAN forward"
+}
+
+# 7b. Walled Garden — lets an unauthenticated client still reach the billing
+# portal (to buy a voucher or pay) BEFORE they've logged in to the hotspot.
+:if ([:len ["${walledGardenHost}"]] > 0) do={
+    :if ([:len [/ip hotspot walled-garden find where comment="HQInvestment Billing Portal"]] = 0) do={
+        /ip hotspot walled-garden add dst-host="${walledGardenHost}" action=allow comment="HQInvestment Billing Portal"
+    }
+}
+:if ([:len [/ip hotspot walled-garden ip find where comment="HQInvestment Billing Portal IP"]] = 0) do={
+    /ip hotspot walled-garden ip add dst-address=${vpnIp} action=accept comment="HQInvestment Billing Portal IP"
+}
+
+# 8. NAT — REQUIRED for any authenticated client (hotspot or PPPoE) to actually
+# reach the internet. Without this, login succeeds but browsing still fails.
+:if ([:len [/ip firewall nat find where comment="HQInvestment NAT"]] = 0) do={
+    /ip firewall nat add chain=srcnat action=masquerade out-interface=ether1 comment="HQInvestment NAT"
 }
 `;
 
