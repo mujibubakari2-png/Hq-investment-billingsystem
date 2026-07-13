@@ -348,7 +348,11 @@ export default function VoucherCodes() {
                                             </div>
                                         </td>
                                         <td><span className={`badge ${v.status === 'Used' ? 'expired' : v.status === 'Unused' ? 'active' : 'inactive'}`}>{v.status}</span></td>
-                                        <td>{v.customer ?? '—'}</td>
+                                        <td>
+                                            {v.status === 'Used'
+                                                ? (v.usedBy || (typeof v.customer === 'number' ? `Customer ${v.customer}` : v.customer ? String(v.customer) : '—'))
+                                                : '—'}
+                                        </td>
                                         <td>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                                 {v.createdBy}
