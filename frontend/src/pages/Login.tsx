@@ -4,7 +4,6 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import LockIcon from '@mui/icons-material/Lock';
 import EmailIcon from '@mui/icons-material/Email';
-import PasswordIcon from '@mui/icons-material/Password';
 import LoginIcon from '@mui/icons-material/Login';
 import { authApi, isMfaChallenge } from '../api/authApi';
 import { isValidEmail } from '../utils/validators';
@@ -388,10 +387,9 @@ export default function Login() {
                                 <div>
                                     <label style={labelStyle}>Email</label>
                                     <div style={{ position: 'relative' }}>
-                                        <EmailIcon
-                                            fontSize="small"
-                                            style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b', pointerEvents: 'none' }}
-                                        />
+                                        <div style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b', pointerEvents: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            <EmailIcon fontSize="small" />
+                                        </div>
                                         <input
                                             type="email"
                                             inputMode="email"
@@ -424,10 +422,9 @@ export default function Login() {
                                 <div>
                                     <label style={labelStyle}>Password</label>
                                     <div style={{ position: 'relative' }}>
-                                        <PasswordIcon
-                                            fontSize="small"
-                                            style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b', pointerEvents: 'none' }}
-                                        />
+                                        <div style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b', pointerEvents: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            <LockIcon fontSize="small" />
+                                        </div>
                                         <input
                                             type={showPass ? 'text' : 'password'}
                                             placeholder="••••••••"
@@ -471,8 +468,8 @@ export default function Login() {
                                     onMouseOut={e => !loading && (e.currentTarget.style.backgroundColor = '#00a3ff')}
                                 >
                                     <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                                        {loading ? 'Signing in...' : 'Sign In'}
                                         {!loading && <LoginIcon fontSize="small" />}
+                                        {loading ? 'Signing in...' : 'Sign In'}
                                     </span>
                                 </button>
                             </form>
