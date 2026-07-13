@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import { getMikroTikService } from "@/lib/mikrotik";
-import { suspendRadiusUser } from "@/lib/radius";
+import { enqueueRadiusSuspendUser } from "@/lib/radius-queue";
+import { enqueueSuspendService } from "@/lib/queue";
 import logger from "@/lib/logger";
 
 function unauthorized() {
@@ -42,19 +43,18 @@ export async function GET(req: Request) {
 
       try {
         if (sub.routerId) {
-          const mikrotik = await getMikroTikService(sub.routerId, sub.tenantId ?? null);
           const serviceType = sub.client?.serviceType === "HOTSPOT" ? "hotspot" : "pppoe";
-          await mikrotik.suspendService(username, serviceType);
+          await enqueueSuspendService(sub.routerId, username, serviceType, sub.tenantId ?? null);
         }
 
-        await suspendRadiusUser(username, sub.tenantId ?? null);
+        await enqueueRadiusSuspendUser(username, sub.tenantId ?? null, `expire-${sub.id}`);
 
         await db.subscription.update({
           where: { id: sub.id },
           data: {
             status: "EXPIRED",
             onlineStatus: "OFFLINE",
-            syncStatus: "SYNCED",
+            syncStatus: "PENDING_MIKROTIK_SUSPENSION",
           },
         });
 

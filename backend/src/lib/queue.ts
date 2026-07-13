@@ -26,6 +26,8 @@ export type MikroTikJobName =
   | 'create-hotspot-user'
   | 'delete-hotspot-user'
   | 'update-hotspot-user'
+  | 'activate-service'
+  | 'suspend-service'
   | 'disconnect-session'
   | 'set-bandwidth'
   | 'sync-subscription';
@@ -114,6 +116,47 @@ export const enqueueHotspotDelete = (
 export const enqueueDisconnectSession = (
   routerId: string, sessionId: string, tenantId: string | null
 ) => enqueueMikroTikOp('disconnect-session', routerId, { sessionId }, tenantId, `disconnect:${routerId}:${sessionId}`);
+
+/**
+ * Queue a service activation (PPPoE or Hotspot) for async processing.
+ * API returns immediately; MikroTik operation happens in background worker.
+ * 
+ * Architecture compliance: Event Queue → Router Worker → MikroTik API
+ */
+export const enqueueActivateService = (
+  routerId: string,
+  username: string,
+  password: string,
+  profileName: string,
+  serviceType: 'pppoe' | 'hotspot',
+  tenantId: string | null,
+  expiresAt?: Date
+) => enqueueMikroTikOp(
+  'activate-service',
+  routerId,
+  { username, password, profileName, serviceType, expiresAt: expiresAt?.toISOString() },
+  tenantId,
+  `activate:${routerId}:${username}:${serviceType}`
+);
+
+/**
+ * Queue a service suspension for async processing.
+ * API returns immediately; MikroTik operation happens in background worker.
+ * 
+ * Architecture compliance: Event Queue → Router Worker → MikroTik API
+ */
+export const enqueueSuspendService = (
+  routerId: string,
+  username: string,
+  serviceType: 'pppoe' | 'hotspot',
+  tenantId: string | null
+) => enqueueMikroTikOp(
+  'suspend-service',
+  routerId,
+  { username, serviceType },
+  tenantId,
+  `suspend:${routerId}:${username}:${serviceType}`
+);
 
 // ── Job Status ────────────────────────────────────────────────────────────────
 

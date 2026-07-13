@@ -3,7 +3,9 @@ import { randomUUID } from "node:crypto";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 import { getMikroTikService, sanitizeMikroTikName } from "@/lib/mikrotik";
-import { syncRadiusUser } from "@/lib/radius";
+import { enqueueRadiusSyncUser } from "@/lib/radius-queue";
+import { enqueueActivateService } from "@/lib/queue";
+import { buildRadiusRateLimit, findOrCreateHotspotClient } from "@/lib/hotspotFlow-helpers";
 import { buildHotspotPortalFeedback } from "@/lib/hotspotFlow";
 import { paymentService } from "@/lib/payments/service";
 import { formatPhoneTZ } from "@/lib/payments/utils";
@@ -340,7 +342,7 @@ async function completeHotspotPurchase(
         activatedAt: now,
         expiresAt,
         onlineStatus: "ONLINE",
-        syncStatus: "SYNCED",
+        syncStatus: "PENDING",
       },
     });
 
@@ -355,13 +357,13 @@ async function completeHotspotPurchase(
     const db = getTenantClient(pkg.tenantId);
     const client = await db.client.findUnique({ where: { id: clientId } });
     if (client) {
-      let rateLimit: string | undefined;
-      if (pkg.uploadSpeed && pkg.downloadSpeed) {
-        const ul = pkg.uploadUnit === "Mbps" ? "M" : "k";
-        const dl = pkg.downloadUnit === "Mbps" ? "M" : "k";
-        rateLimit = `${pkg.uploadSpeed}${ul}/${pkg.downloadSpeed}${dl}`;
-      }
-      await syncRadiusUser({
+      const rateLimit = buildRadiusRateLimit({
+        uploadSpeed: pkg.uploadSpeed,
+        uploadUnit: pkg.uploadUnit,
+        downloadSpeed: pkg.downloadSpeed,
+        downloadUnit: pkg.downloadUnit,
+      });
+      await enqueueRadiusSyncUser({
         username: client.username,
         password: client.phone || "123456",
         tenantId: pkg.tenantId || null,
@@ -370,24 +372,26 @@ async function completeHotspotPurchase(
         status: "Active",
         profileName: pkg.name,
         rateLimit,
-      });
+      }, `purchase-${pkg.id}`);
     }
-  } catch (radErr) {
-    logger.error("[HOTSPOT] RADIUS sync error:", { error: radErr instanceof Error ? radErr.message : String(radErr) });
+  } catch (queueErr) {
+    logger.error("[HOTSPOT] Failed to queue RADIUS sync:", { error: queueErr instanceof Error ? queueErr.message : String(queueErr) });
   }
 
-  // MikroTik activation
+  // MikroTik activation (async via queue)
   if (routerId) {
     try {
-      const mikrotik = await getMikroTikService(routerId, pkg.tenantId ?? null);
       const db = getTenantClient(pkg.tenantId);
       const client = await db.client.findUnique({ where: { id: clientId } });
       const password = client?.phone || "123456";
-      await mikrotik.activateService(
-        client?.username || `HS-${clientId.slice(0, 8)}`,
+      const username = client?.username || `HS-${clientId.slice(0, 8)}`;
+      await enqueueActivateService(
+        routerId,
+        username,
         password,
         pkg.name,
         "hotspot",
+        pkg.tenantId ?? null,
         expiresAt
       );
 
@@ -395,9 +399,9 @@ async function completeHotspotPurchase(
         data: {
           routerId,
           action: "HOTSPOT_USER_CREATED",
-          details: `Payment confirmed for ${reference} (${pkg.name})`,
+          details: `Payment confirmed for ${reference} (${pkg.name}) - activation job queued`,
           status: "success",
-          username: client?.username || `HS-${clientId.slice(0, 8)}`,
+          username,
         },
       });
     } catch (err: unknown) {
@@ -406,8 +410,8 @@ async function completeHotspotPurchase(
       await db.routerLog.create({
         data: {
           routerId,
-          action: "HOTSPOT_USER_CREATED_FAILED",
-          details: `Router offline: ${msg}`,
+          action: "HOTSPOT_USER_CREATED_QUEUE_FAILED",
+          details: `Failed to queue activation: ${msg}`,
           status: "error",
           username: `HS-${clientId.slice(0, 8)}`,
         },

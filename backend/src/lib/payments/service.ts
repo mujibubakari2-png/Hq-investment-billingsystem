@@ -21,7 +21,9 @@ import {
   isValidAmount,
 } from "@/lib/payments/utils";
 import { getMikroTikService } from "@/lib/mikrotik";
-import { syncRadiusUser } from "@/lib/radius";
+import { enqueueRadiusSyncUser } from "@/lib/radius-queue";
+import { enqueueActivateService, enqueueSuspendService } from "@/lib/queue";
+import { buildRadiusRateLimit } from "@/lib/hotspotFlow-helpers";
 import logger from "@/lib/logger";
 
 // ── PII-safe logging helpers (SECURITY FIX: PII-LOG-001) ──────────────────────
@@ -457,56 +459,66 @@ export class PaymentService {
     if (pkg) {
       try {
         const client = transaction.client;
-        let rateLimit: string | undefined;
-        if (pkg.uploadSpeed && pkg.downloadSpeed) {
-          const ul = pkg.uploadUnit === "Mbps" ? "M" : "k";
-          const dl = pkg.downloadUnit === "Mbps" ? "M" : "k";
-          rateLimit = `${pkg.uploadSpeed}${ul}/${pkg.downloadSpeed}${dl}`;
-        }
-        await syncRadiusUser({
-          username: client.username,
-          password: client.phone || client.username,
-          tenantId: pkg.tenantId || null,
-          fullName: client.fullName || undefined,
-          expiresAt: (newSub as any)?.expiresAt ?? result.expiresAt,
-          status: "Active",
-          rateLimit,
-          profileName: pkg.name,
+        const rateLimit = buildRadiusRateLimit({
+          uploadSpeed: pkg.uploadSpeed,
+          uploadUnit: pkg.uploadUnit,
+          downloadSpeed: pkg.downloadSpeed,
+          downloadUnit: pkg.downloadUnit,
         });
-      } catch (radErr) {
-        logger.error(`[PAYMENT SERVICE] RADIUS sync failed during status completion:`, { detail: radErr instanceof Error ? radErr.message : String(radErr) });
-        if (newSub?.id) {
-          await db.subscription.update({
-            where: { id: newSub.id },
-            data: { syncStatus: "PENDING_RADIUS_SYNC" },
-          }).catch((e) => logger.error("[PAYMENT SERVICE] Failed to mark PENDING_RADIUS_SYNC:", { detail: e instanceof Error ? e.message : String(e) }));
-        }
+        await enqueueRadiusSyncUser(
+          {
+            username: client.username,
+            password: client.phone || client.username,
+            tenantId: pkg.tenantId || null,
+            fullName: client.fullName || undefined,
+            expiresAt: (newSub as any)?.expiresAt ?? result.expiresAt,
+            status: "Active",
+            rateLimit,
+            profileName: pkg.name,
+          },
+          `payment-${transaction.id}`
+        );
+        logger.info("[PAYMENT SERVICE] RADIUS sync queued", {
+          username: client.username,
+          transactionId: transaction.id,
+        });
+      } catch (queueErr) {
+        logger.error("[PAYMENT SERVICE] Failed to queue RADIUS sync:", {
+          detail: queueErr instanceof Error ? queueErr.message : String(queueErr),
+        });
       }
     }
 
     if (pkg?.routerId) {
       try {
-        const mikrotik = await getMikroTikService(pkg.routerId, pkg.tenantId ?? null);
         const client = transaction.client;
         const pwd = client.phone || "123456";
         const type = client.serviceType === "HOTSPOT" ? "hotspot" : "pppoe";
-        await mikrotik.activateService(client.username, pwd, pkg.name, type, (newSub as any)?.expiresAt ?? result.expiresAt);
+        await enqueueActivateService(
+          pkg.routerId,
+          client.username,
+          pwd,
+          pkg.name,
+          type,
+          pkg.tenantId ?? null,
+          (newSub as any)?.expiresAt ?? result.expiresAt
+        );
         if (newSub?.id) {
-          await db.subscription.update({ where: { id: newSub.id }, data: { syncStatus: "SYNCED" } });
+          await db.subscription.update({ where: { id: newSub.id }, data: { syncStatus: "PENDING_MIKROTIK_ACTIVATION" } });
         }
         await db.routerLog.create({
           data: {
             routerId: pkg.routerId,
-            action: "PAYMENT_STATUS_ACTIVATED",
-            details: `${providerName} status confirmed: ${reference}`,
+            action: "PAYMENT_STATUS_ACTIVATION_QUEUED",
+            details: `${providerName} status confirmed: ${reference} - activation job queued`,
             status: "success",
             username: transaction.client.username,
             tenantId: transaction.tenantId,
           },
         });
-      } catch (mkErr: unknown) {
-        const msg = mkErr instanceof Error ? mkErr.message : "Unknown";
-        logger.error("[PAYMENT SERVICE] MikroTik activation failed during status completion:", { error: msg });
+      } catch (queueErr: unknown) {
+        const msg = queueErr instanceof Error ? queueErr.message : "Unknown";
+        logger.error("[PAYMENT SERVICE] Failed to queue MikroTik activation during status check:", { error: msg });
         await db.routerLog.create({
           data: {
             routerId: pkg.routerId,
@@ -1026,16 +1038,19 @@ export class PaymentService {
           const dl = pkg.downloadUnit === "Mbps" ? "M" : "k";
           rateLimit = `${pkg.uploadSpeed}${ul}/${pkg.downloadSpeed}${dl}`;
         }
-        await syncRadiusUser({
-          username: client.username,
-          password: client.phone || client.username,
-          tenantId: pkg.tenantId || null,
-          fullName: client.fullName || undefined,
-          expiresAt: (newSub as any).expiresAt,
-          status: "Active",
-          rateLimit,
-          profileName: pkg.name,
-        });
+        await enqueueRadiusSyncUser(
+          {
+            username: client.username,
+            password: client.phone || client.username,
+            tenantId: pkg.tenantId || null,
+            fullName: client.fullName || undefined,
+            expiresAt: (newSub as any).expiresAt,
+            status: "Active",
+            rateLimit,
+            profileName: pkg.name,
+          },
+          `payment-${transaction.id}`
+        );
       } catch (radErr) {
         logger.error(`[PAYMENT SERVICE] RADIUS sync failed â€” scheduling retry:`, { detail: radErr instanceof Error ? radErr.message : String(radErr) });
         if (newSub?.id) {
@@ -1047,29 +1062,36 @@ export class PaymentService {
       }
     }
 
-    // 8. MikroTik activation
+    // 8. MikroTik activation (async via queue — prevents webhook timeout)
     if (pkg?.routerId) {
       try {
-        const mikrotik = await getMikroTikService(pkg.routerId, pkg.tenantId ?? null);
         const client = transaction.client;
         const pwd = client.phone || "123456";
         const type = client.serviceType === "HOTSPOT" ? "hotspot" : "pppoe";
-        await mikrotik.activateService(client.username, pwd, pkg.name, type, (newSub as any).expiresAt);
+        await enqueueActivateService(
+          pkg.routerId,
+          client.username,
+          pwd,
+          pkg.name,
+          type,
+          pkg.tenantId ?? null,
+          (newSub as any).expiresAt
+        );
         if (newSub?.id) {
-          await db.subscription.update({ where: { id: newSub.id }, data: { syncStatus: "SYNCED" } });
+          await db.subscription.update({ where: { id: newSub.id }, data: { syncStatus: "PENDING_MIKROTIK_ACTIVATION" } });
         }
         await db.routerLog.create({
           data: {
             routerId: pkg.routerId,
-            action: "PAYMENT_WEBHOOK_ACTIVATED",
-            details: `${providerName} payment confirmed: ${parsed.transactionRef}`,
+            action: "PAYMENT_WEBHOOK_ACTIVATION_QUEUED",
+            details: `${providerName} payment confirmed: ${parsed.transactionRef} - activation job queued`,
             status: "success",
             username: transaction.client.username,
             tenantId: transaction.tenantId,
           },
         });
-      } catch (mkErr: unknown) {
-        const msg = mkErr instanceof Error ? mkErr.message : "Unknown";
+      } catch (queueErr: unknown) {
+        const msg = queueErr instanceof Error ? queueErr.message : "Unknown";
         logger.error("[PAYMENT SERVICE] MikroTik activation failed:", { error: msg });
         await db.routerLog.create({
           data: {

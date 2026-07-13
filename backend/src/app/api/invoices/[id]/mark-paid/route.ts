@@ -1,7 +1,9 @@
 import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
-import { syncRadiusUser } from "@/lib/radius";
+import { enqueueRadiusSyncUser } from "@/lib/radius-queue";
+import { enqueueActivateService } from "@/lib/queue";
+import { buildRadiusRateLimit } from "@/lib/hotspotFlow-helpers";
 import { getMikroTikService } from "@/lib/mikrotik";
 import { requireRole } from "@/lib/rbac";
 import { canAccessTenant } from "@/lib/tenant";
@@ -133,13 +135,13 @@ export async function POST(
 
             // RADIUS sync
             try {
-                let rateLimit: string | undefined;
-                if (pkg.uploadSpeed && pkg.downloadSpeed) {
-                    const ul = pkg.uploadUnit === "Mbps" ? "M" : "k";
-                    const dl = pkg.downloadUnit === "Mbps" ? "M" : "k";
-                    rateLimit = `${pkg.uploadSpeed}${ul}/${pkg.downloadSpeed}${dl}`;
-                }
-                await syncRadiusUser({
+                const rateLimit = buildRadiusRateLimit({
+                    uploadSpeed: pkg.uploadSpeed,
+                    uploadUnit: pkg.uploadUnit,
+                    downloadSpeed: pkg.downloadSpeed,
+                    downloadUnit: pkg.downloadUnit,
+                });
+                await enqueueRadiusSyncUser({
                     username: client.username,
                     password: client.phone || client.username,
                     tenantId: pkg.tenantId || null,
@@ -148,9 +150,9 @@ export async function POST(
                     status: "Active",
                     rateLimit,
                     profileName: pkg.name,
-                });
-            } catch (radErr) {
-                logger.error("[Mark-Paid] RADIUS sync failed:", { error: radErr instanceof Error ? radErr.message : String(radErr) });
+                }, `invoice-${invoice.id}`);
+            } catch (queueErr) {
+                logger.error("[Mark-Paid] Failed to queue RADIUS sync:", { error: queueErr instanceof Error ? queueErr.message : String(queueErr) });
                 if (newSub?.id) {
                     await db.subscription.update({
                         where: { id: newSub.id },
@@ -162,18 +164,41 @@ export async function POST(
             // MikroTik activation
             if (pkg.routerId) {
                 try {
-                    const mt = await getMikroTikService(pkg.routerId, invoice.tenantId);
                     const pwd = client.phone || "123456";
                     const type = client.serviceType === "HOTSPOT" ? "hotspot" : "pppoe";
-                    await mt.activateService(client.username, pwd, pkg.name, type, expiresAt);
+                    await enqueueActivateService(
+                        pkg.routerId,
+                        client.username,
+                        pwd,
+                        pkg.name,
+                        type,
+                        invoice.tenantId,
+                        expiresAt
+                    );
                     if (newSub?.id) {
                         await db.subscription.update({
                             where: { id: newSub.id },
-                            data: { syncStatus: "SYNCED" },
+                            data: { syncStatus: "PENDING_MIKROTIK_ACTIVATION" },
                         });
                     }
+                    await db.routerLog.create({
+                        data: {
+                            routerId: pkg.routerId,
+                            tenantId: invoice.tenantId,
+                            action: "INVOICE_ACTIVATION_QUEUED",
+                            details: `Invoice ${invoice.invoiceNumber} marked paid - activation job queued`,
+                            status: "success",
+                            username: client.username,
+                        },
+                    });
                 } catch (mkErr: any) {
-                    logger.error("[Mark-Paid] MikroTik activation failed:", { error: mkErr.message instanceof Error ? mkErr.message.message : String(mkErr.message) });
+                    logger.error("[Mark-Paid] MikroTik activation queue failed:", { error: mkErr.message instanceof Error ? mkErr.message.message : String(mkErr.message) });
+                    if (newSub?.id) {
+                        await db.subscription.update({
+                            where: { id: newSub.id },
+                            data: { syncStatus: "FAILED_QUEUE" },
+                        }).catch(() => { });
+                    }
                 }
             }
         }

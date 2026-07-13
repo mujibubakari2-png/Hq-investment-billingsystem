@@ -2,7 +2,9 @@ import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 import { getMikroTikService, sanitizeMikroTikName } from "@/lib/mikrotik";
-import { syncRadiusUser } from "@/lib/radius";
+import { enqueueRadiusSyncUser } from "@/lib/radius-queue";
+import { enqueueActivateService } from "@/lib/queue";
+import { buildRadiusRateLimit, calculateExpirationDate } from "@/lib/hotspotFlow-helpers";
 import { buildHotspotPortalFeedback } from "@/lib/hotspotFlow";
 import logger from "@/lib/logger";
 
@@ -119,62 +121,77 @@ export async function POST(req: NextRequest) {
             });
         }
 
-        // 4. SYNC TO RADIUS
-        const upUnit = pkg.uploadUnit?.charAt(0)?.toUpperCase() || "M";
-        const downUnit = pkg.downloadUnit?.charAt(0)?.toUpperCase() || "M";
-        const rateLimit = `${pkg.uploadSpeed}${upUnit}/${pkg.downloadSpeed}${downUnit}`;
+        // 4. SYNC TO RADIUS (queued - non-blocking)
+        // RAD-Q-002 FIX: Moved to async queue, returns 200 immediately
+        const rateLimit = buildRadiusRateLimit({
+            uploadSpeed: pkg.uploadSpeed,
+            uploadUnit: pkg.uploadUnit,
+            downloadSpeed: pkg.downloadSpeed,
+            downloadUnit: pkg.downloadUnit,
+        });
 
-        let radiusSyncSuccess = false;
+        let radiusSyncQueued = false;
         try {
-            await syncRadiusUser({
-                username: client.username,
-                password: code,
-                tenantId: pkg.tenantId || null,
-                fullName: client.fullName || undefined,
-                expiresAt: expiresAt,
-                status: "Active",
-                rateLimit: rateLimit,
-                profileName: pkg.name
-            });
-            radiusSyncSuccess = true;
-        } catch (radErr) {
-            logger.error("RADIUS sync error for voucher:", { error: radErr instanceof Error ? radErr.message : String(radErr) });
-            // We continue anyway as local MikroTik sync might still work
+            await enqueueRadiusSyncUser(
+                {
+                    username: client.username,
+                    password: code,
+                    tenantId: pkg.tenantId || null,
+                    fullName: client.fullName || undefined,
+                    expiresAt: expiresAt,
+                    status: "Active",
+                    rateLimit: rateLimit,
+                    profileName: pkg.name
+                },
+                `voucher-${voucher.id}` // idempotency key
+            );
+            radiusSyncQueued = true;
+        } catch (queueErr) {
+            logger.error("Failed to queue RADIUS sync for voucher:", { error: queueErr instanceof Error ? queueErr.message : String(queueErr) });
+            // Continue - will try again via retry logic
         }
 
-        // 5. Activate the user on MikroTik (as backup and for local management)
+        // 5. Activate the user on MikroTik (async via queue — non-blocking)
         const rId = routerId || pkg.routerId;
-        let mikrotikSyncSuccess = false;
+        let mikrotikQueueSuccess = false;
         let finalSyncStatus = "PENDING";
 
         if (rId) {
             try {
-                const mikrotik = await getMikroTikService(rId, pkg.tenantId ?? null);
-                await mikrotik.activateService(client.username, code, pkg.name, "hotspot", expiresAt);
-                mikrotikSyncSuccess = true;
-                finalSyncStatus = "SYNCED";
+                await enqueueActivateService(
+                    rId,
+                    client.username,
+                    code,
+                    pkg.name,
+                    "hotspot",
+                    pkg.tenantId ?? null,
+                    expiresAt
+                );
+                mikrotikQueueSuccess = true;
+                finalSyncStatus = "PENDING_MIKROTIK_ACTIVATION";
 
                 await db.routerLog.create({
                     data: {
                         routerId: rId,
                         action: "HOTSPOT_VOUCHER_REDEEMED",
-                        details: `Voucher redeemed: ${code} | MAC: ${macAddress || "N/A"}`,
+                        details: `Voucher redeemed: ${code} | MAC: ${macAddress || "N/A"} - activation job queued`,
                         status: "success",
                         username: client.username,
                         tenantId: pkg.tenantId,
                     },
                 });
-            } catch (logErr: any) {
-                logger.error("Router/MikroTik voucher redeem error:", { error: logErr instanceof Error ? logErr.message : String(logErr) });
-                finalSyncStatus = "FAILED_SYNC";
+            } catch (queueErr: any) {
+                logger.error("Router/MikroTik voucher queue error:", { error: queueErr instanceof Error ? queueErr.message : String(queueErr) });
+                finalSyncStatus = "FAILED_QUEUE";
             }
         } else {
-            // If there's no router assigned, we rely entirely on RADIUS.
-            mikrotikSyncSuccess = radiusSyncSuccess;
+            // If there's no router assigned, we rely entirely on RADIUS (queued).
+            // Mark as PENDING if RADIUS queue succeeded; FAILED if queue also failed
+            finalSyncStatus = radiusSyncQueued ? "PENDING" : "FAILED_SYNC";
         }
 
-        // 6. Abort if BOTH failed to connect to network. The voucher remains UNUSED.
-        if (!radiusSyncSuccess && !mikrotikSyncSuccess) {
+        // 6. Abort if both MikroTik failed AND RADIUS queue failed. The voucher remains UNUSED.
+        if (!mikrotikQueueSuccess && !radiusSyncQueued) {
             return errorResponse("Failed to connect to the network router. Your voucher has NOT been used. Please try again.", 500);
         }
 

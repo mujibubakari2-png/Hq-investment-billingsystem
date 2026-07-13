@@ -4,7 +4,9 @@ import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { requirePermission } from "@/lib/rbac";
 import { getTenantFilter } from "@/lib/tenant";
 import { getMikroTikService } from "@/lib/mikrotik";
-import { syncRadiusUser } from "@/lib/radius";
+import { enqueueRadiusSyncUser } from "@/lib/radius-queue";
+import { enqueueActivateService } from "@/lib/queue";
+import { buildRadiusRateLimit } from "@/lib/hotspotFlow-helpers";
 import logger from "@/lib/logger";
 
 export async function POST(req: NextRequest) {
@@ -44,18 +46,25 @@ export async function POST(req: NextRequest) {
                     throw new Error("Missing critical relations (router, client, package)");
                 }
 
-                // Activate on Mikrotik
-                const mikrotik = await getMikroTikService(sub.routerId, sub.tenantId ?? null);
+                // Queue activation on MikroTik (async — non-blocking)
                 const pwd = sub.client.phone || "123456";
                 const type = sub.client.serviceType === "HOTSPOT" ? "hotspot" : "pppoe";
-                await mikrotik.activateService(sub.client.username, pwd, sub.package.name, type, newExpiresDate);
+                await enqueueActivateService(
+                    sub.routerId,
+                    sub.client.username,
+                    pwd,
+                    sub.package.name,
+                    type,
+                    sub.tenantId ?? null,
+                    newExpiresDate
+                );
 
                 // Update database
                 await db.subscription.update({
                     where: { id: sub.id },
                     data: {
                         status: "ACTIVE",
-                        syncStatus: "SYNCED",
+                        syncStatus: "PENDING_MIKROTIK_ACTIVATION",
                         expiresAt: newExpiresDate,
                     }
                 });
@@ -64,23 +73,23 @@ export async function POST(req: NextRequest) {
                 await db.routerLog.create({
                     data: {
                         routerId: sub.routerId,
-                        action: "BULK_EXTEND_SUCCESS",
-                        details: `Admin bulk extended ${type} plan ${sub.package.name}`,
+                        action: "BULK_EXTEND_QUEUED",
+                        details: `Admin bulk extended ${type} plan ${sub.package.name} - activation job queued`,
                         status: "success",
                         username: sub.client.username,
                         tenantId: sub.tenantId,
                     }
                 });
 
-                // Sync RADIUS
+                // Sync RADIUS (queued - non-blocking)
                 try {
-                    let rateLimit: string | undefined;
-                    if (sub.package.uploadSpeed && sub.package.downloadSpeed) {
-                        const ul = sub.package.uploadUnit === "Mbps" ? "M" : "k";
-                        const dl = sub.package.downloadUnit === "Mbps" ? "M" : "k";
-                        rateLimit = `${sub.package.uploadSpeed}${ul}/${sub.package.downloadSpeed}${dl}`;
-                    }
-                    await syncRadiusUser({
+                    const rateLimit = buildRadiusRateLimit({
+                        uploadSpeed: sub.package.uploadSpeed,
+                        uploadUnit: sub.package.uploadUnit,
+                        downloadSpeed: sub.package.downloadSpeed,
+                        downloadUnit: sub.package.downloadUnit,
+                    });
+                    await enqueueRadiusSyncUser({
                         username: sub.client.username,
                         password: sub.client.phone || "123456",
                         tenantId: sub.package.tenantId || null,
@@ -89,9 +98,9 @@ export async function POST(req: NextRequest) {
                         status: "Active",
                         profileName: sub.package.name,
                         rateLimit,
-                    });
-                } catch (radErr) {
-                    logger.error(`Bulk extend RADIUS sync error on ${sub.id}:`, { error: radErr instanceof Error ? radErr.message : String(radErr) });
+                    }, `bulkext-${sub.id}`);
+                } catch (queueErr) {
+                    logger.error(`Bulk extend RADIUS queue error on ${sub.id}:`, { error: queueErr instanceof Error ? queueErr.message : String(queueErr) });
                 }
 
                 successes.push(sub.client.username);

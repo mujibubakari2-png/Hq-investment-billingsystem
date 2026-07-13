@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 import { requirePermission } from "@/lib/rbac";
-import { suspendRadiusUser } from "@/lib/radius";
+import { enqueueRadiusSuspendUser } from "@/lib/radius-queue";
 import { getTenantFilter } from "@/lib/tenant";
 import { toISOSafe } from "@/lib/dateUtils";
 import logger from "@/lib/logger";
@@ -70,9 +70,9 @@ export async function POST(req: NextRequest) {
                     data: { status: "EXPIRED", onlineStatus: "OFFLINE" },
                 });
 
-                // 3. Suspend the user in RADIUS — sets Expiration to past
+                // 3. Queue RADIUS suspension (non-blocking) — sets Expiration to past
                 //    so FreeRADIUS immediately rejects new auth attempts
-                await suspendRadiusUser(username, sub.tenantId ?? null);
+                await enqueueRadiusSuspendUser(username, sub.tenantId ?? null, `vexp-${sub.id}`);
 
                 results.push({ username, status: "expired" });
             } catch (err) {

@@ -5,7 +5,9 @@ import { jsonResponse, errorResponse, getUserFromRequest } from "@/lib/auth";
 import { requirePermission } from "@/lib/rbac";
 import { SubscriptionCreateSchema, SubscriptionUpdateSchema } from "@/lib/validators";
 import { getMikroTikService } from "@/lib/mikrotik";
-import { syncRadiusUser } from "@/lib/radius";
+import { enqueueRadiusSyncUser } from "@/lib/radius-queue";
+import { enqueueActivateService } from "@/lib/queue";
+import { buildRadiusRateLimit } from "@/lib/hotspotFlow-helpers";
 import { parseSafeDate, toISOSafe, toTimestampSafe, isValidDate } from "@/lib/dateUtils";
 import { invalidateNamespace } from "@/lib/cache";
 import logger from "@/lib/logger";
@@ -146,58 +148,81 @@ export async function POST(req: NextRequest) {
             include: { client: true, package: true, router: true },
         }) as any;
 
-        // ── Sync to RADIUS (always, regardless of router availability) ─────────
+        // ── Sync to RADIUS (queued - non-blocking) ──────────────────────────────
+        // RAD-Q-002 FIX: Moved syncRadiusUser from sync to async queue.
+        // Returns 201 immediately; RADIUS sync happens in background worker.
         if (sub.client && sub.package) {
             try {
                 const expiresAt = parseSafeDate(body.expiresAt) || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
                 const pkg = sub.package;
-                let rateLimit: string | undefined;
-                if (pkg.uploadSpeed && pkg.downloadSpeed) {
-                    const ulUnit = pkg.uploadUnit === "Mbps" ? "M" : "k";
-                    const dlUnit = pkg.downloadUnit === "Mbps" ? "M" : "k";
-                    rateLimit = `${pkg.uploadSpeed}${ulUnit}/${pkg.downloadSpeed}${dlUnit}`;
-                }
-                await syncRadiusUser({
-                    username: sub.client.username,
-                    password: sub.client.phone || undefined,
-                    tenantId: sub.tenantId || null,
-                    fullName: sub.client.fullName || undefined,
-                    expiresAt,
-                    status: "Active",
-                    rateLimit,
-                    profileName: pkg.name,
+                const rateLimit = buildRadiusRateLimit({
+                    uploadSpeed: pkg.uploadSpeed,
+                    uploadUnit: pkg.uploadUnit,
+                    downloadSpeed: pkg.downloadSpeed,
+                    downloadUnit: pkg.downloadUnit,
                 });
-            } catch (radErr: any) {
-                logger.error("RADIUS sync error (manual sub):", { error: radErr instanceof Error ? radErr.message : String(radErr) });
+
+                // Enqueue (non-blocking) - operation happens in radius-worker
+                await enqueueRadiusSyncUser(
+                    {
+                        username: sub.client.username,
+                        password: sub.client.phone || undefined,
+                        tenantId: sub.tenantId || null,
+                        fullName: sub.client.fullName || undefined,
+                        expiresAt,
+                        status: "Active",
+                        rateLimit,
+                        profileName: pkg.name,
+                    },
+                    `sub-${sub.id}` // idempotency key
+                );
+
+                logger.info("RADIUS sync queued (manual sub)", {
+                    username: sub.client.username,
+                    subscriptionId: sub.id,
+                    tenantId: sub.tenantId,
+                });
+            } catch (queueErr: any) {
+                logger.error("Failed to queue RADIUS sync (manual sub):", {
+                    error: queueErr instanceof Error ? queueErr.message : String(queueErr),
+                    subscriptionId: sub.id,
+                });
+                // Continue anyway - sync will retry via background job if queued successfully
             }
         }
 
         // ── Activate on MikroTik router (if router is set) ────────────────────
         if (sub.routerId && sub.client && sub.package) {
             try {
-                const mikrotik = await getMikroTikService(sub.routerId, userPayload.tenantId ?? null);
                 const pwd = sub.client.phone || "123456";
                 const type = sub.client.serviceType === "HOTSPOT" ? "hotspot" : "pppoe";
-                await mikrotik.activateService(sub.client.username, pwd, sub.package.name, type);
+                await enqueueActivateService(
+                    sub.routerId,
+                    sub.client.username,
+                    pwd,
+                    sub.package.name,
+                    type,
+                    userPayload.tenantId ?? null
+                );
 
-                await db.subscription.update({ where: { id: sub.id }, data: { syncStatus: "SYNCED" } });
+                await db.subscription.update({ where: { id: sub.id }, data: { syncStatus: "PENDING_MIKROTIK_ACTIVATION" } });
                 await db.routerLog.create({
                     data: {
                         routerId: sub.routerId,
-                        action: "MANUAL_SUB_ACTIVATED",
-                        details: `Admin assigned ${type} plan ${sub.package.name} manually`,
+                        action: "MANUAL_SUB_ACTIVATION_QUEUED",
+                        details: `Admin assigned ${type} plan ${sub.package.name} - activation job queued`,
                         status: "success",
                         username: sub.client.username
                     }
                 });
             } catch (err: any) {
-                logger.error("Manual sub mikrotik sync error:", { error: err instanceof Error ? err.message : String(err) });
-                await db.subscription.update({ where: { id: sub.id }, data: { syncStatus: "FAILED_SYNC" } });
+                logger.error("Manual sub mikrotik queue error:", { error: err instanceof Error ? err.message : String(err) });
+                await db.subscription.update({ where: { id: sub.id }, data: { syncStatus: "FAILED_QUEUE" } });
                 await db.routerLog.create({
                     data: {
                         routerId: sub.routerId,
-                        action: "MANUAL_SUB_ACTIVATED_FAILED",
-                        details: `Failed to activate: ${err?.message || "Error"}`,
+                        action: "MANUAL_SUB_ACTIVATION_QUEUE_FAILED",
+                        details: `Failed to queue activation: ${err?.message || "Error"}`,
                         status: "error",
                         username: sub.client.username
                     }
