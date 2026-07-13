@@ -81,7 +81,10 @@
     .sidebar {
         transform: translateX(-100%);
         z-index: 300;
-        width: min(280px, 85vw);
+        width: min(320px, 88vw);
+        max-width: 100%;
+        padding-top: env(safe-area-inset-top);
+        padding-bottom: env(safe-area-inset-bottom);
     }
 
     .sidebar.open {
@@ -103,6 +106,45 @@
 
     .sidebar-close-mobile {
         display: flex !important;
+    }
+
+    .sidebar-header {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        background: var(--bg-sidebar);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        padding: calc(16px + env(safe-area-inset-top)) 20px 14px;
+    }
+
+    .sidebar-nav {
+        min-height: 0;
+        padding: 6px 0 16px;
+    }
+
+    .nav-icon {
+        display: flex !important;
+        opacity: 1;
+        color: inherit;
+        min-width: 20px;
+    }
+
+    .nav-icon svg {
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        font-size: 1.2rem !important;
+    }
+
+    .nav-item {
+        gap: 12px;
+        padding: 11px 20px;
+    }
+
+    .nav-item.active .nav-icon {
+        opacity: 1;
+        color: var(--primary);
     }
 }
 
@@ -276,29 +318,3 @@
     flex: 1;
 }
 
-/* ── Mobile: ensure icons are always visible in the drawer ── */
-@media (max-width: 768px) {
-    .nav-icon {
-        display: flex !important;
-        opacity: 1;
-        color: inherit;
-        min-width: 20px;
-    }
-
-    .nav-icon svg {
-        display: block !important;
-        visibility: visible !important;
-        opacity: 1 !important;
-        font-size: 1.2rem !important;
-    }
-
-    .nav-item {
-        gap: 12px;
-        padding: 11px 20px;
-    }
-
-    .nav-item.active .nav-icon {
-        opacity: 1;
-        color: var(--primary);
-    }
-}

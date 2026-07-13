@@ -3,7 +3,11 @@ import { useNavigate, Link } from 'react-router-dom';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import LockIcon from '@mui/icons-material/Lock';
+import EmailIcon from '@mui/icons-material/Email';
+import PasswordIcon from '@mui/icons-material/Password';
+import LoginIcon from '@mui/icons-material/Login';
 import { authApi, isMfaChallenge } from '../api/authApi';
+import { isValidEmail } from '../utils/validators';
 import authStore from '../stores/authStore';
 import Footer from '../components/layout/Footer';
 import { GoogleLogin } from '@react-oauth/google';
@@ -130,6 +134,7 @@ export default function Login() {
     // Shared
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [emailError, setEmailError] = useState('');
 
     // Auto-submit when 6 digits entered
     useEffect(() => {
@@ -175,9 +180,17 @@ export default function Login() {
         e.preventDefault();
         setLoading(true);
         setError('');
+        setEmailError('');
+
+        const trimmedEmail = username.trim();
+        if (!isValidEmail(trimmedEmail)) {
+            setEmailError('Please enter a valid email address');
+            setLoading(false);
+            return;
+        }
 
         try {
-            const result = await authApi.login(username, password);
+            const result = await authApi.login(trimmedEmail, password);
 
             if (isMfaChallenge(result)) {
                 // CRIT-002: Server requires TOTP — switch to MFA step
@@ -371,31 +384,57 @@ export default function Login() {
                                 </div>
                             )}
 
-                            <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                            <form noValidate onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                                 <div>
                                     <label style={labelStyle}>Email</label>
-                                    <input
-                                        type="text"
-                                        placeholder="Enter your email"
-                                        value={username}
-                                        onChange={e => setUsername(e.target.value)}
-                                        required
-                                        style={inputStyle}
-                                        onFocus={e => e.target.style.borderColor = '#008ee6'}
-                                        onBlur={e => e.target.style.borderColor = '#cbd5e1'}
-                                    />
+                                    <div style={{ position: 'relative' }}>
+                                        <EmailIcon
+                                            fontSize="small"
+                                            style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b', pointerEvents: 'none' }}
+                                        />
+                                        <input
+                                            type="email"
+                                            inputMode="email"
+                                            autoComplete="email"
+                                            placeholder="mujibu@gmail.com"
+                                            value={username}
+                                            onChange={e => {
+                                                setUsername(e.target.value);
+                                                if (emailError) setEmailError('');
+                                            }}
+                                            required
+                                            style={{ ...inputStyle, paddingLeft: '40px', paddingRight: '12px' }}
+                                            onFocus={e => e.target.style.borderColor = '#008ee6'}
+                                            onBlur={e => {
+                                                e.target.style.borderColor = '#cbd5e1';
+                                                const trimmed = e.target.value.trim();
+                                                if (trimmed && !isValidEmail(trimmed)) {
+                                                    setEmailError('Please enter a valid email address');
+                                                } else {
+                                                    setEmailError('');
+                                                }
+                                            }}
+                                        />
+                                    </div>
+                                    {emailError && (
+                                        <div style={{ color: '#b91c1c', fontSize: '0.8rem', marginTop: '6px' }}>{emailError}</div>
+                                    )}
                                 </div>
 
                                 <div>
                                     <label style={labelStyle}>Password</label>
                                     <div style={{ position: 'relative' }}>
+                                        <PasswordIcon
+                                            fontSize="small"
+                                            style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b', pointerEvents: 'none' }}
+                                        />
                                         <input
                                             type={showPass ? 'text' : 'password'}
-                                            placeholder="Enter your password"
+                                            placeholder="••••••••"
                                             value={password}
                                             onChange={e => setPassword(e.target.value)}
                                             required
-                                            style={{ ...inputStyle, paddingRight: '48px' }}
+                                            style={{ ...inputStyle, paddingLeft: '40px', paddingRight: '48px' }}
                                             onFocus={e => e.target.style.borderColor = '#008ee6'}
                                             onBlur={e => e.target.style.borderColor = '#cbd5e1'}
                                         />
@@ -431,7 +470,10 @@ export default function Login() {
                                     onMouseOver={e => !loading && (e.currentTarget.style.backgroundColor = '#008ee6')}
                                     onMouseOut={e => !loading && (e.currentTarget.style.backgroundColor = '#00a3ff')}
                                 >
-                                    {loading ? 'Signing in...' : '➡️ Sign In'}
+                                    <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                                        {loading ? 'Signing in...' : 'Sign In'}
+                                        {!loading && <LoginIcon fontSize="small" />}
+                                    </span>
                                 </button>
                             </form>
                         </>

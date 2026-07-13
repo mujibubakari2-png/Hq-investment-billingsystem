@@ -260,7 +260,7 @@ export default function Sidebar({ isOpen, collapsed = false, onClose }: SidebarP
 
                 {/* Role badge at sidebar footer */}
                 {user && (
-                    <div style={{
+                    <div className="sidebar-footer" style={{
                         padding: '10px 16px',
                         borderTop: '1px solid var(--border)',
                         fontSize: '0.72rem',
@@ -269,6 +269,7 @@ export default function Sidebar({ isOpen, collapsed = false, onClose }: SidebarP
                         alignItems: 'center',
                         gap: 6,
                         overflow: 'hidden',
+                        flexShrink: 0,
                     }}>
                         <span style={{
                             flexShrink: 0,

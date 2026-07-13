@@ -387,23 +387,25 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
             <div style={{ paddingBottom: 16 }}>{renderStep()}</div>
 
             {/* Fixed nav bar */}
-            <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 24px', borderTop: '1px solid var(--border-light)', background: 'var(--bg-primary, #fff)', zIndex: 100, boxShadow: '0 -2px 8px rgba(0,0,0,0.08)' }}>
-                <div>
+            <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', padding: '12px 24px', borderTop: '1px solid var(--border-light)', background: 'var(--bg-primary, #fff)', zIndex: 100, boxShadow: '0 -2px 8px rgba(0,0,0,0.08)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', minWidth: 120 }}>
                     {currentStep > 0 && (
-                        <button className="btn btn-secondary" onClick={handlePrev}>
+                        <button className="btn btn-secondary" onClick={handlePrev} style={{ minWidth: 140, justifyContent: 'center' }}>
                             <ArrowBackIcon fontSize="small" /> Previous
                         </button>
                     )}
                 </div>
-                {currentStep === 6 && (serviceVerifyStatus === 'failed' || serviceVerifyStatus === 'checking') ? (
-                    <button className="btn" style={{ background: '#f3f4f6', color: '#374151', fontWeight: 600, border: '1px solid var(--border)' }} onClick={runVerify}>
-                        <RefreshIcon fontSize="small" /> {serviceVerifyStatus === 'checking' ? 'Checking...' : 'Recheck Status'}
-                    </button>
-                ) : (
-                    <button className="btn" style={{ background: currentStep === 3 ? '#7c3aed' : '#16a34a', color: '#fff', fontWeight: 600 }} onClick={handleNext}>
-                        {NEXT_BUTTON_LABELS[currentStep] ?? 'Next'} <ArrowForwardIcon fontSize="small" />
-                    </button>
-                )}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', minWidth: 220 }}>
+                    {currentStep === 6 && (serviceVerifyStatus === 'failed' || serviceVerifyStatus === 'checking') ? (
+                        <button className="btn" style={{ background: '#f3f4f6', color: '#374151', fontWeight: 600, border: '1px solid var(--border)', minWidth: 170, justifyContent: 'center' }} onClick={runVerify}>
+                            <RefreshIcon fontSize="small" /> {serviceVerifyStatus === 'checking' ? 'Checking...' : 'Recheck Status'}
+                        </button>
+                    ) : (
+                        <button className="btn" style={{ background: currentStep === 3 ? '#7c3aed' : '#16a34a', color: '#fff', fontWeight: 600, minWidth: 220, justifyContent: 'center' }} onClick={handleNext}>
+                            {NEXT_BUTTON_LABELS[currentStep] ?? 'Next'} <ArrowForwardIcon fontSize="small" />
+                        </button>
+                    )}
+                </div>
             </div>
         </div>
     );
