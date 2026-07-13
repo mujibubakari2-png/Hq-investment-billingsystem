@@ -37,10 +37,11 @@ describe('Login page', () => {
       </MemoryRouter>
     );
 
-    fireEvent.change(screen.getByPlaceholderText(/enter your email/i), {
+    fireEvent.change(screen.getByPlaceholderText(/mujibu@gmail.com/i), {
       target: { value: 'not-an-email' },
     });
-    fireEvent.change(screen.getByPlaceholderText(/enter your password/i), {
+    const passwordInput = document.querySelector('input[type="password"]') as HTMLInputElement;
+    fireEvent.change(passwordInput, {
       target: { value: 'secret123' },
     });
     fireEvent.click(screen.getByRole('button', { name: /sign in/i }));
