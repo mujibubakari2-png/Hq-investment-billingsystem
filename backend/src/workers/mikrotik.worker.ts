@@ -110,6 +110,30 @@ const handlers: Record<string, (data: MikroTikJobData) => Promise<unknown>> = {
     return r;
   },
 
+  'activate-service': async ({ routerId, tenantId, payload }) => {
+    const { service } = await getService(routerId, tenantId);
+    const expiresAt = payload.expiresAt ? new Date(payload.expiresAt as string) : undefined;
+    const r = await service.activateService(
+      payload.username as string,
+      payload.password as string,
+      payload.profileName as string,
+      payload.serviceType as 'pppoe' | 'hotspot',
+      expiresAt
+    );
+    await log(routerId, tenantId, 'activate-service', 'success', `username: ${payload.username}, service: ${payload.serviceType}`);
+    return r;
+  },
+
+  'suspend-service': async ({ routerId, tenantId, payload }) => {
+    const { service } = await getService(routerId, tenantId);
+    const r = await service.suspendService(
+      payload.username as string,
+      payload.serviceType as 'pppoe' | 'hotspot'
+    );
+    await log(routerId, tenantId, 'suspend-service', 'success', `username: ${payload.username}, service: ${payload.serviceType}`);
+    return r;
+  },
+
   'disconnect-session': async ({ routerId, tenantId, payload }) => {
     const { service } = await getService(routerId, tenantId);
     // Use disconnectPPPoESession (the actual method name on MikroTikService)
