@@ -57,29 +57,81 @@ function shouldLog(level: LogLevel): boolean {
   return LEVELS[level] >= LEVELS[MIN_LEVEL];
 }
 
-// ── BetterStack Transport ─────────────────────────────────────────────────────
-// DO-002 FIX: Send logs to BetterStack (Logtail) when token is configured.
-// Uses fire-and-forget (no await) so it never blocks the request path.
-// Batching and retries are handled server-side by BetterStack's ingest.
+// ── BetterStack Transport (Batched) ───────────────────────────────────────────
+// M6 FIX: Replace per-log-line HTTP requests with a micro-batch transport.
+// Previously: every single log line = 1 HTTP POST to Logtail.
+// Problem: at moderate traffic, this creates hundreds of concurrent connections,
+// wastes bandwidth, and drops logs on transient failures (no retry).
+//
+// Solution: buffer entries for up to FLUSH_INTERVAL_MS (2s) OR until
+// BATCH_SIZE (50) entries accumulate, then send a single batch.
+// One retry on HTTP failure before silently dropping.
 
 const LOGTAIL_TOKEN = process.env.LOGTAIL_SOURCE_TOKEN;
 const LOGTAIL_URL = 'https://in.logtail.com';
+const BATCH_SIZE = 50;
+const FLUSH_INTERVAL_MS = 2000;
+
+let _batch: LogEntry[] = [];
+let _flushTimer: ReturnType<typeof setTimeout> | null = null;
+let _flushing = false;
+
+async function flushBatch(): Promise<void> {
+  if (_batch.length === 0 || _flushing) return;
+  _flushing = true;
+  const toSend = _batch.splice(0, BATCH_SIZE);
+  try {
+    const body = toSend.length === 1 ? JSON.stringify(toSend[0]) : JSON.stringify(toSend);
+    const res = await fetch(LOGTAIL_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${LOGTAIL_TOKEN}` },
+      body,
+    });
+    if (!res.ok) {
+      // One retry on server error
+      await fetch(LOGTAIL_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${LOGTAIL_TOKEN}` },
+        body,
+      }).catch(() => {});
+    }
+  } catch {
+    // Silently drop — never block the application path for logging
+  } finally {
+    _flushing = false;
+    // If more entries arrived while we were flushing, schedule another flush
+    if (_batch.length > 0) scheduleFlush();
+  }
+}
+
+function scheduleFlush(): void {
+  if (_flushTimer) return; // already scheduled
+  _flushTimer = setTimeout(() => {
+    _flushTimer = null;
+    flushBatch().catch(() => {});
+  }, FLUSH_INTERVAL_MS);
+}
 
 function sendToLogtail(entry: LogEntry): void {
   if (!LOGTAIL_TOKEN || process.env.NODE_ENV !== 'production' || process.env.JEST_WORKER_ID) return;
-
-  // Fire-and-forget: we intentionally don't await this
-  fetch(LOGTAIL_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${LOGTAIL_TOKEN}`,
-    },
-    body: JSON.stringify(entry),
-  }).catch(() => {
-    // Silently swallow Logtail errors — never break the application for logging
-  });
+  _batch.push(entry);
+  if (_batch.length >= BATCH_SIZE) {
+    // Batch full — flush immediately
+    if (_flushTimer) { clearTimeout(_flushTimer); _flushTimer = null; }
+    flushBatch().catch(() => {});
+  } else {
+    scheduleFlush();
+  }
 }
+
+// Flush remaining entries when the process exits gracefully
+if (process.env.NODE_ENV === 'production') {
+  const flushOnExit = () => { if (_batch.length > 0) flushBatch().catch(() => {}); };
+  process.once('SIGTERM', flushOnExit);
+  process.once('SIGINT',  flushOnExit);
+  process.once('beforeExit', flushOnExit);
+}
+
 
 // ── Core write function ───────────────────────────────────────────────────────
 

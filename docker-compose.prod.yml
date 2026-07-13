@@ -58,9 +58,14 @@ services:
       redis-server
         --requirepass ${REDIS_PASSWORD}
         --maxmemory 256mb
-        --maxmemory-policy allkeys-lru
+        --maxmemory-policy volatile-lru
+        --maxmemory-samples 10
         --save 60 1000
         --appendonly yes
+    # M2 FIX: volatile-lru evicts ONLY keys with a TTL set (cache, rate-limit counters).
+    # allkeys-lru (previous) would evict ANY key including circuit breaker state,
+    # audit DLQ entries, and distributed locks — potentially breaking reliability
+    # guarantees and losing unprocessed security events.
     volumes:
       - redis_data:/data
     ports:
@@ -110,6 +115,9 @@ services:
       FIELD_ENCRYPTION_KEY: ${FIELD_ENCRYPTION_KEY}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       PAYMENT_ENVIRONMENT: ${PAYMENT_ENVIRONMENT:-live}
+      # M7 FIX: Set to 'false' ONLY if using self-signed PostgreSQL cert.
+      # Default is 'true' (validates TLS certificate) for security.
+      DATABASE_SSL_REJECT_UNAUTHORIZED: ${DATABASE_SSL_REJECT_UNAUTHORIZED:-true}
     ports:
       - "127.0.0.1:3000:3000"
     # Run as non-root user

@@ -55,6 +55,21 @@ function createPrismaClient(): PrismaClient {
     const maxConnections = isProduction ? 10 : 3;
     const idleTimeoutMillis = isProduction ? 30000 : 10000;
 
+    // M7 FIX: SSL rejectUnauthorized is now controlled by environment variable.
+    // Default: true (validates certificate) for security in production.
+    // Set DATABASE_SSL_REJECT_UNAUTHORIZED=false ONLY for self-signed certs.
+    const isLocal = connectionString.includes('localhost') || connectionString.includes('127.0.0.1');
+    const sslRejectUnauthorized = process.env.DATABASE_SSL_REJECT_UNAUTHORIZED !== 'false';
+    const sslConfig = isLocal ? false : { rejectUnauthorized: sslRejectUnauthorized };
+
+    if (!isLocal && !sslRejectUnauthorized) {
+        process.stderr.write(
+            '[DATABASE][SECURITY WARNING] DATABASE_SSL_REJECT_UNAUTHORIZED=false — ' +
+            'TLS certificate validation is disabled. Only use this for self-signed certs; ' +
+            'remove this setting when a valid certificate is available.\n'
+        );
+    }
+
     const pool = new Pool({
         connectionString,
         max: maxConnections,
@@ -62,9 +77,7 @@ function createPrismaClient(): PrismaClient {
         connectionTimeoutMillis: 10000,
         statement_timeout: 30000,
         application_name: "hqinvestment_isp_backend",
-        ssl: connectionString.includes('localhost') || connectionString.includes('127.0.0.1')
-            ? false
-            : { rejectUnauthorized: false }
+        ssl: sslConfig,
     });
     globalForPrisma.prismaPool = pool;
 
@@ -74,32 +87,40 @@ function createPrismaClient(): PrismaClient {
     const client = new PrismaClient({
         adapter,
         errorFormat: 'pretty',
-        // In development include query/info/warn logs for debugging.
-        // In production only log errors to avoid leaking query internals.
+        // C6 FIX: Include query event emitter in BOTH dev AND production so
+        // slow query detection works across all environments.
+        // In production we keep 'query' as an event (not string) to avoid
+        // logging every query body — only the slow query listener fires.
         log: isProduction
-            ? [{ emit: 'event', level: 'error' }]
-            : ['query', 'info', 'warn', 'error'],
+            ? [
+                { emit: 'event', level: 'error' },
+                { emit: 'event', level: 'query' },  // C6: needed for slow query detection
+              ]
+            : [
+                { emit: 'event', level: 'query' },
+                'info', 'warn', 'error'
+              ],
     });
 
-    // MEDIUM-O-004 FIX: Slow query detection.
-    // Log any query that exceeds 1 second so slow queries are visible in
-    // BetterStack before customers start complaining.
+    // C6 FIX: Slow query detection enabled in BOTH development AND production.
+    // Log any query that exceeds 1000ms (production) or 500ms (development).
+    // These logs stream to BetterStack via the structured logger.
+    const slowQueryThresholdMs = isProduction ? 1000 : 500;
+    (client as any).$on('query', (e: any) => {
+        if (typeof e.duration === 'number' && e.duration > slowQueryThresholdMs) {
+            // In production: only log duration + truncated query (no params — may contain PII)
+            const querySnippet = isProduction
+                ? String(e.query ?? '').slice(0, 200)
+                : String(e.query ?? '').slice(0, 500);
+            process.stderr.write(
+                `[SlowQuery] ${e.duration}ms (threshold: ${slowQueryThresholdMs}ms) — ${querySnippet}\n`
+            );
+        }
+    });
+
     if (isProduction) {
         (client as any).$on('error', (e: any) => {
             process.stderr.write(`[DATABASE][ERROR] ${JSON.stringify({ message: e.message, target: e.target })}\n`);
-        });
-    }
-
-    // Slow query logging works in development (where 'query' is a string log level)
-    // and production (where we subscribe to the event emitter).
-    // The $on('query') listener is only available when log includes the query event.
-    if (!isProduction) {
-        (client as any).$on('query', (e: any) => {
-            if (typeof e.duration === 'number' && e.duration > 1000) {
-                process.stderr.write(
-                    `[SlowQuery] ${e.duration}ms — ${String(e.query).slice(0, 500)}\n`
-                );
-            }
         });
     }
 

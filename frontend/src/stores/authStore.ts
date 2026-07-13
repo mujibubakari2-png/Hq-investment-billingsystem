@@ -51,13 +51,22 @@ function safeRemoveItem(key: string): void {
     }
 }
 
-// Bug #6 FIX: Read initial state from localStorage with safe accessors.
-// The token is stored in both HttpOnly cookies (server-side verification)
-// AND localStorage (for Authorization header fallback on cross-port dev requests).
-// If someone injects a fake user, the first API call returns 401 → logout.
+// SEC-C1 FIX: Token is NO LONGER persisted in localStorage.
+// Persisting JWT in localStorage exposes it to XSS attacks — any injected script
+// on the page can read localStorage and steal the session token.
+//
+// Token lifecycle:
+//   - Set in-memory (state.token) at login time.
+//   - Used by httpClient for Authorization header during the active browser tab session.
+//   - Cleared automatically when the tab is closed or the user logs out.
+//   - After page reload: state.token is null → Authorization header not sent →
+//     the backend falls back to the HttpOnly auth cookie automatically.
+//
+// User profile data (name, role, tenant) is still stored in localStorage so the
+// UI can restore itself after a page reload without an extra round-trip.
 function loadState(): AuthState {
     const userJson = safeGetItem('user');
-    const token    = safeGetItem('token'); // Authorization header fallback
+    // SEC-C1: Token intentionally NOT read from localStorage — cookie handles auth after reload.
     let user: AuthUser | null = null;
 
     if (userJson) {
@@ -69,7 +78,7 @@ function loadState(): AuthState {
     }
 
     return {
-        token,
+        token: null, // In-memory only; populated at login. Cookies handle auth on reload.
         user,
         isAuthenticated: !!user,
     };
@@ -95,15 +104,18 @@ function getState(): AuthState {
 }
 
 function login(token: string, user: AuthUser) {
-    safeSetItem('user',  JSON.stringify(user));
-    safeSetItem('token', token); // persist for Authorization header fallback
+    safeSetItem('user', JSON.stringify(user));
+    // SEC-C1: Token stored in-memory ONLY — never persisted to localStorage.
+    // The HttpOnly auth cookie is the durable credential. This in-memory token
+    // is kept so the Authorization header works during the current tab session
+    // (useful for cross-port dev and API clients) without creating an XSS attack surface.
     state = { token, user, isAuthenticated: true };
     notify();
 }
 
 function logout() {
     safeRemoveItem('user');
-    safeRemoveItem('token');
+    // No safeRemoveItem('token') — token was never stored in localStorage.
     state = { token: null, user: null, isAuthenticated: false };
     notify();
 }
@@ -124,7 +136,9 @@ export function useAuth(): AuthState {
 
 export const authStore = {
     getState,
-    getToken: () => state.token ?? safeGetItem('token'), // Authorization header source
+    // SEC-C1: Returns in-memory token only. Returns null after page reload;
+    // httpClient will then rely on the HttpOnly auth cookie automatically.
+    getToken: () => state.token,
     subscribe,
     login,
     logout,

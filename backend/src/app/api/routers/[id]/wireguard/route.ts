@@ -78,22 +78,69 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         const wgServerIp = await wireguardManager.getServerIp();
         const subnetPrefix = wgServerIp.split('.').slice(0, 3).join('.'); // e.g. "10.0.0"
 
-        // Logic to assign a unique Tunnel IP based on server's subnet
+        // M4 FIX: Tunnel IP assignment uses a Redis distributed lock to prevent
+        // race conditions. Without a lock, two simultaneous GET requests (e.g. two
+        // admins opening the WireGuard config page at the same time) can both read
+        // the same usedIps list and be assigned the same tunnel IP.
+        //
+        // Mechanism: Redis SET NX EX (set-if-not-exists with expiry).
+        //   - Only one process acquires the lock at a time.
+        //   - Lock expires automatically after 10s to prevent deadlocks.
+        //   - Loser waits 300ms and retries once before proceeding without lock
+        //     (fail-open: better to have a minor collision risk than a broken UI).
         if (!tunnelIp || !tunnelIp.startsWith(`${subnetPrefix}.`)) {
-            const allWgRouters = await db.router.findMany({
-                where: { id: { not: id }, wgTunnelIp: { not: null } },
-                select: { wgTunnelIp: true }
-            });
-            const usedIps = allWgRouters.map(r => r.wgTunnelIp);
+            let lockAcquired = false;
+            const lockKey = `hq:wg:ip-lock:${subnetPrefix}`;
+            const lockVal = `${id}:${Date.now()}`;
 
-            // Find first free IP from 200 to 250
-            let nextIp = 200;
-            while (usedIps.includes(`${subnetPrefix}.${nextIp}`) && nextIp < 250) {
-                nextIp++;
+            try {
+                const { getRedisClient } = await import('@/lib/cache');
+                const redis = getRedisClient();
+                if (redis) {
+                    // Try to acquire lock (NX = only if not exists, EX = expire in 10s)
+                    const result = await redis.set(lockKey, lockVal, 'EX', 10, 'NX');
+                    lockAcquired = result === 'OK';
+                    if (!lockAcquired) {
+                        // Another process holds the lock — wait briefly and try once more
+                        await new Promise(r => setTimeout(r, 300));
+                        const retry = await redis.set(lockKey, lockVal, 'EX', 10, 'NX');
+                        lockAcquired = retry === 'OK';
+                    }
+                }
+            } catch {
+                // Redis unavailable — continue without lock (fail-open)
             }
-            tunnelIp = `${subnetPrefix}.${nextIp}`;
-            await updateRouterWgFields(db, id, { wgTunnelIp: tunnelIp });
+
+            try {
+                const allWgRouters = await db.router.findMany({
+                    where: { id: { not: id }, wgTunnelIp: { not: null } },
+                    select: { wgTunnelIp: true }
+                });
+                const usedIps = allWgRouters.map(r => r.wgTunnelIp);
+
+                // Find first free IP from 200 to 250
+                let nextIp = 200;
+                while (usedIps.includes(`${subnetPrefix}.${nextIp}`) && nextIp < 250) {
+                    nextIp++;
+                }
+                tunnelIp = `${subnetPrefix}.${nextIp}`;
+                await updateRouterWgFields(db, id, { wgTunnelIp: tunnelIp });
+            } finally {
+                // Always release the lock
+                if (lockAcquired) {
+                    try {
+                        const { getRedisClient } = await import('@/lib/cache');
+                        const redis = getRedisClient();
+                        if (redis) {
+                            const current = await redis.get(lockKey);
+                            // Only delete if we still own the lock (not expired + re-acquired by someone else)
+                            if (current === lockVal) await redis.del(lockKey);
+                        }
+                    } catch { /* best-effort release */ }
+                }
+            }
         }
+
 
         if (!wgPrivateKey) {
             try {
@@ -329,6 +376,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         if (action === "push-config") {
             try {
                 const service = await getMikroTikService(id, userPayload.tenantId ?? null);
+
+                // C5 FIX: Step failure tracking — collects non-fatal errors so the final
+                // response accurately reports what succeeded and what had issues, instead
+                // of silently swallowing all errors and returning success: true regardless.
+                interface StepResult { step: string; ok: boolean; error?: string; }
+                const stepResults: StepResult[] = [];
+                function trackStep(step: string, ok: boolean, err?: unknown): void {
+                    const error = err instanceof Error ? err.message : err ? String(err) : undefined;
+                    stepResults.push({ step, ok, error });
+                    if (!ok) logger.warn(`[PUSH-CONFIG] Step failed: ${step}`, { error });
+                }
 
                 // ──────────────────────────────────────────────────────────
                 // STEP 0: CLEANUP OLD HQINVESTMENT RULES & CONFIGS (NO DUPLICATES!)
@@ -648,7 +706,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 // (If Mikrotik tries to connect before the server expects it, handshake fails)
                 try {
                     await wireguardManager.addPeer(router.wgPublicKey, tunnelIp, router.wgPresharedKey || undefined);
+                    trackStep('WireGuard: add peer on server', true);
                 } catch (e: any) {
+                    trackStep('WireGuard: add peer on server', false, e);
                     logger.error("Failed to add peer to wg0:", { error: e.message instanceof Error ? e.message.message : String(e.message) });
                 }
 
@@ -661,20 +721,25 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                         disabled: "no",
                         comment: "HQInvestment VPN Interface"
                     });
+                    trackStep('WireGuard: create wg-hq interface on router', true);
                 } catch (e: any) {
                     if (e.message?.includes("already")) {
                         try {
                             const wgInterfaces = await service.apiRequestPublic("/interface/wireguard");
                             if (Array.isArray(wgInterfaces)) {
                                 const existing = wgInterfaces.find((i: any) => i.name === "wg-hq");
-                                if (existing?.[".id"]) {
+                                if (existing?.[".".concat("id")]) {
                                     await service.apiRequestPublic(`/interface/wireguard/${existing[".id"]}`, "PATCH", {
                                         "private-key": router.wgPrivateKey
                                     });
                                 }
                             }
-                        } catch { }
+                            trackStep('WireGuard: create wg-hq interface on router', true); // already exists = OK
+                        } catch (patchErr) {
+                            trackStep('WireGuard: create wg-hq interface on router', false, patchErr);
+                        }
                     } else {
+                        trackStep('WireGuard: create wg-hq interface on router', false, e);
                         logger.warn("WG Interface note:", { error: e.message instanceof Error ? e.message.message : String(e.message) });
                     }
                 }
@@ -730,7 +795,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                         "persistent-keepalive": "25s",
                         comment: "HQInvestment ISP Server",
                     });
-                } catch (e: any) { logger.warn("Peer note:", { error: e.message instanceof Error ? e.message.message : String(e.message) }); }
+                    trackStep('WireGuard: add server peer on router', true);
+                } catch (e: any) {
+                    if (!e.message?.includes('already')) {
+                        trackStep('WireGuard: add server peer on router', false, e);
+                    } else {
+                        trackStep('WireGuard: add server peer on router', true); // already exists = OK
+                    }
+                    logger.warn("Peer note:", { error: e.message instanceof Error ? e.message.message : String(e.message) });
+                }
 
                 // ──────────────────────────────────────────────────────────
                 // STEP 4: FIREWALL RULES (COMPLETE HOTSPOT PROTECTION!)
@@ -780,11 +853,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 // Reverse the array so that by putting them at index 0, they end up in the correct order at the very top.
                 const reversedRules = [...firewallRules].reverse();
 
+                let fwFailCount = 0;
                 for (const rule of reversedRules) {
                     try {
                         await service.apiRequestPublic("/ip/firewall/filter", "PUT", { ...rule, "place-before": "0" });
-                    } catch (e: any) { logger.warn("FW note:", { error: e.message instanceof Error ? e.message.message : String(e.message) }); }
+                    } catch (e: any) {
+                        if (!e.message?.includes('already')) fwFailCount++;
+                        logger.warn("FW note:", { error: e.message instanceof Error ? e.message.message : String(e.message) });
+                    }
                 }
+                // Report as a single aggregate step — individual rule failures are logged above
+                trackStep('Firewall: push rules', fwFailCount === 0, fwFailCount > 0 ? `${fwFailCount} rule(s) failed` : undefined);
 
                 // ──────────────────────────────────────────────────────────
                 // STEP 5: NAT (FIXED CONFLICT! - ONLY ETHER1!)
@@ -835,14 +914,22 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                         "src-address": tunnelIp,
                         comment: "HQInvestment RADIUS"
                     });
-                } catch (e: any) { logger.warn("Radius note:", { error: e.message instanceof Error ? e.message.message : String(e.message) }); }
+                    trackStep('RADIUS: register server on router', true);
+                } catch (e: any) {
+                    trackStep('RADIUS: register server on router', false, e);
+                    logger.warn("Radius note:", { error: e.message instanceof Error ? e.message.message : String(e.message) });
+                }
 
                 try {
                     await service.apiRequestPublic("/radius/incoming", "PATCH", {
                         accept: "yes",
                         port: "3799"
                     });
-                } catch (e: any) { logger.warn("Radius incoming note:", { error: e.message instanceof Error ? e.message.message : String(e.message) }); }
+                    trackStep('RADIUS: enable CoA (incoming)', true);
+                } catch (e: any) {
+                    trackStep('RADIUS: enable CoA (incoming)', false, e);
+                    logger.warn("Radius incoming note:", { error: e.message instanceof Error ? e.message.message : String(e.message) });
+                }
 
                 // ──────────────────────────────────────────────────────────
                 // STEP 7b: WALLED GARDEN — allow billing portal BEFORE login
@@ -921,21 +1008,40 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 }
                 await updateRouterWgFields(db, id, updateData);
 
+                const failedSteps = stepResults.filter(s => !s.ok);
+                const criticalStepFailed = failedSteps.some(s =>
+                    s.step.includes('WireGuard') || s.step.includes('Firewall') || s.step.includes('RADIUS')
+                );
+
                 await db.routerLog.create({
                     data: {
                         routerId: id,
-                        action: "wireguard_pushed",
-                        details: `WireGuard config auto-pushed to ${router.name}.${tunnelVerified ? ` Connection switched to tunnel IP ${tunnelIp}.` : " Tunnel verification failed - keeping current host."}`,
-                        status: "success",
+                        action: failedSteps.length === 0 ? "wireguard_pushed" : "wireguard_pushed_partial",
+                        details: `WireGuard config pushed to ${router.name}. ${
+                            failedSteps.length === 0
+                                ? 'All steps succeeded.'
+                                : `${failedSteps.length} step(s) had issues: ${failedSteps.map(s => s.step).join(', ')}.`
+                        }${tunnelVerified ? ` Tunnel IP: ${tunnelIp}.` : ' Tunnel verification failed.'}`,
+                        status: failedSteps.length === 0 ? "success" : "partial",
                     },
                 });
 
+                // C5 FIX: Return accurate status — not always success: true.
+                // partialSuccess = config pushed but some non-critical steps had issues.
+                // success = false only when critical steps (WireGuard/Firewall/RADIUS) failed.
                 return jsonResponse({
-                    success: true,
-                    message: tunnelVerified
-                        ? `WireGuard configured and assumed reachable on ${router.name}. Tunnel IP: ${tunnelIp}.`
-                        : `WireGuard configured on ${router.name}, but tunnel verification failed. Keeping original host IP for now.`,
+                    success: !criticalStepFailed,
+                    partialSuccess: failedSteps.length > 0 && !criticalStepFailed,
                     tunnelVerified,
+                    stepsWithIssues: failedSteps.length,
+                    stepDetails: failedSteps.length > 0 ? failedSteps : undefined,
+                    message: criticalStepFailed
+                        ? `WireGuard push-config completed with ${failedSteps.length} critical failure(s). Check step details and retry.`
+                        : failedSteps.length > 0
+                            ? `WireGuard configured on ${router.name} with ${failedSteps.length} minor issue(s). Core functions are operational.${tunnelVerified ? ` Tunnel IP: ${tunnelIp}.` : ''}`
+                            : tunnelVerified
+                                ? `WireGuard configured and tunnel established on ${router.name}. Tunnel IP: ${tunnelIp}.`
+                                : `WireGuard configured on ${router.name}, but tunnel handshake not yet confirmed. Keeping original host IP.`,
                 });
 
             } catch (err: any) {
@@ -953,6 +1059,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 }, 200);
             }
         }
+
 
         // Default: manual activate (user pasted the script on MikroTik)
         try {
