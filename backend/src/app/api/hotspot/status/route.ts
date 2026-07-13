@@ -120,7 +120,16 @@ export async function GET(req: NextRequest) {
                 orderBy: { createdAt: "desc" },
             });
 
+            // BUG FIX (STK-PUSH-CONNECT-001): This endpoint previously returned only
+            // `username` on COMPLETED, never `password`. The hotspot login page's
+            // connectUser(d.username, d.password) call therefore submitted
+            // password="undefined" to the router after a successful STK push payment,
+            // silently failing the auto-connect even though payment had succeeded and
+            // the subscription was already ACTIVE. Mirrors the password resolution
+            // already used in /api/hotspot/check-mac (client.phone, with the same
+            // "123456" fallback used when the client/RADIUS user was activated).
             response.username = transaction.client.username;
+            response.password = transaction.client.phone || "123456";
             response.expiresAt = subscription?.expiresAt?.toISOString() || transaction.expiryDate?.toISOString();
         }
 

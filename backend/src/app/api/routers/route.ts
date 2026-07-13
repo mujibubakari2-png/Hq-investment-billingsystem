@@ -263,15 +263,18 @@ export async function POST(req: NextRequest) {
             },
         });
 
+        // SEC FIX: never spread the raw DB record into the response — it contains
+        // encrypted password/wgPrivateKey/wgPresharedKey/radiusSecret ciphertext.
+        // Reuse the same safe projection GET already uses, and layer the
+        // create-specific aliases/links on top of it.
         return jsonResponse({
-            ...router,
+            ...mapRouter(router),
             router_id: router.id, // Alias for tests
             routerName: router.name, // Alias
             hostname: router.name, // Alias
             ip: router.host, // Alias
             hostIP: router.host, // Alias
             tenant_id: router.tenantId, // Alias for tests
-            status: router.status === "ONLINE" ? "Online" : "Offline",
             setupInstructions: "To configure your router, please copy the auto-configuration script from the dashboard.",
             downloadLinks: {
                 script: `/api/routers/${router.id}/script`,

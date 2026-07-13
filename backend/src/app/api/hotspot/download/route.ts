@@ -160,8 +160,8 @@ export async function GET(req: NextRequest) {
 # For Router: ${routerName}
 
 /ip hotspot profile
-set [find default=yes] html-directory=hotspot login-by=http-chap,http-pap,cookie,mac-cookie
-add name=hq_hotspot html-directory=hotspot login-by=http-chap,http-pap,cookie,mac-cookie use-radius=yes dns-name=${dnsName}
+set [find default=yes] html-directory=hotspot login-by=http-chap,cookie,mac-cookie
+add name=hq_hotspot html-directory=hotspot login-by=http-chap,cookie,mac-cookie use-radius=yes dns-name=${dnsName}
 
 /radius
             add address=${domain} ${routerSecret ? `secret="${routerSecret}"` : "# secret redacted: contact Super Admin to obtain shared secret"} service=hotspot,ppp authentication-port=1812 accounting-port=1813 timeout=3s comment="HQInvestment RADIUS"

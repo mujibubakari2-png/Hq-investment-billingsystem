@@ -1060,13 +1060,75 @@ export class MikroTikService {
     }
 
     /**
-     * Push hotspot settings to MikroTik (Placeholder)
+     * Push hotspot login-page customization to the router.
+     *
+     * TATIZO-A FIX: this used to be a placeholder that returned success
+     * without touching the router at all — the custom branded login page
+     * (rlogin.html, login.html, etc.) never actually reached the router, so
+     * customers always saw MikroTik's stock hotspot page.
+     *
+     * Real implementation: instruct the router to PULL each templated file
+     * from this server via `/tool fetch` (no new inbound port/service needed
+     * on the router — it's an outbound request the router already knows how
+     * to make). Each file URL is signed + time-limited (see hotspotAssets.ts)
+     * since the router has no session/JWT to authenticate with.
      */
     async pushHotspotSettings(settings: any): Promise<{ success: boolean; message: string }> {
         try {
-            await this.log("push_hotspot_settings", `Attempted to push hotspot settings`, "success");
-            // Placeholder: Needs FTP/SFTP or advanced script to upload login.html
-            return { success: true, message: "Settings synced successfully (placeholder)" };
+            const { listHotspotFiles, buildSignedAssetUrl } = await import("./hotspotAssets");
+
+            const baseUrl = (
+                settings?.backendUrl ||
+                env.NEXT_PUBLIC_APP_URL ||
+                (process.env.APP_URL as string | undefined) ||
+                ""
+            ).replace(/\/$/, "");
+
+            if (!baseUrl) {
+                throw new Error(
+                    "No reachable backend URL configured (set APP_URL / NEXT_PUBLIC_APP_URL, or a per-router " +
+                    "backendUrl in Hotspot Settings). The router must be able to reach this server over " +
+                    "HTTP(S) to pull the hotspot login-page files."
+                );
+            }
+
+            const files = listHotspotFiles();
+            let pushed = 0;
+            const failures: string[] = [];
+
+            for (const file of files) {
+                const url = buildSignedAssetUrl(baseUrl, this.routerId, file.relPath);
+                const dstPath = `hotspot/${file.relPath}`;
+                try {
+                    // RouterOS REST API: POST /rest/tool/fetch runs the fetch job.
+                    // On RouterOS 7 this blocks until the download finishes/fails
+                    // and reports status in the response body.
+                    await this.apiRequest("/tool/fetch", "POST", {
+                        url,
+                        "dst-path": dstPath,
+                        "http-method": "get",
+                    });
+                    pushed++;
+                } catch (fileErr: any) {
+                    failures.push(`${file.relPath}: ${fileErr.message}`);
+                }
+            }
+
+            await this.log(
+                "push_hotspot_settings",
+                `Pushed ${pushed}/${files.length} hotspot files via /tool fetch` +
+                (failures.length ? `; failures: ${failures.join("; ")}` : ""),
+                failures.length === 0 ? "success" : "error"
+            );
+
+            if (failures.length > 0) {
+                return {
+                    success: false,
+                    message: `Pushed ${pushed}/${files.length} files. Failed: ${failures.slice(0, 5).join("; ")}${failures.length > 5 ? " …" : ""}`,
+                };
+            }
+
+            return { success: true, message: `Pushed ${pushed} hotspot files to the router.` };
         } catch (err: any) {
             await this.log("push_hotspot_settings", `Failed: ${err.message}`, "error");
             throw err;

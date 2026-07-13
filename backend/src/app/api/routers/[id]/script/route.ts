@@ -195,10 +195,15 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     /ip dhcp-server set [find name="dhcp-${cleanName.toLowerCase()}"] interface=$lanBridge address-pool="${hotspotPoolName}" disabled=no
 }
 
+# SECURITY FIX: http-pap removed from login-by. PAP sends the password in
+# CLEAR TEXT over the wire; combined with the rlogin.html fallback this used
+# to allow plaintext credential capture on the LAN segment whenever the CHAP
+# challenge/JS path failed. Only https (TLS-encrypted) and http-chap
+# (challenge-hashed, password never transmitted) are accepted now.
 :if ([:len [/ip hotspot profile find name="${hotspotProfileName}"]] = 0) do={
-    /ip hotspot profile add name="${hotspotProfileName}" hotspot-address=${router.lanGateway} dns-name="${cleanName.toLowerCase()}.hotspot" html-directory=hotspot login-by=http-chap,http-pap,https,cookie ssl-certificate=auto http-cookie-lifetime=3d use-radius=yes
+    /ip hotspot profile add name="${hotspotProfileName}" hotspot-address=${router.lanGateway} dns-name="${cleanName.toLowerCase()}.hotspot" html-directory=hotspot login-by=http-chap,https,cookie ssl-certificate=auto http-cookie-lifetime=3d use-radius=yes
 } else={
-    /ip hotspot profile set [find name="${hotspotProfileName}"] hotspot-address=${router.lanGateway} dns-name="${cleanName.toLowerCase()}.hotspot" login-by=http-chap,http-pap,https,cookie ssl-certificate=auto use-radius=yes
+    /ip hotspot profile set [find name="${hotspotProfileName}"] hotspot-address=${router.lanGateway} dns-name="${cleanName.toLowerCase()}.hotspot" login-by=http-chap,https,cookie ssl-certificate=auto use-radius=yes
 }
 :if ([:len [/ip hotspot find name="${hotspotServerName}"]] = 0) do={
     /ip hotspot add name="${hotspotServerName}" interface=$lanBridge address-pool="${hotspotPoolName}" profile="${hotspotProfileName}" disabled=no
@@ -329,7 +334,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 }
 
 # 12. Enable RADIUS & SSL/TLS for Hotspot and PPP Services (TATIZO 3 Hotspot SSL fix)
-/ip hotspot profile set [find default=yes] use-radius=yes ssl-certificate=auto login-by=http-chap,http-pap,https,cookie
+# SECURITY FIX: http-pap removed (plaintext password over the wire).
+/ip hotspot profile set [find default=yes] use-radius=yes ssl-certificate=auto login-by=http-chap,https,cookie
 /ppp profile set [find name=default] use-radius=yes
 /log info "RADIUS & SSL services enabled for Hotspot and PPP"
 
@@ -344,7 +350,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 # To manually configure RADIUS, add a NAS entry on the billing server with this router's IP and shared secret.
 
 # 12. Enable RADIUS & SSL/TLS for Hotspot and PPP Services (no secret embedded)
-/ip hotspot profile set [find default=yes] use-radius=yes ssl-certificate=auto login-by=http-chap,http-pap,https,cookie
+# SECURITY FIX: http-pap removed (plaintext password over the wire).
+/ip hotspot profile set [find default=yes] use-radius=yes ssl-certificate=auto login-by=http-chap,https,cookie
 /ppp profile set [find name=default] use-radius=yes
 # 13. Success Notification
 /log info "HQInvestment Configuration completed (credentials redacted)."

@@ -113,9 +113,20 @@
 
   <script src="md5.js"></script>
   <script>
+    // SECURITY FIX: previously this returned `true` (submitting the plaintext
+    // password via a normal form POST) whenever chap-id was unavailable. That
+    // silently allowed cleartext-over-HTTP submissions if RouterOS negotiated
+    // http-pap or if JS partially failed. We now REQUIRE either:
+    //   (a) an active HTTPS connection (encrypted transport), OR
+    //   (b) a valid CHAP challenge (hashed password, never sent in the clear).
+    // If neither is available, we block submission and show an error instead
+    // of silently leaking the password.
     function doLogin() {
       var f = document.forms['login'];
-      if (typeof hexMD5 !== 'undefined' && '$(chap-id)' !== '') {
+      var isHttps = window.location.protocol === 'https:';
+      var hasChap = typeof hexMD5 !== 'undefined' && '$(chap-id)' !== '';
+
+      if (hasChap) {
         var newpass = hexMD5('$(chap-id)' + f.password.value + '$(chap-challenge)');
         var sendForm = document.createElement('form');
         sendForm.method = 'post';
@@ -129,7 +140,21 @@
         sendForm.submit();
         return false;
       }
-      return true;
+
+      if (isHttps) {
+        // Transport is encrypted end-to-end (TLS) — plain POST is safe here.
+        return true;
+      }
+
+      // Neither CHAP nor HTTPS available: refuse to send the password in the clear.
+      var alertBox = document.querySelector('.alert');
+      if (!alertBox) {
+        alertBox = document.createElement('div');
+        alertBox.className = 'alert';
+        f.parentNode.insertBefore(alertBox, f);
+      }
+      alertBox.textContent = 'Secure login unavailable on this connection. Please reconnect to the WiFi and try again, or contact support.';
+      return false;
     }
   </script>
 </body>

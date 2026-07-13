@@ -5,7 +5,6 @@ export interface MikrotikScriptParams {
     routerId: string;
     apiHost: string;
     publicApiBase: string;
-
     // WireGuard specific (optional)
     isWireGuard?: boolean;
     listenPort?: number;
@@ -59,7 +58,18 @@ export function generateMikrotikScript(params: MikrotikScriptParams): string {
 
     const dnsServers = dns;
     const radSecret = radiusSecret || '';
-    const wifiPassword = 'HQInvestmentWiFi2026!';
+    // SECURITY FIX: previously hardcoded to a single static string
+    // ('HQInvestmentWiFi2026!') shared across EVERY tenant/router generated
+    // by this function — anyone who learned that string from one deployed
+    // router could join the WiFi/LAN of every other tenant's network. Derive
+    // a per-router value instead so a leak is scoped to one router only.
+    // NOTE: this client-side generator is superseded by the server-side
+    // /api/routers/[id]/script endpoint (see routersApi.downloadScript) —
+    // prefer that endpoint for new code; this file is kept only for any
+    // remaining callers (e.g. MikrotikScriptModal) pending consolidation.
+    const wifiPassword = routerPassword && routerPassword.length >= 8
+        ? routerPassword
+        : `HQ-${sanitizeName(routerName)}-${routerId}`.slice(0, 32);
 
     const script = `# ═══════════════════════════════════════════════════════════════
 # HQINVESTMENT ISP Billing - MikroTik Auto-Configuration Script

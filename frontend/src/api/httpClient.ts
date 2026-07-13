@@ -172,3 +172,53 @@ export const post = <T>(path: string, body: unknown) => request<T>(path, { metho
 export const put = <T>(path: string, body: unknown) => request<T>(path, { method: 'PUT', body: JSON.stringify(body) });
 export const patch = <T>(path: string, body: unknown) => request<T>(path, { method: 'PATCH', body: JSON.stringify(body) });
 export const del = <T>(path: string) => request<T>(path, { method: 'DELETE' });
+
+/**
+ * Fetch a non-JSON file response (e.g. the generated .rsc router script) with
+ * the same auth/CSRF/refresh handling as request(), and trigger a browser
+ * download. Use this instead of generating security-sensitive config
+ * client-side — the backend is the single source of truth for router
+ * provisioning scripts (credentials never need to touch browser JS this way).
+ */
+export async function downloadFile(path: string, suggestedFilename?: string): Promise<void> {
+    const fullUrl = `${BASE}${path}`;
+
+    let res = await fetch(fullUrl, {
+        credentials: 'include',
+        headers: { ...authHeaders() },
+    });
+
+    if (res.status === 401) {
+        const refreshed = await refreshToken();
+        if (refreshed) {
+            res = await fetch(fullUrl, {
+                credentials: 'include',
+                headers: { ...authHeaders() },
+            });
+        }
+        if (res.status === 401) forceLogout();
+    }
+
+    if (!res.ok) {
+        let message = `Request failed (${res.status})`;
+        try {
+            const data = await res.json();
+            message = data?.error || data?.message || message;
+        } catch { /* not JSON, keep default message */ }
+        throw new Error(message);
+    }
+
+    const blob = await res.blob();
+    const contentDisposition = res.headers.get('content-disposition') || '';
+    const match = contentDisposition.match(/filename="?([^";]+)"?/);
+    const filename = suggestedFilename || match?.[1] || 'download.txt';
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}

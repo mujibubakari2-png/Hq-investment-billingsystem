@@ -1,5 +1,5 @@
 // ── Network (Routers, VPN, Equipments) API ───────────────────────────────────
-import { get, post, put, del } from './httpClient';
+import { get, post, put, del, downloadFile, CLEAN_API_URL } from './httpClient';
 import type { Router } from '../types';
 
 export interface WireGuardConfig {
@@ -70,6 +70,24 @@ export const routersApi = {
         return get<Record<string, unknown>>(`/routers/${id}/vouchers${qs}`);
     },
     generateVouchers:   (id: string, data: Record<string, unknown>)       => post<Record<string, unknown>>(`/routers/${id}/vouchers/generate`, data),
+
+    // Router setup script (.rsc) — generated and signed server-side; never
+    // built in the browser, so credentials never need to reach client JS.
+    downloadScript: (id: string, routerName?: string) =>
+        downloadFile(`/routers/${id}/script`, routerName ? `setup-${routerName}.rsc` : undefined),
+
+    // Direct remote access — WebFig (browser) and Winbox (desktop) via the
+    // backend's credential-safe relay. See lib/winboxRelay.ts + webfig proxy.
+    remoteAccess: {
+        webfigUrl: (id: string) => `${CLEAN_API_URL}/api/routers/${id}/webfig/`,
+        openWinboxSession: (id: string, winboxPort?: number) =>
+            post<{ host: string; port: number; expiresInSeconds: number; instructions: string }>(
+                `/routers/${id}/winbox-session`,
+                winboxPort ? { winboxPort } : {}
+            ),
+        closeWinboxSession: (id: string, port: number) =>
+            del<{ success: boolean }>(`/routers/${id}/winbox-session?port=${port}`),
+    },
 };
 
 export interface VpnListResponse {

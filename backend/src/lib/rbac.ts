@@ -86,6 +86,9 @@ export const PERMISSIONS = {
   "routers:read": ["SUPER_ADMIN", "ADMIN", "AGENT", "VIEWER"],
   "routers:write": ["SUPER_ADMIN", "ADMIN"],
   "routers:delete": ["SUPER_ADMIN"],
+  // Direct remote access to a router's WebFig UI or a live Winbox TCP session.
+  // Grants FULL control of the router — restricted to tenant managers only.
+  "routers:remote-access": ["SUPER_ADMIN", "ADMIN"],
 
   // Branding — SUPER_ADMIN only
   "branding:write": ["SUPER_ADMIN"],

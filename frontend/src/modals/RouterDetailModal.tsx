@@ -15,13 +15,13 @@ import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import PeopleIcon from '@mui/icons-material/People';
 import LanIcon from '@mui/icons-material/Lan';
 import SyncIcon from '@mui/icons-material/Sync';
+import OpenInBrowserIcon from '@mui/icons-material/OpenInBrowser';
+import TerminalIcon from '@mui/icons-material/Terminal';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import WireGuardConfigModal from './WireGuardConfigModal';
-import { getPublicApiBase } from '../utils/config';
 import { routersApi } from '../api';
 import type { Router } from '../types';
 import { formatDateTime } from '../utils/formatters';
-import { sanitizeMikroTikName } from '../utils/mikrotikUtils';
-import { generateMikrotikScript } from '../utils/mikrotikScriptGenerator';
 
 interface RouterDetailModalProps {
     router: Router;
@@ -52,6 +52,10 @@ export default function RouterDetailModal({ router, onClose, onDelete }: RouterD
     const [showWireGuard, setShowWireGuard] = useState(false);
     const [wgStatus, setWgStatus] = useState<WgStatus | null>(null);
     const [loadingWg, setLoadingWg] = useState(true);
+    const [downloadingScript, setDownloadingScript] = useState(false);
+    const [showWebFig, setShowWebFig] = useState(false);
+    const [openingWinbox, setOpeningWinbox] = useState(false);
+    const [winboxSession, setWinboxSession] = useState<{ host: string; port: number; expiresInSeconds: number } | null>(null);
 
     useEffect(() => {
         let cancelled = false;
@@ -62,41 +66,59 @@ export default function RouterDetailModal({ router, onClose, onDelete }: RouterD
         return () => { cancelled = true; };
     }, [router.id]);
 
-    const downloadScript = () => {
-        // Validate required router configuration before generating full .rsc
-        if (!router.lanIp || !router.lanGateway || !router.hotspotPoolRange || !router.pppoePoolRange || !router.dns) {
-            alert('Please configure LAN, Gateway, Pool ranges, and DNS on this router first (Router Setup Wizard → Generate → Create Config).');
-            return;
+    // Router provisioning scripts are security-sensitive (embed router admin
+    // password, RADIUS secret, and — when WireGuard is set up — VPN private
+    // keys). They are generated and rendered SERVER-SIDE only
+    // (/api/routers/[id]/script) so those values never need to be fetched
+    // into browser state or duplicated/drifted in client-side JS.
+    const downloadScript = async () => {
+        setDownloadingScript(true);
+        try {
+            await routersApi.downloadScript(router.id, router.name);
+        } catch (err: any) {
+            alert(`Imeshindwa kupata script: ${err.message || err}. Hakikisha LAN IP, Gateway, Pool ranges, na DNS zimewekwa kwenye router hii (Setup Wizard).`);
+        } finally {
+            setDownloadingScript(false);
         }
+    };
 
-        const routerIdCode = `MYR-${router.id.padStart(3, '0')}VBHBC`;
-        const safeRouterName = sanitizeMikroTikName(router.name);
-        const publicApiBase = getPublicApiBase();
-        const apiHost = publicApiBase.startsWith('http')
-            ? new URL(publicApiBase).hostname
-            : window.location.hostname;
-        const script = generateMikrotikScript({
-            routerName: router.name,
-            routerUsername: router.username,
-            routerPassword: router.password,
-            routerId: routerIdCode,
-            apiHost,
-            publicApiBase,
-            isWireGuard: false,
-        });
-        const blob = new Blob([script], { type: 'text/plain' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `mikrotik-script-${safeRouterName}.rsc`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+    const openWinbox = async () => {
+        setOpeningWinbox(true);
+        try {
+            const session = await routersApi.remoteAccess.openWinboxSession(router.id);
+            setWinboxSession(session);
+        } catch (err: any) {
+            alert(`Imeshindwa kufungua kikao cha Winbox: ${err.message || err}`);
+        } finally {
+            setOpeningWinbox(false);
+        }
     };
 
     if (showWireGuard) {
         return <WireGuardConfigModal router={router} onClose={() => setShowWireGuard(false)} />;
+    }
+
+    if (showWebFig) {
+        return (
+            <div className="modal-overlay" onClick={() => setShowWebFig(false)}>
+                <div className="modal" style={{ maxWidth: 1100, width: '95vw', height: '90vh', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
+                    <div className="modal-header" style={{ background: 'linear-gradient(135deg, #0891b2, #0e7490)', color: '#fff' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <OpenInBrowserIcon />
+                            <div style={{ fontWeight: 700, fontSize: '1rem' }}>WebFig — {router.name}</div>
+                        </div>
+                        <button onClick={() => setShowWebFig(false)} className="modal-close" style={{ color: '#fff', background: 'rgba(255,255,255,0.15)' }}>
+                            <CloseIcon fontSize="small" />
+                        </button>
+                    </div>
+                    <iframe
+                        title={`webfig-${router.id}`}
+                        src={routersApi.remoteAccess.webfigUrl(router.id)}
+                        style={{ flex: 1, border: 'none', width: '100%' }}
+                    />
+                </div>
+            </div>
+        );
     }
 
     const isOnline = router.status === 'Online';
@@ -235,12 +257,13 @@ export default function RouterDetailModal({ router, onClose, onDelete }: RouterD
                             />
                             <ActionBtn
                                 icon={<DownloadIcon fontSize="small" />}
-                                label="Download Script"
+                                label={downloadingScript ? 'Downloading...' : 'Download Script'}
                                 desc="MikroTik .rsc setup"
                                 color="#0891b2"
                                 bg="#ecfeff"
                                 border="#a5f3fc"
                                 onClick={downloadScript}
+                                disabled={downloadingScript}
                             />
                             <ActionBtn
                                 icon={<LoginIcon fontSize="small" />}
@@ -251,7 +274,51 @@ export default function RouterDetailModal({ router, onClose, onDelete }: RouterD
                                 border="#86efac"
                                 onClick={() => { onClose(); navigate('/hotspot-customizer'); }}
                             />
+                            <ActionBtn
+                                icon={<OpenInBrowserIcon fontSize="small" />}
+                                label="Open WebFig"
+                                desc="Router web GUI (browser)"
+                                color="#0e7490"
+                                bg="#ecfeff"
+                                border="#a5f3fc"
+                                onClick={() => setShowWebFig(true)}
+                            />
+                            <ActionBtn
+                                icon={<TerminalIcon fontSize="small" />}
+                                label={openingWinbox ? 'Opening...' : 'Open Winbox'}
+                                desc="Live TCP session for desktop Winbox"
+                                color="#7c3aed"
+                                bg="#f5f3ff"
+                                border="#ddd6fe"
+                                onClick={openWinbox}
+                                disabled={openingWinbox}
+                            />
                         </div>
+                        {winboxSession && (
+                            <div style={{
+                                marginTop: 10, padding: '12px 14px', borderRadius: 'var(--radius-md)',
+                                background: '#f5f3ff', border: '1px solid #ddd6fe', fontSize: '0.82rem',
+                            }}>
+                                <div style={{ fontWeight: 700, color: '#5b21b6', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    <TerminalIcon style={{ fontSize: 16 }} /> Winbox Connect To:
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <code style={{ background: '#ede9fe', padding: '4px 10px', borderRadius: 6, fontSize: '0.9rem', fontWeight: 600, color: '#4c1d95' }}>
+                                        {winboxSession.host}:{winboxSession.port}
+                                    </code>
+                                    <button
+                                        title="Copy"
+                                        onClick={() => navigator.clipboard.writeText(`${winboxSession.host}:${winboxSession.port}`)}
+                                        style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#6d28d9' }}
+                                    >
+                                        <ContentCopyIcon style={{ fontSize: 15 }} />
+                                    </button>
+                                </div>
+                                <div style={{ color: '#6d28d9', marginTop: 6, fontSize: '0.75rem' }}>
+                                    Fungua Winbox kwenye kompyuta yako, weka anwani hii kwenye "Connect To", tumia username/password ya router. Kiungo kitafunga ndani ya dakika {Math.floor(winboxSession.expiresInSeconds / 60)} kama hakijatumika.
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* ── Danger Zone ── */}
@@ -293,14 +360,15 @@ function StatCard({ icon, label, value, small = false, children }: {
     );
 }
 
-function ActionBtn({ icon, label, desc, color, bg, border, onClick }: {
-    icon: React.ReactNode; label: string; desc: string; color: string; bg: string; border: string; onClick: () => void;
+function ActionBtn({ icon, label, desc, color, bg, border, onClick, disabled }: {
+    icon: React.ReactNode; label: string; desc: string; color: string; bg: string; border: string; onClick: () => void; disabled?: boolean;
 }) {
     return (
         <button
             onClick={onClick}
-            style={{ background: bg, color, border: `1px solid ${border}`, borderRadius: 'var(--radius-md)', padding: '12px 14px', display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s', width: '100%' }}
-            onMouseEnter={e => (e.currentTarget.style.filter = 'brightness(0.96)')}
+            disabled={disabled}
+            style={{ background: bg, color, border: `1px solid ${border}`, borderRadius: 'var(--radius-md)', padding: '12px 14px', display: 'flex', alignItems: 'flex-start', gap: 10, cursor: disabled ? 'wait' : 'pointer', textAlign: 'left', transition: 'all 0.15s', width: '100%', opacity: disabled ? 0.7 : 1 }}
+            onMouseEnter={e => { if (!disabled) e.currentTarget.style.filter = 'brightness(0.96)'; }}
             onMouseLeave={e => (e.currentTarget.style.filter = 'none')}
         >
             <span style={{ marginTop: 2, flexShrink: 0 }}>{icon}</span>
