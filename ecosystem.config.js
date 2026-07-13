@@ -79,9 +79,77 @@ module.exports = {
         HOSTNAME: '127.0.0.1',
         PORT: '3001'
       }
-    }
+    },
 
     // The Vite frontend is served by Nginx from frontend/dist.
     // It does not need a PM2 process.
+
+    // ─── Worker Processes ────────────────────────────────────────────────────────
+
+    /**
+     * RADIUS User Synchronization Worker
+     * 
+     * RAD-W-001 FIX: Processes RADIUS sync jobs asynchronously.
+     * Prevents slow RADIUS servers from blocking API request threads.
+     * Architecture: Event Queue → Radius Worker → RADIUS Server
+     */
+    {
+      name: 'radius-worker',
+      cwd: `${PROJECT_DIR}/backend`,
+      script: 'npx',
+      args: 'tsx src/workers/radius.worker.ts',
+      instances: 1,
+      exec_mode: 'fork',
+      watch: false,
+      max_memory_restart: '512M',
+      exp_backoff_restart_delay: 100,
+      max_restarts: 10,
+      min_uptime: '10s',
+      error_file: `${PROJECT_DIR}/logs/radius-worker-error.log`,
+      out_file: `${PROJECT_DIR}/logs/radius-worker-out.log`,
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      merge_logs: true,
+      env: {
+        NODE_ENV: 'production',
+        NEXT_TELEMETRY_DISABLED: '1',
+      },
+      env_production: {
+        NODE_ENV: 'production',
+        NEXT_TELEMETRY_DISABLED: '1',
+      }
+    },
+
+    /**
+     * MikroTik Router Operations Worker
+     * 
+     * MK-002: Processes MikroTik operations from the Redis queue asynchronously.
+     * Prevents API timeouts from router connectivity issues.
+     * Architecture: Event Queue → Router Worker → MikroTik API
+     */
+    {
+      name: 'mikrotik-worker',
+      cwd: `${PROJECT_DIR}/backend`,
+      script: 'npx',
+      args: 'tsx src/workers/mikrotik.worker.ts',
+      instances: 1,
+      exec_mode: 'fork',
+      watch: false,
+      max_memory_restart: '512M',
+      exp_backoff_restart_delay: 100,
+      max_restarts: 10,
+      min_uptime: '10s',
+      error_file: `${PROJECT_DIR}/logs/mikrotik-worker-error.log`,
+      out_file: `${PROJECT_DIR}/logs/mikrotik-worker-out.log`,
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      merge_logs: true,
+      env: {
+        NODE_ENV: 'production',
+        NEXT_TELEMETRY_DISABLED: '1',
+      },
+      env_production: {
+        NODE_ENV: 'production',
+        NEXT_TELEMETRY_DISABLED: '1',
+      }
+    },
   ]
 };
