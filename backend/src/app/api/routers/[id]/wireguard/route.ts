@@ -957,7 +957,21 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         // Default: manual activate (user pasted the script on MikroTik)
         try {
             // Aggressive Cleanup: Remove any peer that is not actively registered in the DB
-            const allValidRouters = await db.router.findMany({
+            //
+            // CRITICAL FIX (WG-TENANT-WIPE-001): This lookup MUST be cross-tenant/unscoped.
+            // The WireGuard server (wg0) has no concept of "tenant" — a single physical
+            // interface holds peers for every tenant's routers system-wide. The previous
+            // code used the tenant-scoped `db` (getTenantClient(userPayload)) to build
+            // `validKeys`, which only ever contained THIS tenant's routers. Every other
+            // tenant's router — even one with a perfectly healthy, currently-connected
+            // handshake — was invisible to that query and therefore got its peer entry
+            // DESTROYED below, every single time ANY tenant clicked "Activate" for their
+            // own router. That is very likely why activation "keeps failing" even when the
+            // MikroTik-side firewall is clean: another tenant's activation attempt (or an
+            // earlier one on this same platform) may have wiped this router's peer moments
+            // after it registered a handshake.
+            const globalDb = getTenantClient(null);
+            const allValidRouters = await globalDb.router.findMany({
                 where: { wgPublicKey: { not: null } },
                 select: { wgPublicKey: true }
             });
