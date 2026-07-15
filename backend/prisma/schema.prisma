@@ -139,10 +139,16 @@ model Subscription {
   updatedAt    DateTime           @updatedAt
   deletedAt    DateTime?
   tenantId     String?
+  // VOUCHER-RESERVE-001: Links a voucher-redeemed subscription back to its
+  // Voucher row so a background sweep can confirm (first real RADIUS auth
+  // seen) or release (no auth after grace period -> voucher reusable again)
+  // the reservation. Null for non-voucher subscriptions.
+  voucherId    String?
   client       Client             @relation(fields: [clientId], references: [id], onDelete: Cascade)
   package      Package            @relation(fields: [packageId], references: [id], onDelete: Cascade)
   router       Router?            @relation(fields: [routerId], references: [id])
   tenant       Tenant?            @relation(fields: [tenantId], references: [id])
+  voucher      Voucher?           @relation(fields: [voucherId], references: [id])
 
   @@index([tenantId])
   @@index([clientId])
@@ -152,6 +158,7 @@ model Subscription {
   @@index([tenantId, expiresAt])
   @@index([routerId])
   @@index([tenantId, activatedAt])
+  @@index([voucherId])
   @@map("subscriptions")
 }
 
@@ -326,22 +333,24 @@ model Equipment {
 }
 
 model Voucher {
-  id          String        @id @default(uuid())
-  code        String
-  packageId   String
-  routerId    String?
-  status      VoucherStatus @default(UNUSED)
-  createdById String
-  usedBy      String?
-  usedAt      DateTime?
-  customer    Int?
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-  tenantId    String?
-  createdBy   User          @relation(fields: [createdById], references: [id])
-  package     Package       @relation(fields: [packageId], references: [id], onDelete: Cascade)
-  router      Router?       @relation(fields: [routerId], references: [id])
-  tenant      Tenant?       @relation(fields: [tenantId], references: [id])
+  id            String         @id @default(uuid())
+  code          String
+  packageId     String
+  routerId      String?
+  status        VoucherStatus  @default(UNUSED)
+  createdById   String
+  usedBy        String?
+  usedAt        DateTime?
+  customer      Int?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  tenantId      String?
+  createdBy     User           @relation(fields: [createdById], references: [id])
+  package       Package        @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  router        Router?        @relation(fields: [routerId], references: [id])
+  tenant        Tenant?        @relation(fields: [tenantId], references: [id])
+  // VOUCHER-RESERVE-001: subscriptions created while this voucher was reserved (status=ACTIVE)
+  subscriptions Subscription[]
 
   @@unique([code, tenantId])
   // Add tenantId index for voucher listing queries

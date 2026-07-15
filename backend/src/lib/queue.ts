@@ -120,7 +120,13 @@ export const enqueueDisconnectSession = (
 /**
  * Queue a service activation (PPPoE or Hotspot) for async processing.
  * API returns immediately; MikroTik operation happens in background worker.
- * 
+ *
+ * RADIUS-001: The worker-side handler no longer creates/enables a local
+ * MikroTik secret — RADIUS (see lib/radius.ts syncRadiusUser(), triggered
+ * separately via enqueueRadiusSyncUser) is the sole source of truth for
+ * customer auth. This call is kept so the RouterLog audit trail still
+ * records an explicit activation event per customer/router.
+ *
  * Architecture compliance: Event Queue → Router Worker → MikroTik API
  */
 export const enqueueActivateService = (
@@ -142,7 +148,14 @@ export const enqueueActivateService = (
 /**
  * Queue a service suspension for async processing.
  * API returns immediately; MikroTik operation happens in background worker.
- * 
+ *
+ * RADIUS-001: The worker-side handler no longer disables a local MikroTik
+ * secret (there isn't one anymore). It only force-disconnects the
+ * customer's CURRENT active session so suspension takes effect immediately;
+ * RADIUS suspension (see suspendRadiusUser() in lib/radius.ts, triggered
+ * separately via enqueueRadiusSuspendUser) is what blocks any future
+ * reconnect attempt.
+ *
  * Architecture compliance: Event Queue → Router Worker → MikroTik API
  */
 export const enqueueSuspendService = (

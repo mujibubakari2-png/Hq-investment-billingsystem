@@ -5,6 +5,7 @@ import { jsonResponse, errorResponse } from "@/lib/auth";
 import { requirePermission } from "@/lib/rbac";
 import { VoucherCreateSchema } from "@/lib/validators";
 import { toISOSafe, toTimestampSafe } from "@/lib/dateUtils";
+import { writeAuditLog, getIpFromRequest } from "@/lib/auditLog";
 import logger from "@/lib/logger";
 import crypto from "crypto";
 
@@ -156,6 +157,21 @@ export async function POST(req: NextRequest) {
                 tenantId:    tenantIdValue,
             },
         });
+
+        // AUDIT-001: Record voucher creation (audit report point #11 — the
+        // voucher lifecycle previously had no explicit audit trail entry).
+        if (tenantIdValue) {
+            await writeAuditLog({
+                tenantId: tenantIdValue,
+                userId: finalCreatedById,
+                action: "VOUCHER_CREATED",
+                resource: "Voucher",
+                resourceId: voucher.id,
+                details: { code: finalCode, packageId: pkg.id, routerId: routerIdValue },
+                ipAddress: getIpFromRequest(req),
+                userAgent: req.headers.get("user-agent") ?? undefined,
+            });
+        }
 
         return jsonResponse(voucher, 201);
     } catch (e: any) {

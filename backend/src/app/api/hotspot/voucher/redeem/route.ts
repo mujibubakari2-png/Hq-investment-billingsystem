@@ -195,23 +195,38 @@ export async function POST(req: NextRequest) {
             return errorResponse("Failed to connect to the network router. Your voucher has NOT been used. Please try again.", 500);
         }
 
-        // 7. Update voucher status and subscription in a transaction ONLY after successful network activation
+        // 7. RESERVE the voucher and create the subscription in a transaction, ONLY
+        // after the network activation job(s) were successfully queued.
+        //
+        // VOUCHER-RESERVE-001: The voucher is NOT marked USED yet. It moves to the
+        // ACTIVE (reserved) state instead. Queuing the MikroTik/RADIUS job does not
+        // guarantee the client's device actually completes the login (power loss,
+        // signal drop, closed laptop, etc). If we marked it USED here and the login
+        // never completes, the customer loses the voucher for nothing.
+        //
+        // A background sweep (/api/cron/voucher-reservation-sweep) later either:
+        //   - CONFIRMS the voucher as USED once a real RADIUS accounting session
+        //     (radacct.acctstarttime) is observed for this username, or
+        //   - RELEASES the voucher back to UNUSED (and expires the pending
+        //     subscription) if no session appears within the grace period,
+        //     so the customer can simply try the same code again.
         const [updatedVoucher, newSub, updatedClient] = await db.$transaction([
-            // 1. Mark voucher as USED
+            // 1. Mark voucher as ACTIVE (reserved, not yet confirmed used)
             db.voucher.update({
                 where: { id: voucher.id },
                 data: {
-                    status: "USED",
+                    status: "ACTIVE",
                     usedBy: client.username,
                     usedAt: now,
                 },
             }),
-            // 2. Create subscription
+            // 2. Create subscription, linked back to the voucher for the sweep
             db.subscription.create({
                 data: {
                     clientId: client.id,
                     packageId: pkg.id,
                     routerId: routerId || pkg.routerId || undefined,
+                    voucherId: voucher.id,
                     status: "ACTIVE",
                     method: "VOUCHER",
                     activatedAt: now,

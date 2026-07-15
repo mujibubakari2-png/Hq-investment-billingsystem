@@ -85,9 +85,29 @@ describe('RADIUS Service', () => {
             );
 
             // Verify radreply Mikrotik-Group
+            // RADIUS-001: profileName is sanitized to match the ACTUAL profile name
+            // RouterOS has on disk (createProfileFromPackage() uses the same
+            // sanitizeMikroTikName()) — 'Standard' -> 'standard'.
             expect(mockExecuteRaw).toHaveBeenCalledWith(
                 expect.arrayContaining([expect.stringContaining('INSERT INTO radreply')]),
-                'test-user', 'Mikrotik-Group', '=', 'Standard', 'tenant-1'
+                'test-user', 'Mikrotik-Group', '=', 'standard', 'tenant-1'
+            );
+        });
+
+        it('RADIUS-001: sanitizes a profileName with spaces/special chars for Mikrotik-Group', async () => {
+            mockRadiusUserFindFirst.mockResolvedValueOnce(null);
+            mockRadiusUserCreate.mockResolvedValueOnce({ id: 'ru-2', username: 'test-user-2', tenantId: 'tenant-1' });
+
+            await syncRadiusUser({
+                username: 'test-user-2',
+                password: 'secure',
+                tenantId: 'tenant-1',
+                profileName: '10 Mbps / Home Plan!!!',
+            });
+
+            expect(mockExecuteRaw).toHaveBeenCalledWith(
+                expect.arrayContaining([expect.stringContaining('INSERT INTO radreply')]),
+                'test-user-2', 'Mikrotik-Group', '=', '10-mbps-home-plan', 'tenant-1'
             );
         });
 

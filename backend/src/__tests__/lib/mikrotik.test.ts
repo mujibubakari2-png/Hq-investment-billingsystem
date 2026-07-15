@@ -155,7 +155,38 @@ describe('MikroTikService', () => {
         });
     });
 
-    it('should format uptime correctly in activateService', async () => {
+    it('RADIUS-001: activateService makes NO MikroTik API calls (RADIUS is sole source of truth)', async () => {
+        // Regression guard for the dual-write bug (audit report point #2): this
+        // method used to create/enable a local /ip/hotspot/user or /ppp/secret,
+        // which RouterOS would silently prefer over RADIUS. It must now be a
+        // pure log write — zero fetch() calls, zero local user side effects.
+        const service = new MikroTikService({
+            host: '10.0.0.1',
+            port: 80,
+            username: 'admin',
+            password: 'password',
+            restPort: 80
+        }, 'router-123', 'tenant-1');
+
+        const futureDate = new Date(Date.now() + 86400 * 1000);
+        await service.activateService('user', 'pass', 'default-profile', 'hotspot', futureDate);
+
+        expect(global.fetch).not.toHaveBeenCalled();
+        expect(mockRouterLogCreate).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                routerId: 'router-123',
+                action: 'activate_service',
+                username: 'user',
+                status: 'success',
+            }),
+        });
+    });
+
+    it('RADIUS-001: suspendService only kicks the active session, never disables a local secret', async () => {
+        // Regression guard: suspendService() used to call findHotspotUserByName +
+        // disableHotspotUser (a local secret write). It must now ONLY read the
+        // active-sessions list and, if the user is connected, DELETE that one
+        // session — no /ip/hotspot/user or /ppp/secret calls at all.
         const service = new MikroTikService({
             host: '10.0.0.1',
             port: 80,
@@ -165,26 +196,44 @@ describe('MikroTikService', () => {
         }, 'router-123', 'tenant-1');
 
         (global.fetch as jest.Mock)
-            // findHotspotUserByName returns null
+            // listHotspotActiveSessions()
             .mockResolvedValueOnce({
                 ok: true,
-                text: async () => JSON.stringify([])
+                text: async () => JSON.stringify([{ '.id': '*A1', user: 'user', address: '10.0.0.55' }]),
             })
-            // createHotspotUser returns success
-            .mockResolvedValueOnce({
-                ok: true,
-                text: async () => JSON.stringify({ ".id": "*3" })
-            });
+            // disconnectHotspotSession() DELETE
+            .mockResolvedValueOnce({ ok: true, text: async () => '{}' });
 
-        const futureDate = new Date(Date.now() + (86400 * 1000) + (3600 * 1000) + (120 * 1000)); // 1 day, 1 hour, 2 minutes
-        await service.activateService('user', 'pass', 'default-profile', 'hotspot', futureDate);
+        await service.suspendService('user', 'hotspot');
 
-        // Verify the create API call payload contains formatted limit-uptime
-        const createCall = (global.fetch as jest.Mock).mock.calls[1];
-        const body = JSON.parse(createCall[1].body);
+        expect(global.fetch).toHaveBeenCalledTimes(2);
+        const sessionListUrl = (global.fetch as jest.Mock).mock.calls[0][0];
+        const disconnectCall = (global.fetch as jest.Mock).mock.calls[1];
+        expect(sessionListUrl).toContain('/ip/hotspot/active');
+        expect(disconnectCall[0]).toContain('/ip/hotspot/active/*A1');
+        expect(disconnectCall[1].method).toBe('DELETE');
 
-        // 1d01:02:00
-        expect(body['limit-uptime']).toMatch(/^1d01:0[12]:\d\d$/); // Allow small variance due to execution time
+        // Must never touch the local hotspot user table
+        const allUrls = (global.fetch as jest.Mock).mock.calls.map((c: any[]) => c[0]);
+        expect(allUrls.some((u: string) => u.includes('/ip/hotspot/user'))).toBe(false);
+    });
+
+    it('RADIUS-001: suspendService with no active session still succeeds (no reconnect possible, blocked by RADIUS)', async () => {
+        const service = new MikroTikService({
+            host: '10.0.0.1',
+            port: 80,
+            username: 'admin',
+            password: 'password',
+            restPort: 80
+        }, 'router-123', 'tenant-1');
+
+        (global.fetch as jest.Mock).mockResolvedValueOnce({
+            ok: true,
+            text: async () => JSON.stringify([]), // no matching active session
+        });
+
+        await expect(service.suspendService('offline-user', 'pppoe')).resolves.not.toThrow();
+        expect(global.fetch).toHaveBeenCalledTimes(1); // only the session list lookup, no DELETE
     });
 
     it('should allow a WireGuard tunnel IP when the router is already configured for WireGuard', async () => {

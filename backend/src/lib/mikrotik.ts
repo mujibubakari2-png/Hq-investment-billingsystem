@@ -755,6 +755,36 @@ export class MikroTikService {
         }
     }
 
+    /**
+     * RADIUS-001: Kick a customer's currently active session by username,
+     * WITHOUT touching any local /ppp/secret or /ip/hotspot/user entry.
+     *
+     * Used for immediate suspension now that RADIUS is the sole source of
+     * truth for auth (see suspendService() below). A closed session simply
+     * cannot reconnect afterwards because radcheck.Expiration/Simultaneous-Use
+     * already blocks the next Access-Request — this only handles forcing the
+     * *current* session off right now instead of waiting for it to expire.
+     */
+    async kickActiveSession(username: string, serviceType: "pppoe" | "hotspot"): Promise<boolean> {
+        if (serviceType === "pppoe") {
+            const sessions = await this.listPPPoEActiveSessions();
+            const session = sessions.find(s => s.user === username);
+            if (session) {
+                await this.disconnectPPPoESession(session.id, username);
+                return true;
+            }
+            return false;
+        } else {
+            const sessions = await this.listHotspotActiveSessions();
+            const session = sessions.find(s => s.user === username);
+            if (session) {
+                await this.disconnectHotspotSession(session.id, username);
+                return true;
+            }
+            return false;
+        }
+    }
+
     // ══════════════════════════════════════════════════════════════════════════
     // BANDWIDTH PROFILES
     // ══════════════════════════════════════════════════════════════════════════
@@ -853,90 +883,62 @@ export class MikroTikService {
     // ══════════════════════════════════════════════════════════════════════════
 
     /**
-     * Activate a customer's service after payment
+     * Activate a customer's service after payment.
+     *
+     * RADIUS-001: This USED to create/enable a local /ppp/secret or
+     * /ip/hotspot/user entry for the customer. That has been removed.
+     *
+     * Every router this app provisions already has
+     * `use-radius=yes` set on BOTH the Hotspot server profile and the PPP
+     * default profile (see /api/routers/[id]/script). RouterOS's own
+     * behaviour is: if a LOCAL secret/hotspot-user with the same name
+     * exists, it wins over RADIUS silently — so having both created a
+     * hidden race between whichever one was written last (see audit report,
+     * point 2: "Kuna sehemu moja ina risk kubwa sana"). RADIUS
+     * (radcheck/radreply, written by lib/radius.ts syncRadiusUser()) is now
+     * the ONLY source of truth for username, password (MD5), rate limit
+     * (Mikrotik-Rate-Limit), profile group (Mikrotik-Group), expiry
+     * (Expiration) and simultaneous-use. This method intentionally does
+     * nothing on the MikroTik side anymore — it is kept (rather than
+     * deleted) so already-queued 'activate-service' jobs and any external
+     * callers don't break, and so the RouterLog audit trail still shows an
+     * explicit "activation" event per customer.
      */
-    async activateService(username: string, password: string, profileName: string, serviceType: "pppoe" | "hotspot", expiresAt?: Date): Promise<void> {
-        // MK-002 FIX: Sanitize profileName to match the name created by createProfileFromPackage().
-        // createProfileFromPackage() uses sanitizeMikroTikName() but callers often pass the raw
-        // pkg.name (e.g. "50 Mbps / Home"). Without this, MikroTik rejects with "profile not found".
-        profileName = sanitizeMikroTikName(profileName);
-
-        let limitUptime: string | undefined = undefined;
-        if (expiresAt) {
-            const seconds = Math.floor((expiresAt.getTime() - Date.now()) / 1000);
-            if (seconds > 0) {
-                // Format as MikroTik duration: e.g. 1d05:20:00
-                const days = Math.floor(seconds / 86400);
-                const hours = Math.floor((seconds % 86400) / 3600);
-                const mins = Math.floor((seconds % 3600) / 60);
-                const secs = seconds % 60;
-                limitUptime = `${days > 0 ? days + 'd' : ''}${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-            }
-        }
-
-        if (serviceType === "pppoe") {
-            const existing = await this.findPPPoEUserByName(username);
-            if (existing && existing.id) {
-                await this.enablePPPoEUser(existing.id, username);
-                if (existing.profile !== profileName) {
-                    await this.updatePPPoEUser(existing.id, { profile: profileName, name: username });
-                }
-            } else {
-                await this.createPPPoEUser({
-                    name: username,
-                    password,
-                    profile: profileName,
-                    service: "pppoe",
-                    disabled: false,
-                });
-            }
-        } else {
-            const existing = await this.findHotspotUserByName(username);
-            if (existing && existing.id) {
-                await this.enableHotspotUser(existing.id, username);
-                const updateData: any = { profile: profileName, name: username };
-                if (limitUptime) updateData.limitUptime = limitUptime;
-                await this.updateHotspotUser(existing.id, updateData);
-            } else {
-                await this.createHotspotUser({
-                    name: username,
-                    password,
-                    profile: profileName,
-                    server: "all",
-                    disabled: false,
-                    limitUptime,
-                });
-            }
-        }
-        await this.log("activate_service", `Activated ${serviceType} service for ${username}`, "success", username);
+    async activateService(username: string, _password: string, _profileName: string, serviceType: "pppoe" | "hotspot", _expiresAt?: Date): Promise<void> {
+        await this.log(
+            "activate_service",
+            `No MikroTik-side action taken for ${username} — RADIUS (radcheck/radreply) is the sole source of truth for ${serviceType} auth.`,
+            "success",
+            username
+        );
     }
 
     /**
-     * Suspend a customer's service (expired subscription)
+     * Suspend a customer's service (expired subscription / non-payment).
+     *
+     * RADIUS-001: This USED to disable a local /ppp/secret or
+     * /ip/hotspot/user entry. Since activateService() no longer creates
+     * local entries, there is nothing local left to disable — RADIUS
+     * suspension (radcheck.Expiration set in the past, see
+     * suspendRadiusUser() in lib/radius.ts) already blocks the NEXT
+     * Access-Request. The only thing this method still needs to do on the
+     * MikroTik side is force the customer's CURRENT session off immediately,
+     * so suspension takes effect right now instead of waiting for their
+     * session/lease to naturally expire.
      */
     async suspendService(username: string, serviceType: "pppoe" | "hotspot"): Promise<void> {
         try {
-            if (serviceType === "pppoe") {
-                const user = await this.findPPPoEUserByName(username);
-                if (user?.id) {
-                    await this.disablePPPoEUser(user.id, username);
-                    // Also disconnect active session
-                    const sessions = await this.listPPPoEActiveSessions();
-                    const session = sessions.find(s => s.user === username);
-                    if (session) await this.disconnectPPPoESession(session.id, username);
-                }
-            } else {
-                const user = await this.findHotspotUserByName(username);
-                if (user?.id) {
-                    await this.disableHotspotUser(user.id, username);
-                    const sessions = await this.listHotspotActiveSessions();
-                    const session = sessions.find(s => s.user === username);
-                    if (session) await this.disconnectHotspotSession(session.id, username);
-                }
-            }
-            await this.log("suspend_service", `Suspended ${serviceType} service for ${username}`, "success", username);
+            const kicked = await this.kickActiveSession(username, serviceType);
+            await this.log(
+                "suspend_service",
+                kicked
+                    ? `Kicked active ${serviceType} session for ${username} (RADIUS suspension blocks reconnect)`
+                    : `No active ${serviceType} session found for ${username} (RADIUS suspension blocks any future connect)`,
+                "success",
+                username
+            );
         } catch (err: any) {
-            await this.log("suspend_service", `Failed to suspend service for ${username}: ${err.message}`, "error", username);
+            await this.log("suspend_service", `Failed to kick session for ${username}: ${err.message}`, "error", username);
             throw err;
         }
     }

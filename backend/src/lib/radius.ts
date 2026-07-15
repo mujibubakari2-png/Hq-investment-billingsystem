@@ -2,6 +2,7 @@ import { getTenantClient } from "./tenantPrisma";
 import prisma from "./prisma";
 import bcrypt from "bcryptjs";
 import { createHash } from "crypto";
+import { sanitizeMikroTikName } from "./mikrotik";
 
 
 /**
@@ -189,8 +190,15 @@ export async function syncRadiusUser(params: {
     }
 
     // ── 7. radreply: Mikrotik-Group (Hotspot/PPPoE Profile) ──────────────────
+    // RADIUS-001: sanitize to match the ACTUAL profile name RouterOS has on
+    // disk. createProfileFromPackage() in lib/mikrotik.ts creates hotspot/ppp
+    // profiles via sanitizeMikroTikName(pkg.name) (e.g. "10 Mbps Home" ->
+    // "10-mbps-home"). Sending the raw, unsanitized package name here would
+    // point Mikrotik-Group at a profile that doesn't exist on the router, now
+    // that RADIUS is the sole source of truth (no local user carrying a
+    // pre-resolved profile field anymore).
     if (profileName) {
-        await upsertRadReply(username, "Mikrotik-Group", profileName, "=", tenantId);
+        await upsertRadReply(username, "Mikrotik-Group", sanitizeMikroTikName(profileName), "=", tenantId);
     } else {
         await deleteRadReplyAttribute(username, "Mikrotik-Group", tenantId);
     }
