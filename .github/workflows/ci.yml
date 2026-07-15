@@ -180,7 +180,9 @@ jobs:
             ${{ runner.os }}-nextjs-${{ hashFiles('**/pnpm-lock.yaml') }}-
 
       - name: Build backend
-        run: pnpm --filter backend build
+        run: |
+          pnpm --filter backend build
+          cp -r backend/src/generated backend/dist/generated
 
       - name: Upload backend build artifact
         uses: actions/upload-artifact@v5
