@@ -97,8 +97,10 @@ module.exports = {
     {
       name: 'radius-worker',
       cwd: BACKEND_DIR,
-      script: 'node',
-      args: 'dist/workers/radius.worker.js',
+      // FIX: script must be the actual JS file path, NOT 'node'.
+      // Using script:'node' + interpreter:'node' + args causes PM2 to invoke
+      // npm treating args as a package dir, producing ENOENT on package.json.
+      script: 'dist/workers/radius.worker.js',
       interpreter: 'node',
       instances: 1,
       exec_mode: 'fork',
@@ -132,8 +134,10 @@ module.exports = {
     {
       name: 'mikrotik-worker',
       cwd: BACKEND_DIR,
-      script: 'node',
-      args: 'dist/workers/mikrotik.worker.js',
+      // FIX: script must be the actual JS file path, NOT 'node'.
+      // Using script:'node' + interpreter:'node' + args causes PM2 to invoke
+      // npm treating args as a package dir, producing ENOENT on package.json.
+      script: 'dist/workers/mikrotik.worker.js',
       interpreter: 'node',
       instances: 1,
       exec_mode: 'fork',

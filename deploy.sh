@@ -118,6 +118,14 @@ if [ "$FRONTEND_ONLY" = false ]; then
     step "Starting/Reloading backend with PM2"
     pm2 reload ecosystem.config.js --only backend --update-env || pm2 start ecosystem.config.js --only backend --update-env
     ok "Backend reloaded/started"
+
+    step "Starting/Reloading worker processes with PM2"
+    # FIX: Workers were never reloaded by this script — they require dist/ which
+    # is now included in the release artifact (see ci.yml backend artifact upload).
+    pm2 reload ecosystem.config.js --only radius-worker --update-env   || pm2 start ecosystem.config.js --only radius-worker --update-env
+    ok "radius-worker reloaded/started"
+    pm2 reload ecosystem.config.js --only mikrotik-worker --update-env || pm2 start ecosystem.config.js --only mikrotik-worker --update-env
+    ok "mikrotik-worker reloaded/started"
 fi
 
 # ── 7. Start/Reload landing page ───────────────────────────────────────────────

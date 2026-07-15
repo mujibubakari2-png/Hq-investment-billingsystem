@@ -186,7 +186,12 @@ jobs:
         uses: actions/upload-artifact@v5
         with:
           name: backend-next
-          path: backend/.next
+          # Include both .next (Next.js) AND dist/ (compiled PM2 workers).
+          # dist/ is in .gitignore so it must be carried via CI artifact;
+          # without it, radius-worker and mikrotik-worker have no JS to run.
+          path: |
+            backend/.next
+            backend/dist
           retention-days: 1
           include-hidden-files: true
 
@@ -312,7 +317,7 @@ jobs:
             --exclude='backend/src' --exclude='frontend/src' --exclude='landing-page/app' \
             --exclude='*.test.ts' --exclude='__tests__' \
             package.json pnpm-workspace.yaml pnpm-lock.yaml ecosystem.config.js nginx-sites deploy.sh \
-            backend/package.json backend/.next backend/public backend/prisma backend/next.config.mjs backend/scripts \
+            backend/package.json backend/.next backend/dist backend/public backend/prisma backend/next.config.mjs backend/scripts \
             frontend/package.json frontend/dist \
             landing-page/package.json landing-page/.next landing-page/public landing-page/next.config.mjs || true
 
