@@ -59,6 +59,18 @@ export function getRadiusQueue(): Queue<RadiusJobData> {
   return _queue;
 }
 
+/**
+ * Gracefully close the radius-sync BullMQ Queue connection.
+ * Call this in global teardown (e.g. jest.globalTeardown) so that
+ * the underlying Redis connection is released and Jest can exit cleanly.
+ */
+export async function closeRadiusQueue(): Promise<void> {
+  if (_queue) {
+    await _queue.close();
+    _queue = null;
+  }
+}
+
 // ── Enqueue Operations ────────────────────────────────────────────────────────
 
 /**
