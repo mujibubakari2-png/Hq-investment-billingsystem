@@ -21,7 +21,6 @@
 #   frontend → nginx /health
 # =============================================================================
 
-name: hqinvestment
 
 services:
 
