@@ -13,5 +13,23 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
+  # Redis — required by mikrotik-worker and radius-worker (BullMQ queues)
+  # No password in dev (localhost only). Use docker-compose.prod.yml for production.
+  redis:
+    image: redis:7-alpine
+    container_name: hqinvestment-redis
+    restart: always
+    command: redis-server --maxmemory 128mb --maxmemory-policy volatile-lru
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 volumes:
   postgres_data:
+  redis_data:

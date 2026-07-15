@@ -16,6 +16,8 @@
 #   6. Installs Fail2ban
 #   7. Creates project folder structure
 #   8. Generates DH params for SSL
+#   9. Installs Docker CE + starts Redis via docker-compose.prod.yml
+#  10. Installs systemd hq-docker.service (auto-starts Redis on reboot)
 # =============================================================================
 
 set -euo pipefail
@@ -31,7 +33,7 @@ ok()   { echo "  ✅ $1"; }
 
 log "1/8 — Updating system packages"
 apt update && apt upgrade -y
-apt install -y curl wget git unzip ufw fail2ban htop nano build-essential
+apt install -y curl wget git unzip ufw fail2ban htop nano build-essential ca-certificates gnupg lsb-release
 ok "System updated"
 
 # ── 2. Create deploy user ─────────────────────────────────────────────────────
@@ -48,11 +50,11 @@ else
     ok "User $DEPLOY_USER created with sudo and SSH access"
 fi
 
-# ── 3. Allow passwordless nginx reload for deploy user ───────────────────────
-echo "$DEPLOY_USER ALL=(ALL) NOPASSWD: /usr/sbin/nginx -t, /bin/systemctl reload nginx" \
-    > /etc/sudoers.d/nginx-reload
-chmod 440 /etc/sudoers.d/nginx-reload
-ok "Passwordless nginx reload configured for $DEPLOY_USER"
+# ── 3. Allow passwordless sudo for deploy user (nginx + docker services) ─────
+echo "$DEPLOY_USER ALL=(ALL) NOPASSWD: /usr/sbin/nginx -t, /bin/systemctl reload nginx, /bin/systemctl start docker, /bin/systemctl start hq-docker.service, /bin/systemctl stop hq-docker.service" \
+    > /etc/sudoers.d/hq-deploy
+chmod 440 /etc/sudoers.d/hq-deploy
+ok "Passwordless sudo configured for $DEPLOY_USER (nginx + hq-docker.service)"
 
 # ── 4. Node.js + pnpm + PM2 ──────────────────────────────────────────────────
 log "3/8 — Installing Node.js $NODE_VERSION LTS"
@@ -161,6 +163,50 @@ else
     ok "DH params already exist — skipping"
 fi
 
+# ── 9. Docker CE ─────────────────────────────────────────────────────────────
+log "9/10 — Installing Docker CE"
+if ! command -v docker &>/dev/null; then
+    install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
+        | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    chmod a+r /etc/apt/keyrings/docker.gpg
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" \
+        > /etc/apt/sources.list.d/docker.list
+    apt update
+    apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    systemctl enable docker
+    systemctl start docker
+    # Allow deploy user to run docker without sudo
+    usermod -aG docker "$DEPLOY_USER"
+    ok "Docker CE installed and started"
+else
+    ok "Docker CE already installed — skipping"
+fi
+
+# ── 10. Systemd service — keeps Redis+Postgres up on reboot ──────────────────
+log "10/10 — Installing hq-docker systemd service"
+cat > /etc/systemd/system/hq-docker.service << EOF
+[Unit]
+Description=HQ Investment — Docker services (Redis + PostgreSQL)
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=${PROJECT_DIR}
+ExecStart=/usr/bin/docker compose -f docker-compose.prod.yml --env-file backend/.env up -d redis postgres
+ExecStop=/usr/bin/docker compose -f docker-compose.prod.yml stop redis postgres
+TimeoutStartSec=60
+
+[Install]
+WantedBy=multi-user.target
+EOF
+systemctl daemon-reload
+systemctl enable hq-docker.service
+ok "hq-docker.service installed — Redis + PostgreSQL will auto-start on boot"
+
 # ── PM2 startup ───────────────────────────────────────────────────────────────
 log "Configuring PM2 to start on system boot"
 env PATH="$PATH:/usr/bin" pm2 startup systemd -u "$DEPLOY_USER" --hp "/home/$DEPLOY_USER" | tail -1 | bash
@@ -177,6 +223,8 @@ echo "  2. Upload snippets to /etc/nginx/snippets/"
 echo "  3. Enable sites: sudo ln -s /etc/nginx/sites-available/yourdomain.com /etc/nginx/sites-enabled/"
 echo "  4. Get SSL:  sudo certbot --nginx -d yourdomain.com -d www.yourdomain.com -d app.yourdomain.com -d api.yourdomain.com"
 echo "  5. Clone your repo to $PROJECT_DIR"
-echo "  6. Run: cd $PROJECT_DIR && pnpm install && pm2 start ecosystem.config.js && pm2 save"
-echo "  7. Run: ./deploy.sh"
+echo "  6. Copy your .env files to backend/.env, frontend/.env, landing-page/.env"
+echo "  7. Run: sudo systemctl start hq-docker   (starts Redis + PostgreSQL)"
+echo "  8. Run: cd $PROJECT_DIR && pnpm install && pm2 start ecosystem.config.js && pm2 save"
+echo "  9. Run: ./deploy.sh"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

@@ -113,14 +113,22 @@ module.exports = {
       out_file: `${PROJECT_DIR}/logs/radius-worker-out.log`,
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
       merge_logs: true,
-      env_file: `${BACKEND_DIR}/.env`,
+      // NOTE: Do NOT use env_file here.
+      // PM2's env_file loader does NOT strip surrounding quotes from values —
+      // so REDIS_URL="redis://..." becomes the literal string with quotes included,
+      // breaking URL parsing in redis.ts and silently losing the Redis password.
+      // Workers use `import 'dotenv/config'` at startup to load backend/.env
+      // correctly (dotenv DOES strip quotes). PM2 env vars only supplement that.
       env: {
         NODE_ENV: 'production',
         NEXT_TELEMETRY_DISABLED: '1',
+        // NODE_PATH allows @/ path aliases to resolve from the dist/ directory
+        NODE_PATH: `${BACKEND_DIR}/dist`,
       },
       env_production: {
         NODE_ENV: 'production',
         NEXT_TELEMETRY_DISABLED: '1',
+        NODE_PATH: `${BACKEND_DIR}/dist`,
       }
     },
 
@@ -150,14 +158,22 @@ module.exports = {
       out_file: `${PROJECT_DIR}/logs/mikrotik-worker-out.log`,
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
       merge_logs: true,
-      env_file: `${BACKEND_DIR}/.env`,
+      // NOTE: Do NOT use env_file here.
+      // PM2's env_file loader does NOT strip surrounding quotes from values —
+      // so REDIS_URL="redis://..." becomes the literal string with quotes included,
+      // breaking URL parsing in redis.ts and silently losing the Redis password.
+      // Workers use `import 'dotenv/config'` at startup to load backend/.env
+      // correctly (dotenv DOES strip quotes). PM2 env vars only supplement that.
       env: {
         NODE_ENV: 'production',
         NEXT_TELEMETRY_DISABLED: '1',
+        // NODE_PATH allows @/ path aliases to resolve from the dist/ directory
+        NODE_PATH: `${BACKEND_DIR}/dist`,
       },
       env_production: {
         NODE_ENV: 'production',
         NEXT_TELEMETRY_DISABLED: '1',
+        NODE_PATH: `${BACKEND_DIR}/dist`,
       }
     },
   ]

@@ -113,6 +113,53 @@ fi
 # The CI/CD pipeline builds the artifacts and pushes them to the server.
 # This script is now strictly for reloading services and applying migrations.
 
+# ── 5b. Ensure Redis is up before starting workers ──────────────────────────
+if [ "$FRONTEND_ONLY" = false ]; then
+    step "Ensuring Redis is running (required by workers)"
+
+    # Load backend .env to get REDIS_PASSWORD
+    REDIS_PASSWORD_VAL=""
+    if [ -f "$PROJECT_DIR/backend/.env" ]; then
+        REDIS_PASSWORD_VAL=$(grep -E '^REDIS_PASSWORD=' "$PROJECT_DIR/backend/.env" | cut -d= -f2- | tr -d '"\047')
+    fi
+
+    # Make sure Docker service is running
+    if ! systemctl is-active --quiet docker; then
+        log "Docker is not running — starting it..."
+        sudo systemctl start docker
+    fi
+
+    # Start Redis + Postgres via systemd service (idempotent)
+    if systemctl is-enabled --quiet hq-docker.service 2>/dev/null; then
+        sudo systemctl start hq-docker.service || true
+    else
+        log "⚠️  hq-docker.service not found — starting Redis directly via docker compose"
+        docker compose -f "$PROJECT_DIR/docker-compose.prod.yml" --env-file "$PROJECT_DIR/backend/.env" up -d redis postgres || true
+    fi
+
+    # Wait up to 30 s for Redis to accept connections
+    REDIS_READY=false
+    for i in $(seq 1 15); do
+        if [ -n "$REDIS_PASSWORD_VAL" ]; then
+            PONG=$(redis-cli -h 127.0.0.1 -p 6379 -a "$REDIS_PASSWORD_VAL" ping 2>/dev/null || true)
+        else
+            PONG=$(redis-cli -h 127.0.0.1 -p 6379 ping 2>/dev/null || true)
+        fi
+        if [ "$PONG" = "PONG" ]; then
+            REDIS_READY=true
+            break
+        fi
+        log "  Waiting for Redis... ($i/15)"
+        sleep 2
+    done
+
+    if [ "$REDIS_READY" = true ]; then
+        ok "Redis is up and accepting connections"
+    else
+        fail "Redis did not start within 30 s. Run: docker compose -f docker-compose.prod.yml logs redis"
+    fi
+fi
+
 # ── 6. Start/Reload backend with PM2 ──────────────────────────────────────────
 if [ "$FRONTEND_ONLY" = false ]; then
     step "Starting/Reloading backend with PM2"
