@@ -3,6 +3,7 @@
 import { closePrisma } from '@/lib/prisma';
 import { closeCache } from '@/lib/cache';
 import { closeMikroTikQueue } from '@/lib/queue';
+import { closeRadiusQueue } from '@/lib/radius-queue';
 
 // Suppress console.error and console.warn in tests to keep CI logs clean.
 // Many tests intentionally trigger error paths (e.g. simulating network timeouts)
@@ -18,5 +19,6 @@ afterAll(async () => {
         closePrisma(),
         closeCache(),
         closeMikroTikQueue(),
+        closeRadiusQueue(),
     ]);
 });
