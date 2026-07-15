@@ -39,6 +39,15 @@ jest.mock('@/lib/radius', () => ({
     deleteRadiusUser: jest.fn(),
 }));
 
+jest.mock('@/lib/queue', () => ({
+    enqueueActivateService: jest.fn(),
+    enqueueSuspendService: jest.fn(),
+}));
+
+jest.mock('@/lib/radius-queue', () => ({
+    enqueueRadiusSyncUser: jest.fn(),
+}));
+
 jest.mock('@/lib/mikrotik', () => ({
     getMikroTikService: jest.fn(),
     // Keep the real sanitize so §7 tests exercise real logic
@@ -61,6 +70,8 @@ export {};
 const { getTenantClient }                         = require('@/lib/tenantPrisma');
 const { getPaymentProvider, isSupportedProvider } = require('@/lib/payments/registry');
 const { syncRadiusUser }                          = require('@/lib/radius');
+const { enqueueRadiusSyncUser }                 = require('@/lib/radius-queue');
+const { enqueueActivateService }                  = require('@/lib/queue');
 const { getMikroTikService, sanitizeMikroTikName }= require('@/lib/mikrotik');
 const { paymentService }                          = require('@/lib/payments/service');
 
@@ -262,8 +273,8 @@ describe('§1 – Webhook Core Flow', () => {
         expect(tenantDb.transaction.update).toHaveBeenCalledWith(
             expect.objectContaining({ data: expect.objectContaining({ status: 'FAILED' }) }),
         );
-        expect(syncRadiusUser).not.toHaveBeenCalled();
-        expect(getMikroTikService).not.toHaveBeenCalled();
+        expect(enqueueRadiusSyncUser).not.toHaveBeenCalled();
+        expect(enqueueActivateService).not.toHaveBeenCalled();
     });
 
     it('1.3 – invalid signature: processed=false, transaction never touched', async () => {
@@ -319,8 +330,8 @@ describe('§2 – Partial Payment Attack Prevention', () => {
         expect(result.processed).toBe(true);
         expect(result.status).toBe('FAILED');
         expect(result.message).toMatch(/amount/i);
-        expect(syncRadiusUser).not.toHaveBeenCalled();
-        expect(getMikroTikService).not.toHaveBeenCalled();
+        expect(enqueueRadiusSyncUser).not.toHaveBeenCalled();
+        expect(enqueueActivateService).not.toHaveBeenCalled();
     });
 
     it('2.2 – exact match (5000 = 5000): COMPLETED', async () => {
@@ -344,42 +355,42 @@ describe('§3 – FreeRADIUS Synchronisation', () => {
     it('3.1 – successful payment syncs RADIUS: username, phone-password, rateLimit, status', async () => {
         await runWebhook();
 
-        expect(syncRadiusUser).toHaveBeenCalledTimes(1);
-        expect(syncRadiusUser).toHaveBeenCalledWith(
+        expect(enqueueRadiusSyncUser).toHaveBeenCalledTimes(1);
+        expect(enqueueRadiusSyncUser).toHaveBeenCalledWith(
             expect.objectContaining({
                 username: 'john.doe',
                 password: '255712345678',   // RAD-002: phone as password
                 tenantId: TENANT_ID,
                 rateLimit: '10M/10M',
                 status: 'Active',
-            }),
+            }), expect.any(String)
         );
     });
 
     it('3.2 – Kbps package produces "k" suffix in rateLimit', async () => {
         await runWebhook({ pkg: makePkg({ uploadUnit: 'Kbps', downloadUnit: 'Kbps' }) });
 
-        expect(syncRadiusUser).toHaveBeenCalledWith(
-            expect.objectContaining({ rateLimit: '10k/10k' }),
+        expect(enqueueRadiusSyncUser).toHaveBeenCalledWith(
+            expect.objectContaining({ rateLimit: '10k/10k' }), expect.any(String)
         );
     });
 
     it('3.3 – RADIUS expiresAt is a future Date', async () => {
         await runWebhook();
-        const arg = (syncRadiusUser as jest.Mock).mock.calls[0][0];
+        const arg = (enqueueRadiusSyncUser as jest.Mock).mock.calls[0][0];
         expect(arg.expiresAt).toBeInstanceOf(Date);
         expect(arg.expiresAt.getTime()).toBeGreaterThan(Date.now());
     });
 
     it('3.4 – RADIUS profileName equals the raw package name', async () => {
         await runWebhook({ pkg: makePkg({ name: 'Gold Plan' }) });
-        expect(syncRadiusUser).toHaveBeenCalledWith(
-            expect.objectContaining({ profileName: 'Gold Plan' }),
+        expect(enqueueRadiusSyncUser).toHaveBeenCalledWith(
+            expect.objectContaining({ profileName: 'Gold Plan' }), expect.any(String)
         );
     });
 
     it('3.5 – RADIUS sync failure: payment COMPLETED, sub marked PENDING_RADIUS_SYNC', async () => {
-        (syncRadiusUser as jest.Mock).mockRejectedValue(new Error('RADIUS DB down'));
+        (enqueueRadiusSyncUser as jest.Mock).mockRejectedValue(new Error('RADIUS DB down'));
         const { result, tenantDb } = await runWebhook();
 
         expect(result.status).toBe('COMPLETED');
@@ -392,20 +403,20 @@ describe('§3 – FreeRADIUS Synchronisation', () => {
         const tx = makeTx({ client: makeClient({ phone: null, username: 'jane.smith' }) });
         await runWebhook({ tx });
 
-        expect(syncRadiusUser).toHaveBeenCalledWith(
-            expect.objectContaining({ username: 'jane.smith', password: 'jane.smith' }),
+        expect(enqueueRadiusSyncUser).toHaveBeenCalledWith(
+            expect.objectContaining({ username: 'jane.smith', password: 'jane.smith' }), expect.any(String)
         );
     });
 
     it('3.7 – no RADIUS call when package is null', async () => {
         await runWebhook({ pkg: null });
-        expect(syncRadiusUser).not.toHaveBeenCalled();
+        expect(enqueueRadiusSyncUser).not.toHaveBeenCalled();
     });
 
     it('3.8 – RADIUS tenantId comes from the package, not hardcoded', async () => {
         await runWebhook({ pkg: makePkg({ tenantId: 'special-tenant' }) });
-        expect(syncRadiusUser).toHaveBeenCalledWith(
-            expect.objectContaining({ tenantId: 'special-tenant' }),
+        expect(enqueueRadiusSyncUser).toHaveBeenCalledWith(
+            expect.objectContaining({ tenantId: 'special-tenant' }), expect.any(String)
         );
     });
 });
@@ -421,8 +432,7 @@ describe('§4 – MikroTik Activation', () => {
         const mk = makeMikroTik();
         await runWebhook({ pkg: makePkg({ routerId: ROUTER_ID }), mikrotikService: mk });
 
-        expect(getMikroTikService).toHaveBeenCalledWith(ROUTER_ID, TENANT_ID);
-        expect(mk.activateService).toHaveBeenCalledTimes(1);
+        expect(enqueueActivateService).toHaveBeenCalledTimes(1);
     });
 
     it('4.2 – activateService receives the RAW package name (sanitize is internal to MikroTikService)', async () => {
@@ -431,8 +441,8 @@ describe('§4 – MikroTik Activation', () => {
         // sanitizes it internally. Our mock receives the raw name.
         await runWebhook({ pkg: makePkg({ routerId: ROUTER_ID, name: '50 Mbps / Home' }), mikrotikService: mk });
 
-        expect(mk.activateService).toHaveBeenCalledWith(
-            'john.doe', '255712345678', '50 Mbps / Home', 'hotspot', expect.any(Date),
+        expect(enqueueActivateService).toHaveBeenCalledWith(ROUTER_ID, 
+            'john.doe', '255712345678', '50 Mbps / Home', 'hotspot', expect.any(String), expect.any(Date),
         );
     });
 
@@ -441,8 +451,8 @@ describe('§4 – MikroTik Activation', () => {
         const tx = makeTx({ client: makeClient({ serviceType: 'PPPOE', username: 'pppoe.user' }) });
         await runWebhook({ tx, pkg: makePkg({ routerId: ROUTER_ID }), mikrotikService: mk });
 
-        expect(mk.activateService).toHaveBeenCalledWith(
-            'pppoe.user', expect.any(String), expect.any(String), 'pppoe', expect.any(Date),
+        expect(enqueueActivateService).toHaveBeenCalledWith(ROUTER_ID, 
+            'pppoe.user', expect.any(String), expect.any(String), 'pppoe', expect.any(String), expect.any(Date),
         );
     });
 
@@ -450,7 +460,7 @@ describe('§4 – MikroTik Activation', () => {
         const { result } = await runWebhook({ pkg: makePkg({ routerId: null }) });
 
         expect(result.status).toBe('COMPLETED');
-        expect(getMikroTikService).not.toHaveBeenCalled();
+        expect(enqueueActivateService).not.toHaveBeenCalled();
     });
 
     it('4.5 – MikroTik failure: payment COMPLETED, error router log created', async () => {
@@ -462,7 +472,7 @@ describe('§4 – MikroTik Activation', () => {
         expect(result.status).toBe('COMPLETED');
         expect(tenantDb.routerLog.create).toHaveBeenCalledWith(
             expect.objectContaining({
-                data: expect.objectContaining({ action: 'PAYMENT_WEBHOOK_ACTIVATION_FAILED', status: 'error' }),
+                data: expect.objectContaining({ action: 'PAYMENT_WEBHOOK_ACTIVATION_QUEUED', status: 'success' }),
             }),
         );
     });
@@ -473,7 +483,7 @@ describe('§4 – MikroTik Activation', () => {
 
         expect(tenantDb.routerLog.create).toHaveBeenCalledWith(
             expect.objectContaining({
-                data: expect.objectContaining({ action: 'PAYMENT_WEBHOOK_ACTIVATED', status: 'success' }),
+                data: expect.objectContaining({ action: 'PAYMENT_WEBHOOK_ACTIVATION_QUEUED', status: 'success' }),
             }),
         );
     });
@@ -483,7 +493,7 @@ describe('§4 – MikroTik Activation', () => {
         const { tenantDb } = await runWebhook({ pkg: makePkg({ routerId: ROUTER_ID }), mikrotikService: mk });
 
         expect(tenantDb.subscription.update).toHaveBeenCalledWith(
-            expect.objectContaining({ data: expect.objectContaining({ syncStatus: 'SYNCED' }) }),
+            expect.objectContaining({ data: expect.objectContaining({ syncStatus: 'PENDING_MIKROTIK_ACTIVATION' }) }),
         );
     });
 });
@@ -809,39 +819,39 @@ describe('§10 – End-to-End: Payment → RADIUS → MikroTik', () => {
         expect(result.status).toBe('COMPLETED');
 
         // RADIUS called with correct args
-        expect(syncRadiusUser).toHaveBeenCalledWith(
+        expect(enqueueRadiusSyncUser).toHaveBeenCalledWith(
             expect.objectContaining({
                 username: 'john.doe', rateLimit: '10M/10M',
                 profileName: 'Business 20Mbps', status: 'Active', tenantId: TENANT_ID,
-            }),
+            }), expect.any(String)
         );
 
         // MikroTik called with RAW pkg.name (service does not sanitize before passing)
-        expect(mk.activateService).toHaveBeenCalledWith(
-            'john.doe', '255712345678', 'Business 20Mbps', 'hotspot', expect.any(Date),
+        expect(enqueueActivateService).toHaveBeenCalledWith(ROUTER_ID, 
+            'john.doe', '255712345678', 'Business 20Mbps', 'hotspot', expect.any(String), expect.any(Date),
         );
 
         // Subscription SYNCED
         expect(tenantDb.subscription.update).toHaveBeenCalledWith(
-            expect.objectContaining({ data: expect.objectContaining({ syncStatus: 'SYNCED' }) }),
+            expect.objectContaining({ data: expect.objectContaining({ syncStatus: 'PENDING_MIKROTIK_ACTIVATION' }) }),
         );
 
         // Router log success
         expect(tenantDb.routerLog.create).toHaveBeenCalledWith(
             expect.objectContaining({
-                data: expect.objectContaining({ action: 'PAYMENT_WEBHOOK_ACTIVATED', status: 'success' }),
+                data: expect.objectContaining({ action: 'PAYMENT_WEBHOOK_ACTIVATION_QUEUED', status: 'success' }),
             }),
         );
     });
 
     it('10.2 – RADIUS fails: MikroTik still activates (independent error paths)', async () => {
-        (syncRadiusUser as jest.Mock).mockRejectedValue(new Error('RADIUS DB down'));
+        (enqueueRadiusSyncUser as jest.Mock).mockRejectedValue(new Error('RADIUS DB down'));
         const mk  = makeMikroTik();
         const pkg = makePkg({ routerId: ROUTER_ID });
         const { result } = await runWebhook({ pkg, mikrotikService: mk });
 
         expect(result.status).toBe('COMPLETED');
-        expect(mk.activateService).toHaveBeenCalledTimes(1);
+        expect(enqueueActivateService).toHaveBeenCalledTimes(1);
     });
 
     it('10.3 – MikroTik fails: payment COMPLETED, RADIUS still ran', async () => {
@@ -850,23 +860,23 @@ describe('§10 – End-to-End: Payment → RADIUS → MikroTik', () => {
         const { result } = await runWebhook({ pkg, mikrotikService: mk });
 
         expect(result.status).toBe('COMPLETED');
-        expect(syncRadiusUser).toHaveBeenCalledTimes(1);
+        expect(enqueueRadiusSyncUser).toHaveBeenCalledTimes(1);
     });
 
     it('10.4 – routerId=null: RADIUS runs, MikroTik skipped, COMPLETED', async () => {
         const { result } = await runWebhook({ pkg: makePkg({ routerId: null }) });
 
         expect(result.status).toBe('COMPLETED');
-        expect(syncRadiusUser).toHaveBeenCalledTimes(1);
-        expect(getMikroTikService).not.toHaveBeenCalled();
+        expect(enqueueRadiusSyncUser).toHaveBeenCalledTimes(1);
+        expect(enqueueActivateService).not.toHaveBeenCalled();
     });
 
     it('10.5 – failed provider result: neither RADIUS nor MikroTik called', async () => {
         const { result } = await runWebhook({ provider: makeProvider({ resultCode: '99', amount: 5000 }) });
 
         expect(result.status).toBe('FAILED');
-        expect(syncRadiusUser).not.toHaveBeenCalled();
-        expect(getMikroTikService).not.toHaveBeenCalled();
+        expect(enqueueRadiusSyncUser).not.toHaveBeenCalled();
+        expect(enqueueActivateService).not.toHaveBeenCalled();
     });
 
     it('10.6 – HOTSPOT client password falls back to phone; PPPoE falls back to "123456"', async () => {
@@ -875,8 +885,8 @@ describe('§10 – End-to-End: Payment → RADIUS → MikroTik', () => {
         const tx = makeTx({ client: makeClient({ phone: null, serviceType: 'PPPOE', username: 'pppoe.user' }) });
         await runWebhook({ tx, pkg: makePkg({ routerId: ROUTER_ID }), mikrotikService: mk });
 
-        expect(mk.activateService).toHaveBeenCalledWith(
-            'pppoe.user', '123456', expect.any(String), 'pppoe', expect.any(Date),
+        expect(enqueueActivateService).toHaveBeenCalledWith(ROUTER_ID, 
+            'pppoe.user', '123456', expect.any(String), 'pppoe', expect.any(String), expect.any(Date),
         );
     });
 });

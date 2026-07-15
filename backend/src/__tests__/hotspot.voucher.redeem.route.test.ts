@@ -4,6 +4,8 @@ import { NextRequest } from "next/server";
 
 const mockGetTenantClient = jest.fn();
 const mockSyncRadiusUser = jest.fn(async () => ({}));
+const mockEnqueueRadiusSyncUser = jest.fn(async () => ({}));
+const mockEnqueueActivateService = jest.fn(async () => ({}));
 const mockGetMikroTikService = jest.fn();
 
 jest.mock('@/lib/tenantPrisma', () => ({
@@ -12,6 +14,15 @@ jest.mock('@/lib/tenantPrisma', () => ({
 
 jest.mock('@/lib/radius', () => ({
     syncRadiusUser: jest.fn((...args: any[]) => mockSyncRadiusUser.apply(null, args)),
+}));
+
+jest.mock('@/lib/radius-queue', () => ({
+    enqueueRadiusSyncUser: jest.fn((...args: any[]) => mockEnqueueRadiusSyncUser(...args)),
+}));
+
+jest.mock('@/lib/queue', () => ({
+    enqueueActivateService: jest.fn((...args: any[]) => mockEnqueueActivateService(...args)),
+    enqueueSuspendService: jest.fn(),
 }));
 
 jest.mock('@/lib/mikrotik', () => ({
@@ -99,7 +110,12 @@ describe('Hotspot voucher redeem route', () => {
         jest.clearAllMocks();
         mockGetTenantClient.mockReset();
         mockSyncRadiusUser.mockReset();
+        mockEnqueueRadiusSyncUser.mockReset();
+        mockEnqueueActivateService.mockReset();
         mockGetMikroTikService.mockReset();
+        // Default mock return values
+        mockEnqueueRadiusSyncUser.mockResolvedValue({});
+        mockEnqueueActivateService.mockResolvedValue({});
     });
 
     it('creates a non-revealing HS- username for hotspot vouchers', async () => {
@@ -130,11 +146,12 @@ describe('Hotspot voucher redeem route', () => {
                 }),
             }),
         );
-        expect(mockSyncRadiusUser).toHaveBeenCalledWith(
+        expect(mockEnqueueRadiusSyncUser).toHaveBeenCalledWith(
             expect.objectContaining({
                 username: 'HS-voucher-1234',
                 password: voucher.code,
             }),
+            expect.any(String),
         );
     });
 
