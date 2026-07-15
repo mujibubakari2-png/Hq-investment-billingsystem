@@ -303,7 +303,7 @@ jobs:
         uses: actions/download-artifact@v5
         with:
           name: backend-next
-          path: backend/.next
+          path: backend
 
       - name: Download landing page artifact
         uses: actions/download-artifact@v5
