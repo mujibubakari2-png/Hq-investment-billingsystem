@@ -10,6 +10,7 @@
  */
 
 import 'dotenv/config';
+import { env } from '@/lib/env';
 import { Worker, Job } from 'bullmq';
 import { getRedisConnection, MikroTikJobData } from '@/lib/queue';
 import { getMikroTikService } from '@/lib/mikrotik';
@@ -17,6 +18,8 @@ import { assertSafeRouterHost } from '@/lib/networkSafety';
 import { decryptRouterFields } from '@/lib/encryption';
 import { getTenantClient } from '@/lib/tenantPrisma';
 import logger from '@/lib/logger';
+
+void env;
 
 const QUEUE_NAME = 'mikrotik-ops';
 const CONCURRENCY = 5;

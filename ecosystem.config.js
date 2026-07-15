@@ -17,6 +17,7 @@
  */
 
 const PROJECT_DIR = '/var/www/Hq-investment-billingsystem';
+const BACKEND_DIR = `${PROJECT_DIR}/backend`;
 
 module.exports = {
   apps: [
@@ -95,9 +96,10 @@ module.exports = {
      */
     {
       name: 'radius-worker',
-      cwd: `${PROJECT_DIR}/backend`,
-      script: 'npx',
-      args: 'tsx src/workers/radius.worker.ts',
+      cwd: BACKEND_DIR,
+      script: 'node',
+      args: 'dist/workers/radius.worker.js',
+      interpreter: 'node',
       instances: 1,
       exec_mode: 'fork',
       watch: false,
@@ -109,6 +111,7 @@ module.exports = {
       out_file: `${PROJECT_DIR}/logs/radius-worker-out.log`,
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
       merge_logs: true,
+      env_file: `${BACKEND_DIR}/.env`,
       env: {
         NODE_ENV: 'production',
         NEXT_TELEMETRY_DISABLED: '1',
@@ -128,9 +131,10 @@ module.exports = {
      */
     {
       name: 'mikrotik-worker',
-      cwd: `${PROJECT_DIR}/backend`,
-      script: 'npx',
-      args: 'tsx src/workers/mikrotik.worker.ts',
+      cwd: BACKEND_DIR,
+      script: 'node',
+      args: 'dist/workers/mikrotik.worker.js',
+      interpreter: 'node',
       instances: 1,
       exec_mode: 'fork',
       watch: false,
@@ -142,6 +146,7 @@ module.exports = {
       out_file: `${PROJECT_DIR}/logs/mikrotik-worker-out.log`,
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
       merge_logs: true,
+      env_file: `${BACKEND_DIR}/.env`,
       env: {
         NODE_ENV: 'production',
         NEXT_TELEMETRY_DISABLED: '1',

@@ -10,6 +10,7 @@
  */
 
 import 'dotenv/config';
+import { env } from '@/lib/env';
 import { Worker, Job } from 'bullmq';
 import { RadiusJobData } from '@/lib/radius-queue';
 import { getRedisConnection } from '@/lib/redis';
@@ -19,6 +20,8 @@ import {
   deleteRadiusUser,
 } from '@/lib/radius';
 import logger from '@/lib/logger';
+
+void env;
 
 const QUEUE_NAME = 'radius-sync';
 const CONCURRENCY = 10; // Handle multiple RADIUS syncs in parallel

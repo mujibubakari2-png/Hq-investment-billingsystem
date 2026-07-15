@@ -4,11 +4,14 @@
   "private": true,
   "scripts": {
     "dev": "next dev --hostname 0.0.0.0 --port 3000",
-    "build": "prisma generate && next build",
-    "build:full": "prisma generate && next build",
+    "build": "prisma generate && next build && pnpm run build:workers",
+    "build:full": "prisma generate && next build && pnpm run build:workers",
+    "build:workers": "prisma generate && tsc -p tsconfig.workers.json && tsc-alias -p tsconfig.workers.json",
     "start": "next start --hostname 127.0.0.1 --port ${PORT:-3000}",
     "start:droplet": "bash scripts/droplet-start.sh",
     "next:start": "next start --hostname 127.0.0.1 --port ${PORT:-3000}",
+    "start:radius-worker": "node dist/workers/radius.worker.js",
+    "start:mikrotik-worker": "node dist/workers/mikrotik.worker.js",
     "db:seed": "tsx scripts/seed.ts",
     "db:migrate": "prisma migrate deploy",
     "db:check-migrations": "tsx scripts/check-migrations.js",
@@ -82,6 +85,7 @@
     "lint-staged": "^16.4.0",
     "prisma": "7.7.0",
     "ts-jest": "^29.4.11",
+    "tsc-alias": "^1.9.1",
     "typescript": "^5"
   }
 }
