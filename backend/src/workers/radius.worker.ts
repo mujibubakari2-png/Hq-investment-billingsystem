@@ -9,6 +9,7 @@
  *     interpreter: 'node', interpreter_args: '-r ts-node/register', ... }
  */
 
+import 'dotenv/config';
 import { Worker, Job } from 'bullmq';
 import { RadiusJobData } from '@/lib/radius-queue';
 import { getRedisConnection } from '@/lib/redis';

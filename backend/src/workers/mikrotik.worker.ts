@@ -9,6 +9,7 @@
  *     interpreter: 'node', interpreter_args: '-r ts-node/register', ... }
  */
 
+import 'dotenv/config';
 import { Worker, Job } from 'bullmq';
 import { getRedisConnection, MikroTikJobData } from '@/lib/queue';
 import { getMikroTikService } from '@/lib/mikrotik';
