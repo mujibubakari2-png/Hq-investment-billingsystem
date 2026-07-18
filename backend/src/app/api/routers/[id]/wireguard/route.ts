@@ -575,7 +575,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                         "hotspot-address": lanGateway,
                         "dns-name": `${safeRouterNameLower}.hotspot`,
                         "html-directory": "hotspot",
-                        "login-by": "http-chap,http-pap,cookie",
+                        "login-by": "http-chap,https,cookie",
+                        // SECURITY FIX: http-pap removed — PAP sends passwords in cleartext over the wire.
                         "http-cookie-lifetime": "3d",
                         "use-radius": "yes"
                     });
@@ -602,7 +603,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                             if (needsUpdate) {
                                 await service.apiRequestPublic(`/ip/hotspot/profile/${prof[".id"]}`, "PATCH", {
                                     "use-radius": "yes",
-                                    "login-by": "http-chap,http-pap,cookie"
+                                    "login-by": "http-chap,https,cookie"
+                                    // SECURITY FIX: http-pap removed — PAP sends passwords in cleartext over the wire.
                                 });
                                 logger.info(`[PUSH-CONFIG] Secured hotspot profile: ${prof.name} (use-radius=yes, removed mac login-by)`);
                             }
@@ -676,7 +678,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                         "local-address": lanGateway,
                         "remote-address": `pppoe-pool-${safeRouterName}`,
                         "dns-server": "8.8.8.8,1.1.1.1",
-                        "use-encryption": "yes"
+                        "use-encryption": "yes",
+                        "use-radius": "yes"
                     });
                 } catch (e: any) { if (!e.message?.includes("already")) logger.warn("PPPoE profile note:", { error: e.message instanceof Error ? e.message.message : String(e.message) }); }
 

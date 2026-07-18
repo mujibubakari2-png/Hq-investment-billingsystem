@@ -1,4 +1,4 @@
-﻿/**
+/**
  * RouterDiagnosticsModal
  * A live diagnostic checklist for MikroTik routers based on the 20-cause RCA.
  */
@@ -113,7 +113,7 @@ function buildDiagnostics(data: Record<string, unknown>): DiagnosticCheck[] {
           description: 'Without NAT, client traffic cannot reach the internet.',
           status: has('natMasquerade') ? 'pass' : 'fail',
           detail: has('natMasquerade') ? 'Masquerade rule found ?' : 'No srcnat masquerade rule.',
-          fixCommand: ':if ([:len [/ip firewall nat find action=masquerade]] = 0) do={\n    /ip firewall nat add chain=srcnat out-interface=ether1 action=masquerade\n}' },
+          fixCommand: ':if ([:len [/interface list find name="WAN"]] = 0) do={ /interface list add name="WAN" comment="HQInvestment WAN" }\n:if ([:len [/interface list member find list="WAN" interface="ether1"]] = 0) do={ /interface list member add list="WAN" interface="ether1" comment="HQInvestment WAN port" }\n:if ([:len [/ip firewall nat find action=masquerade]] = 0) do={\n    /ip firewall nat add chain=srcnat out-interface-list=WAN action=masquerade\n}' },
 
         { id: 'dhcp-firewall-accept', category: 'Firewall', label: 'DHCP UDP 67/68 allowed (before drops)',
           description: 'Drop rule before DHCP accept silently discards all DHCP packets.',
