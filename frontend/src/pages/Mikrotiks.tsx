@@ -121,19 +121,20 @@ export default function Mikrotiks() {
     const routerIds = useMemo(() => routers.map(r => r.id).join(','), [routers]);
 
     useEffect(() => {
-        if (routerIds.length === 0) return;
+        if (!routerIds) return;
         
         let isCancelled = false;
         const syncLiveStats = async () => {
+            const ids = routerIds.split(',');
             // Only sync routers that are currently on the page
             await Promise.allSettled(
-                routers.map(async (r) => {
+                ids.map(async (id) => {
                     try {
-                        const res = await routersApi.testConnection(r.id) as RouterTestResult;
+                        const res = await routersApi.testConnection(id) as RouterTestResult;
                         if (!isCancelled && res?.success && res?.info) {
                             const info = res.info;
                             setRouters(prev => prev.map(router => 
-                                router.id === r.id 
+                                router.id === id 
                                     ? { 
                                         ...router, 
                                         cpuLoad: info.cpuLoad ?? router.cpuLoad,
@@ -143,25 +144,25 @@ export default function Mikrotiks() {
                                     : router
                             ));
                         } else if (!isCancelled && !res?.success) {
-                            setRouters(prev => prev.map(router => router.id === r.id ? { ...router, status: 'Offline' } : router));
+                            setRouters(prev => prev.map(router => router.id === id ? { ...router, status: 'Offline' } : router));
                         }
                     } catch {
                         if (!isCancelled) {
-                            setRouters(prev => prev.map(router => router.id === r.id ? { ...router, status: 'Offline' } : router));
+                            setRouters(prev => prev.map(router => router.id === id ? { ...router, status: 'Offline' } : router));
                         }
                     }
                 })
             );
         };
 
-        const timer = setInterval(syncLiveStats, 15000);
+        const timer = setInterval(syncLiveStats, 60000); // Refresh every 60s to avoid rate limits
         syncLiveStats(); // Run once immediately after routers are loaded
 
         return () => {
             isCancelled = true;
             clearInterval(timer);
         };
-    }, [routerIds, routers]); // Only re-run effect if the LIST of routers changes
+    }, [routerIds]); // Only re-run effect if the LIST of routers changes
     const handleAddRouter = async (data: Partial<Router>) => {
         try {
             const payload: RouterCreatePayload = {

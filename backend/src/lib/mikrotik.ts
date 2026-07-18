@@ -1088,8 +1088,7 @@ export class MikroTikService {
 
             if (!baseUrl) {
                 throw new Error(
-                    "No reachable backend URL configured (set APP_URL / NEXT_PUBLIC_APP_URL, or a per-router " +
-                    "backendUrl in Hotspot Settings). The router must be able to reach this server over " +
+                    "No reachable backend URL configured. The router must be able to reach this server over " +
                     "HTTP(S) to pull the hotspot login-page files."
                 );
             }
@@ -1098,21 +1097,42 @@ export class MikroTikService {
             let pushed = 0;
             const failures: string[] = [];
 
-            for (const file of files) {
-                const url = buildSignedAssetUrl(baseUrl, this.routerId, file.relPath);
-                const dstPath = `hotspot/${file.relPath}`;
-                try {
-                    // RouterOS REST API: POST /rest/tool/fetch runs the fetch job.
-                    // On RouterOS 7 this blocks until the download finishes/fails
-                    // and reports status in the response body.
-                    await this.apiRequest("/tool/fetch", "POST", {
-                        url,
-                        "dst-path": dstPath,
-                        "http-method": "get",
-                    });
-                    pushed++;
-                } catch (fileErr: any) {
-                    failures.push(`${file.relPath}: ${fileErr.message}`);
+            // Prevent the entire push from exceeding 25s to avoid 504 Gateway Timeouts
+            const MAX_TIME_MS = 25000; 
+            const startTime = Date.now();
+            
+            // Run in small batches to avoid overloading the router while still parallelizing
+            const BATCH_SIZE = 4;
+            
+            for (let i = 0; i < files.length; i += BATCH_SIZE) {
+                if (Date.now() - startTime > MAX_TIME_MS) {
+                    failures.push(`Timeout: Overall push exceeded ${MAX_TIME_MS / 1000}s`);
+                    break; // Abort the loop if we're out of time
+                }
+
+                const batch = files.slice(i, i + BATCH_SIZE);
+                
+                await Promise.all(batch.map(async (file) => {
+                    const url = buildSignedAssetUrl(baseUrl, this.routerId, file.relPath);
+                    const dstPath = `hotspot/${file.relPath}`;
+                    try {
+                        await this.apiRequest("/tool/fetch", "POST", {
+                            url,
+                            "dst-path": dstPath,
+                            "http-method": "get",
+                        });
+                        pushed++;
+                    } catch (fileErr: any) {
+                        failures.push(`${file.relPath}: ${fileErr.message}`);
+                    }
+                }));
+                
+                // If a batch completely failed with connection/abort errors, abort the whole push
+                // to prevent wasting time on remaining batches
+                const batchFailures = failures.slice(-BATCH_SIZE);
+                if (batchFailures.length === batch.length && batchFailures.some(f => f.includes("abort") || f.includes("fetch failed") || f.includes("socket"))) {
+                    failures.push(`Fatal: Router appears offline or unreachable, aborting sync`);
+                    break;
                 }
             }
 
