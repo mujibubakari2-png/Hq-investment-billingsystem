@@ -22,18 +22,9 @@ export interface EthernetInterface {
     status: 'Up' | 'Down';
 }
 
-export interface VpnSecret {
-    id?: string;
-    username: string;
-    password: string;
-    protocol: string;
-    profile: string;
-    localAddress: string;
-    remoteAddress: string;
-}
 
-export type ServiceType = 'pppoe' | 'hotspot' | 'both';
-export type VpnMode    = 'hybrid' | 'wireguard' | 'openvpn';
+export type ServiceType  = 'pppoe' | 'hotspot' | 'both';
+export type VpnMode      = 'hybrid' | 'wireguard' | 'openvpn';
 export type VerifyStatus = 'checking' | 'success' | 'failed';
 
 // ── Step definitions ──────────────────────────────────────────────────────────

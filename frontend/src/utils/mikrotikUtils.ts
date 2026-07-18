@@ -16,3 +16,9 @@ export function sanitizeMikroTikName(name: string): string {
         .toLowerCase()
         || "unnamed";                          // fallback if result is empty
 }
+
+export function sanitizePassphrase(p: unknown): string {
+    if (!p || typeof p !== 'string') return '';
+    // remove quotes and backslashes and limit length to 64 characters
+    return p.replace(/['"\\]/g, '').substring(0, 64);
+}

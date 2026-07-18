@@ -9,11 +9,7 @@ import DnsIcon from '@mui/icons-material/Dns';
 import WifiIcon from '@mui/icons-material/Wifi';
 import DeviceHubIcon from '@mui/icons-material/DeviceHub';
 import VpnKeyIcon from '@mui/icons-material/VpnKey';
-import LockIcon from '@mui/icons-material/Lock';
-import AddIcon from '@mui/icons-material/Add';
-import DeleteIcon from '@mui/icons-material/Delete';
-import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
-import type { ServiceType, VpnMode, VpnSecret } from './WizardTypes';
+import type { ServiceType, VpnMode } from './WizardTypes';
 
 // ── Step 2: Services ──────────────────────────────────────────────────────────
 
@@ -21,13 +17,13 @@ interface Step2Props {
     serviceType: ServiceType;
     setServiceType: (v: ServiceType) => void;
     pppoeLocalAddress: string; setPppoeLocalAddress: (v: string) => void;
-    pppoePoolStart: string;    setPppoePoolStart:    (v: string) => void;
-    pppoePoolEnd: string;      setPppoePoolEnd:      (v: string) => void;
+    pppoePoolStart: string; setPppoePoolStart: (v: string) => void;
+    pppoePoolEnd: string; setPppoePoolEnd: (v: string) => void;
     hotspotLocalAddress: string; setHotspotLocalAddress: (v: string) => void;
-    hotspotPoolStart: string;    setHotspotPoolStart:    (v: string) => void;
-    hotspotPoolEnd: string;      setHotspotPoolEnd:      (v: string) => void;
-    radiusAddress: string;     setRadiusAddress:     (v: string) => void;
-    radiusSecret: string;      setRadiusSecret:      (v: string) => void;
+    hotspotPoolStart: string; setHotspotPoolStart: (v: string) => void;
+    hotspotPoolEnd: string; setHotspotPoolEnd: (v: string) => void;
+    radiusAddress: string; setRadiusAddress: (v: string) => void;
+    radiusSecret: string; setRadiusSecret: (v: string) => void;
 }
 
 export function Step2Services(p: Step2Props) {
@@ -78,51 +74,7 @@ export function Step2Services(p: Step2Props) {
                 ))}
             </div>
 
-            {/* IP & RADIUS config */}
-            <div style={{ maxWidth: 750, margin: '30px auto 0', textAlign: 'left', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)', padding: 24, background: '#f8fafc' }}>
-                <h3 style={{ fontSize: '1rem', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <SettingsIcon style={{ fontSize: 18, color: 'var(--primary)' }} /> IP &amp; RADIUS Configuration
-                </h3>
-                <div className="grid-2 gap-20">
-                    {(p.serviceType === 'pppoe' || p.serviceType === 'both') && (
-                        <div style={{ background: '#fff', padding: 16, borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-light)' }}>
-                            <div style={{ fontWeight: 600, fontSize: '0.85rem', marginBottom: 12, color: '#0d9488' }}>PPPoE Network Settings</div>
-                            <div className="form-group"><label className="form-label">Local Gateway Address</label>
-                                <input className="form-input" value={p.pppoeLocalAddress} onChange={e => p.setPppoeLocalAddress(e.target.value)} placeholder="Auto-filled from VPN IP" />
-                            </div>
-                            <div className="grid-2 gap-10">
-                                <div className="form-group"><label className="form-label">Pool Start</label><input className="form-input" value={p.pppoePoolStart} onChange={e => p.setPppoePoolStart(e.target.value)} placeholder="Auto-filled from VPN IP" /></div>
-                                <div className="form-group"><label className="form-label">Pool End</label><input className="form-input" value={p.pppoePoolEnd} onChange={e => p.setPppoePoolEnd(e.target.value)} placeholder="Auto-filled from VPN IP" /></div>
-                            </div>
-                        </div>
-                    )}
-                    {(p.serviceType === 'hotspot' || p.serviceType === 'both') && (
-                        <div style={{ background: '#fff', padding: 16, borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-light)' }}>
-                            <div style={{ fontWeight: 600, fontSize: '0.85rem', marginBottom: 12, color: '#0d9488' }}>Hotspot Network Settings</div>
-                            <div className="form-group"><label className="form-label">Hotspot Gateway Address</label>
-                                <input className="form-input" value={p.hotspotLocalAddress} onChange={e => p.setHotspotLocalAddress(e.target.value)} placeholder="Auto-filled from VPN IP" />
-                            </div>
-                            <div className="grid-2 gap-10">
-                                <div className="form-group"><label className="form-label">Pool Start</label><input className="form-input" value={p.hotspotPoolStart} onChange={e => p.setHotspotPoolStart(e.target.value)} placeholder="Auto-filled from VPN IP" /></div>
-                                <div className="form-group"><label className="form-label">Pool End</label><input className="form-input" value={p.hotspotPoolEnd} onChange={e => p.setHotspotPoolEnd(e.target.value)} placeholder="Auto-filled from VPN IP" /></div>
-                            </div>
-                        </div>
-                    )}
-                    <div style={{ background: '#fff', padding: 16, borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-light)', gridColumn: p.serviceType === 'both' ? 'span 2' : 'auto' }}>
-                        <div style={{ fontWeight: 600, fontSize: '0.85rem', marginBottom: 12, color: '#4338ca' }}>RADIUS Server Settings</div>
-                        <div className="grid-2 gap-10">
-                            <div className="form-group"><label className="form-label">RADIUS Server IP/Host</label>
-                                <input className="form-input" value={p.radiusAddress} onChange={e => p.setRadiusAddress(e.target.value)} placeholder="Server IP" />
-                                <div className="form-hint">Address of your billing server</div>
-                            </div>
-                            <div className="form-group"><label className="form-label">RADIUS Shared Secret</label>
-                                <input className="form-input" value={p.radiusSecret} onChange={e => p.setRadiusSecret(e.target.value)} placeholder="Secret key" />
-                                <div className="form-hint">Must match server configuration</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+
         </div>
     );
 }
@@ -130,18 +82,8 @@ export function Step2Services(p: Step2Props) {
 // ── Step 3: VPN Configuration ─────────────────────────────────────────────────
 
 interface Step3Props {
-    vpnEnabled: boolean;      setVpnEnabled:      (v: boolean) => void;
-    vpnMode: VpnMode;         setVpnMode:         (v: VpnMode) => void;
-    vpnProtocol: string;      setVpnProtocol:     (v: string) => void;
-    vpnPoolStart: string;     setVpnPoolStart:    (v: string) => void;
-    vpnPoolEnd: string;       setVpnPoolEnd:      (v: string) => void;
-    vpnDns: string;           setVpnDns:          (v: string) => void;
-    ipsecSecret: string;      setIpsecSecret:     (v: string) => void;
-    vpnSecrets: VpnSecret[];
-    showAddVpnSecret: boolean; setShowAddVpnSecret: (v: boolean) => void;
-    vpnForm: VpnSecret;       setVpnForm:          (v: VpnSecret) => void;
-    onAddSecret: () => void;
-    onRemoveSecret: (i: number) => void;
+    vpnEnabled: boolean; setVpnEnabled: (v: boolean) => void;
+    vpnMode: VpnMode; setVpnMode: (v: VpnMode) => void;
 }
 
 export function Step3Vpn(p: Step3Props) {
@@ -150,7 +92,7 @@ export function Step3Vpn(p: Step3Props) {
             <div style={{ textAlign: 'center', marginBottom: 24 }}>
                 <VpnKeyIcon style={{ fontSize: 56, color: '#7c3aed', marginBottom: 12 }} />
                 <h2 style={{ marginBottom: 6 }}>VPN Tunnel Configuration</h2>
-                <p style={{ color: 'var(--text-secondary)' }}>Configure VPN server and secrets on this router</p>
+                <p style={{ color: 'var(--text-secondary)' }}>Configure the WireGuard management tunnel for this router</p>
             </div>
 
             <div style={{ maxWidth: 700, margin: '0 auto' }}>
@@ -159,8 +101,8 @@ export function Step3Vpn(p: Step3Props) {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                         <VpnKeyIcon style={{ color: '#7c3aed' }} />
                         <div>
-                            <div style={{ fontWeight: 600 }}>Enable VPN Server</div>
-                            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Configure VPN server on this MikroTik</div>
+                            <div style={{ fontWeight: 600 }}>Enable VPN Management Tunnel</div>
+                            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Connect this router securely to the billing server via WireGuard</div>
                         </div>
                     </div>
                     <label style={{ position: 'relative', display: 'inline-block', width: 48, height: 26 }}>
@@ -206,116 +148,12 @@ export function Step3Vpn(p: Step3Props) {
                         </div>
                     </div>
 
-                    {/* VPN Server Settings */}
-                    <div style={{ border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)', overflow: 'hidden', marginBottom: 16 }}>
-                        <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--border-light)', fontWeight: 600, background: '#f5f3ff', color: '#7c3aed', display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <SettingsIcon style={{ fontSize: 16 }} /> VPN Server Settings
-                        </div>
-                        <div style={{ padding: 20 }}>
-                            <div className="grid-2 gap-16">
-                                <div className="form-group"><label className="form-label">VPN Protocol</label>
-                                    <select className="form-select" value={p.vpnProtocol} onChange={e => p.setVpnProtocol(e.target.value)}>
-                                        <option value="L2TP">L2TP/IPsec</option><option value="PPTP">PPTP</option><option value="SSTP">SSTP</option><option value="OpenVPN">OpenVPN</option>
-                                    </select>
-                                    <div className="form-hint">L2TP/IPsec recommended for security</div>
-                                </div>
-                                <div className="form-group"><label className="form-label">IPsec Pre-Shared Key</label>
-                                    <input className="form-input" type="password" value={p.ipsecSecret} onChange={e => p.setIpsecSecret(e.target.value)} />
-                                    <div className="form-hint">Shared secret for IPsec authentication</div>
-                                </div>
-                                <div className="form-group"><label className="form-label">IP Pool Start</label><input className="form-input" value={p.vpnPoolStart} onChange={e => p.setVpnPoolStart(e.target.value)} placeholder="10.0.0.2" /></div>
-                                <div className="form-group"><label className="form-label">IP Pool End</label><input className="form-input" value={p.vpnPoolEnd} onChange={e => p.setVpnPoolEnd(e.target.value)} placeholder="10.0.0.254" /></div>
-                                <div className="form-group"><label className="form-label">DNS Server</label><input className="form-input" value={p.vpnDns} onChange={e => p.setVpnDns(e.target.value)} placeholder="8.8.8.8" /></div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* VPN Secrets */}
-                    <div style={{ border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
-                        <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--border-light)', fontWeight: 600, background: '#f5f3ff', color: '#7c3aed', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <LockIcon style={{ fontSize: 16 }} /> PPP Secrets (VPN Users)
-                                <span style={{ background: '#7c3aed', color: '#fff', padding: '1px 8px', borderRadius: 10, fontSize: '0.75rem' }}>{p.vpnSecrets.length}</span>
-                            </div>
-                            <button className="btn btn-primary" style={{ padding: '5px 12px', fontSize: '0.8rem' }} onClick={() => p.setShowAddVpnSecret(true)}>
-                                <AddIcon style={{ fontSize: 14 }} /> Add Secret
-                            </button>
-                        </div>
-                        <div style={{ padding: 16 }}>
-                            {p.vpnSecrets.length === 0 ? (
-                                <div style={{ textAlign: 'center', padding: '30px 20px', color: 'var(--text-muted)' }}>
-                                    <VpnKeyIcon style={{ fontSize: 32, marginBottom: 8, opacity: 0.4 }} />
-                                    <div style={{ fontSize: '0.88rem' }}>No VPN secrets added yet</div>
-                                    <div style={{ fontSize: '0.78rem', marginTop: 4 }}>Click "Add Secret" to create VPN user credentials</div>
-                                </div>
-                            ) : (
-                                <div className="table-container">
-                                    <table style={{ width: '100%', fontSize: '0.85rem', borderCollapse: 'collapse' }}>
-                                        <thead>
-                                            <tr style={{ borderBottom: '1px solid var(--border-light)' }}>
-                                                {['USERNAME','PROTOCOL','PROFILE','LOCAL IP','REMOTE IP',''].map(h => (
-                                                    <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{h}</th>
-                                                ))}
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {p.vpnSecrets.map((s, i) => (
-                                                <tr key={i} style={{ borderBottom: '1px solid var(--border-light)' }}>
-                                                    <td style={{ padding: '10px 12px', fontWeight: 500 }}>{s.username}</td>
-                                                    <td style={{ padding: '10px 12px' }}><span style={{ background: '#7c3aed22', color: '#7c3aed', padding: '2px 8px', borderRadius: 8, fontSize: '0.78rem', fontWeight: 600 }}>{s.protocol}</span></td>
-                                                    <td style={{ padding: '10px 12px' }}>{s.profile}</td>
-                                                    <td style={{ padding: '10px 12px', fontFamily: 'monospace', fontSize: '0.8rem' }}>{s.localAddress || 'Auto'}</td>
-                                                    <td style={{ padding: '10px 12px', fontFamily: 'monospace', fontSize: '0.8rem' }}>{s.remoteAddress || 'Auto'}</td>
-                                                    <td style={{ padding: '10px 12px', textAlign: 'center' }}>
-                                                        <button className="btn-icon delete" onClick={() => p.onRemoveSecret(i)} title="Remove"><DeleteIcon style={{ fontSize: 16 }} /></button>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Add Secret Form */}
-                    {p.showAddVpnSecret && (
-                        <div style={{ marginTop: 16, border: '2px solid #7c3aed33', borderRadius: 'var(--radius-md)', padding: 20, background: '#faf5ff' }}>
-                            <div style={{ fontWeight: 600, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}><AddIcon style={{ fontSize: 16, color: '#7c3aed' }} /> New VPN Secret</div>
-                            <div className="grid-2 gap-12">
-                                <div className="form-group"><label className="form-label">Username <span className="required">*</span></label>
-                                    <input className="form-input" placeholder="vpn-user01" value={p.vpnForm.username} onChange={e => p.setVpnForm({ ...p.vpnForm, username: e.target.value })} />
-                                </div>
-                                <div className="form-group"><label className="form-label">Password <span className="required">*</span></label>
-                                    <input className="form-input" type="password" placeholder="Strong password" value={p.vpnForm.password} onChange={e => p.setVpnForm({ ...p.vpnForm, password: e.target.value })} />
-                                </div>
-                                <div className="form-group"><label className="form-label">Profile</label>
-                                    <select className="form-select" value={p.vpnForm.profile} onChange={e => p.setVpnForm({ ...p.vpnForm, profile: e.target.value })}>
-                                        <option value="default">default</option><option value="default-encryption">default-encryption</option>
-                                    </select>
-                                </div>
-                                <div className="form-group"><label className="form-label">Protocol</label>
-                                    <select className="form-select" value={p.vpnForm.protocol} onChange={e => p.setVpnForm({ ...p.vpnForm, protocol: e.target.value })}>
-                                        <option value="L2TP">L2TP/IPsec</option><option value="PPTP">PPTP</option><option value="SSTP">SSTP</option><option value="OpenVPN">OpenVPN</option>
-                                    </select>
-                                </div>
-                                <div className="form-group"><label className="form-label">Local Address</label><input className="form-input" placeholder="Auto-assign" value={p.vpnForm.localAddress} onChange={e => p.setVpnForm({ ...p.vpnForm, localAddress: e.target.value })} /></div>
-                                <div className="form-group"><label className="form-label">Remote Address</label><input className="form-input" placeholder="Auto-assign" value={p.vpnForm.remoteAddress} onChange={e => p.setVpnForm({ ...p.vpnForm, remoteAddress: e.target.value })} /></div>
-                            </div>
-                            <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-                                <button className="btn btn-secondary" onClick={() => p.setShowAddVpnSecret(false)}>Cancel</button>
-                                <button className="btn btn-primary" onClick={p.onAddSecret}><AddIcon fontSize="small" /> Add Secret</button>
-                            </div>
-                        </div>
-                    )}
-
-                    <div style={{ marginTop: 16, padding: '12px 16px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 'var(--radius-sm)', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-                        <InfoOutlinedIcon style={{ fontSize: 18, color: '#1d4ed8', marginTop: 2 }} />
-                        <div style={{ fontSize: '0.82rem', color: '#1e40af', lineHeight: 1.6 }}>
-                            <strong>VPN Configuration Notes:</strong><br />
-                            • VPN secrets will be pushed to MikroTik as PPP Secrets during config generation<br />
-                            • {p.vpnProtocol === 'L2TP' ? 'L2TP server with IPsec encryption will be enabled' : `${p.vpnProtocol} server will be enabled`}<br />
-                            • IP Pool: {p.vpnPoolStart} – {p.vpnPoolEnd}
+                    {/* Info note */}
+                    <div style={{ marginTop: 8, padding: '12px 16px', background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: 'var(--radius-sm)', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                        <VpnKeyIcon style={{ fontSize: 18, color: '#7c3aed', marginTop: 2 }} />
+                        <div style={{ fontSize: '0.82rem', color: '#5b21b6', lineHeight: 1.6 }}>
+                            <strong>WireGuard Tunnel Note:</strong><br />
+                            The VPN tunnel allows the billing server to manage this router securely. WireGuard keys and peer configuration are generated automatically when you set up the router in the system. RADIUS handles all subscriber authentication — no manual PPP secrets are needed here.
                         </div>
                     </div>
                 </>)}

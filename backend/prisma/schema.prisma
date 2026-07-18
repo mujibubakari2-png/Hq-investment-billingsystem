@@ -250,6 +250,16 @@ model Router {
   wgPublicKey       String?
   wgServerEndpoint  String?
   wgTunnelIp        String?          @default("10.200.0.1")
+  // ── Wireless configuration fields (optional, for AP-bridge mode) ───────────
+  wlanEnabled       Boolean          @default(false) // Enable wlan1 (2.4GHz) and wlan2 (5GHz)
+  wlan1Ssid         String?          // SSID for wlan1, defaults to "MikroTik-<MAC>"
+  wlan2Ssid         String?          // SSID for wlan2, defaults to "MikroTik-<MAC>"
+  wlanSecurity      String?          @default("wpa2-psk") // wpa2-psk, wpa3-psk, wpa2-eap, etc.
+  wlanPassphrase    String?          // PSK/passphrase for wireless (encrypted at rest)
+  wlan1TxChain      String?          @default("0,1")  // TX chains for 2.4GHz
+  wlan1RxChain      String?          @default("0,1")  // RX chains for 2.4GHz
+  wlan2TxChain      String?          @default("0")    // TX chains for 5GHz
+  wlan2RxChain      String?          @default("0")    // RX chains for 5GHz
   equipments        Equipment[]
   hotspotSettings   HotspotSettings?
   packages          Package[]

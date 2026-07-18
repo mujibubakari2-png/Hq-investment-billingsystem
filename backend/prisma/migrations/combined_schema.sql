@@ -221,6 +221,15 @@ CREATE TABLE IF NOT EXISTS "routers" (
     "wgPublicKey"      TEXT,
     "wgServerEndpoint" TEXT,
     "wgTunnelIp"       TEXT           DEFAULT '10.200.0.1',
+    "wlanEnabled"      BOOLEAN        NOT NULL DEFAULT false,
+    "wlan1Ssid"        TEXT,
+    "wlan2Ssid"        TEXT,
+    "wlanSecurity"     TEXT           DEFAULT 'wpa2-psk',
+    "wlanPassphrase"   TEXT,
+    "wlan1TxChain"     TEXT           DEFAULT '0,1',
+    "wlan1RxChain"     TEXT           DEFAULT '0,1',
+    "wlan2TxChain"     TEXT           DEFAULT '0',
+    "wlan2RxChain"     TEXT           DEFAULT '0',
 
     CONSTRAINT "routers_pkey" PRIMARY KEY ("id")
 );

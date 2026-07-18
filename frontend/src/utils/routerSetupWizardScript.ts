@@ -8,10 +8,12 @@ export interface RouterSetupWizardScriptParams {
   serviceType: 'pppoe' | 'hotspot' | 'both';
   selectedInterfaces: string[];
   vpnEnabled: boolean;
-  vpnProtocol: string;
-  vpnPoolStart: string;
-  vpnPoolEnd: string;
-  vpnSecrets: Array<{ username: string; password: string; protocol?: string; profile?: string; localAddress?: string; remoteAddress?: string }>;
+  // VPN Server Settings (L2TP/PPTP/PPP Secrets) — optional:
+  // removed from the wizard UI; may still be supplied programmatically.
+  vpnProtocol?: string;
+  vpnPoolStart?: string;
+  vpnPoolEnd?: string;
+  vpnSecrets?: Array<{ username: string; password: string; protocol?: string; profile?: string; localAddress?: string; remoteAddress?: string }>;
   hotspotLocalAddress: string;
   hotspotPoolStart: string;
   hotspotPoolEnd: string;
@@ -226,8 +228,8 @@ export function buildRouterSetupWizardScript(params: RouterSetupWizardScriptPara
         ]
       : []),
     '',
-    ...(params.vpnEnabled ? [
-      '# ===== VPN Server =====',
+    ...(params.vpnEnabled && params.vpnProtocol && params.vpnPoolStart && params.vpnPoolEnd ? [
+      '# ===== VPN Server (L2TP/PPP) =====',
       ...(params.vpnProtocol === 'L2TP' || params.vpnMode === 'hybrid'
         ? [
             `/ip pool add name="${vpnPoolName}" ranges=${params.vpnPoolStart}-${params.vpnPoolEnd}`,
@@ -235,7 +237,7 @@ export function buildRouterSetupWizardScript(params: RouterSetupWizardScriptPara
             `/interface l2tp-server server set enabled=yes use-ipsec=yes ipsec-secret="${params.ipsecSecret ?? ''}" default-profile="${vpnProfile}"`,
           ]
         : []),
-      ...(params.vpnSecrets.length > 0 ? params.vpnSecrets.map((s) => `/ppp secret add name="${s.username}" password="${s.password}" service=${(s.protocol ?? params.vpnProtocol).toLowerCase()} profile="${vpnProfile}"${s.localAddress ? ` local-address=${s.localAddress}` : ''}${s.remoteAddress ? ` remote-address=${s.remoteAddress}` : ''}`) : []),
+      ...((params.vpnSecrets ?? []).length > 0 ? (params.vpnSecrets ?? []).map((s) => `/ppp secret add name="${s.username}" password="${s.password}" service=${(s.protocol ?? params.vpnProtocol ?? 'l2tp').toLowerCase()} profile="${vpnProfile}"${s.localAddress ? ` local-address=${s.localAddress}` : ''}${s.remoteAddress ? ` remote-address=${s.remoteAddress}` : ''}`) : []),
     ] : []),
     '',
     '# ===== RADIUS Client =====',

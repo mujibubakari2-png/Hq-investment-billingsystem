@@ -25,6 +25,8 @@ export interface MikrotikScriptParams {
     radiusSecret?: string;
 }
 
+import { sanitizeMikroTikName, sanitizePassphrase } from './mikrotikUtils';
+
 export function generateMikrotikScript(params: MikrotikScriptParams): string {
     const {
         routerName, routerUsername, routerPassword, routerId, apiHost, publicApiBase,
@@ -38,11 +40,8 @@ export function generateMikrotikScript(params: MikrotikScriptParams): string {
         throw new Error("Missing required configuration fields for script generation. Please configure LAN, Gateway, Pool ranges, and DNS on this router first.");
     }
 
-    const sanitizeName = (name: string) =>
-        name.trim().replace(/\s+/g, '-').replace(/[^a-zA-Z0-9\-]/g, '').replace(/-+/g, '-').replace(/^-+|-+$/g, '');
-
-    const safeRouterName = sanitizeName(routerName);
-    const safeRouterNameLower = safeRouterName.toLowerCase();
+    const safeRouterName = sanitizeMikroTikName(routerName);
+    const safeRouterNameLower = safeRouterName; // already lower-cased by sanitizer
 
     // subnetAddress: the VPN management subnet (used for firewall src-address restrictions)
     const subnetAddress = routerTunnelIp ? `${routerTunnelIp.split('.').slice(0, 3).join('.')}.0/24` : '10.200.0.0/24';
@@ -68,8 +67,8 @@ export function generateMikrotikScript(params: MikrotikScriptParams): string {
     // prefer that endpoint for new code; this file is kept only for any
     // remaining callers (e.g. MikrotikScriptModal) pending consolidation.
     const wifiPassword = routerPassword && routerPassword.length >= 8
-        ? routerPassword
-        : `HQ-${sanitizeName(routerName)}-${routerId}`.slice(0, 32);
+        ? sanitizePassphrase(routerPassword)
+        : (`HQ-${safeRouterName}-${routerId}`).slice(0, 32);
 
     const script = `# ═══════════════════════════════════════════════════════════════
 # HQINVESTMENT ISP Billing - MikroTik Auto-Configuration Script
@@ -195,16 +194,16 @@ ${isWireGuard ? `# VPN IP: ${routerTunnelIp}\n` : ''}# Generated: ${new Date().t
 # ── 6. Wi-Fi Security (WPA2-PSK) ────────────────────────────────
 # Prevent MikroTik from leaving WLAN interfaces open and avoid the
 # "pre-shared key authentication not enabled, disable WPS" warning.
-:if ([:len [/interface wireless security-profiles find name="hq-wifi-sec"]] = 0) do={
-    /interface wireless security-profiles add name="hq-wifi-sec" mode=dynamic-keys authentication-types=wpa2-psk wpa2-pre-shared-key="${wifiPassword}"
+:if ([:len [/interface wireless security-profiles find name="hq-wlan-${safeRouterNameLower}"]] = 0) do={
+    /interface wireless security-profiles add name="hq-wlan-${safeRouterNameLower}" mode=dynamic-keys authentication-types=wpa2-psk wpa2-pre-shared-key="${wifiPassword}"
 } else={
-    /interface wireless security-profiles set [find name="hq-wifi-sec"] mode=dynamic-keys authentication-types=wpa2-psk wpa2-pre-shared-key="${wifiPassword}"
+    /interface wireless security-profiles set [find name="hq-wlan-${safeRouterNameLower}"] mode=dynamic-keys authentication-types=wpa2-psk wpa2-pre-shared-key="${wifiPassword}"
 }
 :if ([:len [/interface wireless find default-name="wlan1"]] > 0) do={
-    /interface wireless set [find default-name="wlan1"] security-profile="hq-wifi-sec"
+    /interface wireless set [find default-name="wlan1"] security-profile="hq-wlan-${safeRouterNameLower}"
 }
 :if ([:len [/interface wireless find default-name="wlan2"]] > 0) do={
-    /interface wireless set [find default-name="wlan2"] security-profile="hq-wifi-sec"
+    /interface wireless set [find default-name="wlan2"] security-profile="hq-wlan-${safeRouterNameLower}"
 }
 
 # ── 7. Hotspot Server ────────────────────────────────────────────
@@ -233,10 +232,10 @@ ${isWireGuard ? `# VPN IP: ${routerTunnelIp}\n` : ''}# Generated: ${new Date().t
 :if ([:len [/ppp profile find name="pppoe-profile-${safeRouterName}"]] = 0) do={
     /ppp profile add name="pppoe-profile-${safeRouterName}" local-address=${lanGateway} remote-address="pppoe-pool-${safeRouterName}" dns-server=${dnsServers} use-encryption=yes
 }
-:if ([:len [/interface pppoe-server server find service-name="pppoe-svc-${safeRouterName}"]] = 0) do={
-    /interface pppoe-server server add service-name="pppoe-svc-${safeRouterName}" interface=$lanBridge default-profile="pppoe-profile-${safeRouterName}" authentication=pap,chap,mschap1,mschap2 one-session-per-host=yes disabled=no
+:if ([:len [/interface pppoe-server server find service-name="hq-pppoe-${safeRouterNameLower}"]] = 0) do={
+    /interface pppoe-server server add service-name="hq-pppoe-${safeRouterNameLower}" interface=$lanBridge default-profile="pppoe-profile-${safeRouterName}" authentication=pap,chap,mschap1,mschap2 one-session-per-host=yes disabled=no
 } else={
-    /interface pppoe-server server set [find service-name="pppoe-svc-${safeRouterName}"] one-session-per-host=yes authentication=pap,chap,mschap1,mschap2
+    /interface pppoe-server server set [find service-name="hq-pppoe-${safeRouterNameLower}"] one-session-per-host=yes authentication=chap,mschap1,mschap2
 }
 
 ${isWireGuard ? `# ── 9. WireGuard VPN Configuration ─────────────────────────────
@@ -261,6 +260,24 @@ ${isWireGuard ? `# ── 9. WireGuard VPN Configuration ───────�
     /ip firewall nat add chain=srcnat out-interface=$wanInterface action=masquerade comment="Masquerade for internet"
 }
 
+# ===== IPv6 protection (parity with backend) =====
+:if ([:len [/ipv6 firewall address-list find name="bad_ipv6"]] = 0) do={
+    /ipv6 firewall address-list add list=bad_ipv6 address=::/128 comment="HQ INVESTMENT: unspecified address"
+    /ipv6 firewall address-list add list=bad_ipv6 address=::1/128 comment="HQ INVESTMENT: loopback"
+    /ipv6 firewall address-list add list=bad_ipv6 address=fec0::/10 comment="HQ INVESTMENT: site-local"
+    /ipv6 firewall address-list add list=bad_ipv6 address=::ffff:0:0/96 comment="HQ INVESTMENT: ipv4-mapped"
+    /ipv6 firewall address-list add list=bad_ipv6 address=::/96 comment="HQ INVESTMENT: ipv4 compat"
+    /ipv6 firewall address-list add list=bad_ipv6 address=100::/64 comment="HQ INVESTMENT: discard only"
+    /ipv6 firewall address-list add list=bad_ipv6 address=2001:db8::/24 comment="HQ INVESTMENT: documentation"
+    /ipv6 firewall address-list add list=bad_ipv6 address=2001:10::/28 comment="HQ INVESTMENT: ORCHID"
+    /ipv6 firewall address-list add list=bad_ipv6 address=3ffe::/16 comment="HQ INVESTMENT: 6bone"
+}
+
+:if ([:len [/ipv6 firewall filter find where comment="HQ INVESTMENT: accept established,related,untracked"]] = 0) do={
+    /ipv6 firewall filter add chain=input action=accept connection-state=established,related,untracked comment="HQ INVESTMENT: accept established,related,untracked"
+}
+}
+
 # FIX CAUSE #18: MSS Clamping — prevents large packets being dropped on PPPoE/WAN links.
 # Essential for HTTPS and large downloads to work correctly.
 :if ([:len [/ip firewall mangle find where comment="MSS Clamp - HQ INVESTMENT"]] = 0) do={
@@ -281,6 +298,14 @@ ${isWireGuard ? `# ── 9. WireGuard VPN Configuration ───────�
 }
 :if ([:len [/ip firewall filter find where comment="Allow DHCP forward - HQ INVESTMENT"]] = 0) do={
     /ip firewall filter add place-before=0 chain=forward protocol=udp dst-port=67,68 action=accept comment="Allow DHCP forward - HQ INVESTMENT"
+}
+
+# Allow local loopback (parity with backend)
+:if ([:len [/ip firewall filter find where comment="Allow local loopback"]] = 0) do={
+    :if ([:len [/ip firewall filter find where src-address="127.0.0.1" dst-address="127.0.0.1"]] = 0) do={
+        :local localhost "127.0.0.1"
+        /ip firewall filter add place-before=0 chain=input action=accept src-address=$localhost dst-address=$localhost comment="Allow local loopback"
+    }
 }
 
 # SECURITY: Allow Winbox, Web, and API accept rules restricted to VPN subnet

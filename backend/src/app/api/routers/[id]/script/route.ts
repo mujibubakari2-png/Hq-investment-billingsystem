@@ -5,6 +5,12 @@ import { requirePermission } from "@/lib/rbac";
 import { canAccessTenant } from "@/lib/tenant";
 import { decryptRouterFields, encrypt } from "@/lib/encryption";
 import { generateRouterAdminPassword, generateRadiusSecret } from "@/lib/routerProvisioning";
+
+// Simple sanitizer for wireless passphrases embedded into RouterOS scripts.
+function sanitizePassphrase(p: unknown): string {
+    if (!p || typeof p !== 'string') return '';
+    return p.replace(/["'\\]/g, '').substring(0, 64);
+}
 import logger from "@/lib/logger";
 
 /**
@@ -195,6 +201,15 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 :if ([:len [/interface list member find list="LAN" interface=$lanBridge]] = 0) do={
     /interface list member add list="LAN" interface=$lanBridge comment="HQ INVESTMENT LAN bridge"
 }
+
+# 6b. Bridge Port Membership — Add common LAN interfaces as bridge members (for L2 switching)
+# Note: wireless interfaces (wlan0/wlan1/wlan2) are added separately if wlanEnabled=true
+:foreach intf in=[/interface find where !(name=ether1 || name~"bridge" || name~"ppp" || name~"wlan" || name~"wg" || passthrough=yes || type=loopback)] do={
+    :local intfName [/interface get $intf name]
+    :if ([:len [/interface bridge port find bridge=$lanBridge interface=$intfName]] = 0) do={
+        /interface bridge port add bridge=$lanBridge interface=$intfName comment="HQ INVESTMENT LAN port"
+    }
+}
 :if ([:len [/ip pool find name="${hotspotPoolName}"]] = 0) do={
     /ip pool add name="${hotspotPoolName}" ranges=${router.hotspotPoolRange}
 }
@@ -238,9 +253,97 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 }
 :if ([:len [/interface pppoe-server server find service-name="hq-pppoe-${cleanName.toLowerCase()}"]] = 0) do={
     /interface pppoe-server server add service-name="hq-pppoe-${cleanName.toLowerCase()}" interface=$lanBridge default-profile="hq-pppoe-${cleanName.toLowerCase()}" authentication=pap,chap,mschap1,mschap2 one-session-per-host=yes disabled=no
+} else={
+    /interface pppoe-server server set [find service-name="hq-pppoe-${cleanName.toLowerCase()}"] interface=$lanBridge default-profile="hq-pppoe-${cleanName.toLowerCase()}" authentication=chap,mschap1,mschap2 one-session-per-host=yes disabled=no
+}
+`;
+
+    // 6c. Wireless AP Configuration (optional — only if wlanEnabled=true)
+        const _r: any = router as any;
+        if (_r.wlanEnabled) {
+            const wlan1Ssid = _r.wlan1Ssid || "HQ-Hotspot-2.4GHz";
+            const wlan2Ssid = _r.wlan2Ssid || "HQ-Hotspot-5GHz";
+            const wlanPass = _r.wlanPassphrase ? sanitizePassphrase(_r.wlanPassphrase) : "hqinvestment123456";
+            const wlanSecurity = _r.wlanSecurity || "wpa2-psk";
+            const wlan1TxChain = _r.wlan1TxChain || "0,1";
+            const wlan1RxChain = _r.wlan1RxChain || "0,1";
+            const wlan2TxChain = _r.wlan2TxChain || "0";
+            const wlan2RxChain = _r.wlan2RxChain || "0";
+
+            script += `
+# 6c. Wireless AP Configuration
+# Configure wlan1 (2.4GHz)
+:local wlan1Id [/interface wireless find where default-name=wlan1]
+:if ([:len $wlan1Id] > 0) do={
+    /interface wireless set $wlan1Id disabled=no mode=ap-bridge band=2ghz-b/g/n tx-power-mode=all-channels-same distance=indoors installation=any channel-width=20/40mhz frequency=auto tx-chains=${wlan1TxChain} rx-chains=${wlan1RxChain}
+    /interface wireless set $wlan1Id ssid="${wlan1Ssid}"
+    :if ([:len [/interface wireless security-profile find name="hq-wlan-${cleanName.toLowerCase()}"]] = 0) do={
+        /interface wireless security-profile add name="hq-wlan-${cleanName.toLowerCase()}" mode=${wlanSecurity} authentication-types=${wlanSecurity} wpa2-pre-shared-key="${wlanPass}" wpa3-pre-shared-key="${wlanPass}" comment="HQ INVESTMENT"
+    }
+    /interface wireless set $wlan1Id security-profile="hq-wlan-${cleanName.toLowerCase()}"
+    :if ([:len [/interface bridge port find bridge=$lanBridge interface=wlan1]] = 0) do={
+        /interface bridge port add bridge=$lanBridge interface=wlan1 comment="HQ INVESTMENT WiFi 2.4GHz port"
+    }
+    :if ([:len [/interface list member find list="LAN" interface=wlan1]] = 0) do={
+        /interface list member add list="LAN" interface=wlan1 comment="HQ INVESTMENT WiFi 2.4GHz"
+    }
 }
 
-# 7. Firewall Rules (TATIZO 2 fix: Enforce vpnSubnet src-address restriction for management ports)
+# Configure wlan2 (5GHz) if available
+:local wlan2Id [/interface wireless find where default-name=wlan2]
+:if ([:len $wlan2Id] > 0) do={
+    /interface wireless set $wlan2Id disabled=no mode=ap-bridge band=5ghz-a/n/ac tx-power-mode=all-channels-same distance=indoors installation=any channel-width=20/40/80mhz frequency=auto tx-chains=${wlan2TxChain} rx-chains=${wlan2RxChain}
+    /interface wireless set $wlan2Id ssid="${wlan2Ssid}"
+    /interface wireless set $wlan2Id security-profile="hq-wlan-${cleanName.toLowerCase()}"
+    :if ([:len [/interface bridge port find bridge=$lanBridge interface=wlan2]] = 0) do={
+        /interface bridge port add bridge=$lanBridge interface=wlan2 comment="HQ INVESTMENT WiFi 5GHz port"
+    }
+    :if ([:len [/interface list member find list="LAN" interface=wlan2]] = 0) do={
+        /interface list member add list="LAN" interface=wlan2 comment="HQ INVESTMENT WiFi 5GHz"
+    }
+}
+/log info "Wireless AP interfaces configured for HQ INVESTMENT"
+`;
+        }
+
+        script += `
+# 7. Firewall Rules
+# 7-pre. IPv4 Connection Tracking (same as MikroTik default — REQUIRED for performance & security)
+:if ([:len [/ip firewall filter find where comment="HQ: accept established input"]] = 0) do={
+    /ip firewall filter add chain=input action=accept connection-state=established,related,untracked comment="HQ: accept established input"
+}
+:if ([:len [/ip firewall filter find where comment="HQ: drop invalid input"]] = 0) do={
+    /ip firewall filter add chain=input action=drop connection-state=invalid comment="HQ: drop invalid input"
+}
+:if ([:len [/ip firewall filter find where comment="HQ: accept ICMP"]] = 0) do={
+    /ip firewall filter add chain=input action=accept protocol=icmp comment="HQ: accept ICMP"
+}
+:if ([:len [/ip firewall filter find where comment="HQ: ipsec forward in"]] = 0) do={
+    /ip firewall filter add chain=forward action=accept ipsec-policy=in,ipsec comment="HQ: ipsec forward in"
+}
+:if ([:len [/ip firewall filter find where comment="HQ: ipsec forward out"]] = 0) do={
+    /ip firewall filter add chain=forward action=accept ipsec-policy=out,ipsec comment="HQ: ipsec forward out"
+}
+:if ([:len [/ip firewall filter find where comment="HQ: fasttrack forward"]] = 0) do={
+    /ip firewall filter add chain=forward action=fasttrack-connection connection-state=established,related comment="HQ: fasttrack forward"
+}
+:if ([:len [/ip firewall filter find where comment="HQ: accept established forward"]] = 0) do={
+    /ip firewall filter add chain=forward action=accept connection-state=established,related,untracked comment="HQ: accept established forward"
+}
+:if ([:len [/ip firewall filter find where comment="HQ: drop invalid forward"]] = 0) do={
+    /ip firewall filter add chain=forward action=drop connection-state=invalid comment="HQ: drop invalid forward"
+}
+:if ([:len [/ip firewall filter find where comment="HQ: drop WAN non-dstnat"]] = 0) do={
+    /ip firewall filter add chain=forward action=drop connection-nat-state=!dstnat in-interface-list=WAN comment="HQ: drop all from WAN not DSTNATed"
+}
+
+# 7-mgmt. Management access & VPN rules (TATIZO 2 fix: Enforce vpnSubnet src-address restriction)
+        :if ([:len [/ip firewall filter find where comment="Allow local loopback"]] = 0) do={
+            :if ([:len [/ip firewall filter find where src-address="127.0.0.1" dst-address="127.0.0.1"]] = 0) do={
+                :local localhost "127.0.0.1"
+                /ip firewall filter add chain=input action=accept src-address=$localhost dst-address=$localhost comment="Allow local loopback"
+            }
+        }
 :if ([:len [/ip firewall filter find where comment="Allow HQ INVESTMENT API Access"]] = 0) do={
     /ip firewall filter add chain=input action=accept protocol=tcp dst-port=${apiPort},443,8291 src-address=${vpnSubnet} comment="Allow HQ INVESTMENT API Access"
 }
@@ -283,6 +386,95 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 :if ([:len [/ip firewall nat find where comment="HQ INVESTMENT NAT"]] = 0) do={
     /ip firewall nat add chain=srcnat action=masquerade out-interface-list=WAN comment="HQ INVESTMENT NAT"
 }
+
+# 8b. IPv6 Firewall Rules — Comprehensive IPv6 protection
+# Add bad IPv6 address list (same as default RouterOS config)
+:if ([:len [/ipv6 firewall address-list find name="bad_ipv6"]] = 0) do={
+    /ipv6 firewall address-list add list=bad_ipv6 address=::/128 comment="HQ INVESTMENT: unspecified address"
+    /ipv6 firewall address-list add list=bad_ipv6 address=::1/128 comment="HQ INVESTMENT: loopback"
+    /ipv6 firewall address-list add list=bad_ipv6 address=fec0::/10 comment="HQ INVESTMENT: site-local"
+    /ipv6 firewall address-list add list=bad_ipv6 address=::ffff:0:0/96 comment="HQ INVESTMENT: ipv4-mapped"
+    /ipv6 firewall address-list add list=bad_ipv6 address=::/96 comment="HQ INVESTMENT: ipv4 compat"
+    /ipv6 firewall address-list add list=bad_ipv6 address=100::/64 comment="HQ INVESTMENT: discard only"
+    /ipv6 firewall address-list add list=bad_ipv6 address=2001:db8::/24 comment="HQ INVESTMENT: documentation"
+    /ipv6 firewall address-list add list=bad_ipv6 address=2001:10::/28 comment="HQ INVESTMENT: ORCHID"
+    /ipv6 firewall address-list add list=bad_ipv6 address=3ffe::/16 comment="HQ INVESTMENT: 6bone"
+}
+
+# IPv6 Input chain rules
+:if ([:len [/ipv6 firewall filter find where comment="HQ INVESTMENT: accept established,related,untracked"]] = 0) do={
+    /ipv6 firewall filter add chain=input action=accept connection-state=established,related,untracked comment="HQ INVESTMENT: accept established,related,untracked"
+}
+:if ([:len [/ipv6 firewall filter find where comment="HQ INVESTMENT: drop invalid IPv6"]] = 0) do={
+    /ipv6 firewall filter add chain=input action=drop connection-state=invalid comment="HQ INVESTMENT: drop invalid IPv6"
+}
+:if ([:len [/ipv6 firewall filter find where comment="HQ INVESTMENT: accept ICMPv6"]] = 0) do={
+    /ipv6 firewall filter add chain=input action=accept protocol=icmpv6 comment="HQ INVESTMENT: accept ICMPv6"
+}
+:if ([:len [/ipv6 firewall filter find where comment="HQ INVESTMENT: accept UDP traceroute"]] = 0) do={
+    /ipv6 firewall filter add chain=input action=accept protocol=udp dst-port=33434-33534 comment="HQ INVESTMENT: accept UDP traceroute"
+}
+:if ([:len [/ipv6 firewall filter find where comment="HQ INVESTMENT: accept DHCPv6-Client"]] = 0) do={
+    /ipv6 firewall filter add chain=input action=accept protocol=udp dst-port=546 src-address=fe80::/10 comment="HQ INVESTMENT: accept DHCPv6-Client prefix delegation"
+}
+:if ([:len [/ipv6 firewall filter find where comment="HQ INVESTMENT: accept IKE"]] = 0) do={
+    /ipv6 firewall filter add chain=input action=accept protocol=udp dst-port=500,4500 comment="HQ INVESTMENT: accept IKE"
+}
+:if ([:len [/ipv6 firewall filter find where comment="HQ INVESTMENT: accept ipsec AH"]] = 0) do={
+    /ipv6 firewall filter add chain=input action=accept protocol=ipsec-ah comment="HQ INVESTMENT: accept ipsec AH"
+}
+:if ([:len [/ipv6 firewall filter find where comment="HQ INVESTMENT: accept ipsec ESP"]] = 0) do={
+    /ipv6 firewall filter add chain=input action=accept protocol=ipsec-esp comment="HQ INVESTMENT: accept ipsec ESP"
+}
+:if ([:len [/ipv6 firewall filter find where comment="HQ INVESTMENT: accept ipsec policy input"]] = 0) do={
+    /ipv6 firewall filter add chain=input action=accept ipsec-policy=in,ipsec comment="HQ INVESTMENT: accept all that matches ipsec policy"
+}
+:if ([:len [/ipv6 firewall filter find where comment="HQ INVESTMENT: drop input !LAN"]] = 0) do={
+    /ipv6 firewall filter add chain=input action=drop in-interface-list=!LAN comment="HQ INVESTMENT: drop everything else not coming from LAN"
+}
+
+# IPv6 Forward chain rules (fasttrack, established, bad addresses, ICMPv6)
+:if ([:len [/ipv6 firewall filter find where comment="HQ INVESTMENT: fasttrack6"]] = 0) do={
+    /ipv6 firewall filter add chain=forward action=fasttrack-connection connection-state=established,related comment="HQ INVESTMENT: fasttrack6"
+}
+:if ([:len [/ipv6 firewall filter find where comment="HQ INVESTMENT: accept forward established"]] = 0) do={
+    /ipv6 firewall filter add chain=forward action=accept connection-state=established,related,untracked comment="HQ INVESTMENT: accept established,related,untracked"
+}
+:if ([:len [/ipv6 firewall filter find where comment="HQ INVESTMENT: drop forward invalid"]] = 0) do={
+    /ipv6 firewall filter add chain=forward action=drop connection-state=invalid comment="HQ INVESTMENT: drop invalid IPv6"
+}
+:if ([:len [/ipv6 firewall filter find where comment="HQ INVESTMENT: drop bad src ipv6"]] = 0) do={
+    /ipv6 firewall filter add chain=forward action=drop src-address-list=bad_ipv6 comment="HQ INVESTMENT: drop packets with bad src ipv6"
+}
+:if ([:len [/ipv6 firewall filter find where comment="HQ INVESTMENT: drop bad dst ipv6"]] = 0) do={
+    /ipv6 firewall filter add chain=forward action=drop dst-address-list=bad_ipv6 comment="HQ INVESTMENT: drop packets with bad dst ipv6"
+}
+:if ([:len [/ipv6 firewall filter find where comment="HQ INVESTMENT: drop ICMPv6 hop-limit=1"]] = 0) do={
+    /ipv6 firewall filter add chain=forward action=drop protocol=icmpv6 hop-limit=equal:1 comment="HQ INVESTMENT: rfc4890 drop hop-limit=1"
+}
+:if ([:len [/ipv6 firewall filter find where comment="HQ INVESTMENT: accept ICMPv6 forward"]] = 0) do={
+    /ipv6 firewall filter add chain=forward action=accept protocol=icmpv6 comment="HQ INVESTMENT: accept ICMPv6"
+}
+:if ([:len [/ipv6 firewall filter find where comment="HQ INVESTMENT: accept HIP"]] = 0) do={
+    /ipv6 firewall filter add chain=forward action=accept protocol=139 comment="HQ INVESTMENT: accept HIP"
+}
+:if ([:len [/ipv6 firewall filter find where comment="HQ INVESTMENT: accept IKE forward"]] = 0) do={
+    /ipv6 firewall filter add chain=forward action=accept protocol=udp dst-port=500,4500 comment="HQ INVESTMENT: accept IKE"
+}
+:if ([:len [/ipv6 firewall filter find where comment="HQ INVESTMENT: accept ipsec AH forward"]] = 0) do={
+    /ipv6 firewall filter add chain=forward action=accept protocol=ipsec-ah comment="HQ INVESTMENT: accept ipsec AH"
+}
+:if ([:len [/ipv6 firewall filter find where comment="HQ INVESTMENT: accept ipsec ESP forward"]] = 0) do={
+    /ipv6 firewall filter add chain=forward action=accept protocol=ipsec-esp comment="HQ INVESTMENT: accept ipsec ESP"
+}
+:if ([:len [/ipv6 firewall filter find where comment="HQ INVESTMENT: accept ipsec policy forward"]] = 0) do={
+    /ipv6 firewall filter add chain=forward action=accept ipsec-policy=in,ipsec comment="HQ INVESTMENT: accept all that matches ipsec policy"
+}
+:if ([:len [/ipv6 firewall filter find where comment="HQ INVESTMENT: drop forward !LAN"]] = 0) do={
+    /ipv6 firewall filter add chain=forward action=drop in-interface-list=!LAN comment="HQ INVESTMENT: drop everything else not coming from LAN"
+}
+
+/log info "IPv6 firewall rules configured"
 `;
 
         if (router.wgPrivateKey && router.wgPeerPublicKey && router.wgTunnelIp) {

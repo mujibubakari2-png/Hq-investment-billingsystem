@@ -16,14 +16,14 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import { routersApi, vpnApi } from '../api';
+import { routersApi } from '../api';
 import { getPublicApiBase } from '../utils/config';
 import { sanitizeMikroTikName } from '../utils/mikrotikUtils';
 import { buildRouterSetupWizardScript, validateRouterSetupWizardServiceInputs } from '../utils/routerSetupWizardScript';
 
 import {
     WIZARD_STEPS, NEXT_BUTTON_LABELS,
-    type EthernetInterface, type VpnSecret, type ServiceType, type VpnMode, type VerifyStatus,
+    type EthernetInterface, type ServiceType, type VpnMode, type VerifyStatus,
 } from '../components/wizard/WizardTypes';
 import { Step0Download, Step1Connection } from '../components/wizard/WizardSteps01';
 import { Step2Services, Step3Vpn }         from '../components/wizard/WizardSteps23';
@@ -81,16 +81,8 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
     const [radiusSecret, setRadiusSecret]   = useState('');
 
     // Step 3: VPN
-    const [vpnEnabled, setVpnEnabled]       = useState(true);
-    const [vpnMode, setVpnMode]             = useState<VpnMode>('hybrid');
-    const [vpnProtocol, setVpnProtocol]     = useState('L2TP');
-    const [vpnPoolStart, setVpnPoolStart]   = useState('10.0.0.2');
-    const [vpnPoolEnd, setVpnPoolEnd]       = useState('10.0.0.254');
-    const [vpnDns, setVpnDns]               = useState('8.8.8.8');
-    const [ipsecSecret, setIpsecSecret]     = useState(() => generateClientSecureSecret(24));
-    const [vpnSecrets, setVpnSecrets]       = useState<VpnSecret[]>([]);
-    const [showAddVpnSecret, setShowAddVpnSecret] = useState(false);
-    const [vpnForm, setVpnForm]             = useState<VpnSecret>({ username: '', password: '', protocol: 'L2TP', profile: 'default', localAddress: '', remoteAddress: '' });
+    const [vpnEnabled, setVpnEnabled] = useState(true);
+    const [vpnMode, setVpnMode]       = useState<VpnMode>('hybrid');
 
     // Step 4: interfaces
     const [interfaces, setInterfaces]           = useState<EthernetInterface[]>([]);
@@ -222,12 +214,6 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
         } catch { setServiceVerifyStatus('failed'); setVpnVerifyStatus('failed'); }
     };
 
-    const addVpnSecret = () => {
-        if (!vpnForm.username || !vpnForm.password) { alert('Username and Password are required.'); return; }
-        setVpnSecrets(prev => [...prev, { ...vpnForm, id: Date.now().toString() }]);
-        setVpnForm({ username: '', password: '', protocol: vpnProtocol, profile: 'default', localAddress: '', remoteAddress: '' });
-        setShowAddVpnSecret(false);
-    };
 
     const toggleInterface = (name: string) => setSelectedInterfaces(prev => prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name]);
 
@@ -263,14 +249,6 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
             alert('RADIUS shared secret haipo au si salama. Tafadhali subiri ipakiwe kiotomatiki au weka secret yako kwenye Hatua 2.');
             return '';
         }
-        if (vpnEnabled && (vpnProtocol === 'L2TP' || vpnMode === 'hybrid') && (!ipsecSecret || KNOWN_INSECURE_SECRETS.has(ipsecSecret))) {
-            alert('IPsec Pre-Shared Key haipo au si salama. Tafadhali weka key yenye nguvu kwenye Hatua 3.');
-            return '';
-        }
-        if (vpnSecrets.some(s => !s.password || s.password.length < 8)) {
-            alert('Baadhi ya VPN secrets zina password dhaifu (chini ya herufi 8). Rekebisha kwenye Hatua 3 kabla ya kuendelea.');
-            return '';
-        }
 
         return buildRouterSetupWizardScript({
             routerName,
@@ -280,17 +258,11 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
             serviceType,
             selectedInterfaces,
             vpnEnabled,
-            vpnProtocol,
-            vpnPoolStart,
-            vpnPoolEnd,
-            vpnSecrets: vpnSecrets.map((s) => ({
-                username: s.username,
-                password: s.password,
-                protocol: s.protocol,
-                profile: s.profile,
-                localAddress: s.localAddress,
-                remoteAddress: s.remoteAddress,
-            })),
+            vpnMode,
+            vpnProtocol: '',
+            vpnPoolStart: '',
+            vpnPoolEnd: '',
+            vpnSecrets: [],
             hotspotLocalAddress,
             hotspotPoolStart,
             hotspotPoolEnd,
@@ -299,13 +271,10 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
             pppoePoolEnd,
             radiusAddress,
             radiusSecret,
-            vpnMode,
-            vpnDns,
-            ipsecSecret,
             wgConfig,
             certName,
             vpnManagementSubnet,
-            dnsServers: (routerData && (routerData.dns as string)) || vpnDns || '8.8.8.8,8.8.4.4',
+            dnsServers: (routerData && (routerData.dns as string)) || '8.8.8.8,8.8.4.4',
         });
     };
 
@@ -329,12 +298,7 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
         if (currentStep < WIZARD_STEPS.length - 1) {
             setCurrentStep(currentStep + 1);
         } else {
-            if (vpnEnabled && vpnSecrets.length > 0 && routerId) {
-                vpnSecrets.forEach(s => {
-                    (vpnApi as any).create({ ...s, routerId, service: s.protocol.toLowerCase() }).catch(console.error);
-                });
-            }
-            if (onClose) onClose(); else navigate('/mikrotiks');
+        if (onClose) onClose(); else navigate('/mikrotiks');
         }
     };
     const handlePrev   = () => { if (currentStep > 0) setCurrentStep(currentStep - 1); };
@@ -346,10 +310,10 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
             case 0: return <Step0Download routerName={routerName} wgConfig={wgConfig} />;
             case 1: return <Step1Connection connectionStatus={connectionStatus} connectionError={connectionError} routerData={routerData} onRetry={checkConnection} onNext={handleNext} onBack={() => setCurrentStep(0)} />;
             case 2: return <Step2Services serviceType={serviceType} setServiceType={setServiceType} pppoeLocalAddress={pppoeLocalAddress} setPppoeLocalAddress={setPppoeLocalAddress} pppoePoolStart={pppoePoolStart} setPppoePoolStart={setPppoePoolStart} pppoePoolEnd={pppoePoolEnd} setPppoePoolEnd={setPppoePoolEnd} hotspotLocalAddress={hotspotLocalAddress} setHotspotLocalAddress={setHotspotLocalAddress} hotspotPoolStart={hotspotPoolStart} setHotspotPoolStart={setHotspotPoolStart} hotspotPoolEnd={hotspotPoolEnd} setHotspotPoolEnd={setHotspotPoolEnd} radiusAddress={radiusAddress} setRadiusAddress={setRadiusAddress} radiusSecret={radiusSecret} setRadiusSecret={setRadiusSecret} />;
-            case 3: return <Step3Vpn vpnEnabled={vpnEnabled} setVpnEnabled={setVpnEnabled} vpnMode={vpnMode} setVpnMode={setVpnMode} vpnProtocol={vpnProtocol} setVpnProtocol={setVpnProtocol} vpnPoolStart={vpnPoolStart} setVpnPoolStart={setVpnPoolStart} vpnPoolEnd={vpnPoolEnd} setVpnPoolEnd={setVpnPoolEnd} vpnDns={vpnDns} setVpnDns={setVpnDns} ipsecSecret={ipsecSecret} setIpsecSecret={setIpsecSecret} vpnSecrets={vpnSecrets} showAddVpnSecret={showAddVpnSecret} setShowAddVpnSecret={setShowAddVpnSecret} vpnForm={vpnForm} setVpnForm={setVpnForm} onAddSecret={addVpnSecret} onRemoveSecret={i => setVpnSecrets(prev => prev.filter((_, idx) => idx !== i))} />;
+            case 3: return <Step3Vpn vpnEnabled={vpnEnabled} setVpnEnabled={setVpnEnabled} vpnMode={vpnMode} setVpnMode={setVpnMode} />;
             case 4: return <Step4Interfaces routerName={routerName} interfaces={interfaces} loadingInterfaces={loadingInterfaces} selectedInterfaces={selectedInterfaces} onToggleInterface={toggleInterface} onRefresh={fetchInterfaces} />;
-            case 5: return <Step5Generate routerName={routerName} serviceType={serviceType} selectedInterfaces={selectedInterfaces} vpnEnabled={vpnEnabled} vpnProtocol={vpnProtocol} vpnPoolStart={vpnPoolStart} vpnPoolEnd={vpnPoolEnd} vpnSecrets={vpnSecrets} hotspotLocalAddress={hotspotLocalAddress} pppoeLocalAddress={pppoeLocalAddress} configGenerated={configGenerated} showPreview={showPreview} setShowPreview={setShowPreview} getGeneratedScript={getGeneratedScript} onDownload={handleDownloadConfig} />;
-            case 6: return <Step6Verify routerName={routerName} serviceType={serviceType} vpnEnabled={vpnEnabled} vpnMode={vpnMode} vpnSecrets={vpnSecrets} serviceVerifyStatus={serviceVerifyStatus} vpnVerifyStatus={vpnVerifyStatus} onGoBack={() => setCurrentStep(0)} onFinish={handleFinish} />;
+            case 5: return <Step5Generate routerName={routerName} serviceType={serviceType} selectedInterfaces={selectedInterfaces} vpnEnabled={vpnEnabled} hotspotLocalAddress={hotspotLocalAddress} pppoeLocalAddress={pppoeLocalAddress} configGenerated={configGenerated} showPreview={showPreview} setShowPreview={setShowPreview} getGeneratedScript={getGeneratedScript} onDownload={handleDownloadConfig} />;
+            case 6: return <Step6Verify routerName={routerName} serviceType={serviceType} vpnEnabled={vpnEnabled} vpnMode={vpnMode} serviceVerifyStatus={serviceVerifyStatus} vpnVerifyStatus={vpnVerifyStatus} onGoBack={() => setCurrentStep(0)} onFinish={handleFinish} />;
             default: return null;
         }
     };

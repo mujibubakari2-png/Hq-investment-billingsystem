@@ -29,9 +29,9 @@ describe('generateMikrotikScript', () => {
         // Without /24, return traffic exits via the WAN gateway and the server cannot reach the router.
         expect(script).toContain('/ip address add address=10.0.0.200/24 interface="wg-hq"');
         expect(script).toContain('allowed-address=10.0.0.0/24');
-        expect(script).toContain('/interface wireless security-profiles add name="hq-wifi-sec"');
+        expect(script).toContain('/interface wireless security-profiles add name="hq-wlan-router-1"');
         expect(script).toContain('authentication-types=wpa2-psk');
-        expect(script).toContain('wpa2-pre-shared-key=');
+        expect(script).toContain('wpa2-pre-shared-key="HQ-router-1-router-1"');
         expect(script).toContain('/ip hotspot walled-garden ip add dst-address="192.168.88.1" action=accept comment="Hotspot Gateway"');
     });
 });

@@ -111,10 +111,6 @@ interface Step5Props {
     serviceType: ServiceType;
     selectedInterfaces: string[];
     vpnEnabled: boolean;
-    vpnProtocol: string;
-    vpnPoolStart: string;
-    vpnPoolEnd: string;
-    vpnSecrets: { username: string }[];
     hotspotLocalAddress: string;
     pppoeLocalAddress: string;
     configGenerated: boolean;
@@ -151,20 +147,6 @@ export function Step5Generate(p: Step5Props) {
                             <div style={{ fontWeight: 500 }}>{p.selectedInterfaces.length > 0 ? p.selectedInterfaces.join(', ') : 'None selected'}</div>
                         </div>
                     </div>
-                    {p.vpnEnabled && (
-                        <div className="grid-2 gap-16" style={{ marginBottom: 12, paddingTop: 12, borderTop: '1px solid var(--border-light)' }}>
-                            <div>
-                                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
-                                    <VpnKeyIcon style={{ fontSize: 14 }} /> VPN Server:
-                                </div>
-                                <div style={{ fontWeight: 500 }}>{p.vpnProtocol} — {p.vpnSecrets.length} secret(s)</div>
-                            </div>
-                            <div>
-                                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: 4 }}>VPN IP Pool:</div>
-                                <div style={{ fontWeight: 500, fontFamily: 'monospace', fontSize: '0.85rem' }}>{p.vpnPoolStart} – {p.vpnPoolEnd}</div>
-                            </div>
-                        </div>
-                    )}
                     <div>
                         <div style={{ fontSize: '0.75rem', fontWeight: 600, marginBottom: 4 }}>Bridge Configuration:</div>
                         <div style={{ fontSize: '0.82rem', color: '#0d9488' }}>
@@ -242,7 +224,6 @@ interface Step6Props {
     serviceType: ServiceType;
     vpnEnabled: boolean;
     vpnMode: VpnMode;
-    vpnSecrets: { username: string }[];
     serviceVerifyStatus: VerifyStatus;
     vpnVerifyStatus: VerifyStatus;
     onGoBack: () => void;
@@ -253,14 +234,16 @@ export function Step6Verify(p: Step6Props) {
     const svcIcon = p.serviceType === 'hotspot'
         ? <WifiIcon style={{ fontSize: 16 }} />
         : p.serviceType === 'both'
-        ? <DeviceHubIcon style={{ fontSize: 16 }} />
-        : <DnsIcon style={{ fontSize: 16 }} />;
+            ? <DeviceHubIcon style={{ fontSize: 16 }} />
+            : <DnsIcon style={{ fontSize: 16 }} />;
 
     const svcLabel = p.serviceType === 'pppoe' ? 'PPPoE Server Status'
         : p.serviceType === 'hotspot' ? 'Hotspot Server Status'
-        : 'PPPoE & Hotspot Status';
+            : 'PPPoE & Hotspot Status';
 
-    const overallOk = p.serviceVerifyStatus === 'success' && (!p.vpnEnabled || p.vpnVerifyStatus === 'success');
+    const overallChecking = p.serviceVerifyStatus === 'checking' || (p.vpnEnabled && p.vpnVerifyStatus === 'checking');
+    const overallFailed = p.serviceVerifyStatus === 'failed' || (p.vpnEnabled && p.vpnVerifyStatus === 'failed');
+    const overallSuccess = p.serviceVerifyStatus === 'success' && (!p.vpnEnabled || p.vpnVerifyStatus === 'success');
 
     return (
         <div style={{ textAlign: 'center', padding: '30px 0' }}>
@@ -277,15 +260,15 @@ export function Step6Verify(p: Step6Props) {
                     <div style={{ padding: 20, textAlign: 'center' }}>
                         {p.serviceVerifyStatus === 'checking' ? (
                             <><RefreshIcon className="spin" style={{ fontSize: 40, color: 'var(--primary)', marginBottom: 8 }} />
-                            <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Checking {p.serviceType === 'both' ? 'PPPoE & Hotspot' : p.serviceType} service...</div></>
+                                <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Checking {p.serviceType === 'both' ? 'PPPoE & Hotspot' : p.serviceType} service...</div></>
                         ) : p.serviceVerifyStatus === 'failed' ? (
                             <><CancelIcon style={{ fontSize: 40, color: '#dc2626', marginBottom: 8 }} />
-                            <div style={{ color: '#dc2626', fontWeight: 600, marginBottom: 4 }}>Configuration Failed</div>
-                            <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Services not found on router</div></>
+                                <div style={{ color: '#dc2626', fontWeight: 600, marginBottom: 4 }}>Configuration Failed</div>
+                                <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Services not found on router</div></>
                         ) : (
                             <><CheckCircleIcon style={{ fontSize: 40, color: '#16a34a', marginBottom: 8 }} />
-                            <div style={{ color: '#16a34a', fontWeight: 600, marginBottom: 4 }}>Configuration Successful</div>
-                            <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Services are running</div></>
+                                <div style={{ color: '#16a34a', fontWeight: 600, marginBottom: 4 }}>Configuration Successful</div>
+                                <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Services are running</div></>
                         )}
                     </div>
                 </div>
@@ -299,15 +282,15 @@ export function Step6Verify(p: Step6Props) {
                         <div style={{ padding: 20, textAlign: 'center' }}>
                             {p.vpnVerifyStatus === 'checking' ? (
                                 <><RefreshIcon className="spin" style={{ fontSize: 40, color: '#7c3aed', marginBottom: 8 }} />
-                                <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Checking VPN ({p.vpnMode}) status...</div></>
+                                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Checking VPN ({p.vpnMode}) status...</div></>
                             ) : p.vpnVerifyStatus === 'failed' ? (
                                 <><CancelIcon style={{ fontSize: 40, color: '#d97706', marginBottom: 8 }} />
-                                <div style={{ color: '#d97706', fontWeight: 600, marginBottom: 4 }}>Pending Setup</div>
-                                <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{p.vpnMode === 'wireguard' ? 'WireGuard' : p.vpnMode === 'openvpn' ? 'OpenVPN' : 'Hybrid VPN'} server not yet active</div></>
+                                    <div style={{ color: '#d97706', fontWeight: 600, marginBottom: 4 }}>Pending Setup</div>
+                                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{p.vpnMode === 'wireguard' ? 'WireGuard' : p.vpnMode === 'openvpn' ? 'OpenVPN' : 'Hybrid VPN'} server not yet active</div></>
                             ) : (
                                 <><CheckCircleIcon style={{ fontSize: 40, color: '#16a34a', marginBottom: 8 }} />
-                                <div style={{ color: '#16a34a', fontWeight: 600, marginBottom: 4 }}>VPN Active</div>
-                                <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{p.vpnMode === 'wireguard' ? 'WireGuard' : p.vpnMode === 'openvpn' ? 'OpenVPN' : 'Hybrid'} with {p.vpnSecrets.length} secret(s)</div></>
+                                    <div style={{ color: '#16a34a', fontWeight: 600, marginBottom: 4 }}>VPN Active</div>
+                                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{p.vpnMode === 'wireguard' ? 'WireGuard' : p.vpnMode === 'openvpn' ? 'OpenVPN' : 'Hybrid'} tunnel is active</div></>
                             )}
                         </div>
                     </div>
@@ -316,29 +299,50 @@ export function Step6Verify(p: Step6Props) {
 
             {/* Overall result */}
             <div style={{ maxWidth: 600, margin: '0 auto', padding: 30, border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)', background: 'var(--bg-surface)' }}>
-                {!overallOk ? (
+                {overallChecking ? (
                     <>
-                        <CancelIcon style={{ fontSize: 48, color: 'var(--primary)', marginBottom: 12 }} />
-                        <h3 style={{ color: 'var(--primary)', marginBottom: 16 }}>Configuration Failed</h3>
+                        <RefreshIcon className="spin" style={{ fontSize: 48, color: 'var(--primary)', marginBottom: 12 }} />
+                        <h3 style={{ color: 'var(--primary)', marginBottom: 16 }}>Verifying Configuration</h3>
+                        <p style={{ color: '#374151', fontSize: '0.9rem', margin: '8px 0 20px' }}>
+                            Please wait while we verify the router configuration...
+                        </p>
+                    </>
+                ) : overallFailed ? (
+                    <>
+                        <CancelIcon style={{ fontSize: 48, color: '#dc2626', marginBottom: 12 }} />
+                        <h3 style={{ color: '#dc2626', marginBottom: 16 }}>Configuration Failed</h3>
                         <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 'var(--radius-sm)', padding: '12px 16px', fontSize: '0.85rem', color: '#b91c1c', marginBottom: 20 }}>
-                            All service configurations failed. Please check your RSC file import and try again.
+                            {p.serviceVerifyStatus === 'failed' ? (
+                                p.serviceType === 'hotspot' ? 'Hotspot configuration failed. Please check your RSC file import and try again.'
+                                : p.serviceType === 'pppoe' ? 'PPPoE configuration failed. Please check your RSC file import and try again.'
+                                : 'Both Hotspot and PPPoE configurations failed. Please check your RSC file import and try again.'
+                            ) : p.vpnEnabled && p.vpnVerifyStatus === 'failed' ? (
+                                'VPN configuration failed. Please check your setup and try again.'
+                            ) : (
+                                'Configuration failed. Please check your setup and try again.'
+                            )}
                         </div>
                         <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
                             <button className="btn btn-secondary" onClick={p.onGoBack}><ArrowBackIcon fontSize="small" /> Go Back and Try Again</button>
                             <button className="btn btn-secondary" onClick={p.onFinish}><ListIcon fontSize="small" /> Back to Router List</button>
                         </div>
                     </>
-                ) : (
+                ) : overallSuccess ? (
                     <>
                         <CheckCircleIcon style={{ fontSize: 48, color: '#16a34a', marginBottom: 12 }} />
                         <h3 style={{ color: '#16a34a' }}>All Systems Go!</h3>
                         <p style={{ color: '#374151', fontSize: '0.9rem', margin: '8px 0 20px' }}>
                             Router <strong>{p.routerName}</strong> is fully configured and connected.
-                            {p.vpnEnabled && ` VPN server (${p.vpnMode}) is active with ${p.vpnSecrets.length} user(s).`}
+                            {p.vpnEnabled && ` VPN tunnel (${p.vpnMode}) is active.`}
                         </p>
                         <button className="btn" style={{ background: '#16a34a', color: '#fff', fontWeight: 600, padding: '10px 24px' }} onClick={p.onFinish}>
                             Go to Routers Dashboard
                         </button>
+                    </>
+                ) : (
+                    <>
+                        <RefreshIcon className="spin" style={{ fontSize: 48, color: 'var(--primary)', marginBottom: 12 }} />
+                        <h3 style={{ color: 'var(--primary)', marginBottom: 16 }}>Checking Status...</h3>
                     </>
                 )}
             </div>
