@@ -4,7 +4,7 @@ import { errorResponse } from "@/lib/auth";
 import { requirePermission } from "@/lib/rbac";
 import { canAccessTenant } from "@/lib/tenant";
 import { decryptRouterFields, encrypt } from "@/lib/encryption";
-import { generateRouterAdminPassword, generateRadiusSecret } from "@/lib/routerProvisioning";
+import { deriveLanNetworkCidr, generateRouterAdminPassword, generateRadiusSecret } from "@/lib/routerProvisioning";
 
 // Simple sanitizer for wireless passphrases embedded into RouterOS scripts.
 function sanitizePassphrase(p: unknown): string {
@@ -91,6 +91,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         const hotspotPoolName = `hs-pool-${cleanName.toLowerCase()}`;
         const pppoePoolName = `pppoe-pool-${cleanName.toLowerCase()}`;
         const lanBridgeName = 'bridge-lan';
+        const dhcpNetworkCidr = deriveLanNetworkCidr(router.lanIp) || `${router.lanGateway || '192.168.88.1'}/24`;
 
         // Resolve VPN Subnet and VPN IP based on actual WireGuard Tunnel IP to prevent multi-tenant conflicts
         const subnetPrefix = router.wgTunnelIp ? router.wgTunnelIp.split('.').slice(0, 3).join('.') : "10.200.0";
@@ -223,9 +224,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 # 6a. DHCP Server (REQUIRED: without this, hotspot clients never receive an IP
 # address from the router and can never reach the captive-portal login page.)
 :if ([:len [/ip dhcp-server network find where address="${router.lanIp}"]] = 0) do={
-    /ip dhcp-server network add address="${router.lanIp}" gateway="${router.lanGateway}" dns-server=${router.dns} comment="HQ INVESTMENT Hotspot Network"
+    /ip dhcp-server network add address="${dhcpNetworkCidr}" gateway="${router.lanGateway}" dns-server=${router.dns} comment="HQ INVESTMENT Hotspot Network"
 } else={
-    /ip dhcp-server network set [find where address="${router.lanIp}"] gateway="${router.lanGateway}" dns-server=${router.dns}
+    /ip dhcp-server network set [find where address="${dhcpNetworkCidr}"] gateway="${router.lanGateway}" dns-server=${router.dns}
 }
 :if ([:len [/ip dhcp-server find name="dhcp-${cleanName.toLowerCase()}"]] = 0) do={
     /ip dhcp-server add name="dhcp-${cleanName.toLowerCase()}" interface=$lanBridge address-pool="${hotspotPoolName}" lease-time=1h disabled=no

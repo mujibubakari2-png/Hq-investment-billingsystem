@@ -3,6 +3,7 @@ import {
     preflightCheckRouters,
     lintGeneratedScript,
     deriveVpnManagementSubnet,
+    deriveLanNetworkCidr,
     generateSecureSecret,
     generateRouterAdminPassword,
     generateRadiusSecret,
@@ -159,6 +160,17 @@ describe('preflightCheckRouters', () => {
             expect.objectContaining({ routerId: 'r2', routerName: 'Broken Router', ready: false }),
         ]);
         expect(result[1].errors.some((e) => e.field === 'password')).toBe(true);
+    });
+});
+
+describe('deriveLanNetworkCidr', () => {
+    it('derives the DHCP network CIDR from a LAN IP with a prefix', () => {
+        expect(deriveLanNetworkCidr('192.168.88.1/24')).toBe('192.168.88.0/24');
+        expect(deriveLanNetworkCidr('10.10.0.1/24')).toBe('10.10.0.0/24');
+    });
+
+    it('defaults to a /24 network when the LAN IP has no prefix', () => {
+        expect(deriveLanNetworkCidr('192.168.88.1')).toBe('192.168.88.0/24');
     });
 });
 

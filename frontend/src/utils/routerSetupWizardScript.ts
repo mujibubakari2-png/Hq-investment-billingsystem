@@ -224,7 +224,8 @@ export function buildRouterSetupWizardScript(params: RouterSetupWizardScriptPara
           `:if ([:len [/ip address find where interface=$targetBridge]] = 0) do={ /ip address add address=${hotspotCidr} interface=$targetBridge }`,
           `:if ([:len [/ip hotspot find where name="hq-hotspot-${safeRouterName}"]] = 0) do={ /ip hotspot add name="hq-hotspot-${safeRouterName}" interface=$targetBridge address-pool="${hsPoolName}" profile="${hotspotProfile}" disabled=no } else={ /ip hotspot set [find name="hq-hotspot-${safeRouterName}"] interface=$targetBridge address-pool="${hsPoolName}" profile="${hotspotProfile}" disabled=no }`,
           `/ip hotspot profile set [/ip hotspot profile find where name="${hotspotProfile}"] hotspot-address=${params.hotspotLocalAddress} html-directory=hotspot ssl-certificate=auto use-radius=yes`,
-          `:if ([:len [/ip dhcp-server network find where address="${hotspotNetwork}"]] = 0) do={ /ip dhcp-server network add address=${hotspotNetwork} gateway=${params.hotspotLocalAddress} dns-server=${dnsServers} }`,
+          `:if ([:len [/ip dhcp-server network find where address="${hotspotNetwork}"]] = 0) do={ /ip dhcp-server network add address=${hotspotNetwork} gateway=${params.hotspotLocalAddress} dns-server=${dnsServers} } else={ /ip dhcp-server network set [find where address="${hotspotNetwork}"] gateway=${params.hotspotLocalAddress} dns-server=${dnsServers} }`,
+          `:if ([:len [/ip dhcp-server find where name="dhcp-${safeRouterName}"]] = 0) do={ /ip dhcp-server add name="dhcp-${safeRouterName}" interface=$targetBridge address-pool="${hsPoolName}" lease-time=1h disabled=no } else={ /ip dhcp-server set [find where name="dhcp-${safeRouterName}"] interface=$targetBridge address-pool="${hsPoolName}" lease-time=1h disabled=no }`,
         ]
       : []),
     '',

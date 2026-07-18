@@ -201,6 +201,15 @@ export function preflightCheckRouters(routers: RouterForScriptGeneration[]) {
  * (e.g. "10.200.0.5" -> "10.200.0.0/24"). Used to scope Winbox/Web/API
  * firewall rules to VPN-only access instead of the whole WAN.
  */
+export function deriveLanNetworkCidr(lanIp: string | null | undefined): string | null {
+    if (!lanIp) return null;
+    const [address] = lanIp.split('/');
+    const parts = address.split('.');
+    if (parts.length !== 4 || parts.some((p) => Number.isNaN(Number(p)))) return null;
+    const [a, b, c] = parts;
+    return `${a}.${b}.${c}.0/24`;
+}
+
 export function deriveVpnManagementSubnet(wgTunnelIp: string | null | undefined): string | null {
     if (!wgTunnelIp) return null;
     const parts = wgTunnelIp.split(".");

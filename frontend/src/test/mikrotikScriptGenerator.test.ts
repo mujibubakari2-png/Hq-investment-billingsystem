@@ -33,5 +33,6 @@ describe('generateMikrotikScript', () => {
         expect(script).toContain('authentication-types=wpa2-psk');
         expect(script).toContain('wpa2-pre-shared-key="HQ-router-1-router-1"');
         expect(script).toContain('/ip hotspot walled-garden ip add dst-address="192.168.88.1" action=accept comment="Hotspot Gateway"');
+        expect(script).toContain('/ip dhcp-server network add address=192.168.88.0/24 gateway=192.168.88.1 dns-server=8.8.8.8');
     });
 });

@@ -59,6 +59,8 @@ describe('buildRouterSetupWizardScript', () => {
         expect(script).not.toContain('# ===== PPPoE Server =====');
         expect(script).toContain('/ip service set www-ssl disabled=no certificate=auto');
         expect(script).toContain('ssl-certificate=auto');
+        expect(script).toContain('/ip dhcp-server add name="dhcp-router-1"');
+        expect(script).toContain('/ip dhcp-server network add address=192.168.88.0/24');
     });
 
     it('generates both-services config with PPPoE and hotspot sections', () => {

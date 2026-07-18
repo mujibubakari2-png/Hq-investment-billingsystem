@@ -27,6 +27,15 @@ export interface MikrotikScriptParams {
 
 import { sanitizeMikroTikName, sanitizePassphrase } from './mikrotikUtils';
 
+function deriveLanNetworkCidr(lanIp?: string): string | null {
+    if (!lanIp) return null;
+    const [address] = lanIp.split('/');
+    const parts = address.split('.');
+    if (parts.length !== 4 || parts.some((part) => Number.isNaN(Number(part)))) return null;
+    const [a, b, c] = parts;
+    return `${a}.${b}.${c}.0/24`;
+}
+
 export function generateMikrotikScript(params: MikrotikScriptParams): string {
     const {
         routerName, routerUsername, routerPassword, routerId, apiHost, publicApiBase,
@@ -52,8 +61,7 @@ export function generateMikrotikScript(params: MikrotikScriptParams): string {
     // LAN variables
     const cleanLanIp = lanIp.includes('/') ? lanIp.split('/')[0] : lanIp;
     const lanCidr = lanIp.includes('/') ? lanIp : `${cleanLanIp}/24`;
-    const parts = cleanLanIp.split('.');
-    const lanNetwork = parts.length === 4 ? `${parts[0]}.${parts[1]}.${parts[2]}.0/24` : '';
+    const lanNetwork = deriveLanNetworkCidr(lanIp) || (cleanLanIp.split('.').length === 4 ? `${cleanLanIp.split('.').slice(0, 3).join('.')}.0/24` : '');
 
     const dnsServers = dns;
     const radSecret = radiusSecret || '';
