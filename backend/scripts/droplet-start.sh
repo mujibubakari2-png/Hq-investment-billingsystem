@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ─────────────────────────────────────────────────────────────────────────────
-# HQInvestment ISP Billing — DigitalOcean Droplet Start Script
+# HQ INVESTMENT ISP Billing — DigitalOcean Droplet Start Script
 # Primary start script for Droplet deployments
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -138,7 +138,7 @@ fi
 
 # ── 6. Start the Next.js production server ───────────────────────────────────
 echo ""
-echo "🚀 Starting HQInvestment ISP Backend on port ${PORT:-3000}..."
+echo "🚀 Starting HQ INVESTMENT ISP Backend on port ${PORT:-3000}..."
 echo "   NODE_ENV: ${NODE_ENV:-production}"
 echo "   HOST:     0.0.0.0"
 echo "   PORT:     ${PORT:-3000}"

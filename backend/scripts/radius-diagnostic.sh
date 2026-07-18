@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ─────────────────────────────────────────────────────────────────────────────
-# HQInvestment ISP — Professional RADIUS Diagnostic Tool
+# HQ INVESTMENT ISP — Professional RADIUS Diagnostic Tool
 # This script performs deep inspection of the RADIUS & VPN stack to identify
 # why MikroTik routers are not getting responses from the server.
 # ─────────────────────────────────────────────────────────────────────────────
@@ -15,7 +15,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 echo -e "${BLUE}================================================================${NC}"
-echo -e "${BLUE}       HQInvestment RADIUS & VPN Diagnostic Tool               ${NC}"
+echo -e "${BLUE}       HQ INVESTMENT RADIUS & VPN Diagnostic Tool               ${NC}"
 echo -e "${BLUE}================================================================${NC}"
 echo ""
 
@@ -104,13 +104,13 @@ fi
 echo ""
 echo -e "${YELLOW}[6/7] Verifying RADIUS Client Configuration...${NC}"
 if [ -f /etc/freeradius/3.0/clients.conf ]; then
-    if grep -q "HQInvestment" /etc/freeradius/3.0/clients.conf; then
-        echo -e "${GREEN}✅ clients.conf contains HQInvestment managed clients${NC}"
+    if grep -q "HQ INVESTMENT" /etc/freeradius/3.0/clients.conf; then
+        echo -e "${GREEN}✅ clients.conf contains HQ INVESTMENT managed clients${NC}"
         # Check subnet
         SUBNET=$(grep -A 5 "client wireguard_subnet" /etc/freeradius/3.0/clients.conf | grep "ipaddr" | awk '{print $3}')
         echo "   Configured Subnet: $SUBNET"
     else
-        echo -e "${RED}❌ clients.conf is missing HQInvestment configuration!${NC}"
+        echo -e "${RED}❌ clients.conf is missing HQ INVESTMENT configuration!${NC}"
         echo "   Please run: sudo bash backend/scripts/setup-freeradius.sh"
     fi
 else

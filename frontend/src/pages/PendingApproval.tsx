@@ -20,7 +20,7 @@ export default function PendingApproval() {
                 <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>You're Almost In!</h1>
                 
                 <div style={{ color: 'var(--text-secondary)', marginBottom: '2rem', fontSize: '0.95rem', lineHeight: '1.5' }}>
-                    <p style={{ marginBottom: '1rem' }}>Thanks for registering with HQInvestment Billing!</p>
+                    <p style={{ marginBottom: '1rem' }}>Thanks for registering with HQ INVESTMENT Billing!</p>
                     <p>Your account is currently being reviewed by our team. This usually takes less than 24 hours. Once approved, your <strong>10-day free trial</strong> will activate automatically and you'll receive a confirmation by email and SMS.</p>
                 </div>
 
@@ -30,7 +30,7 @@ export default function PendingApproval() {
             </div>
             
             <div style={{ marginTop: 'auto', marginBottom: '1rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                &copy; {new Date().getFullYear()} HQInvestment Billing
+                &copy; {new Date().getFullYear()} HQ INVESTMENT Billing
             </div>
         </div>
     );

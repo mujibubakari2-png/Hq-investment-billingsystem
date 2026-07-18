@@ -202,7 +202,7 @@ export default function ForgotPassword() {
                                     </button>
 
                                     <div style={{ textAlign: 'center', fontSize: '0.95rem', color: '#64748b' }}>
-                                        New to HQInvestment? <span onClick={() => navigate('/register')} style={{ color: '#ffbd00', fontWeight: 600, cursor: 'pointer' }}>Sign up free</span>
+                                        New to HQ INVESTMENT? <span onClick={() => navigate('/register')} style={{ color: '#ffbd00', fontWeight: 600, cursor: 'pointer' }}>Sign up free</span>
                                     </div>
                                 </form>
                             )}

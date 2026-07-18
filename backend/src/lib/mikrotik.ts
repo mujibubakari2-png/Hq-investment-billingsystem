@@ -999,7 +999,7 @@ export class MikroTikService {
                     iface = "wg-hq";
                     await this.apiRequest("/interface/wireguard", "PUT", {
                         name: iface,
-                        comment: "Auto-created by HQInvestment",
+                        comment: "Auto-created by HQ INVESTMENT",
                         "listen-port": "51820"
                     });
                 }

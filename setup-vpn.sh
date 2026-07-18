@@ -1,12 +1,12 @@
 #!/bin/bash
 # ═══════════════════════════════════════════════════════════════
-# WireGuard VPN Setup Script for HQInvestment Billing System
+# WireGuard VPN Setup Script for HQ INVESTMENT Billing System
 # Run this once on your droplet/VPS to initialize the VPN server
 # ═══════════════════════════════════════════════════════════════
 
 set -e  # Exit immediately on error
 
-echo "🚀 Starting HQInvestment VPN Setup..."
+echo "🚀 Starting HQ INVESTMENT VPN Setup..."
 
 # 1. Install WireGuard
 sudo apt update

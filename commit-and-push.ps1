@@ -1,5 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# HQInvestment ISP — Commit & Push Script (PowerShell)
+# HQ INVESTMENT ISP — Commit & Push Script (PowerShell)
 # Run this from the project root:  .\commit-and-push.ps1
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -7,7 +7,7 @@ Set-Location $PSScriptRoot
 
 Write-Host ""
 Write-Host "==================================================" -ForegroundColor Cyan
-Write-Host "  HQInvestment ISP — Git Commit & Push" -ForegroundColor Cyan
+Write-Host "  HQ INVESTMENT ISP — Git Commit & Push" -ForegroundColor Cyan
 Write-Host "==================================================" -ForegroundColor Cyan
 Write-Host ""
 

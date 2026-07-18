@@ -164,7 +164,7 @@ set [find default=yes] html-directory=hotspot login-by=http-chap,cookie,mac-cook
 add name=hq_hotspot html-directory=hotspot login-by=http-chap,cookie,mac-cookie use-radius=yes dns-name=${dnsName}
 
 /radius
-            add address=${domain} ${routerSecret ? `secret="${routerSecret}"` : "# secret redacted: contact Super Admin to obtain shared secret"} service=hotspot,ppp authentication-port=1812 accounting-port=1813 timeout=3s comment="HQInvestment RADIUS"
+            add address=${domain} ${routerSecret ? `secret="${routerSecret}"` : "# secret redacted: contact Super Admin to obtain shared secret"} service=hotspot,ppp authentication-port=1812 accounting-port=1813 timeout=3s comment="HQ INVESTMENT RADIUS"
 
 /ip hotspot walled-garden
 add dst-host=${domain} action=allow

@@ -391,13 +391,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 // ──────────────────────────────────────────────────────────
                 // STEP 0: CLEANUP OLD HQINVESTMENT RULES & CONFIGS (NO DUPLICATES!)
                 // ──────────────────────────────────────────────────────────
-                logger.info("[PUSH-CONFIG] Cleaning up old HQInvestment configs...");
+                logger.info("[PUSH-CONFIG] Cleaning up old HQ INVESTMENT configs...");
 
                 try {
                     const oldFilterRules = await service.apiRequestPublic("/ip/firewall/filter");
                     if (Array.isArray(oldFilterRules)) {
                         for (const rule of oldFilterRules) {
-                            if (rule.comment?.includes("HQInvestment")) {
+                            if (rule.comment?.includes("HQ INVESTMENT")) {
                                 try {
                                     await service.apiRequestPublic(`/ip/firewall/filter/${rule[".id"]}`, "DELETE");
                                 } catch { }
@@ -410,7 +410,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                     const oldNatRules = await service.apiRequestPublic("/ip/firewall/nat");
                     if (Array.isArray(oldNatRules)) {
                         for (const rule of oldNatRules) {
-                            if (rule.comment?.includes("HQInvestment")) {
+                            if (rule.comment?.includes("HQ INVESTMENT")) {
                                 try {
                                     await service.apiRequestPublic(`/ip/firewall/nat/${rule[".id"]}`, "DELETE");
                                 } catch { }
@@ -423,7 +423,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                     const oldRoutes = await service.apiRequestPublic("/ip/route");
                     if (Array.isArray(oldRoutes)) {
                         for (const route of oldRoutes) {
-                            if (route.comment?.includes("HQInvestment")) {
+                            if (route.comment?.includes("HQ INVESTMENT")) {
                                 try {
                                     await service.apiRequestPublic(`/ip/route/${route[".id"]}`, "DELETE");
                                 } catch { }
@@ -436,7 +436,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                     const oldAddresses = await service.apiRequestPublic("/ip/address");
                     if (Array.isArray(oldAddresses)) {
                         for (const addr of oldAddresses) {
-                            if (addr.comment?.includes("HQInvestment")) {
+                            if (addr.comment?.includes("HQ INVESTMENT")) {
                                 try {
                                     await service.apiRequestPublic(`/ip/address/${addr[".id"]}`, "DELETE");
                                 } catch { }
@@ -544,7 +544,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                             // Disable STP (Spanning Tree) to prevent 30-second port-up delays
                             // that break hotspot login for newly connected clients
                             "protocol-mode": "none",
-                            comment: "HQInvestment LAN Bridge - Hotspot & PPPoE"
+                            comment: "HQ INVESTMENT LAN Bridge - Hotspot & PPPoE"
                         });
                     } catch (e: any) { if (!e.message?.includes("already")) logger.warn("Bridge note:", { error: e.message instanceof Error ? e.message.message : String(e.message) }); }
                 } else {
@@ -587,7 +587,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                     await service.apiRequestPublic("/ip/dns/static", "PUT", {
                         name: `${safeRouterNameLower}.hotspot`,
                         address: lanGateway,
-                        comment: "HQInvestment Hotspot DNS"
+                        comment: "HQ INVESTMENT Hotspot DNS"
                     });
                 } catch (e: any) { if (!e.message?.includes("already")) logger.warn("Static DNS note:", { error: e.message instanceof Error ? e.message.message : String(e.message) }); }
 
@@ -639,7 +639,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                     await service.apiRequestPublic("/ip/address", "PUT", {
                         address: lanCidr,
                         interface: lanBridgeName,
-                        comment: "HQInvestment Hotspot LAN"
+                        comment: "HQ INVESTMENT Hotspot LAN"
                     });
                 } catch (e: any) { if (!e.message?.includes("already")) logger.warn("HS IP note:", { error: e.message instanceof Error ? e.message.message : String(e.message) }); }
 
@@ -722,7 +722,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                         "listen-port": String(listenPort),
                         "private-key": router.wgPrivateKey,
                         disabled: "no",
-                        comment: "HQInvestment VPN Interface"
+                        comment: "HQ INVESTMENT VPN Interface"
                     });
                     trackStep('WireGuard: create wg-hq interface on router', true);
                 } catch (e: any) {
@@ -766,7 +766,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                     await service.apiRequestPublic("/ip/address", "PUT", {
                         address: `${tunnelIp}/24`,
                         interface: "wg-hq",
-                        comment: "HQInvestment VPN Address"
+                        comment: "HQ INVESTMENT VPN Address"
                     });
                 } catch (e: any) { if (!e.message?.includes("already")) logger.warn("WG IP note:", { error: e.message instanceof Error ? e.message.message : String(e.message) }); }
 
@@ -774,7 +774,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                     const oldPeers = await service.apiRequestPublic("/interface/wireguard/peers");
                     if (Array.isArray(oldPeers)) {
                         for (const peer of oldPeers) {
-                            if (peer.comment?.includes("HQInvestment") || peer.interface === "wg-hq") {
+                            if (peer.comment?.includes("HQ INVESTMENT") || peer.interface === "wg-hq") {
                                 try {
                                     await service.apiRequestPublic(`/interface/wireguard/peers/${peer[".id"]}`, "DELETE");
                                 } catch { }
@@ -796,7 +796,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                         "endpoint-address": serverEndpoint,
                         "endpoint-port": String(serverPort),
                         "persistent-keepalive": "25s",
-                        comment: "HQInvestment ISP Server",
+                        comment: "HQ INVESTMENT ISP Server",
                     });
                     trackStep('WireGuard: add server peer on router', true);
                 } catch (e: any) {
@@ -823,34 +823,34 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 // allowing any device to get free internet access.
                 const firewallRules = [
                     // ── INPUT CHAIN: allow management & services ──
-                    { chain: "input", protocol: "udp", "dst-port": String(listenPort), action: "accept", comment: "Allow WireGuard - HQInvestment" },
-                    { chain: "input", "in-interface": "wg-hq", action: "accept", comment: "Allow WireGuard interface input - HQInvestment" },
-                    { chain: "input", protocol: "icmp", "src-address": `${subnetPrefix}.0/24`, action: "accept", comment: "Allow ICMP from VPN - HQInvestment" },
-                    { chain: "input", protocol: "tcp", "dst-port": String(restPort), "src-address": `${subnetPrefix}.0/24`, action: "accept", comment: "Allow REST API from VPN - HQInvestment" },
-                    { chain: "input", protocol: "tcp", "dst-port": "8291", "src-address": `${subnetPrefix}.0/24`, action: "accept", comment: "Allow Winbox from VPN - HQInvestment" },
-                    { chain: "input", protocol: "udp", "dst-port": "3799", "src-address": `${subnetPrefix}.0/24`, action: "accept", comment: "Allow RADIUS CoA from VPN - HQInvestment" },
-                    { chain: "input", protocol: "tcp", "dst-port": "80,443", "src-address": `${subnetPrefix}.0/24`, action: "accept", comment: "Allow Web from VPN - HQInvestment" },
-                    { chain: "input", protocol: "tcp", "dst-port": "8728,8729", "src-address": `${subnetPrefix}.0/24`, action: "accept", comment: "Allow API from VPN - HQInvestment" },
-                    { chain: "input", protocol: "udp", "dst-port": "53,67", "in-interface": lanBridgeName, action: "accept", comment: "Allow DNS & DHCP from LAN - HQInvestment" },
-                    { chain: "input", protocol: "icmp", action: "accept", comment: "Allow Ping - HQInvestment" },
-                    { chain: "input", "connection-state": "established,related", action: "accept", comment: "Allow Established Input - HQInvestment" },
-                    { chain: "input", "in-interface": lanBridgeName, protocol: "tcp", "dst-port": "80,443", action: "accept", comment: "Allow Hotspot Captive Portal - HQInvestment" },
-                    { chain: "input", "in-interface": lanBridgeName, protocol: "udp", "dst-port": "67", action: "accept", comment: "Allow Hotspot DHCP - HQInvestment" },
-                    { chain: "input", "in-interface": lanBridgeName, protocol: "udp", "dst-port": "53", action: "accept", comment: "Allow Hotspot DNS - HQInvestment" },
+                    { chain: "input", protocol: "udp", "dst-port": String(listenPort), action: "accept", comment: "Allow WireGuard - HQ INVESTMENT" },
+                    { chain: "input", "in-interface": "wg-hq", action: "accept", comment: "Allow WireGuard interface input - HQ INVESTMENT" },
+                    { chain: "input", protocol: "icmp", "src-address": `${subnetPrefix}.0/24`, action: "accept", comment: "Allow ICMP from VPN - HQ INVESTMENT" },
+                    { chain: "input", protocol: "tcp", "dst-port": String(restPort), "src-address": `${subnetPrefix}.0/24`, action: "accept", comment: "Allow REST API from VPN - HQ INVESTMENT" },
+                    { chain: "input", protocol: "tcp", "dst-port": "8291", "src-address": `${subnetPrefix}.0/24`, action: "accept", comment: "Allow Winbox from VPN - HQ INVESTMENT" },
+                    { chain: "input", protocol: "udp", "dst-port": "3799", "src-address": `${subnetPrefix}.0/24`, action: "accept", comment: "Allow RADIUS CoA from VPN - HQ INVESTMENT" },
+                    { chain: "input", protocol: "tcp", "dst-port": "80,443", "src-address": `${subnetPrefix}.0/24`, action: "accept", comment: "Allow Web from VPN - HQ INVESTMENT" },
+                    { chain: "input", protocol: "tcp", "dst-port": "8728,8729", "src-address": `${subnetPrefix}.0/24`, action: "accept", comment: "Allow API from VPN - HQ INVESTMENT" },
+                    { chain: "input", protocol: "udp", "dst-port": "53,67", "in-interface": lanBridgeName, action: "accept", comment: "Allow DNS & DHCP from LAN - HQ INVESTMENT" },
+                    { chain: "input", protocol: "icmp", action: "accept", comment: "Allow Ping - HQ INVESTMENT" },
+                    { chain: "input", "connection-state": "established,related", action: "accept", comment: "Allow Established Input - HQ INVESTMENT" },
+                    { chain: "input", "in-interface": lanBridgeName, protocol: "tcp", "dst-port": "80,443", action: "accept", comment: "Allow Hotspot Captive Portal - HQ INVESTMENT" },
+                    { chain: "input", "in-interface": lanBridgeName, protocol: "udp", "dst-port": "67", action: "accept", comment: "Allow Hotspot DHCP - HQ INVESTMENT" },
+                    { chain: "input", "in-interface": lanBridgeName, protocol: "udp", "dst-port": "53", action: "accept", comment: "Allow Hotspot DNS - HQ INVESTMENT" },
                     // ── FORWARD CHAIN: authenticated PPPoE only ──
                     // NOTE: Hotspot-authenticated forward is handled automatically by the hotspot
                     // engine. Do NOT add a blanket bridge->ether1 accept rule here!
-                    { chain: "forward", "in-interface": "all-ppp", "out-interface": "ether1", action: "accept", comment: "Allow PPPoE to Internet - HQInvestment" },
-                    { chain: "forward", "connection-state": "established,related", action: "accept", comment: "Allow Established Forward - HQInvestment" },
-                    { chain: "forward", "in-interface": "wg-hq", action: "accept", comment: "Allow WG traffic - HQInvestment" },
-                    { chain: "forward", "out-interface": "wg-hq", action: "accept", comment: "Allow WG return - HQInvestment" },
+                    { chain: "forward", "in-interface": "all-ppp", "out-interface": "ether1", action: "accept", comment: "Allow PPPoE to Internet - HQ INVESTMENT" },
+                    { chain: "forward", "connection-state": "established,related", action: "accept", comment: "Allow Established Forward - HQ INVESTMENT" },
+                    { chain: "forward", "in-interface": "wg-hq", action: "accept", comment: "Allow WG traffic - HQ INVESTMENT" },
+                    { chain: "forward", "out-interface": "wg-hq", action: "accept", comment: "Allow WG return - HQ INVESTMENT" },
                     // ── DROP RULES: must come LAST (lowest priority) ──
-                    { chain: "input", "in-interface": "ether1", action: "drop", comment: "Drop WAN input - HQInvestment" },
+                    { chain: "input", "in-interface": "ether1", action: "drop", comment: "Drop WAN input - HQ INVESTMENT" },
                     // SECURITY: Block unauthenticated LAN/bridge clients from reaching WAN.
                     // The Hotspot engine creates DYNAMIC accept rules for authenticated users, so
                     // authenticated clients are NOT affected by this drop rule.
                     // PPPoE clients use the all-ppp forward rule above and are also unaffected.
-                    { chain: "forward", "in-interface": lanBridgeName, action: "drop", comment: "Drop unauthenticated LAN forward - HQInvestment" },
+                    { chain: "forward", "in-interface": lanBridgeName, action: "drop", comment: "Drop unauthenticated LAN forward - HQ INVESTMENT" },
                 ];
 
                 // Reverse the array so that by putting them at index 0, they end up in the correct order at the very top.
@@ -876,7 +876,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 try {
                     await service.apiRequestPublic("/ip/firewall/nat", "PUT", {
                         chain: "srcnat",
-                        action: "masquerade", comment: "NAT for Internet - HQInvestment", "place-before": "0"
+                        action: "masquerade", comment: "NAT for Internet - HQ INVESTMENT", "place-before": "0"
                     });
                 } catch (e: any) { logger.warn("NAT note:", { error: e.message instanceof Error ? e.message.message : String(e.message) }); }
 
@@ -886,7 +886,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 try {
                     await service.apiRequestPublic("/ip/route", "PUT", {
                         "dst-address": `${subnetPrefix}.0/24`, gateway: "wg-hq",
-                        comment: "WireGuard route - HQInvestment"
+                        comment: "WireGuard route - HQ INVESTMENT"
                     });
                 } catch (e: any) { logger.warn("Route note:", { error: e.message instanceof Error ? e.message.message : String(e.message) }); }
 
@@ -899,7 +899,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                     const oldRadius = await service.apiRequestPublic("/radius");
                     if (Array.isArray(oldRadius)) {
                         for (const r of oldRadius) {
-                            if (r.comment?.includes("HQInvestment") || r.comment?.includes("HQInvestment RADIUS")) {
+                            if (r.comment?.includes("HQ INVESTMENT") || r.comment?.includes("HQ INVESTMENT RADIUS")) {
                                 try { await service.apiRequestPublic(`/radius/${r[".id"]}`, "DELETE"); } catch { }
                             }
                         }
@@ -915,7 +915,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                         "accounting-port": "1813",
                         timeout: "10000ms",
                         "src-address": tunnelIp,
-                        comment: "HQInvestment RADIUS"
+                        comment: "HQ INVESTMENT RADIUS"
                     });
                     trackStep('RADIUS: register server on router', true);
                 } catch (e: any) {
@@ -944,11 +944,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 const billingHostClean = billingHost.split(':')[0]; // strip port if any
 
                 try {
-                    // Remove old walled garden entries created by HQInvestment
+                    // Remove old walled garden entries created by HQ INVESTMENT
                     const oldWg = await service.apiRequestPublic("/ip/hotspot/walled-garden");
                     if (Array.isArray(oldWg)) {
                         for (const entry of oldWg) {
-                            if (entry.comment?.includes("HQInvestment")) {
+                            if (entry.comment?.includes("HQ INVESTMENT")) {
                                 try { await service.apiRequestPublic(`/ip/hotspot/walled-garden/${entry[".id"]}`, "DELETE"); } catch { }
                             }
                         }
@@ -959,7 +959,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                     const oldWgIp = await service.apiRequestPublic("/ip/hotspot/walled-garden/ip");
                     if (Array.isArray(oldWgIp)) {
                         for (const entry of oldWgIp) {
-                            if (entry.comment?.includes("HQInvestment")) {
+                            if (entry.comment?.includes("HQ INVESTMENT")) {
                                 try { await service.apiRequestPublic(`/ip/hotspot/walled-garden/ip/${entry[".id"]}`, "DELETE"); } catch { }
                             }
                         }
@@ -971,7 +971,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                     await service.apiRequestPublic("/ip/hotspot/walled-garden", "PUT", {
                         "dst-host": billingHostClean,
                         action: "allow",
-                        comment: "Billing Portal - HQInvestment"
+                        comment: "Billing Portal - HQ INVESTMENT"
                     });
                 } catch (e: any) { if (!e.message?.includes("already")) logger.warn("Walled garden DNS note:", { error: e.message instanceof Error ? e.message.message : String(e.message) }); }
 
@@ -980,7 +980,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                     await service.apiRequestPublic("/ip/hotspot/walled-garden/ip", "PUT", {
                         "dst-address": wgServerIp,
                         action: "accept",
-                        comment: "Billing Portal IP - HQInvestment"
+                        comment: "Billing Portal IP - HQ INVESTMENT"
                     });
                 } catch (e: any) { if (!e.message?.includes("already")) logger.warn("Walled garden IP note:", { error: e.message instanceof Error ? e.message.message : String(e.message) }); }
 
@@ -989,7 +989,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                     await service.apiRequestPublic("/ip/hotspot/walled-garden/ip", "PUT", {
                         "dst-address": `${subnetPrefix}.0/24`,
                         action: "accept",
-                        comment: "VPN Subnet - HQInvestment"
+                        comment: "VPN Subnet - HQ INVESTMENT"
                     });
                 } catch (e: any) { if (!e.message?.includes("already")) logger.warn("Walled garden VPN note:", { error: e.message instanceof Error ? e.message.message : String(e.message) }); }
 

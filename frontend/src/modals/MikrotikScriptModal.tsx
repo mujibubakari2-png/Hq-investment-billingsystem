@@ -107,7 +107,7 @@ export default function MikrotikScriptModal({ router, onClose }: MikrotikScriptM
                     display: 'flex', alignItems: 'flex-start', gap: 8, borderBottom: '1px solid #c7d2fe', flexWrap: 'wrap',
                 }}>
                     <CheckCircleIcon style={{ fontSize: 16, flexShrink: 0, marginTop: 2 }} />
-                    <span>This script auto-configures your MikroTik router for HQInvestment ISP billing. Paste into <strong>Terminal</strong> or upload as <strong>.rsc</strong> file.</span>
+                    <span>This script auto-configures your MikroTik router for HQ INVESTMENT ISP billing. Paste into <strong>Terminal</strong> or upload as <strong>.rsc</strong> file.</span>
                 </div>
 
                 {/* Script Content */}

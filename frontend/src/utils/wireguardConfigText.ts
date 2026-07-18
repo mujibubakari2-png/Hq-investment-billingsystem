@@ -44,18 +44,18 @@ export function buildWireGuardConfigText(params: WireGuardConfigTextParams): str
 
 /interface wireguard
 :if ([:len [/interface wireguard find name="wg-hq"]] = 0) do={
-    /interface wireguard add name="wg-hq" listen-port=${listenPort} private-key="${routerPrivateKey}" comment="HQInvestment VPN Interface"
+    /interface wireguard add name="wg-hq" listen-port=${listenPort} private-key="${routerPrivateKey}" comment="HQ INVESTMENT VPN Interface"
 } else={
     /interface wireguard set [find name="wg-hq"] listen-port=${listenPort} private-key="${routerPrivateKey}"
 }
 :if ([:len [/interface wireguard peers find interface="wg-hq" public-key="${serverPublicKey}"]] = 0) do={
-    /interface wireguard peers add interface="wg-hq" public-key="${serverPublicKey}" preshared-key="${presharedKey}" endpoint-address=${serverEndpoint} endpoint-port=${serverPort} allowed-address=${serverPeerSubnet} persistent-keepalive=25s comment="HQInvestment ISP Server"
+    /interface wireguard peers add interface="wg-hq" public-key="${serverPublicKey}" preshared-key="${presharedKey}" endpoint-address=${serverEndpoint} endpoint-port=${serverPort} allowed-address=${serverPeerSubnet} persistent-keepalive=25s comment="HQ INVESTMENT ISP Server"
 } else={
     /interface wireguard peers set [find interface="wg-hq" public-key="${serverPublicKey}"] endpoint-address=${serverEndpoint} endpoint-port=${serverPort} allowed-address=${serverPeerSubnet} persistent-keepalive=25s
 }
 # Remove stale /32 if present (causes routing issues), then set /24
 :foreach addr in=[/ip address find interface="wg-hq"] do={ /ip address remove $addr }
-/ip address add address=${routerTunnelIp}/24 interface="wg-hq" comment="HQInvestment VPN Address"
+/ip address add address=${routerTunnelIp}/24 interface="wg-hq" comment="HQ INVESTMENT VPN Address"
 
 # Note: This is RouterOS-native syntax for MikroTik. The full .rsc script is also available from the Router Setup Wizard → Generate → Create Config.`;
     }
@@ -68,7 +68,7 @@ export function buildWireGuardConfigText(params: WireGuardConfigTextParams): str
 
 /interface wireguard
 :if ([:len [/interface wireguard find name="wg-hq"]] = 0) do={
-    /interface wireguard add name="wg-hq" listen-port=${listenPort} private-key="${serverPrivateKey}" comment="HQInvestment VPN Interface"
+    /interface wireguard add name="wg-hq" listen-port=${listenPort} private-key="${serverPrivateKey}" comment="HQ INVESTMENT VPN Interface"
 } else={
     /interface wireguard set [find name="wg-hq"] listen-port=${listenPort} private-key="${serverPrivateKey}"
 }
@@ -79,6 +79,6 @@ export function buildWireGuardConfigText(params: WireGuardConfigTextParams): str
 }
 # Remove stale /32 if present (causes routing issues), then set /24
 :foreach addr in=[/ip address find interface="wg-hq"] do={ /ip address remove $addr }
-/ip address add address=${serverTunnelIp}/24 interface="wg-hq" comment="HQInvestment VPN Address"
+/ip address add address=${serverTunnelIp}/24 interface="wg-hq" comment="HQ INVESTMENT VPN Address"
 }`;
 }

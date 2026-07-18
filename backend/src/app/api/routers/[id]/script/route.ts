@@ -11,7 +11,7 @@ import logger from "@/lib/logger";
  * GET /api/routers/[id]/script
  * 
  * Generates a MikroTik RouterOS script that the user can copy and paste 
- * into their router terminal to automatically configure it for HQInvestment.
+ * into their router terminal to automatically configure it for HQ INVESTMENT.
  */
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
@@ -107,7 +107,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
             });
         }
 
-        let script = `# HQInvestment ISP Billing System - Router Setup Script
+        let script = `# HQ INVESTMENT ISP Billing System - Router Setup Script
 # Generated for: ${cleanName}
 # Date: ${new Date().toISOString()}
 #
@@ -119,12 +119,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 # ⚠️ PASTE THIS VIA A LOCAL/CONSOLE CONNECTION (physical cable or existing
 # trusted Winbox/terminal session) — NOT over an untrusted network. Once this
 # script runs, remote management (Winbox/WebFig/REST API) is firewalled to the
-# HQInvestment VPN subnet only. If WireGuard has not yet completed a handshake
+# HQ INVESTMENT VPN subnet only. If WireGuard has not yet completed a handshake
 # when you run this, you may temporarily lose remote access to this router
 # until the VPN tunnel comes up — keep a local/console connection available.
 # ==============================================================================
 
-/log info "Starting HQInvestment Auto-Configuration..."
+/log info "Starting HQ INVESTMENT Auto-Configuration..."
 
 # 1. Set System Identity
 /system identity set name="${cleanName}"
@@ -151,7 +151,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 # lets anyone on the same broadcast segment as the WAN uplink discover and attempt
 # to log into the router bypassing the IP-layer firewall entirely.
 :if ([:len [/interface list find name="hq-mgmt"]] = 0) do={
-    /interface list add name="hq-mgmt" comment="HQInvestment management interfaces (LAN+VPN only)"
+    /interface list add name="hq-mgmt" comment="HQ INVESTMENT management interfaces (LAN+VPN only)"
 }
 :if ([:len [/interface list member find list="hq-mgmt" interface="${lanBridgeName}"]] = 0) do={
     /interface list member add list="hq-mgmt" interface="${lanBridgeName}"
@@ -168,13 +168,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 # 4b. WAN/LAN Interface Lists (required for out-interface-list=WAN/LAN in firewall/NAT rules)
 # Without these, NAT and PPPoE firewall rules break on routers where WAN is not ether1.
 :if ([:len [/interface list find name="WAN"]] = 0) do={
-    /interface list add name="WAN" comment="HQInvestment WAN"
+    /interface list add name="WAN" comment="HQ INVESTMENT WAN"
 }
 :if ([:len [/interface list find name="LAN"]] = 0) do={
-    /interface list add name="LAN" comment="HQInvestment LAN"
+    /interface list add name="LAN" comment="HQ INVESTMENT LAN"
 }
 :if ([:len [/interface list member find list="WAN" interface="ether1"]] = 0) do={
-    /interface list member add list="WAN" interface="ether1" comment="HQInvestment WAN port"
+    /interface list member add list="WAN" interface="ether1" comment="HQ INVESTMENT WAN port"
 }
 
 # 5. DNS and NTP (Critical for handshakes)
@@ -184,16 +184,16 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     /system ntp client servers add address=pool.ntp.org
 }
 :if ([:len [/ip dns static find name="router.lan"]] = 0) do={
-    /ip dns static add name=router.lan address=${router.lanGateway} comment="HQInvestment"
+    /ip dns static add name=router.lan address=${router.lanGateway} comment="HQ INVESTMENT"
 }
 
 # 6. LAN Bridge, IP Address, Hotspot, and PPPoE Setup
 :local lanBridge "${lanBridgeName}"
 :if ([:len [/interface bridge find name=$lanBridge]] = 0) do={
-    /interface bridge add name=$lanBridge protocol-mode=none comment="HQInvestment Hotspot LAN"
+    /interface bridge add name=$lanBridge protocol-mode=none comment="HQ INVESTMENT Hotspot LAN"
 }
 :if ([:len [/interface list member find list="LAN" interface=$lanBridge]] = 0) do={
-    /interface list member add list="LAN" interface=$lanBridge comment="HQInvestment LAN bridge"
+    /interface list member add list="LAN" interface=$lanBridge comment="HQ INVESTMENT LAN bridge"
 }
 :if ([:len [/ip pool find name="${hotspotPoolName}"]] = 0) do={
     /ip pool add name="${hotspotPoolName}" ranges=${router.hotspotPoolRange}
@@ -202,13 +202,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     /ip pool add name="${pppoePoolName}" ranges=${router.pppoePoolRange}
 }
 :if ([:len [/ip address find where address="${router.lanIp}" interface=$lanBridge]] = 0) do={
-    /ip address add address="${router.lanIp}" interface=$lanBridge comment="HQInvestment Hotspot LAN"
+    /ip address add address="${router.lanIp}" interface=$lanBridge comment="HQ INVESTMENT Hotspot LAN"
 }
 
 # 6a. DHCP Server (REQUIRED: without this, hotspot clients never receive an IP
 # address from the router and can never reach the captive-portal login page.)
 :if ([:len [/ip dhcp-server network find where address="${router.lanIp}"]] = 0) do={
-    /ip dhcp-server network add address="${router.lanIp}" gateway="${router.lanGateway}" dns-server=${router.dns} comment="HQInvestment Hotspot Network"
+    /ip dhcp-server network add address="${router.lanIp}" gateway="${router.lanGateway}" dns-server=${router.dns} comment="HQ INVESTMENT Hotspot Network"
 } else={
     /ip dhcp-server network set [find where address="${router.lanIp}"] gateway="${router.lanGateway}" dns-server=${router.dns}
 }
@@ -241,8 +241,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 }
 
 # 7. Firewall Rules (TATIZO 2 fix: Enforce vpnSubnet src-address restriction for management ports)
-:if ([:len [/ip firewall filter find where comment="Allow HQInvestment API Access"]] = 0) do={
-    /ip firewall filter add chain=input action=accept protocol=tcp dst-port=${apiPort},443,8291 src-address=${vpnSubnet} comment="Allow HQInvestment API Access"
+:if ([:len [/ip firewall filter find where comment="Allow HQ INVESTMENT API Access"]] = 0) do={
+    /ip firewall filter add chain=input action=accept protocol=tcp dst-port=${apiPort},443,8291 src-address=${vpnSubnet} comment="Allow HQ INVESTMENT API Access"
 }
 :if ([:len [/ip firewall filter find where comment="Allow WireGuard VPN"]] = 0) do={
     /ip firewall filter add chain=input action=accept protocol=udp dst-port=51820 comment="Allow WireGuard VPN"
@@ -270,18 +270,18 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 # 7b. Walled Garden — lets an unauthenticated client still reach the billing
 # portal (to buy a voucher or pay) BEFORE they've logged in to the hotspot.
 :if ([:len ["${walledGardenHost}"]] > 0) do={
-    :if ([:len [/ip hotspot walled-garden find where comment="HQInvestment Billing Portal"]] = 0) do={
-        /ip hotspot walled-garden add dst-host="${walledGardenHost}" action=allow comment="HQInvestment Billing Portal"
+    :if ([:len [/ip hotspot walled-garden find where comment="HQ INVESTMENT Billing Portal"]] = 0) do={
+        /ip hotspot walled-garden add dst-host="${walledGardenHost}" action=allow comment="HQ INVESTMENT Billing Portal"
     }
 }
-:if ([:len [/ip hotspot walled-garden ip find where comment="HQInvestment Billing Portal IP"]] = 0) do={
-    /ip hotspot walled-garden ip add dst-address=${vpnIp} action=accept comment="HQInvestment Billing Portal IP"
+:if ([:len [/ip hotspot walled-garden ip find where comment="HQ INVESTMENT Billing Portal IP"]] = 0) do={
+    /ip hotspot walled-garden ip add dst-address=${vpnIp} action=accept comment="HQ INVESTMENT Billing Portal IP"
 }
 
 # 8. NAT — REQUIRED for any authenticated client (hotspot or PPPoE) to actually
 # reach the internet. Without this, login succeeds but browsing still fails.
-:if ([:len [/ip firewall nat find where comment="HQInvestment NAT"]] = 0) do={
-    /ip firewall nat add chain=srcnat action=masquerade out-interface-list=WAN comment="HQInvestment NAT"
+:if ([:len [/ip firewall nat find where comment="HQ INVESTMENT NAT"]] = 0) do={
+    /ip firewall nat add chain=srcnat action=masquerade out-interface-list=WAN comment="HQ INVESTMENT NAT"
 }
 `;
 
@@ -300,7 +300,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
             script += `
 # 9. WireGuard VPN Interface
 :if ([:len [/interface wireguard find name="wg-hq"]] = 0) do={
-    /interface wireguard add name=wg-hq listen-port=${listenPort} private-key="${router.wgPrivateKey}" comment="HQInvestment VPN Interface"
+    /interface wireguard add name=wg-hq listen-port=${listenPort} private-key="${router.wgPrivateKey}" comment="HQ INVESTMENT VPN Interface"
 } else={
     /interface wireguard set [find name="wg-hq"] private-key="${router.wgPrivateKey}"
 }
@@ -308,18 +308,18 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 # 10. WireGuard IP Address (/24 required for subnet routing — /32 breaks server→router replies)
 # Remove stale /32 if present, then add /24
 :foreach addr in=[/ip address find interface="wg-hq"] do={ /ip address remove $addr }
-/ip address add address="${router.wgTunnelIp}/24" interface=wg-hq comment="HQInvestment VPN Address"
+/ip address add address="${router.wgTunnelIp}/24" interface=wg-hq comment="HQ INVESTMENT VPN Address"
 
 # 11. WireGuard Peer (Server)
 :if ([:len [/interface wireguard peers find interface="wg-hq" public-key="${router.wgPeerPublicKey}"]] = 0) do={
-    /interface wireguard peers add interface=wg-hq public-key="${router.wgPeerPublicKey}" allowed-address="${subnetPrefix}.0/24" endpoint-address="${serverEndpoint}" endpoint-port=${listenPort} persistent-keepalive=25s comment="HQInvestment ISP Server"
+    /interface wireguard peers add interface=wg-hq public-key="${router.wgPeerPublicKey}" allowed-address="${subnetPrefix}.0/24" endpoint-address="${serverEndpoint}" endpoint-port=${listenPort} persistent-keepalive=25s comment="HQ INVESTMENT ISP Server"
 } else={
     /interface wireguard peers set [find interface="wg-hq" public-key="${router.wgPeerPublicKey}"] allowed-address="${subnetPrefix}.0/24" endpoint-address="${serverEndpoint}" endpoint-port=${listenPort} persistent-keepalive=25s
 }
 
 # 12. VPN Routing
 :if ([:len [/ip route find dst-address="${subnetPrefix}.0/24" gateway="wg-hq"]] = 0) do={
-    /ip route add dst-address="${subnetPrefix}.0/24" gateway=wg-hq comment="WireGuard route - HQInvestment"
+    /ip route add dst-address="${subnetPrefix}.0/24" gateway=wg-hq comment="WireGuard route - HQ INVESTMENT"
 }
 `;
         }
@@ -347,10 +347,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         if (userPayload.role === "SUPER_ADMIN") {
             script += `
 # 11. RADIUS Configuration
-:if ([:len [/radius find where comment="HQInvestment RADIUS"]] = 0) do={
-    /radius add address=${radiusAddr} secret="${router.radiusSecret}" service=hotspot,ppp timeout=3000ms ${srcAddrPart} comment="HQInvestment RADIUS"
+:if ([:len [/radius find where comment="HQ INVESTMENT RADIUS"]] = 0) do={
+    /radius add address=${radiusAddr} secret="${router.radiusSecret}" service=hotspot,ppp timeout=3000ms ${srcAddrPart} comment="HQ INVESTMENT RADIUS"
 } else={
-    /radius set [find comment="HQInvestment RADIUS"] address=${radiusAddr} secret="${router.radiusSecret}" ${srcAddrPart}
+    /radius set [find comment="HQ INVESTMENT RADIUS"] address=${radiusAddr} secret="${router.radiusSecret}" ${srcAddrPart}
 }
 :if ([:len [/radius incoming find]] = 0) do={
     /radius incoming set accept=yes port=3799
@@ -363,7 +363,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 /log info "RADIUS & SSL services enabled for Hotspot and PPP"
 
 # 13. Success Notification
-/log info "HQInvestment Configuration completed successfully!"
+/log info "HQ INVESTMENT Configuration completed successfully!"
 /log info "Your router should now be reachable by the billing system."
 `;
         } else {
@@ -377,7 +377,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 /ip hotspot profile set [find default=yes] use-radius=yes ssl-certificate=auto login-by=http-chap,https,cookie
 /ppp profile set [find name=default] use-radius=yes
 # 13. Success Notification
-/log info "HQInvestment Configuration completed (credentials redacted)."
+/log info "HQ INVESTMENT Configuration completed (credentials redacted)."
 `;
         }
 

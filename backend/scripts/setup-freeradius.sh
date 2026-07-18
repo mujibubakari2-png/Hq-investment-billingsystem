@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ─────────────────────────────────────────────────────────────────────────────
-# HQInvestment ISP Billing — FreeRADIUS Setup Script
+# HQ INVESTMENT ISP Billing — FreeRADIUS Setup Script
 # Installs and configures FreeRADIUS to work with PostgreSQL (port 5444)
 # and accepts authentication requests from MikroTik routers.
 #
@@ -16,7 +16,7 @@ ENV_FILE="$BACKEND_DIR/.env"
 
 echo ""
 echo "╔══════════════════════════════════════════════════════╗"
-echo "║    FreeRADIUS Setup — HQInvestment ISP Billing       ║"
+echo "║    FreeRADIUS Setup — HQ INVESTMENT ISP Billing       ║"
 echo "╚══════════════════════════════════════════════════════╝"
 echo ""
 
@@ -438,11 +438,11 @@ WG_SERVER="${WG_SERVER_IP:-10.0.0.1}"
 WG_SUBNET=$(echo "$WG_SERVER" | cut -d. -f1-3).0/24
 DROPLET_PUBLIC_IP="${DROPLET_IP:-}"
 
-if ! grep -q "# HQInvestment ISP Managed Clients" "$RADIUS_CONF_DIR/clients.conf" 2>/dev/null; then
+if ! grep -q "# HQ INVESTMENT ISP Managed Clients" "$RADIUS_CONF_DIR/clients.conf" 2>/dev/null; then
 
 sudo tee -a "$RADIUS_CONF_DIR/clients.conf" > /dev/null <<CLIENTS
 
-# ─── HQInvestment ISP Managed Clients ───────────────────────────────────────
+# ─── HQ INVESTMENT ISP Managed Clients ───────────────────────────────────────
 # MikroTik routers connect via WireGuard VPN (10.0.0.0/24) using this secret.
 # The same secret must be configured in MikroTik → RADIUS → Secret.
 
@@ -479,7 +479,7 @@ fi
 
 echo "✅ clients.conf updated (secret: $RADIUS_SECRET, subnet: $WG_SUBNET)"
 else
-    echo "ℹ️  clients.conf already has HQInvestment entries — skipping"
+    echo "ℹ️  clients.conf already has HQ INVESTMENT entries — skipping"
 fi
 
 # ── Step 6: Open firewall ports ────────────────────────────────────────────────

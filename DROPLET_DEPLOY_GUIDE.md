@@ -1,6 +1,6 @@
 # DigitalOcean Droplet Deployment Guide
 
-This guide explains how to deploy the HQInvestment ISP Billing System to a **DigitalOcean Droplet** (VPS). This gives you full control and is often cheaper than App Platform for large databases.
+This guide explains how to deploy the HQ INVESTMENT ISP Billing System to a **DigitalOcean Droplet** (VPS). This gives you full control and is often cheaper than App Platform for large databases.
 
 ## Step 1: Create a Droplet
 1. Go to DigitalOcean and create a new **Droplet**.

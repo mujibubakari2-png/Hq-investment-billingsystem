@@ -113,7 +113,7 @@ describe('buildRouterSetupWizardScript', () => {
         });
 
         const walledGardenIndex = script.indexOf('/ip hotspot walled-garden add');
-        const dropRuleIndex = script.indexOf('Drop unauthenticated LAN forward - HQInvestment');
+        const dropRuleIndex = script.indexOf('Drop unauthenticated LAN forward - HQ INVESTMENT');
 
         expect(walledGardenIndex).toBeGreaterThan(-1);
         expect(dropRuleIndex).toBeGreaterThan(-1);

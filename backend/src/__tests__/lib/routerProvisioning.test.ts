@@ -183,8 +183,8 @@ describe('lintGeneratedScript (TATIZO 1 & 2 safety net)', () => {
     it('passes a clean, fully-restricted script', () => {
         const script = [
             '/user set [find name="admin"] disabled=yes',
-            '/ip firewall filter add chain=input action=accept protocol=tcp dst-port=80,443,8291 src-address=10.200.0.0/24 comment="Allow HQInvestment API Access (VPN only)"',
-            '/ip firewall filter add chain=input action=drop protocol=tcp dst-port=80,443,8291 comment="Block HQInvestment Management Ports (non-VPN)"',
+            '/ip firewall filter add chain=input action=accept protocol=tcp dst-port=80,443,8291 src-address=10.200.0.0/24 comment="Allow HQ INVESTMENT API Access (VPN only)"',
+            '/ip firewall filter add chain=input action=drop protocol=tcp dst-port=80,443,8291 comment="Block HQ INVESTMENT Management Ports (non-VPN)"',
         ].join('\n');
         expect(lintGeneratedScript(script).ok).toBe(true);
     });
@@ -205,7 +205,7 @@ describe('lintGeneratedScript (TATIZO 1 & 2 safety net)', () => {
 
     it('flags a management-port accept rule with no src-address restriction', () => {
         const script =
-            '/ip firewall filter add chain=input action=accept protocol=tcp dst-port=80,443,8291 comment="Allow HQInvestment API Access"';
+            '/ip firewall filter add chain=input action=accept protocol=tcp dst-port=80,443,8291 comment="Allow HQ INVESTMENT API Access"';
         const result = lintGeneratedScript(script);
         expect(result.ok).toBe(false);
         expect(result.issues[0].type).toBe('unrestricted_management_access');
@@ -228,7 +228,7 @@ describe('lintGeneratedScript (TATIZO 1 & 2 safety net)', () => {
     it('joins RouterOS line-continuations before checking, so a src-address on the next line is still seen', () => {
         const script = [
             '/ip firewall filter add chain=input action=accept protocol=tcp \\',
-            '    dst-port=80,443,8291 src-address=10.200.0.0/24 comment="Allow HQInvestment API Access (VPN only)"',
+            '    dst-port=80,443,8291 src-address=10.200.0.0/24 comment="Allow HQ INVESTMENT API Access (VPN only)"',
         ].join('\n');
         expect(lintGeneratedScript(script).ok).toBe(true);
     });

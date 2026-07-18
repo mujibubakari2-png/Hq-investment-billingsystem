@@ -57,7 +57,7 @@ function buildDiagnostics(data: Record<string, unknown>): DiagnosticCheck[] {
           description: 'A LAN bridge must exist for DHCP and hotspot to function.',
           status: has('bridge') ? 'pass' : 'fail',
           detail: has('bridge') ? `Bridge: ${val('bridge')}` : 'No bridge found on router.',
-          fixCommand: ':if ([:len [/interface bridge find]] = 0) do={ /interface bridge add name=bridge-lan protocol-mode=none arp=enabled vlan-filtering=no comment="HQInvestment LAN" }' },
+          fixCommand: ':if ([:len [/interface bridge find]] = 0) do={ /interface bridge add name=bridge-lan protocol-mode=none arp=enabled vlan-filtering=no comment="HQ INVESTMENT LAN" }' },
 
         { id: 'bridge-arp', category: 'Bridge', label: 'Bridge ARP mode = enabled',
           description: 'reply-only ARP blocks dynamic DHCP leases from working.',
@@ -113,19 +113,19 @@ function buildDiagnostics(data: Record<string, unknown>): DiagnosticCheck[] {
           description: 'Without NAT, client traffic cannot reach the internet.',
           status: has('natMasquerade') ? 'pass' : 'fail',
           detail: has('natMasquerade') ? 'Masquerade rule found ?' : 'No srcnat masquerade rule.',
-          fixCommand: ':if ([:len [/interface list find name="WAN"]] = 0) do={ /interface list add name="WAN" comment="HQInvestment WAN" }\n:if ([:len [/interface list member find list="WAN" interface="ether1"]] = 0) do={ /interface list member add list="WAN" interface="ether1" comment="HQInvestment WAN port" }\n:if ([:len [/ip firewall nat find action=masquerade]] = 0) do={\n    /ip firewall nat add chain=srcnat out-interface-list=WAN action=masquerade\n}' },
+          fixCommand: ':if ([:len [/interface list find name="WAN"]] = 0) do={ /interface list add name="WAN" comment="HQ INVESTMENT WAN" }\n:if ([:len [/interface list member find list="WAN" interface="ether1"]] = 0) do={ /interface list member add list="WAN" interface="ether1" comment="HQ INVESTMENT WAN port" }\n:if ([:len [/ip firewall nat find action=masquerade]] = 0) do={\n    /ip firewall nat add chain=srcnat out-interface-list=WAN action=masquerade\n}' },
 
         { id: 'dhcp-firewall-accept', category: 'Firewall', label: 'DHCP UDP 67/68 allowed (before drops)',
           description: 'Drop rule before DHCP accept silently discards all DHCP packets.',
           status: has('dhcpFirewallAccept') ? 'pass' : 'warn',
           detail: has('dhcpFirewallAccept') ? 'DHCP accept rule found ?' : 'No explicit DHCP accept rule found.',
-          fixCommand: ':if ([:len [/ip firewall filter find where comment="Allow DHCP input - HQInvestment"]] = 0) do={\n    /ip firewall filter add place-before=0 chain=input protocol=udp dst-port=67,68 action=accept comment="Allow DHCP input - HQInvestment"\n}' },
+          fixCommand: ':if ([:len [/ip firewall filter find where comment="Allow DHCP input - HQ INVESTMENT"]] = 0) do={\n    /ip firewall filter add place-before=0 chain=input protocol=udp dst-port=67,68 action=accept comment="Allow DHCP input - HQ INVESTMENT"\n}' },
 
         { id: 'mss-clamp', category: 'Firewall', label: 'MSS clamping (mangle) rule exists',
           description: 'Without MSS clamping, HTTPS/large downloads silently fail on PPPoE/WAN.',
           status: has('mssClamp') ? 'pass' : 'warn',
           detail: has('mssClamp') ? 'MSS clamp rule found ?' : 'No MSS clamp � HTTPS issues may occur.',
-          fixCommand: ':if ([:len [/ip firewall mangle find where comment="MSS Clamp - HQInvestment"]] = 0) do={\n    /ip firewall mangle add chain=forward protocol=tcp tcp-flags=syn action=change-mss new-mss=clamp-to-pmtu passthrough=yes comment="MSS Clamp - HQInvestment"\n}' },
+          fixCommand: ':if ([:len [/ip firewall mangle find where comment="MSS Clamp - HQ INVESTMENT"]] = 0) do={\n    /ip firewall mangle add chain=forward protocol=tcp tcp-flags=syn action=change-mss new-mss=clamp-to-pmtu passthrough=yes comment="MSS Clamp - HQ INVESTMENT"\n}' },
 
         // -- WIRELESS ----------------------------------------------
         { id: 'wlan-enabled', category: 'Wireless', label: 'wlan1 interface is enabled',

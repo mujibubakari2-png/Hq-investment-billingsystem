@@ -1,6 +1,6 @@
 import * as keytar from 'keytar';
 
-const SERVICE_NAME = 'HQInvestment_ISP_MikroTik';
+const SERVICE_NAME = 'HQ INVESTMENT_ISP_MikroTik';
 
 export class CredentialService {
   /**
