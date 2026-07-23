@@ -4,6 +4,7 @@ import { jsonResponse, errorResponse } from "@/lib/auth";
 import { requireRole } from "@/lib/rbac";
 import { toISOSafe } from "@/lib/dateUtils";
 import { isPlatformSuperAdmin } from "@/lib/tenant";
+import { writeAuditLog, getIpFromRequest } from "@/lib/auditLog";
 import logger from "@/lib/logger";
 
 
@@ -140,6 +141,16 @@ export async function POST(req: NextRequest) {
                 });
             });
 
+            await writeAuditLog({
+                tenantId: "platform",
+                userId: user.userId,
+                action: "PLATFORM_CONFIRM_INVOICE_PAYMENT",
+                resource: "TenantInvoice",
+                resourceId: invoiceId,
+                details: { tenantId: invoice.tenantId, amount: Number(invoice.amount), packageMonths: invoice.packageMonths || 1 },
+                ipAddress: getIpFromRequest(req),
+            }).catch(() => {});
+
             return jsonResponse({ message: "SaaS invoice marked as PAID and tenant activated" });
         }
 
@@ -190,6 +201,16 @@ export async function POST(req: NextRequest) {
                     licenseExpiresAt: newExpiry
                 }
             });
+
+            await writeAuditLog({
+                tenantId: "platform",
+                userId: user.userId,
+                action: "PLATFORM_EXTEND_LICENSE",
+                resource: "Tenant",
+                resourceId: tenantId,
+                details: { months: monthsToAdd, newExpiry: newExpiry.toISOString() },
+                ipAddress: getIpFromRequest(req),
+            }).catch(() => {});
 
             return jsonResponse({
                 message: `License extended by ${monthsToAdd} month(s). New expiry: ${newExpiry.toDateString()}`,

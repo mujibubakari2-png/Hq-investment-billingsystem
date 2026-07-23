@@ -21,7 +21,7 @@ import logger from "@/lib/logger";
  */
 function generateTempPassword(length = 12): string {
     const chars = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#";
-    const max   = 256 - (256 % chars.length); // Rejection threshold
+    const max = 256 - (256 % chars.length); // Rejection threshold
     const result: string[] = [];
     while (result.length < length) {
         const buf = crypto.randomBytes(length * 2);
@@ -89,9 +89,9 @@ export async function GET(req: NextRequest) {
 
         const { searchParams } = new URL(req.url);
         const search = searchParams.get("search") || "";
-        const page   = Math.max(1, parseInt(searchParams.get("page")  || "1"));
-        const limit  = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "50")));
-        const skip   = (page - 1) * limit;
+        const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
+        const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "50")));
+        const skip = (page - 1) * limit;
 
         const { filter: tenantFilter } = getTenantFilter(userPayload);
 
@@ -100,7 +100,7 @@ export async function GET(req: NextRequest) {
             userWhere.OR = [
                 { username: { contains: search, mode: "insensitive" } },
                 { fullName: { contains: search, mode: "insensitive" } },
-                { email:    { contains: search, mode: "insensitive" } },
+                { email: { contains: search, mode: "insensitive" } },
             ];
         }
 
@@ -108,15 +108,15 @@ export async function GET(req: NextRequest) {
             db.user.findMany({
                 where: userWhere,
                 select: {
-                    id:          true,
-                    username:    true,
-                    fullName:    true,
-                    email:       true,
-                    role:        true,
-                    status:      true,
-                    phone:       true,
-                    lastLogin:   true,
-                    createdAt:   true,
+                    id: true,
+                    username: true,
+                    fullName: true,
+                    email: true,
+                    role: true,
+                    status: true,
+                    phone: true,
+                    lastLogin: true,
+                    createdAt: true,
                     createdById: true,
                 },
                 orderBy: { createdAt: "asc" },
@@ -202,18 +202,37 @@ export async function POST(req: NextRequest) {
 
         const assignedRole = roleMap[body.role] || "AGENT";
 
-        // Prevent creating another SUPER_ADMIN — each tenant has exactly one
+        // ── SECURITY: No SUPER_ADMIN creation via this endpoint ────────────────
+        // Each tenant has exactly one owner. Platform admins must be created via
+        // /api/super-admin/admins, which requires platform-level authentication.
         if (assignedRole === "SUPER_ADMIN") {
             return errorResponse(
-                "Each tenant has exactly one Super Admin owner. Create Admin, Agent, or Viewer users here.",
+                "Cannot create SUPER_ADMIN users here",
                 403
             );
         }
 
         const requestedTenantId = body.tenantId || body.tenant_id;
         const tenantId = platformAdmin ? requestedTenantId : getJwtTenantId(userPayload);
+
+        // ── SECURITY: Block platform-admin creation via this route ─────────────
+        // If no tenantId (null/undefined), this would create a platform-level user.
+        // That is only allowed via /api/super-admin/admins with a separate auth flow.
         if (!tenantId) {
-            return errorResponse("Tenant ID is required to create a sub-user", 400);
+            return errorResponse(
+                "Tenant ID is required",
+                400
+            );
+        }
+
+        // ── SECURITY: Platform admin cannot create sub-users for another tenant ─
+        // without explicitly providing a valid tenantId
+        if (platformAdmin && requestedTenantId) {
+            const targetTenant = await db.tenant.findUnique({
+                where: { id: requestedTenantId },
+                select: { id: true },
+            });
+            if (!targetTenant) return errorResponse("Target tenant not found", 404);
         }
 
         await assertTenantCanAddSubUser(tenantId);

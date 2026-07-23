@@ -2,12 +2,15 @@ import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import { errorResponse, jsonResponse } from "@/lib/auth";
 import { requireRole } from "@/lib/rbac";
+import { isPlatformSuperAdmin } from "@/lib/tenant";
 import logger from "@/lib/logger";
 
 export async function GET(req: NextRequest) {
     try {
         const guard = requireRole(req, "SUPER_ADMIN");
         if (guard.error) return guard.error;
+        // SECURITY: Only platform-level admins can see platform-wide stats
+        if (!isPlatformSuperAdmin(guard.user)) return errorResponse("Forbidden: Platform Super Admin Only", 403);
         const db = getTenantClient(null);
 
         const [

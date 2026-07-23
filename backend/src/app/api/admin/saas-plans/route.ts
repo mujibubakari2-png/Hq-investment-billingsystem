@@ -2,6 +2,8 @@ import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 import { requireRole } from "@/lib/rbac";
+import { isPlatformSuperAdmin } from "@/lib/tenant";
+import { writeAuditLog, getIpFromRequest } from "@/lib/auditLog";
 import logger from "@/lib/logger";
 
 // GET /api/admin/saas-plans - list all SaaS plans (Super Admin only)
@@ -9,6 +11,7 @@ export async function GET(req: NextRequest) {
     try {
         const guard = requireRole(req, "SUPER_ADMIN");
         if (guard.error) return guard.error;
+        if (!isPlatformSuperAdmin(guard.user)) return errorResponse("Forbidden: Platform Super Admin Only", 403);
         const db = getTenantClient(null);
 
         const plans = await db.saasPlan.findMany({
@@ -27,6 +30,7 @@ export async function POST(req: NextRequest) {
     try {
         const guard = requireRole(req, "SUPER_ADMIN");
         if (guard.error) return guard.error;
+        if (!isPlatformSuperAdmin(guard.user)) return errorResponse("Forbidden: Platform Super Admin Only", 403);
         const db = getTenantClient(null);
         const user = guard.user;
 

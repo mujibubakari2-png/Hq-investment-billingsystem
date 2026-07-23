@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import { requireRole } from "@/lib/rbac";
+import { isPlatformSuperAdmin } from "@/lib/tenant";
+import { writeAuditLog, getIpFromRequest } from "@/lib/auditLog";
 import logger from "@/lib/logger";
 
 export const dynamic = 'force-dynamic';
@@ -9,6 +11,14 @@ export async function GET(req: NextRequest) {
     try {
         const guard = requireRole(req, "SUPER_ADMIN");
         if (guard.error) return guard.error;
+
+        // ── CRITICAL SECURITY FIX ───────────────────────────────────
+        // Without this check, ANY tenant-level SUPER_ADMIN can activate
+        // or extend licenses for ALL tenants on the platform.
+        if (!isPlatformSuperAdmin(guard.user)) {
+            return NextResponse.json({ error: "Forbidden: Platform Super Admin Only" }, { status: 403 });
+        }
+
         const user = guard.user;
         const db = getTenantClient(null);
 
@@ -76,6 +86,15 @@ export async function GET(req: NextRequest) {
                 }
             }
         }
+
+        await writeAuditLog({
+            tenantId: "platform",
+            userId: user.userId,
+            action: "PLATFORM_FIX_TENANTS",
+            resource: "Tenant",
+            details: { fixedCount },
+            ipAddress: getIpFromRequest(req),
+        }).catch(() => {});
 
         return NextResponse.json({ message: `Finished fixing tenants. Total fixed: ${fixedCount}` });
     } catch (e: any) {

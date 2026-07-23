@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 import { requirePermission } from "@/lib/rbac";
+import { isPlatformSuperAdmin } from "@/lib/tenant";
 import logger from "@/lib/logger";
 
 const BLOCKED_SETTING_KEYS = new Set(["paymentGateways"]);
@@ -11,6 +12,14 @@ export async function GET(req: NextRequest) {
         const guard = requirePermission(req, "system-settings:read");
         if (guard.error) return guard.error;
         const userPayload = guard.user;
+
+        // ── SECURITY: Platform admins must use /api/super-admin/settings ────────
+        // A platform admin has tenantId = null, so the query below would return
+        // platform-level settings (SMTP passwords, API keys, etc.).
+        if (isPlatformSuperAdmin(userPayload)) {
+            return errorResponse("Platform admins: use /api/super-admin/settings", 403);
+        }
+
         const db = getTenantClient(userPayload);
 
         const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
@@ -41,8 +50,15 @@ export async function PUT(req: NextRequest) {
         const guard = requirePermission(req, "system-settings:write");
         if (guard.error) return guard.error;
         const userPayload = guard.user;
-        const db = getTenantClient(userPayload);
 
+        // ── SECURITY: Platform admins must use /api/super-admin/settings ────────
+        // Without this, a platform admin (tenantId = null) would upsert platform
+        // settings directly, bypassing access controls.
+        if (isPlatformSuperAdmin(userPayload)) {
+            return errorResponse("Platform admins: use /api/super-admin/settings", 403);
+        }
+
+        const db = getTenantClient(userPayload);
         const tenantIdValue = userPayload.tenantId;
         const body = await req.json();
 
