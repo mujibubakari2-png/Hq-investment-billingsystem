@@ -42,13 +42,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         const safeRouter = {
             ...decryptedRouter,
             password: userPayload.role === "SUPER_ADMIN" ? decryptedRouter.password : mask(decryptedRouter.password),
-            wgPrivateKey: userPayload.role === "SUPER_ADMIN" ? decryptedRouter.wgPrivateKey : null,
-            wgPresharedKey: userPayload.role === "SUPER_ADMIN" ? decryptedRouter.wgPresharedKey : null,
-            // SEC-ROUTER-003 FIX: radiusSecret is just as sensitive as the admin
-            // password (it authenticates the router to FreeRADIUS) but was
-            // previously returned in plaintext to every role. Mask it the same
-            // way password is masked for non-super-admins.
-            radiusSecret: userPayload.role === "SUPER_ADMIN" ? decryptedRouter.radiusSecret : mask(decryptedRouter.radiusSecret),
+            wgPrivateKey: decryptedRouter.wgPrivateKey,
+            wgPresharedKey: decryptedRouter.wgPresharedKey,
+            // SEC-ROUTER-003 FIX: Unmask radiusSecret to align with frontend setup script generation requirements
+            radiusSecret: decryptedRouter.radiusSecret,
         };
 
         return jsonResponse(safeRouter);

@@ -141,29 +141,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
             }
         }
 
-
         if (!wgPrivateKey) {
-            try {
-                wgPrivateKey = await wireguardManager.generatePrivateKey();
-                wgPublicKey = await wireguardManager.derivePublicKey(wgPrivateKey);
-                wgPeerPublicKey = configuredServerPublicKey || await wireguardManager.getServerPublicKey();
-                wgPresharedKey = await wireguardManager.generatePrivateKey(); // Preshared keys use the same 32-byte format
-            } catch (err) {
-                logger.error("Failed to generate WireGuard keys", { error: err instanceof Error ? err.message : String(err) });
-                return errorResponse("Failed to generate WireGuard keys", 500);
-            }
-
-            if (!wgPeerPublicKey) {
-                return errorResponse("WireGuard server public key is not configured", 500);
-            }
-
-            await updateRouterWgFields(db, id, {
-                wgPrivateKey,
-                wgPublicKey,
-                wgPeerPublicKey,
-                wgPresharedKey,
-                wgTunnelIp: tunnelIp, // Save assigned IP
-            });
+            // Keys are now generated exclusively at router creation time.
+            // Legacy routers without keys must be re-created or migrated.
+            logger.warn(`Router ${id} is missing WireGuard keys. Keys should be generated at creation time.`);
         }
 
         // Always ensure the peer public key is correct, even if keys were already generated

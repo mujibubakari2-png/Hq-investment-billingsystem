@@ -5,6 +5,7 @@ import { getTenantClient } from "@/lib/tenantPrisma";
 import { toISOSafe } from "@/lib/dateUtils";
 import { encrypt, decrypt, encryptRouterFields } from "@/lib/encryption";
 import { generateRadiusSecret } from "@/lib/routerProvisioning";
+import { wireguardManager } from "@/lib/wireguard";
 import logger from "@/lib/logger";
 
 // Safe projection: omit password, wgPrivateKey, wgPresharedKey, radiusSecret
@@ -165,6 +166,29 @@ export async function POST(req: NextRequest) {
         // same value as the admin password) and a unique admin username for
         // every NEW router. Existing routers keep their current values on
         // update (only backfilled by scripts/rotateRouterSecrets.ts).
+        
+        let initialWgKeys: any = {};
+        let initialRadiusSecret: string | undefined;
+
+        if (!existing) {
+            initialRadiusSecret = generateRadiusSecret();
+            try {
+                const wgPrivateKey = await wireguardManager.generatePrivateKey();
+                const wgPublicKey = await wireguardManager.derivePublicKey(wgPrivateKey);
+                const wgPeerPublicKey = await wireguardManager.getServerPublicKey();
+                const wgPresharedKey = await wireguardManager.generatePrivateKey();
+                
+                initialWgKeys = {
+                    wgPrivateKey,
+                    wgPublicKey,
+                    wgPeerPublicKey,
+                    wgPresharedKey,
+                };
+            } catch (err) {
+                logger.error("Failed to generate initial WireGuard keys for new router", { error: err instanceof Error ? err.message : String(err) });
+            }
+        }
+
         const routerData: any = {
             name,
             host,
@@ -179,7 +203,8 @@ export async function POST(req: NextRequest) {
             accountingEnabled: body.accountingEnabled ?? true,
             tenantId: tenantIdValue,
             ...(!existing && {
-                radiusSecret: generateRadiusSecret(),
+                radiusSecret: initialRadiusSecret,
+                ...initialWgKeys
             }),
         };
 
