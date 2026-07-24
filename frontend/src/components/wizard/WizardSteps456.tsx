@@ -41,7 +41,7 @@ export function Step4Interfaces({ routerName, interfaces, loadingInterfaces, sel
         <div style={{ textAlign: 'center', padding: '30px 0' }}>
             <CableIcon style={{ fontSize: 56, color: 'var(--text-secondary)', marginBottom: 16 }} />
             <h2 style={{ marginBottom: 6 }}>Select Network Interfaces</h2>
-            <p style={{ color: 'var(--text-secondary)', marginBottom: 24 }}>Choose ethernet ports for your services</p>
+            <p style={{ color: 'var(--text-secondary)', marginBottom: 24 }}>Choose ethernet and wireless ports for your services</p>
 
             <div style={{ maxWidth: 650, margin: '0 auto 20px', padding: '12px 16px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 'var(--radius-sm)', textAlign: 'left', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
                 <WarningAmberIcon style={{ color: '#d97706', fontSize: 20, marginTop: 2 }} />
@@ -52,7 +52,7 @@ export function Step4Interfaces({ routerName, interfaces, loadingInterfaces, sel
 
             <div style={{ maxWidth: 650, margin: '0 auto', textAlign: 'left' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600 }}>🌐 Available Ethernet Interfaces</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600 }}>🌐 Available Network Interfaces</div>
                     <button className="btn btn-secondary" style={{ padding: '4px 10px', fontSize: '0.75rem' }} onClick={onRefresh}>
                         <RefreshIcon fontSize="inherit" /> Refresh
                     </button>
@@ -66,7 +66,7 @@ export function Step4Interfaces({ routerName, interfaces, loadingInterfaces, sel
                 ) : interfaces.length === 0 ? (
                     <div style={{ textAlign: 'center', padding: 40, border: '1px solid var(--border-light)', borderRadius: 'var(--radius-md)', background: '#fff' }}>
                         <WarningAmberIcon style={{ color: '#d97706', fontSize: 32, marginBottom: 10 }} />
-                        <p style={{ color: 'var(--text-secondary)' }}>No ethernet interfaces found. Please check connection.</p>
+                        <p style={{ color: 'var(--text-secondary)' }}>No network interfaces found. Please check connection.</p>
                     </div>
                 ) : (
                     <div className="grid-2 gap-12">
@@ -118,6 +118,8 @@ interface Step5Props {
     setShowPreview: (v: boolean) => void;
     getGeneratedScript: () => string;
     onDownload: () => void;
+    onAutoPush: () => void;
+    actionLoading: boolean;
 }
 
 export function Step5Generate(p: Step5Props) {
@@ -169,6 +171,9 @@ export function Step5Generate(p: Step5Props) {
                     </button>
                     <button className="btn" style={{ background: '#16a34a', color: '#fff', fontWeight: 600, padding: '10px 24px' }} onClick={p.onDownload}>
                         <FileDownloadIcon fontSize="small" /> Generate &amp; Download
+                    </button>
+                    <button className="btn" style={{ background: '#8b5cf6', color: '#fff', fontWeight: 600, padding: '10px 24px' }} onClick={p.onAutoPush} disabled={p.actionLoading}>
+                        {p.actionLoading ? <RefreshIcon className="spin" fontSize="small" /> : <RocketLaunchIcon fontSize="small" />} {p.actionLoading ? 'Pushing...' : 'Auto-Push to Router'}
                     </button>
                 </div>
 

@@ -84,7 +84,7 @@ describe('WireGuard route', () => {
     expect(mockRequirePermission).toHaveBeenCalledWith(req, 'routers:read');
   });
 
-  it('assigns a WireGuard tunnel IP and generates keys on GET config', async () => {
+  it('assigns a WireGuard tunnel IP on GET config', async () => {
     const route = require('@/app/api/routers/[id]/wireguard/route');
     mockRequirePermission.mockReturnValue({
       error: null,
@@ -131,7 +131,7 @@ describe('WireGuard route', () => {
 
     expect(res.status).toBe(200);
     expect(body.routerTunnelIp).toBe('10.200.0.200');
-    expect(body.routerPublicKey).toBe('public-key-1');
+    expect(body.routerPublicKey).toBeNull();
     expect(body.serverPublicKey).toBe('server-public-key');
     expect(findManyMock).toHaveBeenCalledWith(expect.objectContaining({
       where: { id: { not: 'router-1' }, wgTunnelIp: { not: null } },

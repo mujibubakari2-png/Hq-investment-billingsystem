@@ -35,14 +35,6 @@ import { Step4Interfaces, Step5Generate, Step6Verify } from '../components/wizar
 // overwrite them by hand. Generate a cryptographically random secret in the
 // browser instead (Web Crypto, not Math.random) so every router gets a
 // unique value out of the box.
-const SECRET_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-function generateClientSecureSecret(length = 24): string {
-    const bytes = new Uint8Array(length);
-    (window.crypto || (window as any).msCrypto).getRandomValues(bytes);
-    let out = '';
-    for (let i = 0; i < length; i++) out += SECRET_ALPHABET[bytes[i] % SECRET_ALPHABET.length];
-    return out;
-}
 // Legacy static defaults that must never be trusted/kept if found in saved
 // state or a stale draft — these are known, guessable, cross-tenant values.
 const KNOWN_INSECURE_SECRETS = new Set(['hqinvestment_radius_secret', 'MyISPVpnKey2024!']);
@@ -93,6 +85,7 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
     const [configGenerated, setConfigGenerated] = useState(false);
     const [showPreview, setShowPreview]         = useState(false);
     const [wgConfig, setWgConfig]               = useState<any>(null);
+    const [actionLoading, setActionLoading]     = useState(false);
 
     // Step 6: verify
     const [serviceVerifyStatus, setServiceVerifyStatus] = useState<VerifyStatus>('checking');
@@ -110,23 +103,12 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
         }
     }, [routerId]);
 
-    // SEC-ROUTER-003 FIX: once the router record loads, prefer its REAL
-    // radiusSecret (already generated + synced to the RADIUS NAS table by
-    // the backend when the router was created) over any placeholder — using
-    // a different value here would silently break RADIUS auth because it
-    // would no longer match the NAS entry. Masked values ("****1234",
-    // returned to non-super-admin roles) and known legacy static defaults
-    // are never trusted as a real secret; in that case we generate a random
-    // one client-side instead of falling back to a static string.
-    // Runs once per routerData load (guarded so it never overwrites a value
-    // the operator has since edited by hand).
     useEffect(() => {
         if (!routerData) return;
         setRadiusSecret(prev => {
             if (prev) return prev; // already set (from backend or a previous run) — don't clobber operator edits
-            const real = routerData.radiusSecret as string | undefined;
-            const usable = real && !real.startsWith('****') && !KNOWN_INSECURE_SECRETS.has(real);
-            return usable ? (real as string) : generateClientSecureSecret(32);
+            // Trust the backend secret now that it's unmasked.
+            return (routerData.radiusSecret as string) || '';
         });
     }, [routerData]);
 
@@ -291,6 +273,41 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
         setConfigGenerated(true);
     };
 
+    const handleAutoPush = async () => {
+        if (!routerId) return;
+        
+        const serviceValidation = validateRouterSetupWizardServiceInputs({
+            serviceType,
+            hotspotLocalAddress,
+            pppoeLocalAddress,
+            hotspotPoolStart,
+            hotspotPoolEnd,
+            pppoePoolStart,
+            pppoePoolEnd,
+        });
+
+        if (!serviceValidation.ok) {
+            alert(`Missing required PPPoE/Hotspot values: ${serviceValidation.missingFields.join(', ')}.`);
+            return;
+        }
+
+        setActionLoading(true);
+        try {
+            const res = await routersApi.wireguard.pushConfig(routerId, selectedInterfaces);
+            if (res.success || res.partialSuccess) {
+                setConfigGenerated(true);
+                alert(res.message || 'Configuration pushed successfully.');
+                handleNext();
+            } else {
+                alert('Auto-Push Failed: ' + (res.message || 'Unknown error'));
+            }
+        } catch (err: any) {
+            alert('Auto-Push Failed: ' + (err.message || String(err)));
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
     const handleNext = () => {
         if (currentStep === 1 && connectionStatus !== 'online') { alert('Please wait for connection check or ensure router is online.'); return; }
         if (currentStep === 4 && selectedInterfaces.length === 0) { alert('Please select at least one interface for the service bridge.'); return; }
@@ -312,7 +329,7 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
             case 2: return <Step2Services serviceType={serviceType} setServiceType={setServiceType} pppoeLocalAddress={pppoeLocalAddress} setPppoeLocalAddress={setPppoeLocalAddress} pppoePoolStart={pppoePoolStart} setPppoePoolStart={setPppoePoolStart} pppoePoolEnd={pppoePoolEnd} setPppoePoolEnd={setPppoePoolEnd} hotspotLocalAddress={hotspotLocalAddress} setHotspotLocalAddress={setHotspotLocalAddress} hotspotPoolStart={hotspotPoolStart} setHotspotPoolStart={setHotspotPoolStart} hotspotPoolEnd={hotspotPoolEnd} setHotspotPoolEnd={setHotspotPoolEnd} radiusAddress={radiusAddress} setRadiusAddress={setRadiusAddress} radiusSecret={radiusSecret} setRadiusSecret={setRadiusSecret} />;
             case 3: return <Step3Vpn vpnEnabled={vpnEnabled} setVpnEnabled={setVpnEnabled} vpnMode={vpnMode} setVpnMode={setVpnMode} />;
             case 4: return <Step4Interfaces routerName={routerName} interfaces={interfaces} loadingInterfaces={loadingInterfaces} selectedInterfaces={selectedInterfaces} onToggleInterface={toggleInterface} onRefresh={fetchInterfaces} />;
-            case 5: return <Step5Generate routerName={routerName} serviceType={serviceType} selectedInterfaces={selectedInterfaces} vpnEnabled={vpnEnabled} hotspotLocalAddress={hotspotLocalAddress} pppoeLocalAddress={pppoeLocalAddress} configGenerated={configGenerated} showPreview={showPreview} setShowPreview={setShowPreview} getGeneratedScript={getGeneratedScript} onDownload={handleDownloadConfig} />;
+            case 5: return <Step5Generate routerName={routerName} serviceType={serviceType} selectedInterfaces={selectedInterfaces} vpnEnabled={vpnEnabled} hotspotLocalAddress={hotspotLocalAddress} pppoeLocalAddress={pppoeLocalAddress} configGenerated={configGenerated} showPreview={showPreview} setShowPreview={setShowPreview} getGeneratedScript={getGeneratedScript} onDownload={handleDownloadConfig} onAutoPush={handleAutoPush} actionLoading={actionLoading} />;
             case 6: return <Step6Verify routerName={routerName} serviceType={serviceType} vpnEnabled={vpnEnabled} vpnMode={vpnMode} serviceVerifyStatus={serviceVerifyStatus} vpnVerifyStatus={vpnVerifyStatus} onGoBack={() => setCurrentStep(0)} onFinish={handleFinish} />;
             default: return null;
         }

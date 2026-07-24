@@ -254,6 +254,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         const { id } = await params;
         const body = await req.json();
         const action = body.action || "activate";
+        const lanPorts: string[] = Array.isArray(body.lanPorts) ? body.lanPorts : [];
 
         const router = await getRouterWgFields(db, id);
         if (!router) return errorResponse("Router not found", 404);
@@ -540,6 +541,92 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                         }
                     } catch { }
                 }
+
+                // Add selected physical ports to the bridge
+                if (lanPorts.length > 0) {
+                    try {
+                        const existingPorts = await service.apiRequestPublic("/interface/bridge/port");
+                        for (const portName of lanPorts) {
+                            if (!portName || portName === "ether1" || portName.includes("wan")) continue; // Safety check
+                            
+                            const existing = Array.isArray(existingPorts) ? existingPorts.find((p: any) => p.interface === portName) : null;
+                            if (existing) {
+                                if (existing.bridge !== lanBridgeName) {
+                                    try {
+                                        await service.apiRequestPublic(`/interface/bridge/port/${existing[".id"]}`, "PATCH", { bridge: lanBridgeName });
+                                    } catch (e) { logger.warn(`[PUSH-CONFIG] Failed to move port ${portName} to ${lanBridgeName}`); }
+                                }
+                            } else {
+                                try {
+                                    await service.apiRequestPublic("/interface/bridge/port", "PUT", {
+                                        bridge: lanBridgeName,
+                                        interface: portName,
+                                        comment: "HQ INVESTMENT Auto-Added"
+                                    });
+                                } catch (e) { logger.warn(`[PUSH-CONFIG] Failed to add port ${portName} to ${lanBridgeName}`); }
+                            }
+                        }
+                    } catch (err) { logger.warn("[PUSH-CONFIG] Failed to update bridge ports"); }
+                }
+
+                // Clean up old IP addresses on the bridge to prevent duplicates
+                try {
+                    const oldAddrs = await service.apiRequestPublic("/ip/address");
+                    if (Array.isArray(oldAddrs)) {
+                        for (const addr of oldAddrs) {
+                            if (addr.interface === lanBridgeName || addr.comment?.includes("HQ INVESTMENT")) {
+                                try { await service.apiRequestPublic(`/ip/address/${addr[".id"]}`, "DELETE"); } catch {}
+                            }
+                        }
+                    }
+                } catch {}
+
+                // Clean up duplicate/conflicting DHCP servers, pools, and networks
+                try {
+                    const dhcps = await service.apiRequestPublic("/ip/dhcp-server");
+                    if (Array.isArray(dhcps)) {
+                        for (const dhcp of dhcps) {
+                            if (dhcp.interface === lanBridgeName || dhcp.name === "defconf" || dhcp.comment?.includes("HQ INVESTMENT")) {
+                                try { await service.apiRequestPublic(`/ip/dhcp-server/${dhcp[".id"]}`, "DELETE"); } catch {}
+                            }
+                        }
+                    }
+                } catch {}
+
+                try {
+                    const networks = await service.apiRequestPublic("/ip/dhcp-server/network");
+                    if (Array.isArray(networks)) {
+                        for (const net of networks) {
+                            if (net.comment?.includes("HQ INVESTMENT")) {
+                                try { await service.apiRequestPublic(`/ip/dhcp-server/network/${net[".id"]}`, "DELETE"); } catch {}
+                            }
+                        }
+                    }
+                } catch {}
+
+                try {
+                    const pools = await service.apiRequestPublic("/ip/pool");
+                    if (Array.isArray(pools)) {
+                        for (const pool of pools) {
+                            if (pool.name?.includes("hs-pool") || pool.name?.includes("pppoe-pool") || pool.comment?.includes("HQ INVESTMENT")) {
+                                try { await service.apiRequestPublic(`/ip/pool/${pool[".id"]}`, "DELETE"); } catch {}
+                            }
+                        }
+                    }
+                } catch {}
+
+                // Clean up old Hotspot configurations
+                try {
+                    const hotspots = await service.apiRequestPublic("/ip/hotspot");
+                    if (Array.isArray(hotspots)) {
+                        for (const hs of hotspots) {
+                            if (hs.interface === lanBridgeName || hs.comment?.includes("HQ INVESTMENT")) {
+                                try { await service.apiRequestPublic(`/ip/hotspot/${hs[".id"]}`, "DELETE"); } catch {}
+                            }
+                        }
+                    }
+                } catch {}
+
 
                 // Sanitize name for RouterOS identifiers using shared lib function
                 const safeRouterName = sanitizeMikroTikName(router.name);
