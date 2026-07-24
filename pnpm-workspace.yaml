@@ -3,3 +3,5 @@ packages:
   - 'backend'
   - 'frontend'
   - 'landing-page'
+  - 'super-admin'
+  - 'desktop'

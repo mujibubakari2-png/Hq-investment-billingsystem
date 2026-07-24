@@ -943,6 +943,210 @@ model RateLimit {
   @@map("rate_limits")
 }
 
+// ─────────────────────────────────────────────────────────────
+// E-COMMERCE MODELS (Platform-level, managed by Super Admin)
+// ─────────────────────────────────────────────────────────────
+
+model ProductCategory {
+  id           String    @id @default(uuid())
+  name         String
+  slug         String    @unique
+  icon         String?   // emoji or icon name
+  image        String?   // URL to category image
+  description  String?
+  sortOrder    Int       @default(0)
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  products     Product[]
+
+  @@index([slug])
+  @@index([isActive])
+  @@map("product_categories")
+}
+
+model Product {
+  id             String         @id @default(uuid())
+  name           String
+  slug           String         @unique
+  sku            String?        @unique
+  barcode        String?
+  categoryId     String?
+  brand          String?
+  price          Decimal        @db.Decimal(12, 2)
+  discountType   String?        @default("percent") // "percent" | "fixed"
+  discountValue  Decimal?       @db.Decimal(12, 2)
+  currency       String         @default("TZS")
+  quantity       Int            @default(0)
+  description    String?
+  specifications Json?          // [{key: "Weight", value: "2kg"}, ...]
+  tags           String[]
+  status         ProductStatus  @default(DRAFT)
+  featured       Boolean        @default(false)
+  trending       Boolean        @default(false)
+  bestSeller     Boolean        @default(false)
+  isNew          Boolean        @default(false)
+  viewCount      Int            @default(0)
+  clickCount     Int            @default(0)
+  seoTitle       String?
+  seoDescription String?
+  metaKeywords   String[]
+  ogImage        String?
+  scheduledAt    DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  deletedAt      DateTime?
+  category       ProductCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  images         ProductImage[]
+  orderItems     EcomOrderItem[]
+  reviews        Review[]
+
+  @@index([slug])
+  @@index([categoryId])
+  @@index([status])
+  @@index([featured])
+  @@index([trending])
+  @@index([bestSeller])
+  @@index([createdAt])
+  @@index([deletedAt])
+  @@map("products")
+}
+
+model ProductImage {
+  id         String   @id @default(uuid())
+  url        String
+  altText    String?
+  sortOrder  Int      @default(0)
+  isFeatured Boolean  @default(false)
+  productId  String
+  createdAt  DateTime @default(now())
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@map("product_images")
+}
+
+model EcomOrder {
+  id              String          @id @default(uuid())
+  orderNumber     String          @unique
+  customerName    String
+  customerEmail   String?
+  customerPhone   String?
+  shippingAddress Json?           // {street, city, region, country, zip}
+  totalAmount     Decimal         @db.Decimal(12, 2)
+  status          OrderStatus     @default(PENDING)
+  paymentMethod   String?
+  paymentStatus   PaymentStatus   @default(PENDING)
+  paymentRef      String?
+  notes           String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  deletedAt       DateTime?
+  items           EcomOrderItem[]
+
+  @@index([orderNumber])
+  @@index([status])
+  @@index([paymentStatus])
+  @@index([customerEmail])
+  @@index([createdAt])
+  @@map("ecom_orders")
+}
+
+model EcomOrderItem {
+  id        String    @id @default(uuid())
+  orderId   String
+  productId String
+  quantity  Int
+  unitPrice Decimal   @db.Decimal(12, 2)
+  total     Decimal   @db.Decimal(12, 2)
+  order     EcomOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product   Product   @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@index([productId])
+  @@map("ecom_order_items")
+}
+
+model Review {
+  id         String   @id @default(uuid())
+  productId  String
+  authorName String
+  email      String?
+  rating     Int      // 1-5
+  title      String?
+  comment    String?
+  isApproved Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@index([isApproved])
+  @@map("reviews")
+}
+
+model Banner {
+  id         String   @id @default(uuid())
+  title      String?
+  subtitle   String?
+  imageUrl   String
+  linkUrl    String?
+  linkText   String?
+  position   Int      @default(0)    // sort order
+  isActive   Boolean  @default(true)
+  startDate  DateTime?
+  endDate    DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([position])
+  @@map("banners")
+}
+
+model Testimonial {
+  id        String   @id @default(uuid())
+  name      String
+  role      String?
+  company   String?
+  content   String
+  avatarUrl String?
+  rating    Int      @default(5)
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive])
+  @@map("testimonials")
+}
+
+model Faq {
+  id        String   @id @default(uuid())
+  question  String
+  answer    String
+  category  String?  @default("general")
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([category])
+  @@map("faqs")
+}
+
+model NewsletterSubscriber {
+  id          String   @id @default(uuid())
+  email       String   @unique
+  isActive    Boolean  @default(true)
+  subscribedAt DateTime @default(now())
+
+  @@index([email])
+  @@index([isActive])
+  @@map("newsletter_subscribers")
+}
+
 enum Role {
   SUPER_ADMIN
   ADMIN
@@ -1095,3 +1299,21 @@ enum PaymentStatus {
   COMPLETED
   FAILED
 }
+
+enum ProductStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+  SCHEDULED
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  REFUNDED
+}
+

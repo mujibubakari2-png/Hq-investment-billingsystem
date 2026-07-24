@@ -21,7 +21,8 @@
         "backend",
         "frontend",
         "landing-page",
-        "desktop"
+        "desktop",
+        "super-admin"
     ],
     "keywords": [
         "isp",
