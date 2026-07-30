@@ -155,19 +155,26 @@ export async function POST(req: NextRequest) {
             },
         });
 
-        // Best-effort: sync MikroTik bandwidth profile to match this package
+        // Best-effort: sync router bandwidth profile to match this package via adapter
         if (pkg.routerId) {
             try {
-                const mikrotik = await getMikroTikService(pkg.routerId, userPayload.tenantId ?? null);
-                await mikrotik.createProfileFromPackage(
-                    pkg.name,
-                    pkg.uploadSpeed,
-                    pkg.uploadUnit,
-                    pkg.downloadSpeed,
-                    pkg.downloadUnit,
-                    pkg.type === "PPPOE" ? "pppoe" : "hotspot",
-                    pkg.devices || 1,
-                );
+                const adapter = await import("@/lib/routerAdapters").then(m => m.getRouterAdapter(pkg.routerId!, userPayload.tenantId ?? null));
+                if (adapter.createProfileFromPackage) {
+                    await (adapter as any).createProfileFromPackage(
+                        pkg.name,
+                        pkg.uploadSpeed,
+                        pkg.uploadUnit,
+                        pkg.downloadSpeed,
+                        pkg.downloadUnit,
+                        pkg.type === "PPPOE" ? "pppoe" : "hotspot",
+                        pkg.devices || 1,
+                    );
+                } else if (adapter.createPPPoEProfile && pkg.type === "PPPOE") {
+                    await adapter.createPPPoEProfile({ name: pkg.name, rateLimit: `${pkg.downloadSpeed}${pkg.downloadUnit}`, comment: `Package:${pkg.name}` });
+                } else if (adapter.createHotspotProfile && pkg.type === "HOTSPOT") {
+                    await adapter.createHotspotProfile({ name: pkg.name, rateLimit: `${pkg.downloadSpeed}${pkg.downloadUnit}`, sharedUsers: pkg.devices || 1, comment: `Package:${pkg.name}` });
+                }
+
                 await db.routerLog.create({
                     data: {
                         routerId: pkg.routerId,
@@ -178,7 +185,7 @@ export async function POST(req: NextRequest) {
                     },
                 });
             } catch (err: any) {
-                logger.error("[packages] MikroTik sync failed", { error: err instanceof Error ? err.message : String(err) });
+                logger.error("[packages] Router adapter sync failed", { error: err instanceof Error ? err.message : String(err) });
                 await db.routerLog.create({
                     data: {
                         routerId: pkg.routerId,
@@ -189,7 +196,7 @@ export async function POST(req: NextRequest) {
                     },
                 });
                 // Package was created — return success with warning, don't roll back
-                return jsonResponse({ ...pkg, warning: "Package was created but MikroTik sync failed. Try syncing again later." }, 201);
+                return jsonResponse({ ...pkg, warning: "Package was created but router sync failed. Try syncing again later." }, 201);
             }
         }
 

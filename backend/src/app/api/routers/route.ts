@@ -20,8 +20,41 @@ function mapRouter(r: any) {
         port: r.port,
         apiPort: r.apiPort,
         type: r.type,
+        // ── Vendor / multi-vendor fields ──────────────────────────────────────
+        vendor: r.vendor ?? r.type?.toLowerCase() ?? "mikrotik",
+        model: r.model ?? null,
+        architecture: r.architecture ?? null,
+        firmwareVersion: r.firmwareVersion ?? null,
+        apiType: r.apiType ?? null,
+        capabilities: r.capabilities ?? null,       // JSON object — vendor capability flags
+        supportedFeatures: r.supportedFeatures ?? [], // string[] — feature list
+        licenseLevel: r.licenseLevel ?? null,
+        // ── Health / provisioning status ──────────────────────────────────────
+        healthStatus: r.healthStatus ?? null,
+        provisioningStatus: r.provisioningStatus ?? null,
+        lastDiscovery: toISOSafe(r.lastDiscovery) ?? null,
+        lastSync: toISOSafe(r.lastSync) ?? null,
+        errorState: r.errorState ?? null,
+        featureFlags: r.featureFlags ?? null,
+        // ── Connection ────────────────────────────────────────────────────────
         vpnMode: r.vpnMode,
         description: r.description,
+        wgEnabled: r.wgEnabled ?? false,
+        wgPublicKey: r.wgPublicKey ?? null,         // Public key is safe to expose
+        wgServerEndpoint: r.wgServerEndpoint ?? null,
+        wgTunnelIp: r.wgTunnelIp ?? null,
+        wgListenPort: r.wgListenPort ?? null,
+        // ── Network config ────────────────────────────────────────────────────
+        lanIp: r.lanIp ?? null,
+        lanGateway: r.lanGateway ?? null,
+        hotspotPoolRange: r.hotspotPoolRange ?? null,
+        pppoePoolRange: r.pppoePoolRange ?? null,
+        dns: r.dns ?? null,
+        // ── Wireless ─────────────────────────────────────────────────────────
+        wlanEnabled: r.wlanEnabled ?? false,
+        wlan1Ssid: r.wlan1Ssid ?? null,
+        wlan2Ssid: r.wlan2Ssid ?? null,
+        // ── Runtime stats ─────────────────────────────────────────────────────
         status: r.status === "ONLINE" ? "Online" : "Offline",
         activeUsers: r.activeUsers,
         cpuLoad: r.cpuLoad,
@@ -152,12 +185,14 @@ export async function POST(req: NextRequest) {
             return errorResponse(`Router with name "${name}" already exists in your tenant`);
         }
 
-        if (!existing) {
+        // Only enforce per-tenant router limits when the caller belongs to a tenant.
+        // Platform super-admins (tenantId = null) are not subject to plan limits.
+        if (!existing && tenantIdValue) {
             const tenant = await db.tenant.findUnique({
                 where: { id: tenantIdValue },
                 include: { plan: true, routers: { select: { id: true } } }
             });
-            if (tenant && tenant.routers.length >= tenant.plan.maxRouters) {
+            if (tenant && tenant.plan && tenant.routers.length >= tenant.plan.maxRouters) {
                 return errorResponse(`Router limit reached. Your plan allows up to ${tenant.plan.maxRouters} routers.`, 403);
             }
         }
@@ -197,6 +232,13 @@ export async function POST(req: NextRequest) {
             port: port,
             apiPort: apiPort,
             type: body.type || "MikroTik",
+            // ── Multi-vendor fields ──────────────────────────────────
+            vendor: body.vendor || body.type?.toLowerCase() || "mikrotik",
+            model: body.model || null,
+            architecture: body.architecture || null,
+            firmwareVersion: body.firmwareVersion || null,
+            apiType: body.apiType || null,
+            // ─────────────────────────────────────────────────────────
             vpnMode: body.vpnMode || "hybrid",
             description: body.description || "",
             status: body.status || "OFFLINE",
@@ -207,6 +249,7 @@ export async function POST(req: NextRequest) {
                 ...initialWgKeys
             }),
         };
+
 
         // WireGuard configuration fields
         if (body.wgTunnelIp) routerData.wgTunnelIp = body.wgTunnelIp;
@@ -250,31 +293,35 @@ export async function POST(req: NextRequest) {
             });
         }
 
-        if (existingNas) {
-            await db.radiusNas.update({
-                where: { id: existingNas.id },
-                data: { 
-                    shortName: router.name,
-                    secret: decryptedRadiusSecret
+        // Only sync to RADIUS NAS table when a tenant is associated
+        // (platform-admin routers with tenantId=null don't belong to a RADIUS realm)
+        if (tenantIdValue) {
+            if (existingNas) {
+                await db.radiusNas.update({
+                    where: { id: existingNas.id },
+                    data: {
+                        shortName: router.name,
+                        secret: decryptedRadiusSecret
+                    }
+                });
+            } else {
+                // Also clean up old NAS entry if the IP changed
+                if (existing && existing.wgTunnelIp !== router.wgTunnelIp) {
+                    await db.radiusNas.deleteMany({
+                        where: { tenantId: tenantIdValue, nasName: existing.wgTunnelIp || existing.host }
+                    });
                 }
-            });
-        } else {
-            // Also clean up old NAS entry if the IP changed
-            if (existing && existing.wgTunnelIp !== router.wgTunnelIp) {
-                await db.radiusNas.deleteMany({
-                    where: { tenantId: tenantIdValue, nasName: existing.wgTunnelIp || existing.host }
+                await db.radiusNas.create({
+                    data: {
+                        nasName: nasIp,
+                        shortName: router.name,
+                        secret: decryptedRadiusSecret,
+                        type: "other",
+                        tenantId: tenantIdValue,
+                        description: "Auto-synced from Router"
+                    }
                 });
             }
-            await db.radiusNas.create({
-                data: {
-                    nasName: nasIp,
-                    shortName: router.name,
-                    secret: decryptedRadiusSecret,
-                    type: "other",
-                    tenantId: tenantIdValue,
-                    description: "Auto-synced from Router"
-                }
-            });
         }
 
         // Log the creation

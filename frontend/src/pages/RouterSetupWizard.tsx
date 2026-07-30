@@ -315,11 +315,11 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
         if (currentStep < WIZARD_STEPS.length - 1) {
             setCurrentStep(currentStep + 1);
         } else {
-        if (onClose) onClose(); else navigate('/mikrotiks');
+        if (onClose) onClose(); else navigate('/routers');
         }
     };
     const handlePrev   = () => { if (currentStep > 0) setCurrentStep(currentStep - 1); };
-    const handleFinish = () => { if (onClose) onClose(); else navigate('/mikrotiks'); };
+    const handleFinish = () => { if (onClose) onClose(); else navigate('/routers'); };
 
     // ── Step switcher ─────────────────────────────────────────────────────
     const renderStep = () => {

@@ -47,6 +47,8 @@ const ReactQueryDevtools = import.meta.env.DEV
     )
   : null;
 
+import { GlobalPopup } from './components/GlobalPopup/GlobalPopup';
+
 // ── App Root ──────────────────────────────────────────────────────────────────
 
 createRoot(document.getElementById('root')!).render(
@@ -55,6 +57,7 @@ createRoot(document.getElementById('root')!).render(
       <ErrorBoundary>
         <GoogleOAuthWrapper>
           <App />
+          <GlobalPopup />
         </GoogleOAuthWrapper>
       </ErrorBoundary>
       {/* DevTools: lazy-loaded in development only — fully tree-shaken in production.

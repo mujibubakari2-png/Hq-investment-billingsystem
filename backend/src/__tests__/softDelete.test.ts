@@ -1,52 +1,42 @@
 /**
  * softDelete utility unit tests
- * 
- * Tests: isSoftDeleted, notDeleted, onlyDeleted (pure logic â€” no DB calls).
- * softDelete() / restore() / purgeOldSoftDeleted() are covered by mocking prisma.
+ *
+ * Tests: isSoftDeleted, notDeleted, onlyDeleted (pure logic — no DB calls).
+ * softDelete() / restore() / purgeOldSoftDeleted() are covered by mocking getTenantClient.
  */
 
-// â”€â”€ Mock prisma before importing the module â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-jest.mock('../lib/prisma', () => {
-    const mockPrisma = {
-        client: {
-            update: jest.fn(),
-            deleteMany: jest.fn(),
-        },
-        user: {
-            update: jest.fn(),
-            deleteMany: jest.fn(),
-        },
-        subscription: {
-            update: jest.fn(),
-            deleteMany: jest.fn(),
-        },
-        router: {
-            update: jest.fn(),
-            deleteMany: jest.fn(),
-        },
-        package: {
-            update: jest.fn(),
-            deleteMany: jest.fn(),
-        },
-        transaction: {
-            update: jest.fn(),
-            deleteMany: jest.fn(),
-        },
-        // $extends is used by getTenantClient() — return the mock itself
-        // so all model-level mocks remain accessible after the extend call
-        $extends: jest.fn().mockImplementation(function(this: any) { return mockPrisma; }),
-    };
-    return { __esModule: true, default: mockPrisma };
-});
+// ── Mock getTenantClient so no real DB is needed ──────────────────────────────
+const mockUpdate   = jest.fn();
+const mockDeleteMany = jest.fn();
 
-import prismaMock from '../lib/prisma';
+const mockDb: any = {
+    client:       { update: mockUpdate, deleteMany: mockDeleteMany },
+    user:         { update: mockUpdate, deleteMany: mockDeleteMany },
+    subscription: { update: mockUpdate, deleteMany: mockDeleteMany },
+    router:       { update: mockUpdate, deleteMany: mockDeleteMany },
+    package:      { update: mockUpdate, deleteMany: mockDeleteMany },
+    transaction:  { update: mockUpdate, deleteMany: mockDeleteMany },
+};
+
+jest.mock('../lib/tenantPrisma', () => ({
+    getTenantClient: jest.fn(() => mockDb),
+}));
+
+// Also mock prisma so the module can be imported without a real DB connection
+jest.mock('../lib/prisma', () => ({
+    __esModule: true,
+    default: {
+        $extends: jest.fn().mockReturnValue({}),
+    },
+}));
+
 import {
     softDelete, restore, isSoftDeleted,
     notDeleted, onlyDeleted, purgeOldSoftDeleted,
     type SoftDeletableModel,
 } from '../lib/softDelete';
 
-// â”€â”€ Pure helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Pure helpers ──────────────────────────────────────────────────────────────
 describe('isSoftDeleted', () => {
     it('returns true when deletedAt is a Date', () => {
         expect(isSoftDeleted({ deletedAt: new Date() })).toBe(true);
@@ -73,23 +63,21 @@ describe('onlyDeleted', () => {
     });
 });
 
-// â”€â”€ softDelete() â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── softDelete() ──────────────────────────────────────────────────────────────
 describe('softDelete', () => {
-    const mockUpdate = (prismaMock as any).client.update as jest.MockedFunction<any>;
-
     beforeEach(() => jest.clearAllMocks());
 
     it('calls prisma update with deletedAt = now and returns result', async () => {
         const now = new Date();
         mockUpdate.mockResolvedValue({ id: 'client-1', deletedAt: now });
 
-        const result = await softDelete('client', 'client-1');
+        const result = await softDelete('client', 'client-1', 'tenant-1');
 
-        expect(mockUpdate).toHaveBeenCalledWith({
-            where: { id: 'client-1' },
+        expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({
+            where: expect.objectContaining({ id: 'client-1' }),
             data: { deletedAt: expect.any(Date) },
             select: { id: true, deletedAt: true },
-        });
+        }));
         expect(result?.deletedAt).toBeInstanceOf(Date);
     });
 
@@ -97,39 +85,37 @@ describe('softDelete', () => {
         const p2025 = Object.assign(new Error('Not found'), { code: 'P2025' });
         mockUpdate.mockRejectedValue(p2025);
 
-        const result = await softDelete('client', 'nonexistent');
+        const result = await softDelete('client', 'nonexistent', 'tenant-1');
         expect(result).toBeNull();
     });
 
     it('rethrows non-P2025 errors', async () => {
         mockUpdate.mockRejectedValue(new Error('DB connection lost'));
 
-        await expect(softDelete('client', 'client-1')).rejects.toThrow('DB connection lost');
+        await expect(softDelete('client', 'client-1', 'tenant-1')).rejects.toThrow('DB connection lost');
     });
 
     it('throws for unsupported model', async () => {
         await expect(
-            softDelete('invoice' as SoftDeletableModel, 'x')
+            softDelete('invoice' as SoftDeletableModel, 'x', 'tenant-1')
         ).rejects.toThrow(/not supported/i);
     });
 });
 
-// â”€â”€ restore() â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── restore() ─────────────────────────────────────────────────────────────────
 describe('restore', () => {
-    const mockUpdate = (prismaMock as any).client.update as jest.MockedFunction<any>;
-
     beforeEach(() => jest.clearAllMocks());
 
     it('calls prisma update with deletedAt = null', async () => {
         mockUpdate.mockResolvedValue({ id: 'client-1', deletedAt: null });
 
-        const result = await restore('client', 'client-1');
+        const result = await restore('client', 'client-1', 'tenant-1');
 
-        expect(mockUpdate).toHaveBeenCalledWith({
-            where: { id: 'client-1' },
+        expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({
+            where: expect.objectContaining({ id: 'client-1' }),
             data: { deletedAt: null },
             select: { id: true, deletedAt: true },
-        });
+        }));
         expect(result?.deletedAt).toBeNull();
     });
 
@@ -137,22 +123,16 @@ describe('restore', () => {
         const p2025 = Object.assign(new Error('Not found'), { code: 'P2025' });
         mockUpdate.mockRejectedValue(p2025);
 
-        expect(await restore('client', 'x')).toBeNull();
+        expect(await restore('client', 'x', 'tenant-1')).toBeNull();
     });
 });
 
-// â”€â”€ purgeOldSoftDeleted() â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── purgeOldSoftDeleted() ─────────────────────────────────────────────────────
 describe('purgeOldSoftDeleted', () => {
     beforeEach(() => jest.clearAllMocks());
 
     it('calls deleteMany on all six models and returns counts', async () => {
-        const mockCount = { count: 3 };
-        const mockDelete = (model: string) =>
-            ((prismaMock as any)[model].deleteMany as jest.MockedFunction<any>)
-                .mockResolvedValue(mockCount);
-
-        ['client', 'user', 'subscription', 'router', 'package', 'transaction']
-            .forEach(mockDelete);
+        mockDeleteMany.mockResolvedValue({ count: 3 });
 
         const result = await purgeOldSoftDeleted(90);
 
@@ -164,13 +144,9 @@ describe('purgeOldSoftDeleted', () => {
 
     it('uses a cutoff date older than daysOld', async () => {
         const captured: Date[] = [];
-        const capturingMock = jest.fn().mockImplementation(({ where }: any) => {
+        mockDeleteMany.mockImplementation(({ where }: any) => {
             captured.push(where.deletedAt.lte);
             return Promise.resolve({ count: 0 });
-        });
-
-        ['client', 'user', 'subscription', 'router', 'package', 'transaction'].forEach(m => {
-            (prismaMock as any)[m].deleteMany = capturingMock;
         });
 
         const before = Date.now();
@@ -178,6 +154,7 @@ describe('purgeOldSoftDeleted', () => {
         const after = Date.now();
 
         const cutoff = captured[0];
+        expect(cutoff).toBeInstanceOf(Date);
         expect(cutoff.getTime()).toBeLessThan(before - 29 * 24 * 60 * 60 * 1000);
         expect(cutoff.getTime()).toBeGreaterThan(after - 31 * 24 * 60 * 60 * 1000);
     });

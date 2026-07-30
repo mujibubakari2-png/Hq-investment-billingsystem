@@ -6,6 +6,8 @@ import { canAccessTenant } from "@/lib/tenant";
 import { RouterUpdateSchema } from "@/lib/validators";
 import { encrypt, encryptRouterFields, decryptRouterFields } from "@/lib/encryption";
 import { generateRadiusSecret } from "@/lib/routerProvisioning";
+import { detectRouterCapabilities, normalizeRouterVendor } from "@/lib/routerAdapters";
+import { detectApiType } from "@/lib/versionCompatibility";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
@@ -104,6 +106,45 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         if (update.status) data.status = update.status.toUpperCase();
         if (typeof update.accountingEnabled !== 'undefined') data.accountingEnabled = !!update.accountingEnabled;
 
+        const existingRouterData = existingRouter as any;
+        const vendor = normalizeRouterVendor(update.vendor || body.vendor || body.type || existingRouterData.vendor || existingRouterData.type || "MikroTik");
+        const hasVendorChange = Boolean(update.vendor || body.vendor || body.type);
+        if (hasVendorChange) {
+            data.vendor = vendor;
+            data.type = update.vendor || body.vendor || body.type || existingRouterData.type || "MikroTik";
+        }
+
+        const model = update.model || body.model || existingRouterData.model || null;
+        if (update.model || body.model || existingRouterData.model) {
+            data.model = model;
+        }
+
+        const architecture = update.architecture || body.architecture || existingRouterData.architecture || null;
+        if (update.architecture || body.architecture || existingRouterData.architecture) {
+            data.architecture = architecture;
+        }
+
+        const firmwareVersion = update.firmwareVersion || body.firmwareVersion || body.firmware || existingRouterData.firmwareVersion || null;
+        if (update.firmwareVersion || body.firmwareVersion || body.firmware || existingRouterData.firmwareVersion || hasVendorChange || (update.architecture || body.architecture || existingRouterData.architecture)) {
+            const resolvedFirmwareVersion = firmwareVersion || (vendor === "mikrotik" ? "6.49.10" : "1.0.0");
+            const capabilities = detectRouterCapabilities(
+                vendor,
+                resolvedFirmwareVersion,
+                architecture
+            );
+            data.firmwareVersion = resolvedFirmwareVersion;
+
+            // Resolve apiType using the dedicated helper
+            const detectedApiType = detectApiType(vendor as any, resolvedFirmwareVersion);
+            data.apiType = update.apiType || body.apiType || detectedApiType || existingRouterData.apiType || "SSH";
+            data.capabilities = JSON.stringify(capabilities.capabilities);
+            data.supportedFeatures = capabilities.supportedFeatures.join(",");
+        }
+        if (update.licenseLevel || body.licenseLevel) data.licenseLevel = update.licenseLevel || body.licenseLevel || null;
+        if (update.healthStatus || body.healthStatus) data.healthStatus = update.healthStatus || body.healthStatus || "UNKNOWN";
+        if (update.provisioningStatus || body.provisioningStatus) data.provisioningStatus = update.provisioningStatus || body.provisioningStatus || "PENDING";
+        if (update.featureFlags || body.featureFlags) data.featureFlags = update.featureFlags || body.featureFlags || null;
+
         const encryptedData = encryptRouterFields(data);
         const router = await db.router.update({ where: { id }, data: encryptedData });
 
@@ -134,9 +175,9 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
             // RADIUS NAS secret MUST be stored in plaintext. FreeRADIUS daemon does not support AES-GCM.
             await db.radiusNas.update({
                 where: { id: existingNas.id },
-                data: { 
+                data: {
                     shortName: router.name,
-                    secret: radiusSecret 
+                    secret: radiusSecret
                 }
             });
         } else {

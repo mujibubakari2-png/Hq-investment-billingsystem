@@ -174,7 +174,7 @@ export async function GET() {
         if (!queueResult.ok) {
             throw new Error(queueResult.error ?? 'Queue inspection timed out');
         }
-        const counts = queueResult.data;
+        const counts = queueResult.data as any;
         response.queue = counts;
 
         const FAILED_THRESHOLD = 100;

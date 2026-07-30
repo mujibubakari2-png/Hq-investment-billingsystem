@@ -11,6 +11,7 @@ import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 import { mobileTransactionsApi, type MobileTransactionEntry } from '../api';
 import { normalizeApiList } from '../utils/apiResponse';
 import { formatDateTime } from '../utils/formatters';
+import { Popup } from '../stores/popupStore';
 
 interface MobileTransactionsSummaries {
     today?: {
@@ -42,7 +43,7 @@ export default function MobileTransactions() {
     const [activeGateways, setActiveGateways] = useState<string[]>([]);
 
     const handleExport = () => {
-        if (transactions.length === 0) return alert('No transactions to export!');
+        if (transactions.length === 0) return Popup.warning('Export Failed', 'No transactions to export!');
 
         const headers = ['User', 'Plan', 'Amount', 'Method', 'Transaction ID', 'Status', 'Date'];
         const csvContent = "data:text/csv;charset=utf-8,"
@@ -339,9 +340,9 @@ export default function MobileTransactions() {
                                                         const ref = tx.transactionId || tx.reference;
                                                         if (ref) {
                                                             navigator.clipboard.writeText(ref);
-                                                            alert(`Copied: ${ref}`);
+                                                            Popup.success('Copied', `Copied Transaction ID: ${ref}`);
                                                         } else {
-                                                            alert('No Transaction ID mapped.');
+                                                            Popup.warning('Copy Failed', 'No Transaction ID mapped.');
                                                         }
                                                     }}
                                                 >

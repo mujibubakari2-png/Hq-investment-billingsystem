@@ -479,6 +479,55 @@ export default function HotspotLoginCustomizer() {
         var currentPkg = null;
         var pollInterval = null;
 
+        function showCustomAlert(title, message, type) {
+            var overlay = document.getElementById('customAlertOverlay');
+            if (!overlay) {
+                overlay = document.createElement('div');
+                overlay.id = 'customAlertOverlay';
+                overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:99999;font-family:inherit;backdrop-filter:blur(4px);opacity:0;transition:opacity 0.3s ease;';
+                var box = document.createElement('div');
+                box.id = 'customAlertBox';
+                box.style.cssText = 'background:#fff;border-radius:12px;padding:24px;width:90%;max-width:320px;text-align:center;box-shadow:0 10px 25px rgba(0,0,0,0.2);transform:scale(0.9);transition:transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);';
+                var icon = document.createElement('div');
+                icon.id = 'customAlertIcon';
+                icon.style.cssText = 'width:48px;height:48px;border-radius:50%;margin:0 auto 16px;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:bold;';
+                var titleEl = document.createElement('h3');
+                titleEl.id = 'customAlertTitle';
+                titleEl.style.cssText = 'margin:0 0 8px;font-size:1.1rem;color:#111827;';
+                var msgEl = document.createElement('p');
+                msgEl.id = 'customAlertMsg';
+                msgEl.style.cssText = 'margin:0 0 20px;font-size:0.9rem;color:#4b5563;line-height:1.5;';
+                var btn = document.createElement('button');
+                btn.innerText = 'OK';
+                btn.style.cssText = 'width:100%;padding:10px;background:' + PRIMARY + ';color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer;';
+                btn.onclick = function() {
+                    overlay.style.opacity = '0';
+                    box.style.transform = 'scale(0.9)';
+                    setTimeout(function(){ overlay.style.display = 'none'; }, 300);
+                };
+                box.appendChild(icon);
+                box.appendChild(titleEl);
+                box.appendChild(msgEl);
+                box.appendChild(btn);
+                overlay.appendChild(box);
+                document.body.appendChild(overlay);
+            }
+            var icon = document.getElementById('customAlertIcon');
+            if (type === 'error') {
+                icon.style.background = '#fee2e2'; icon.style.color = '#ef4444'; icon.innerHTML = '✕';
+            } else if (type === 'success') {
+                icon.style.background = '#dcfce7'; icon.style.color = '#22c55e'; icon.innerHTML = '✓';
+            } else {
+                icon.style.background = '#e0e7ff'; icon.style.color = '#6366f1'; icon.innerHTML = 'ℹ';
+            }
+            document.getElementById('customAlertTitle').innerText = title || 'Notification';
+            document.getElementById('customAlertMsg').innerText = message || '';
+            overlay.style.display = 'flex';
+            void overlay.offsetWidth; // trigger reflow
+            overlay.style.opacity = '1';
+            document.getElementById('customAlertBox').style.transform = 'scale(1)';
+        }
+
         // â”€â”€ Packages baked-in at generation time (always show these immediately) â”€â”€
         var fallbackPackages = ${JSON.stringify(
             routerPackages.length > 0
@@ -521,7 +570,7 @@ export default function HotspotLoginCustomizer() {
 
         function initiatePurchase() {
             var phone = document.getElementById('phoneInput').value;
-            if (!phone || phone.length < 10) { alert('Please enter a valid phone number'); return; }
+            if (!phone || phone.length < 10) { showCustomAlert('Validation Error', 'Please enter a valid phone number', 'error'); return; }
             
             var btn = document.getElementById('btnPay');
             btn.disabled = true;
@@ -551,7 +600,7 @@ export default function HotspotLoginCustomizer() {
                 startPolling(d.reference);
             })
             .catch(function(err) {
-                alert(err.message || 'Failed to initiate purchase');
+                showCustomAlert('Error', err.message || 'Failed to initiate purchase', 'error');
                 btn.disabled = false;
                 btn.innerText = 'Pay Now';
             });
@@ -580,7 +629,7 @@ export default function HotspotLoginCustomizer() {
                         }
                     } else if (d.status === 'FAILED') {
                         clearInterval(pollInterval);
-                        alert(d.message || 'Payment failed or cancelled. Please try again.');
+                        showCustomAlert('Payment Failed', d.message || 'Payment failed or cancelled. Please try again.', 'error');
                         closePayment();
                     } else if (d.title) {
                         document.getElementById('pollStatus').innerText = d.title;
@@ -591,7 +640,7 @@ export default function HotspotLoginCustomizer() {
                     // Network or parse error during polling — stop polling and surface message
                     if (pollInterval) clearInterval(pollInterval);
                     console.error('[Hotspot] status poll error:', err);
-                    alert(err.message || 'Failed to check payment status. Please try again later.');
+                    showCustomAlert('Network Error', err.message || 'Failed to check payment status. Please try again later.', 'error');
                     closePayment();
                 });
             }, 3000);
@@ -627,7 +676,7 @@ export default function HotspotLoginCustomizer() {
 
         function doVoucher() {
             var code = document.getElementById('voucher-code').value;
-            if (!code) { alert('Please enter a voucher code'); return false; }
+            if (!code) { showCustomAlert('Validation Error', 'Please enter a voucher code', 'error'); return false; }
             
             var btn = document.forms['voucher_form'].querySelector('button');
             btn.disabled = true;
@@ -646,14 +695,14 @@ export default function HotspotLoginCustomizer() {
                 .then(function(d) {
                 if (d && typeof d.error === 'string') { throw new Error(d.error); }
                 if (d.title) {
-                    alert(d.title + '\n' + (d.message || 'Connecting...'));
+                    showCustomAlert(d.title, d.message || 'Connecting...', 'success');
                 } else {
-                    alert('Voucher valid! Connecting...');
+                    showCustomAlert('Success', 'Voucher valid! Connecting...', 'success');
                 }
                 connectUser(d.username, d.password || '');
             })
             .catch(function(err) {
-                alert(err.message || 'Failed to redeem voucher');
+                showCustomAlert('Error', err.message || 'Failed to redeem voucher', 'error');
                 btn.disabled = false;
                 btn.innerText = 'Redeem';
             });
@@ -663,7 +712,7 @@ export default function HotspotLoginCustomizer() {
 
         function doReconnect() {
             var ref = document.getElementById('zenopay-ref').value;
-            if (!ref) { alert('Please enter your reference'); return; }
+            if (!ref) { showCustomAlert('Validation Error', 'Please enter your reference', 'error'); return; }
             
             var btn = document.querySelector('button[onclick="doReconnect()"]');
             btn.disabled = true;

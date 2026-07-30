@@ -44,7 +44,7 @@ export async function GET(req: Request) {
       try {
         if (sub.routerId) {
           const serviceType = sub.client?.serviceType === "HOTSPOT" ? "hotspot" : "pppoe";
-          await enqueueSuspendService(sub.routerId, username, serviceType, sub.tenantId ?? null);
+          await enqueueSuspendService(sub.routerId, sub.tenantId ?? null, username, serviceType as "pppoe" | "hotspot");
         }
 
         await enqueueRadiusSuspendUser(username, sub.tenantId ?? null, `expire-${sub.id}`);

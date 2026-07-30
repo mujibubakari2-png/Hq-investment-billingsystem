@@ -196,14 +196,7 @@ export async function POST(req: NextRequest) {
             try {
                 const pwd = sub.client.phone || "123456";
                 const type = sub.client.serviceType === "HOTSPOT" ? "hotspot" : "pppoe";
-                await enqueueActivateService(
-                    sub.routerId,
-                    sub.client.username,
-                    pwd,
-                    sub.package.name,
-                    type,
-                    userPayload.tenantId ?? null
-                );
+                await enqueueActivateService(sub.routerId, userPayload.tenantId ?? null, sub.client.username, pwd, sub.package.name, type as "pppoe" | "hotspot");
 
                 await db.subscription.update({ where: { id: sub.id }, data: { syncStatus: "PENDING_MIKROTIK_ACTIVATION" } });
                 await db.routerLog.create({

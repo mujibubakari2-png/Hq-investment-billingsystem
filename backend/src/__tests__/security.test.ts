@@ -32,52 +32,68 @@ function mkModel(overrides: Record<string, jest.Mock> = {}) {
   };
 }
 
-// Expose refs so individual tests can reconfigure return values
-const models = {
-  paymentChannel: mkModel(),
-  transaction:    mkModel(),
-  // webhookLog.findFirst must return a truthy value so the tenantPrisma proxy
-  // ownership check (in the `.update` interceptor) does not throw
-  // "Not Found or Unauthorized for webhookLog update".
-  webhookLog: mkModel({
-    create:    jest.fn().mockResolvedValue({ id: 'wl-001' }),
-    findFirst: jest.fn().mockResolvedValue({ id: 'wl-001' }),
-  }),
-  subscription: mkModel(),
-  client:       mkModel(),
-  package:      mkModel(),
-  routerLog:    mkModel(),
-};
-
-jest.mock('@/lib/prisma', () => ({
-  __esModule: true,
-  default: {
-    ...models,
+jest.mock('@/lib/prisma', () => {
+  function mkM(overrides: Record<string, jest.Mock> = {}) {
+    return {
+      findFirst:        jest.fn().mockResolvedValue(null),
+      findMany:         jest.fn().mockResolvedValue([]),
+      findUnique:       jest.fn().mockResolvedValue(null),
+      findFirstOrThrow: jest.fn().mockResolvedValue(null),
+      updateMany:       jest.fn().mockResolvedValue({ count: 0 }),
+      update:           jest.fn().mockResolvedValue({ id: 'mock-id' }),
+      create:           jest.fn().mockResolvedValue({ id: 'mock-id' }),
+      createMany:       jest.fn().mockResolvedValue({ count: 0 }),
+      delete:           jest.fn().mockResolvedValue({}),
+      deleteMany:       jest.fn().mockResolvedValue({ count: 0 }),
+      count:            jest.fn().mockResolvedValue(0),
+      aggregate:        jest.fn().mockResolvedValue({}),
+      ...overrides,
+    };
+  }
+  const db: any = {
+    paymentChannel: mkM(),
+    transaction:    mkM(),
+    // webhookLog.findFirst must return truthy for ownership-check in proxy
+    webhookLog: mkM({
+      create:    jest.fn().mockResolvedValue({ id: 'wl-001' }),
+      findFirst: jest.fn().mockResolvedValue({ id: 'wl-001' }),
+    }),
+    subscription: mkM(),
+    client:       mkM(),
+    package:      mkM(),
+    routerLog:    mkM(),
     $transaction: jest.fn(async (fn: any) =>
       fn({
         transaction: {
-          ...models.transaction,
+          ...mkM(),
           updateMany: jest.fn().mockResolvedValue({ count: 1 }),
           findUnique: jest.fn().mockResolvedValue({ id: 'tx-001', status: 'COMPLETED' }),
-          update: jest.fn().mockResolvedValue({ id: 'tx-001' }),
+          update:     jest.fn().mockResolvedValue({ id: 'tx-001' }),
         },
         subscription: {
-          ...models.subscription,
+          ...mkM(),
           findFirst: jest.fn().mockResolvedValue(null),
           create:    jest.fn().mockResolvedValue({ id: 'sub-001', expiresAt: new Date() }),
           update:    jest.fn().mockResolvedValue({ id: 'sub-001' }),
         },
         client: {
-          ...models.client,
+          ...mkM(),
           update: jest.fn().mockResolvedValue({ id: 'client-001', status: 'ACTIVE' }),
         },
         invoice: {
-          ...mkModel(),
+          ...mkM(),
           update: jest.fn().mockResolvedValue({}),
         },
       })
     ),
-  },
+  };
+  // $extends must return the same db so getTenantClient's proxy wraps the correct target
+  db.$extends = jest.fn().mockReturnValue(db);
+  return { __esModule: true, default: db };
+});
+
+jest.mock('@/lib/tenantPrisma', () => ({
+  getTenantClient: jest.fn(),
 }));
 
 jest.mock('@/lib/payments/registry', () => ({
@@ -91,6 +107,19 @@ jest.mock('@/lib/radius',   () => ({ syncRadiusUser: jest.fn() }));
 import { PaymentService } from '@/lib/payments/service';
 import { getPaymentProvider } from '@/lib/payments/registry';
 import { hasPermission } from '@/lib/rbac';
+import { getTenantClient } from '@/lib/tenantPrisma';
+
+// Access the mocked prisma models for per-test reconfiguration
+// (models live inside the jest.mock factory to avoid hoisting issues)
+const models = {
+  get paymentChannel() { return require('@/lib/prisma').default.paymentChannel; },
+  get transaction()    { return require('@/lib/prisma').default.transaction; },
+  get webhookLog()     { return require('@/lib/prisma').default.webhookLog; },
+  get subscription()   { return require('@/lib/prisma').default.subscription; },
+  get client()         { return require('@/lib/prisma').default.client; },
+  get package()        { return require('@/lib/prisma').default.package; },
+  get routerLog()      { return require('@/lib/prisma').default.routerLog; },
+};
 
 // ── Fixture ────────────────────────────────────────────────────────────────
 const PENDING_TX = {
@@ -139,8 +168,12 @@ describe('Security — Webhook Signature Verification', () => {
   let svc: PaymentService;
 
   beforeEach(() => {
+    const prismaMock = require('@/lib/prisma').default;
+    (getTenantClient as jest.Mock).mockReturnValue(prismaMock);
     svc = new PaymentService();
     jest.clearAllMocks();
+    // Re-apply after clearAllMocks
+    (getTenantClient as jest.Mock).mockReturnValue(prismaMock);
     // Ensure webhookLog operations work through the tenantPrisma proxy.
     // findFirst must return the log object so the ownership-check passes on .update.
     models.webhookLog.create.mockResolvedValue({ id: 'wl-001' });

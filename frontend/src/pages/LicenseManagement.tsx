@@ -4,6 +4,7 @@ import PeopleIcon from '@mui/icons-material/People';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import WarningIcon from '@mui/icons-material/Warning';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
+import { Popup } from '../stores/popupStore';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import PaymentIcon from '@mui/icons-material/Payment';
 import { licenseApi, saasPlansApi, type LicenseResponse, type SaasPlan } from '../api';
@@ -131,7 +132,7 @@ export default function LicenseManagement() {
     const copyKey = () => {
         if (licenseKey) {
             navigator.clipboard.writeText(licenseKey);
-            alert('License key copied to clipboard!');
+            Popup.success('Copied', 'License key copied to clipboard!');
         }
     };
 
@@ -302,7 +303,7 @@ export default function LicenseManagement() {
             {/* Invoice Status — one clear card, one action per invoice row (no duplicate Pay buttons) */}
             {hasAnyPending && sortedPendingInvoices.length > 0 && (
                 <div style={{
-                    background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '8px', padding: '16px 24px', 
+                    background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '8px', padding: '16px 24px',
                     display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px',
                     marginBottom: '24px'
                 }}>

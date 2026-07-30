@@ -168,11 +168,11 @@ export async function POST(
                     const type = client.serviceType === "HOTSPOT" ? "hotspot" : "pppoe";
                     await enqueueActivateService(
                         pkg.routerId,
+                        invoice.tenantId,
                         client.username,
                         pwd,
                         pkg.name,
                         type,
-                        invoice.tenantId,
                         expiresAt
                     );
                     if (newSub?.id) {

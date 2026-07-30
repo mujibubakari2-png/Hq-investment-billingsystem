@@ -64,22 +64,57 @@ export interface Router {
   password?: string;
   port?: number;
   apiPort?: number;
-  type: 'MikroTik';
+  /** Legacy field — kept for backward compat; prefer vendor */
+  type: string;
+  // ── Vendor / multi-vendor fields ──────────────────────────────────────
+  vendor?: string;
+  model?: string | null;
+  architecture?: string | null;
+  firmwareVersion?: string | null;
+  apiType?: string | null;
+  /** JSON object of capability flags: { pppoe: bool, hotspot: bool, ... } */
+  capabilities?: Record<string, boolean> | string | null;
+  /** Array of supported feature names e.g. ['pppoe', 'hotspot', 'wireguard'] */
+  supportedFeatures?: string[];
+  licenseLevel?: string | null;
+  // ── Health / provisioning status ──────────────────────────────────────
+  /** HEALTHY | DEGRADED | UNREACHABLE | UNKNOWN */
+  healthStatus?: string | null;
+  /** PROVISIONED | IN_PROGRESS | FAILED | PARTIAL | DRY_RUN | NOT_PROVISIONED */
+  provisioningStatus?: string | null;
+  lastDiscovery?: string | null;
+  lastSync?: string | null;
+  errorState?: string | null;
+  featureFlags?: Record<string, boolean> | null;
+  // ── Connection / VPN ──────────────────────────────────────────────────
   vpnMode?: string;
   description?: string;
+  wgEnabled?: boolean;
+  /** WireGuard public key — safe to expose to frontend */
+  wgPublicKey?: string | null;
+  wgServerEndpoint?: string | null;
+  wgTunnelIp?: string | null;
+  wgListenPort?: number | null;
+  // ── Network config ────────────────────────────────────────────────────
+  lanIp?: string | null;
+  lanGateway?: string | null;
+  hotspotPoolRange?: string | null;
+  pppoePoolRange?: string | null;
+  dns?: string | null;
+  radiusSecret?: string;
+  // ── Wireless ─────────────────────────────────────────────────────────
+  wlanEnabled?: boolean;
+  wlan1Ssid?: string | null;
+  wlan2Ssid?: string | null;
+  // ── Runtime stats ─────────────────────────────────────────────────────
   status: 'Online' | 'Offline';
   activeUsers: number;
   cpuLoad: number;
   memoryUsed: number;
   uptime: string;
   lastSeen: string;
-  lanIp?: string;
-  lanGateway?: string;
-  hotspotPoolRange?: string;
-  pppoePoolRange?: string;
-  dns?: string;
-  radiusSecret?: string;
 }
+
 
 export interface Equipment {
   id: string;

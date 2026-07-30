@@ -10,10 +10,14 @@
  * Setup:
  *   1. Generate a key: node -e "logger.info(require('crypto').randomBytes(32).toString('hex'))"
  *   2. Add to .env: FIELD_ENCRYPTION_KEY=<your-64-char-hex-string>
- *   3. Run a one-time migration script to encrypt existing plaintext values.
+ *   3. To rotate, add FIELD_ENCRYPTION_KEY_V2 and set ACTIVE_ENCRYPTION_VERSION=v2
+ *   4. Run a one-time migration script to encrypt existing plaintext values.
  *
  * Encrypted format: "enc:v1:<iv_hex>:<authTag_hex>:<ciphertext_hex>"
  * Plaintext values (not yet migrated) pass through transparently.
+ *
+ * ENTERPRISE-015: Secret Rotation via KMS/Vault pattern.
+ * Supports multiple key versions concurrently to allow zero-downtime rotation.
  */
 
 import crypto from 'crypto';
@@ -22,20 +26,36 @@ import logger from "@/lib/logger";
 const ALGORITHM   = 'aes-256-gcm';
 const IV_LENGTH   = 12; // 96-bit IV recommended for GCM
 const TAG_LENGTH  = 16;
-const PREFIX      = 'enc:v1:';
+const PREFIX_BASE = 'enc:';
 
-function getKey(): Buffer {
-  const hex = process.env.FIELD_ENCRYPTION_KEY;
+/**
+ * Get the encryption key for a specific version.
+ * If version is 'v1', it checks FIELD_ENCRYPTION_KEY.
+ * For 'v2', it checks FIELD_ENCRYPTION_KEY_V2, etc.
+ */
+function getKey(version: string): Buffer {
+  const envKey = version === 'v1' ? 'FIELD_ENCRYPTION_KEY' : `FIELD_ENCRYPTION_KEY_${version.toUpperCase()}`;
+  const hex = process.env[envKey];
+
   if (!hex) {
+    // Fallback to KMS fetcher in a real enterprise setup:
+    // return await fetchKeyFromVault(version);
     throw new Error(
-      'FATAL: FIELD_ENCRYPTION_KEY is required in all environments. ' +
-      'Generate one with: node -e "logger.info(require(\'crypto\').randomBytes(32).toString(\'hex\'))"'
+      `FATAL: ${envKey} is required in all environments. ` +
+      'Generate one with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"'
     );
   }
   if (hex.length !== 64) {
-    throw new Error('FIELD_ENCRYPTION_KEY must be a 64-character hex string (32 bytes).');
+    throw new Error(`${envKey} must be a 64-character hex string (32 bytes).`);
   }
   return Buffer.from(hex, 'hex');
+}
+
+/**
+ * Determines which key version to use for new encryptions.
+ */
+function getActiveVersion(): string {
+  return process.env.ACTIVE_ENCRYPTION_VERSION || 'v1';
 }
 
 /**
@@ -44,16 +64,25 @@ function getKey(): Buffer {
  */
 export function encrypt(plaintext: string | null | undefined): string | null {
   if (!plaintext) return plaintext ?? null;
-  if (plaintext.startsWith(PREFIX)) return plaintext; // already encrypted
+  const activeVersion = getActiveVersion();
+  const activePrefix = `${PREFIX_BASE}${activeVersion}:`;
 
-  const key = getKey();
+  if (plaintext.startsWith(PREFIX_BASE)) {
+    // If it's already encrypted with the ACTIVE version, skip.
+    if (plaintext.startsWith(activePrefix)) return plaintext;
+
+    // If it's encrypted with an OLDER version, decrypt it first so we can re-encrypt.
+    plaintext = decrypt(plaintext)!;
+  }
+
+  const key = getKey(activeVersion);
   const iv  = crypto.randomBytes(IV_LENGTH);
   const cipher = crypto.createCipheriv(ALGORITHM, key, iv, { authTagLength: TAG_LENGTH });
 
   const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
   const authTag   = cipher.getAuthTag();
 
-  return `${PREFIX}${iv.toString('hex')}:${authTag.toString('hex')}:${encrypted.toString('hex')}`;
+  return `${activePrefix}${iv.toString('hex')}:${authTag.toString('hex')}:${encrypted.toString('hex')}`;
 }
 
 /**
@@ -62,13 +91,18 @@ export function encrypt(plaintext: string | null | undefined): string | null {
  */
 export function decrypt(value: string | null | undefined): string | null {
   if (!value) return value ?? null;
-  if (!value.startsWith(PREFIX)) return value; // not encrypted yet — pass through
+  if (!value.startsWith(PREFIX_BASE)) return value; // not encrypted yet — pass through
 
-  const parts = value.slice(PREFIX.length).split(':');
-  if (parts.length !== 3) throw new Error('Invalid encrypted field format.');
+  const parts = value.split(':');
+  // Format: "enc", "v1", "<iv>", "<tag>", "<cipher>"
+  if (parts.length !== 5 || parts[0] !== 'enc') throw new Error('Invalid encrypted field format.');
 
-  const [ivHex, tagHex, ciphertextHex] = parts;
-  const key        = getKey();
+  const version = parts[1];
+  const ivHex = parts[2];
+  const tagHex = parts[3];
+  const ciphertextHex = parts[4];
+
+  const key        = getKey(version);
   const iv         = Buffer.from(ivHex, 'hex');
   const authTag    = Buffer.from(tagHex, 'hex');
   const ciphertext = Buffer.from(ciphertextHex, 'hex');
@@ -81,7 +115,7 @@ export function decrypt(value: string | null | undefined): string | null {
 
 /** Returns true if the value is already encrypted */
 export function isEncrypted(value: string | null | undefined): boolean {
-  return !!value?.startsWith(PREFIX);
+  return !!value?.startsWith(PREFIX_BASE);
 }
 
 /**

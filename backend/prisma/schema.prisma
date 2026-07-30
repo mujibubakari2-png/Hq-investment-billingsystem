@@ -196,78 +196,107 @@ model Transaction {
 }
 
 model Router {
-  id                String           @id @default(uuid())
-  name              String
-  host              String
+  id                 String       @id @default(uuid())
+  name               String
+  host               String
   // SEC-ROUTER-004 FIX: New routers now get a unique, randomly-generated
   // username at creation time (see generateAdminUsername() in
   // routerProvisioning.ts) instead of always defaulting to the literal
   // "admin" — the @default("admin") below only applies to rows/paths that
   // bypass the application layer (e.g. raw SQL, legacy rows).
-  username          String?          @default("admin")
-  password          String?
+  username           String?      @default("admin")
+  password           String?
   // SEC-ROUTER-003 FIX: RADIUS shared secret is now a field SEPARATE from the
   // admin password (previously the admin password was reused as the RADIUS
   // secret for every router, and defaulted to a static "hqsecret" string when
   // missing). Generated per-router at creation time, AES-256-GCM encrypted at
   // rest via encryptRouterFields()/decryptRouterFields().
-  radiusSecret      String?
-  port              Int?             @default(8728)
-  type              String           @default("MikroTik")
-  status            RouterStatus     @default(OFFLINE)
-  activeUsers       Int              @default(0)
-  cpuLoad           Float            @default(0)
-  memoryUsed        Float            @default(0)
-  uptime            String?
-  lastSeen          DateTime?
-  accountingEnabled Boolean          @default(true)
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
-  deletedAt         DateTime?
-  tenantId          String?
-  apiPort           Int?             @default(8728)
+  radiusSecret       String?
+  port               Int?         @default(8728)
+  type               String       @default("MikroTik")
+  vendor             String?      @default("mikrotik")
+  model              String?
+  architecture       String?
+  firmwareVersion    String?
+  apiType            String?
+  capabilities       Json? // Typed JSON: { pppoe: bool, hotspot: bool, … } — see RouterCapabilitySet
+  supportedFeatures  String[] // e.g. ["PPPoE","Hotspot","RADIUS"] — PostgreSQL array
+  licenseLevel       String?
+  healthStatus       String?
+  provisioningStatus String?
+  lastDiscovery      DateTime?
+  lastSync           DateTime?
+  errorState         String?
+  featureFlags       String?
+  status             RouterStatus @default(OFFLINE)
+  activeUsers        Int          @default(0)
+  cpuLoad            Float        @default(0)
+  memoryUsed         Float        @default(0)
+  uptime             String?
+  lastSeen           DateTime?
+  accountingEnabled  Boolean      @default(true)
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+  deletedAt          DateTime?
+  tenantId           String?
+  apiPort            Int?         @default(8728)
   // Optional REST API port, separate from the terminal/Winbox port (8728).
   // RouterOS REST API runs on 80 (HTTP) or 443 (HTTPS) by default, but can be custom.
   // If null, getMikroTikService() auto-maps port 8728/8729 → 80/443 as before.
-  restPort          Int?
-  description       String?
-  vpnMode           String?          @default("hybrid")
+  restPort           Int?
+  description        String?
+  vpnMode            String?      @default("hybrid")
+  // ENTERPRISE-014: Multi-Region Worker Affinity
+  region             Region? // Inherits from Tenant if null
+
+  // ENTERPRISE-012: Carrier-Grade Backup Verification
+  lastBackupAt         DateTime?
+  lastBackupChecksum   String?
+  lastBackupUrl        String?
+  backupSize           Int? // Size in bytes
+  backupType           String? // e.g. "binary", "export"
+  backupVersion        String? // RouterOS version during backup
+  backupVerified       Boolean?  @default(false)
+  backupStorage        String? // e.g. "s3", "local"
+  backupRetentionUntil DateTime?
+
   // ── Network configuration fields (used by /api/routers/[id]/script) ──────────
   // These were present in route code but missing from the schema, causing TS errors.
   // All optional — existing routers without these values get null (script endpoint
   // validates them and returns a 400 with the specific missing field names).
-  lanIp             String? // e.g. "192.168.88.1"
-  lanGateway        String? // e.g. "192.168.88.1"
-  hotspotPoolRange  String? // e.g. "192.168.88.10-192.168.88.254"
-  pppoePoolRange    String? // e.g. "10.0.0.10-10.0.0.254"
-  dns               String? // e.g. "8.8.8.8,8.8.4.4"
-  wgConfiguredAt    DateTime?
-  wgEnabled         Boolean          @default(false)
-  wgListenPort      Int?             @default(51820)
-  wgPeerPublicKey   String?
-  wgPresharedKey    String?
-  wgPrivateKey      String?
-  wgPublicKey       String?
-  wgServerEndpoint  String?
-  wgTunnelIp        String?          @default("10.200.0.1")
+  lanIp            String? // e.g. "192.168.88.1"
+  lanGateway       String? // e.g. "192.168.88.1"
+  hotspotPoolRange String? // e.g. "192.168.88.10-192.168.88.254"
+  pppoePoolRange   String? // e.g. "10.0.0.10-10.0.0.254"
+  dns              String? // e.g. "8.8.8.8,8.8.4.4"
+  wgConfiguredAt   DateTime?
+  wgEnabled        Boolean                 @default(false)
+  wgListenPort     Int?                    @default(51820)
+  wgPeerPublicKey  String?
+  wgPresharedKey   String?
+  wgPrivateKey     String?
+  wgPublicKey      String?
+  wgServerEndpoint String?
+  wgTunnelIp       String?                 @default("10.200.0.1")
   // ── Wireless configuration fields (optional, for AP-bridge mode) ───────────
-  wlanEnabled       Boolean          @default(false) // Enable wlan1 (2.4GHz) and wlan2 (5GHz)
-  wlan1Ssid         String?          // SSID for wlan1, defaults to "MikroTik-<MAC>"
-  wlan2Ssid         String?          // SSID for wlan2, defaults to "MikroTik-<MAC>"
-  wlanSecurity      String?          @default("wpa2-psk") // wpa2-psk, wpa3-psk, wpa2-eap, etc.
-  wlanPassphrase    String?          // PSK/passphrase for wireless (encrypted at rest)
-  wlan1TxChain      String?          @default("0,1")  // TX chains for 2.4GHz
-  wlan1RxChain      String?          @default("0,1")  // RX chains for 2.4GHz
-  wlan2TxChain      String?          @default("0")    // TX chains for 5GHz
-  wlan2RxChain      String?          @default("0")    // RX chains for 5GHz
-  equipments        Equipment[]
-  hotspotSettings   HotspotSettings?
-  packages          Package[]
-  logs              RouterLog[]
-  tenant            Tenant?          @relation(fields: [tenantId], references: [id])
-  subscriptions     Subscription[]
-  vouchers          Voucher[]
-  vpnUsers          VpnUser[]
+  wlanEnabled      Boolean                 @default(false) // Enable wlan1 (2.4GHz) and wlan2 (5GHz)
+  wlan1Ssid        String? // SSID for wlan1, defaults to "MikroTik-<MAC>"
+  wlan2Ssid        String? // SSID for wlan2, defaults to "MikroTik-<MAC>"
+  wlanSecurity     String?                 @default("wpa2-psk") // wpa2-psk, wpa3-psk, wpa2-eap, etc.
+  wlanPassphrase   String? // PSK/passphrase for wireless (encrypted at rest)
+  wlan1TxChain     String?                 @default("0,1") // TX chains for 2.4GHz
+  wlan1RxChain     String?                 @default("0,1") // RX chains for 2.4GHz
+  wlan2TxChain     String?                 @default("0") // TX chains for 5GHz
+  wlan2RxChain     String?                 @default("0") // RX chains for 5GHz
+  equipments       Equipment[]
+  hotspotSettings  HotspotSettings?
+  packages         Package[]
+  logs             RouterLog[]
+  provisioningLogs RouterProvisioningLog[]
+  tenant           Tenant?                 @relation(fields: [tenantId], references: [id])
+  subscriptions    Subscription[]
+  vouchers         Voucher[]
+  vpnUsers         VpnUser[]
 
   @@unique([name, tenantId])
   // Add tenantId index — findMany({ where: { tenantId } }) was doing a full table scan
@@ -276,24 +305,63 @@ model Router {
 }
 
 model RouterLog {
-  id        String   @id @default(uuid())
-  routerId  String
-  action    String
-  details   String?
-  status    String   @default("success")
-  username  String?
-  ipAddress String?
-  createdAt DateTime @default(now())
-  tenantId  String?
-  router    Router   @relation(fields: [routerId], references: [id], onDelete: Cascade)
-  tenant    Tenant?  @relation(fields: [tenantId], references: [id])
+  id               String   @id @default(uuid())
+  routerId         String
+  action           String
+  details          String?
+  status           String   @default("success")
+  username         String?
+  ipAddress        String?
+  // VENDOR-ADAPTER-001: Per-command audit trail for multi-vendor operations
+  commandSent      String? // The actual HTTP path / CLI command sent to the router
+  responseReceived String? // Router's raw response (truncated to 2000 chars)
+  adapterVersion   String? // e.g. "MikroTikAdapter@7.15" or "OmadaAdapter@5.9"
+  durationMs       Int? // Operation round-trip time in milliseconds
+  createdAt        DateTime @default(now())
+  tenantId         String?
+  router           Router   @relation(fields: [routerId], references: [id], onDelete: Cascade)
+  tenant           Tenant?  @relation(fields: [tenantId], references: [id])
 
-  // Add tenantId and routerId indexes for common log query patterns
   @@index([routerId])
   @@index([tenantId])
   @@index([createdAt])
-  @@index([tenantId, createdAt])
+  @@index([tenantId, createdAt]) // Existing
+  @@index([tenantId, createdAt(sort: Desc)], map: "router_logs_tenant_created_desc_idx") // ENTERPRISE-011: DB Optimization
+  @@index([action])
   @@map("router_logs")
+}
+
+// VENDOR-ADAPTER-002: Dedicated provisioning step audit log
+// Tracks each individual step of a provisioning plan execution,
+// enabling rollback tracing, retry history, and progress reporting.
+model RouterProvisioningLog {
+  id            String    @id @default(uuid())
+  routerId      String
+  tenantId      String?
+  planId        String // Groups all steps belonging to one plan run
+  stepId        String // e.g. "create-bridge", "create-pppoe-pool"
+  stepName      String // Human-readable step description
+  vendor        String // Which vendor adapter handled this step
+  status        String // PENDING | RUNNING | SUCCESS | FAILED | ROLLED_BACK | SKIPPED
+  commandSent   String? // Adapter command / HTTP path dispatched
+  responseData  String? // Router response (truncated to 2000 chars)
+  errorMessage  String? // Failure reason if status=FAILED
+  dryRun        Boolean   @default(false)
+  attemptNumber Int       @default(1)
+  durationMs    Int? // Step execution time in milliseconds
+  rollbackCmd   String? // Rollback command stored for later execution if needed
+  startedAt     DateTime  @default(now())
+  completedAt   DateTime?
+  router        Router    @relation(fields: [routerId], references: [id], onDelete: Cascade)
+  tenant        Tenant?   @relation(fields: [tenantId], references: [id])
+
+  @@index([routerId])
+  @@index([tenantId])
+  @@index([planId])
+  @@index([status])
+  @@index([routerId, planId])
+  @@index([tenantId, startedAt(sort: Desc)]) // ENTERPRISE-011: DB Optimization
+  @@map("router_provisioning_logs")
 }
 
 model HotspotSettings {
@@ -531,20 +599,22 @@ model SystemSetting {
 }
 
 model Tenant {
-  id                    String                 @id @default(uuid())
+  id                    String                  @id @default(uuid())
   name                  String
-  email                 String                 @unique
+  email                 String                  @unique
   phone                 String?
-  slug                  String                 @unique
+  slug                  String                  @unique
   logoUrl               String?
   ownerUserId           String?
-  status                TenantStatus           @default(ACTIVE)
+  status                TenantStatus            @default(ACTIVE)
   planId                String
   trialStart            DateTime?
   trialEnd              DateTime?
   licenseExpiresAt      DateTime?
-  createdAt             DateTime               @default(now())
-  updatedAt             DateTime               @updatedAt
+  // ENTERPRISE-014: Default region for the tenant's infrastructure
+  region                Region                  @default(GLOBAL)
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
   branding              TenantBranding?
   clients               Client[]
   equipments            Equipment[]
@@ -565,6 +635,7 @@ model Tenant {
   radiusNas             RadiusNas[]
   radiusUsers           RadiusUser[]
   routerLogs            RouterLog[]
+  provisioningLogs      RouterProvisioningLog[]
   routers               Router[]
   smsMessages           SmsMessage[]
   subscriptions         Subscription[]
@@ -574,8 +645,8 @@ model Tenant {
   tenantLicenses        TenantLicense[]
   tenantPayments        TenantPayment[]
   tenantPaymentGateways TenantPaymentGateway[]
-  owner                 User?                  @relation("TenantOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
-  plan                  SaasPlan               @relation(fields: [planId], references: [id])
+  owner                 User?                   @relation("TenantOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+  plan                  SaasPlan                @relation(fields: [planId], references: [id])
   transactions          Transaction[]
   userOtps              UserOtp[]
   users                 User[]
@@ -927,6 +998,7 @@ model RadPostAuth {
 
   @@index([username])
   @@index([tenantId])
+  @@index([tenantId, authdate])
   @@map("radpostauth")
 }
 
@@ -948,17 +1020,17 @@ model RateLimit {
 // ─────────────────────────────────────────────────────────────
 
 model ProductCategory {
-  id           String    @id @default(uuid())
-  name         String
-  slug         String    @unique
-  icon         String?   // emoji or icon name
-  image        String?   // URL to category image
-  description  String?
-  sortOrder    Int       @default(0)
-  isActive     Boolean   @default(true)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  products     Product[]
+  id          String    @id @default(uuid())
+  name        String
+  slug        String    @unique
+  icon        String? // emoji or icon name
+  image       String? // URL to category image
+  description String?
+  sortOrder   Int       @default(0)
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  products    Product[]
 
   @@index([slug])
   @@index([isActive])
@@ -966,35 +1038,35 @@ model ProductCategory {
 }
 
 model Product {
-  id             String         @id @default(uuid())
+  id             String           @id @default(uuid())
   name           String
-  slug           String         @unique
-  sku            String?        @unique
+  slug           String           @unique
+  sku            String?          @unique
   barcode        String?
   categoryId     String?
   brand          String?
-  price          Decimal        @db.Decimal(12, 2)
-  discountType   String?        @default("percent") // "percent" | "fixed"
-  discountValue  Decimal?       @db.Decimal(12, 2)
-  currency       String         @default("TZS")
-  quantity       Int            @default(0)
+  price          Decimal          @db.Decimal(12, 2)
+  discountType   String?          @default("percent") // "percent" | "fixed"
+  discountValue  Decimal?         @db.Decimal(12, 2)
+  currency       String           @default("TZS")
+  quantity       Int              @default(0)
   description    String?
-  specifications Json?          // [{key: "Weight", value: "2kg"}, ...]
+  specifications Json? // [{key: "Weight", value: "2kg"}, ...]
   tags           String[]
-  status         ProductStatus  @default(DRAFT)
-  featured       Boolean        @default(false)
-  trending       Boolean        @default(false)
-  bestSeller     Boolean        @default(false)
-  isNew          Boolean        @default(false)
-  viewCount      Int            @default(0)
-  clickCount     Int            @default(0)
+  status         ProductStatus    @default(DRAFT)
+  featured       Boolean          @default(false)
+  trending       Boolean          @default(false)
+  bestSeller     Boolean          @default(false)
+  isNew          Boolean          @default(false)
+  viewCount      Int              @default(0)
+  clickCount     Int              @default(0)
   seoTitle       String?
   seoDescription String?
   metaKeywords   String[]
   ogImage        String?
   scheduledAt    DateTime?
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
   deletedAt      DateTime?
   category       ProductCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   images         ProductImage[]
@@ -1032,7 +1104,7 @@ model EcomOrder {
   customerName    String
   customerEmail   String?
   customerPhone   String?
-  shippingAddress Json?           // {street, city, region, country, zip}
+  shippingAddress Json? // {street, city, region, country, zip}
   totalAmount     Decimal         @db.Decimal(12, 2)
   status          OrderStatus     @default(PENDING)
   paymentMethod   String?
@@ -1072,7 +1144,7 @@ model Review {
   productId  String
   authorName String
   email      String?
-  rating     Int      // 1-5
+  rating     Int // 1-5
   title      String?
   comment    String?
   isApproved Boolean  @default(false)
@@ -1086,18 +1158,18 @@ model Review {
 }
 
 model Banner {
-  id         String   @id @default(uuid())
-  title      String?
-  subtitle   String?
-  imageUrl   String
-  linkUrl    String?
-  linkText   String?
-  position   Int      @default(0)    // sort order
-  isActive   Boolean  @default(true)
-  startDate  DateTime?
-  endDate    DateTime?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id        String    @id @default(uuid())
+  title     String?
+  subtitle  String?
+  imageUrl  String
+  linkUrl   String?
+  linkText  String?
+  position  Int       @default(0) // sort order
+  isActive  Boolean   @default(true)
+  startDate DateTime?
+  endDate   DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
   @@index([isActive])
   @@index([position])
@@ -1137,9 +1209,9 @@ model Faq {
 }
 
 model NewsletterSubscriber {
-  id          String   @id @default(uuid())
-  email       String   @unique
-  isActive    Boolean  @default(true)
+  id           String   @id @default(uuid())
+  email        String   @unique
+  isActive     Boolean  @default(true)
   subscribedAt DateTime @default(now())
 
   @@index([email])
@@ -1255,6 +1327,21 @@ enum InvoiceStatus {
   DRAFT
 }
 
+enum BillingCycle {
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+// ENTERPRISE-014: Multi-Region Worker Affinity
+enum Region {
+  AFRICA
+  EUROPE
+  ASIA
+  AMERICAS
+  GLOBAL
+}
+
 enum SmsStatus {
   SENT
   FAILED
@@ -1316,4 +1403,3 @@ enum OrderStatus {
   CANCELLED
   REFUNDED
 }
-

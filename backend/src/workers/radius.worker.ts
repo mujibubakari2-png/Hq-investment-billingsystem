@@ -98,7 +98,11 @@ export function startRadiusWorker(): Worker<RadiusJobData> {
   const worker = new Worker<RadiusJobData>(
     QUEUE_NAME,
     async (job: Job<RadiusJobData>) => {
-      const { name, idempotencyKey, tenantId } = job.data;
+      const { name, idempotencyKey } = job.data;
+      // Guard: Ensure tenantId is explicitly string or null, never undefined
+      const tenantId = job.data.tenantId ?? null;
+      job.data.tenantId = tenantId;
+
       logger.info(`[RadiusWorker] start: ${name}`, {
         jobId: job.id,
         idempotencyKey,

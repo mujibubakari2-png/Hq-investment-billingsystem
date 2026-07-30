@@ -1,184 +1,167 @@
 /**
- * Circuit Breaker — HIGH-R-004 FIX
+ * Per-Router Circuit Breaker
  *
- * A Redis-backed circuit breaker that prevents cascading failures when
- * external services (MikroTik routers, payment providers, RADIUS) become
- * slow, unresponsive, or repeatedly fail.
+ * ENTERPRISE-002: Prevents overloading routers that are consistently failing.
  *
  * States:
- *   CLOSED   — Normal operation. Requests flow through.
- *   OPEN     — Service is broken. Requests are rejected immediately (fail-fast).
- *   HALF-OPEN — After the cool-down period, one request is allowed through to
- *               probe whether the service has recovered. On success → CLOSED.
- *               On failure → OPEN again.
+ *   CLOSED     → normal operation, requests pass through
+ *   OPEN       → circuit tripped, requests rejected immediately
+ *   HALF_OPEN  → trial mode, one request allowed through to test recovery
  *
- * Why Redis?
- *   A single-process in-memory counter would not share state across PM2 workers.
- *   Using Redis ensures that when worker #1 trips a breaker for a router, workers
- *   #2–#5 also see it as OPEN and don't pile on.
+ * Transitions:
+ *   CLOSED → OPEN     when failureCount ≥ threshold within window
+ *   OPEN   → HALF_OPEN after resetTimeoutMs
+ *   HALF_OPEN → CLOSED  on success
+ *   HALF_OPEN → OPEN    on failure (back to full open)
  *
- * Fail-safe behaviour:
- *   If Redis itself is unavailable, the circuit breaker fails open (lets the
- *   request through) to avoid masking Redis outages as external service outages.
+ * Stored in Redis so it persists across worker restarts.
  *
  * Usage:
- *   import { withCircuitBreaker } from '@/lib/circuitBreaker';
- *
- *   // Protect a MikroTik call:
- *   const result = await withCircuitBreaker(
- *     `mikrotik:${routerId}`,       // unique name per circuit
- *     () => service.createPPPoEUser(routerId, username, password),
- *     { threshold: 5, windowSec: 60, halfOpenAfterSec: 30 }
- *   );
- *
- *   // Protect a payment provider call:
- *   const result = await withCircuitBreaker(
- *     `payment:zenopay:${tenantId}`,
- *     () => zenoPay.initiatePayment(params),
- *   );
+ *   const cb = getCircuitBreaker(routerId);
+ *   if (!await cb.canAttempt()) throw new Error('Circuit open for this router');
+ *   try {
+ *     const result = await someAdapterCall();
+ *     await cb.recordSuccess();
+ *     return result;
+ *   } catch (err) {
+ *     await cb.recordFailure();
+ *     throw err;
+ *   }
  */
 
-import { getRedisClient } from '@/lib/cache';
-import logger from '@/lib/logger';
+import { getRedisConnection } from "./queue";
+import logger from "@/lib/logger";
 
-export interface CircuitBreakerOptions {
-    /** Number of consecutive failures that trip the breaker to OPEN. Default: 5. */
-    threshold?: number;
-    /** Sliding window in seconds over which failures are counted. Default: 60. */
-    windowSec?: number;
-    /** How long (seconds) the breaker stays OPEN before testing half-open. Default: 30. */
-    halfOpenAfterSec?: number;
+// ── Configuration ──────────────────────────────────────────────────────────────
+
+const FAILURE_THRESHOLD = 5;              // failures before OPEN
+const RESET_TIMEOUT_MS = 60_000;          // 1 min before trying HALF_OPEN
+const SUCCESS_THRESHOLD = 2;             // successes in HALF_OPEN to CLOSE
+const WINDOW_MS = 120_000;               // sliding window = 2 min
+
+// ── State ──────────────────────────────────────────────────────────────────────
+
+type CBState = "CLOSED" | "OPEN" | "HALF_OPEN";
+
+interface CBData {
+    state: CBState;
+    failureCount: number;
+    successCount: number;
+    lastFailureAt: number;
+    openedAt: number;
 }
 
-const DEFAULTS: Required<CircuitBreakerOptions> = {
-    threshold: 5,
-    windowSec: 60,
-    halfOpenAfterSec: 30,
-};
+// ── Redis Helpers ─────────────────────────────────────────────────────────────
 
-/**
- * Execute `fn` inside a circuit breaker.
- *
- * @param name    Unique circuit identifier, e.g. `mikrotik:routerId` or `payment:zenopay`.
- * @param fn      The async operation to protect.
- * @param options Circuit breaker tuning parameters.
- * @throws  `CircuitBreakerOpenError` if the circuit is OPEN.
- * @throws  The original error from `fn` if the call fails (and increments the counter).
- */
-export async function withCircuitBreaker<T>(
-    name: string,
-    fn: () => Promise<T>,
-    options: CircuitBreakerOptions = {},
-): Promise<T> {
-    const opts = { ...DEFAULTS, ...options };
-    const redis = getRedisClient();
-
-    if (!redis) {
-        // Redis unavailable — bypass the breaker (fail-open) to avoid
-        // treating a Redis outage as an external service outage.
-        logger.warn('[CircuitBreaker] Redis unavailable, bypassing circuit breaker', { name });
-        return fn();
-    }
-
-    const openKey  = `cb:open:${name}`;
-    const failKey  = `cb:fail:${name}`;
-
-    // ── Check breaker state ───────────────────────────────────────────────────
-    try {
-        const isOpen = await redis.exists(openKey);
-        if (isOpen) {
-            throw new CircuitBreakerOpenError(name);
-        }
-    } catch (checkErr) {
-        if (checkErr instanceof CircuitBreakerOpenError) throw checkErr;
-        // Redis error during state check — fail-open
-        logger.warn('[CircuitBreaker] Redis error during state check, bypassing', {
-            name,
-            error: checkErr instanceof Error ? checkErr.message : String(checkErr),
-        });
-        return fn();
-    }
-
-    // ── Execute the guarded operation ────────────────────────────────────────
-    try {
-        const result = await fn();
-
-        // Success: reset failure counter
-        try { await redis.del(failKey); } catch { /* ignore Redis errors on reset */ }
-
-        return result;
-    } catch (fnErr) {
-        // ── Record failure ────────────────────────────────────────────────────
-        try {
-            const failures = await redis.incr(failKey);
-            if (failures === 1) {
-                // Set TTL on the first failure to create a sliding window
-                await redis.expire(failKey, opts.windowSec);
-            }
-
-            if (failures >= opts.threshold) {
-                // Trip the breaker: mark OPEN with a TTL for half-open probe
-                await redis.set(openKey, '1', 'EX', opts.halfOpenAfterSec);
-                logger.error('[CircuitBreaker] OPENED — too many consecutive failures', {
-                    name,
-                    failures,
-                    halfOpenAfterSec: opts.halfOpenAfterSec,
-                });
-                // Clean up the failure counter — the open key is now the authority
-                await redis.del(failKey);
-            } else {
-                logger.warn('[CircuitBreaker] failure recorded', { name, failures, threshold: opts.threshold });
-            }
-        } catch (redisErr) {
-            // Redis error during counter update — log but don't mask the real error
-            logger.warn('[CircuitBreaker] Redis error during failure recording', {
-                name,
-                error: redisErr instanceof Error ? redisErr.message : String(redisErr),
-            });
-        }
-
-        throw fnErr; // always re-throw the original error
-    }
+function cbKey(routerId: string): string {
+    return `router:circuit:${routerId}`;
 }
 
-/**
- * Manually reset a circuit breaker (e.g. after confirming a service is healthy).
- */
-export async function resetCircuitBreaker(name: string): Promise<void> {
-    const redis = getRedisClient();
-    if (!redis) return;
-    try {
-        await redis.del(`cb:open:${name}`, `cb:fail:${name}`);
-        logger.info('[CircuitBreaker] Manually reset', { name });
-    } catch (err: any) {
-        logger.warn('[CircuitBreaker] Error resetting circuit breaker', { name, error: err.message });
+async function getCBData(routerId: string): Promise<CBData> {
+    const redis = getRedisConnection();
+    const raw = await (redis as any).get(cbKey(routerId));
+    if (!raw) {
+        return { state: "CLOSED", failureCount: 0, successCount: 0, lastFailureAt: 0, openedAt: 0 };
     }
-}
-
-/**
- * Check the current state of a circuit breaker.
- * Returns 'open', 'closed', or 'unknown' (if Redis is unavailable).
- */
-export async function getCircuitBreakerState(name: string): Promise<'open' | 'closed' | 'unknown'> {
-    const redis = getRedisClient();
-    if (!redis) return 'unknown';
     try {
-        const isOpen = await redis.exists(`cb:open:${name}`);
-        return isOpen ? 'open' : 'closed';
+        return JSON.parse(raw) as CBData;
     } catch {
-        return 'unknown';
+        return { state: "CLOSED", failureCount: 0, successCount: 0, lastFailureAt: 0, openedAt: 0 };
     }
 }
 
-/**
- * Thrown when a circuit breaker is in OPEN state.
- * Callers should catch this to return a graceful degraded response.
- */
-export class CircuitBreakerOpenError extends Error {
-    public readonly circuitName: string;
-    constructor(name: string) {
-        super(`Circuit breaker OPEN for "${name}". Service temporarily unavailable.`);
-        this.name = 'CircuitBreakerOpenError';
-        this.circuitName = name;
-    }
+async function setCBData(routerId: string, data: CBData): Promise<void> {
+    const redis = getRedisConnection();
+    // Expire after 24h to prevent stale entries
+    await (redis as any).set(cbKey(routerId), JSON.stringify(data), "EX", 86400);
+}
+
+// ── Circuit Breaker ────────────────────────────────────────────────────────────
+
+export interface RouterCircuitBreaker {
+    routerId: string;
+    /** Returns true if the request should be allowed through */
+    canAttempt(): Promise<boolean>;
+    /** Call on successful adapter operation */
+    recordSuccess(): Promise<void>;
+    /** Call on failed adapter operation */
+    recordFailure(error?: string): Promise<void>;
+    /** Get current state for monitoring */
+    getState(): Promise<{ state: CBState; failureCount: number; openedAt?: number }>;
+    /** Admin: manually reset the breaker */
+    reset(): Promise<void>;
+}
+
+export function getCircuitBreaker(routerId: string): RouterCircuitBreaker {
+    return {
+        routerId,
+
+        async canAttempt(): Promise<boolean> {
+            const data = await getCBData(routerId);
+            const now = Date.now();
+
+            if (data.state === "CLOSED") return true;
+
+            if (data.state === "OPEN") {
+                if (now - data.openedAt >= RESET_TIMEOUT_MS) {
+                    await setCBData(routerId, { ...data, state: "HALF_OPEN", successCount: 0 });
+                    logger.info(`[CircuitBreaker] Router ${routerId}: OPEN → HALF_OPEN (trial attempt)`);
+                    return true;
+                }
+                const remainMs = RESET_TIMEOUT_MS - (now - data.openedAt);
+                logger.warn(`[CircuitBreaker] Router ${routerId}: circuit OPEN — blocked (${Math.round(remainMs / 1000)}s remaining)`);
+                return false;
+            }
+
+            // HALF_OPEN: allow one attempt
+            return true;
+        },
+
+        async recordSuccess(): Promise<void> {
+            const data = await getCBData(routerId);
+            if (data.state === "CLOSED") return;
+
+            if (data.state === "HALF_OPEN") {
+                const newSuccess = data.successCount + 1;
+                if (newSuccess >= SUCCESS_THRESHOLD) {
+                    await setCBData(routerId, { state: "CLOSED", failureCount: 0, successCount: 0, lastFailureAt: 0, openedAt: 0 });
+                    logger.info(`[CircuitBreaker] Router ${routerId}: HALF_OPEN → CLOSED ✅`);
+                } else {
+                    await setCBData(routerId, { ...data, successCount: newSuccess });
+                }
+            }
+        },
+
+        async recordFailure(error?: string): Promise<void> {
+            const data = await getCBData(routerId);
+            const now = Date.now();
+
+            if (data.state === "HALF_OPEN") {
+                await setCBData(routerId, { ...data, state: "OPEN", openedAt: now, failureCount: data.failureCount + 1 });
+                logger.warn(`[CircuitBreaker] Router ${routerId}: HALF_OPEN → OPEN (probe failed: ${error})`);
+                return;
+            }
+
+            const withinWindow = (now - data.lastFailureAt) < WINDOW_MS;
+            const newCount = withinWindow ? data.failureCount + 1 : 1;
+
+            if (newCount >= FAILURE_THRESHOLD) {
+                await setCBData(routerId, { state: "OPEN", failureCount: newCount, successCount: 0, lastFailureAt: now, openedAt: now });
+                logger.error(`[CircuitBreaker] Router ${routerId}: CLOSED → OPEN 🚨 (${newCount} failures in window)`);
+            } else {
+                await setCBData(routerId, { ...data, state: "CLOSED", failureCount: newCount, lastFailureAt: now });
+                logger.warn(`[CircuitBreaker] Router ${routerId}: failure ${newCount}/${FAILURE_THRESHOLD}`);
+            }
+        },
+
+        async getState() {
+            const data = await getCBData(routerId);
+            return { state: data.state, failureCount: data.failureCount, openedAt: data.openedAt || undefined };
+        },
+
+        async reset() {
+            await setCBData(routerId, { state: "CLOSED", failureCount: 0, successCount: 0, lastFailureAt: 0, openedAt: 0 });
+            logger.info(`[CircuitBreaker] Router ${routerId}: manually reset to CLOSED`);
+        },
+    };
 }

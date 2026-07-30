@@ -129,7 +129,7 @@ export async function GET(req: Request) {
           })
         );
         if (sub?.routerId) {
-          await enqueueSuspendService(sub.routerId, username, "hotspot", voucher.tenantId ?? null).catch((e) =>
+          await enqueueSuspendService(sub.routerId, voucher.tenantId ?? null, username, "hotspot").catch((e) =>
             logger.error("[VOUCHER SWEEP] Failed to queue MikroTik suspend on release", {
               voucherId: voucher.id,
               error: e instanceof Error ? e.message : String(e),

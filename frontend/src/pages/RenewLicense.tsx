@@ -8,6 +8,7 @@ import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import LockIcon from '@mui/icons-material/Lock';
 import { licenseApi, saasPlansApi, type LicenseResponse, type SaasPlan } from '../api';
 import authStore from '../stores/authStore';
+import { Popup } from '../stores/popupStore';
 import { formatDate } from '../utils/formatters';
 
 export default function RenewLicense() {
@@ -187,6 +188,8 @@ export default function RenewLicense() {
         return pkg ? pkg.price : 0;
     };
 
+    const currentPlanName = activePlan?.name || 'Current Plan';
+
     const handleApplyCoupon = async () => {
         if (!couponCode.trim()) return;
         try {
@@ -211,13 +214,13 @@ export default function RenewLicense() {
     };
 
     const handlePayment = async () => {
-        if (!phone) {
-            alert('Please enter a valid phone number');
+        if (!phone || phone.length < 9) {
+            Popup.warning('Validation Error', 'Please enter a valid phone number');
             return;
         }
         const amountToPay = getAmountToPay();
         if (!amountToPay || amountToPay <= 0) {
-            alert('Please select a valid payment package');
+            Popup.warning('Validation Error', 'Please select a valid payment package');
             return;
         }
 
@@ -462,8 +465,6 @@ export default function RenewLicense() {
     }
 
     // ── Main form (IDLE state) ────────────────────────────────────────────────
-    const currentPlanName = activePlan?.name || 'Current Plan';
-
     return (
         <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg-lighter)', fontFamily: 'var(--font-family)', justifyContent: 'center', padding: 'clamp(10px, 3vw, 2rem)' }}>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', width: '100%', maxWidth: 1000 }}>
@@ -635,7 +636,7 @@ export default function RenewLicense() {
                     <div style={{ padding: 'clamp(14px, 3.5vw, 2rem)', display: 'flex', flexDirection: 'column', flex: 1, overflowX: 'auto' }}>
                         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginBottom: '2rem' }}>
                             <button className="btn btn-outline" style={{ display: 'flex', alignItems: 'center', gap: '4px' }} onClick={handlePrintInvoice}><PrintIcon fontSize="small" /> Print</button>
-                            <button className="btn btn-outline" style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#333', color: 'white' }} onClick={() => { alert('Choose "Save as PDF" as the destination in the print dialog to save.'); handlePrintInvoice(); }}><DescriptionIcon fontSize="small" /> PDF</button>
+                            <button className="btn btn-outline" style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#333', color: 'white' }} onClick={() => { Popup.info('Print to PDF', 'Choose "Save as PDF" as the destination in the print dialog to save.'); handlePrintInvoice(); }}><DescriptionIcon fontSize="small" /> PDF</button>
                         </div>
 
                         <div style={{ borderTop: '4px solid #d32f2f', paddingTop: '1.5rem', display: 'flex', justifyContent: 'space-between', marginBottom: '2rem' }}>

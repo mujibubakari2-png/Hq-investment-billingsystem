@@ -29,25 +29,47 @@ function mkModel(overrides: Record<string, jest.Mock> = {}) {
   };
 }
 
-jest.mock('@/lib/prisma', () => ({
-  __esModule: true,
-  default: {
-    paymentChannel: mkModel(),
-    transaction: mkModel(),
-    webhookLog: mkModel({ create: jest.fn().mockResolvedValue({ id: 'wl-001' }) }),
-    subscription: mkModel(),
-    client: mkModel(),
-    package: mkModel(),
-    routerLog: mkModel(),
-    tenantInvoice: mkModel(),
-    tenantPayment: mkModel(),
+jest.mock('@/lib/prisma', () => {
+  function mkM(overrides: Record<string, jest.Mock> = {}) {
+    return {
+      findFirst: jest.fn().mockResolvedValue(null),
+      findMany: jest.fn().mockResolvedValue([]),
+      findUnique: jest.fn().mockResolvedValue(null),
+      findFirstOrThrow: jest.fn().mockResolvedValue(null),
+      updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      update: jest.fn().mockResolvedValue({ id: 'mock-id' }),
+      create: jest.fn().mockResolvedValue({ id: 'mock-id' }),
+      createMany: jest.fn().mockResolvedValue({ count: 0 }),
+      delete: jest.fn().mockResolvedValue({}),
+      deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+      count: jest.fn().mockResolvedValue(0),
+      ...overrides,
+    };
+  }
+  const db: any = {
+    paymentChannel: mkM(),
+    transaction: mkM(),
+    webhookLog: mkM({ create: jest.fn().mockResolvedValue({ id: 'wl-001' }) }),
+    subscription: mkM(),
+    client: mkM(),
+    package: mkM(),
+    routerLog: mkM(),
+    tenantInvoice: mkM(),
+    tenantPayment: mkM(),
     $transaction: jest.fn(async (fn: any) => fn({
-      transaction: mkModel(),
-      subscription: mkModel(),
-      client: mkModel(),
-      invoice: mkModel(),
+      transaction: mkM(),
+      subscription: mkM(),
+      client: mkM(),
+      invoice: mkM(),
     })),
-  },
+  };
+  // $extends must return the same db object so getTenantClient proxy wraps the right target
+  db.$extends = jest.fn().mockReturnValue(db);
+  return { __esModule: true, default: db };
+});
+
+jest.mock('@/lib/tenantPrisma', () => ({
+  getTenantClient: jest.fn(),
 }));
 
 jest.mock('@/lib/payments/registry', () => ({
@@ -62,13 +84,18 @@ jest.mock('@/lib/payments/registry', () => ({
 }));
 
 import { PaymentService, PaymentContext } from '../lib/payments/service';
+import { getTenantClient } from '@/lib/tenantPrisma';
 
 describe('PaymentService.getChannel — Credential Isolation (CRITICAL-1)', () => {
   let svc: PaymentService;
 
   beforeEach(() => {
+    const prismaMock = require('@/lib/prisma').default;
+    (getTenantClient as jest.Mock).mockReturnValue(prismaMock);
     svc = new PaymentService();
     jest.clearAllMocks();
+    // Re-apply after clearAllMocks wipes the mock implementation
+    (getTenantClient as jest.Mock).mockReturnValue(prismaMock);
   });
 
   it.each(['PALMPESA', 'ZENOPAY', 'MONGIKE', 'HARAKAPAY'] as const)(

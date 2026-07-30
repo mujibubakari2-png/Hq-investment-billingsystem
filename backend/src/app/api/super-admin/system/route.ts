@@ -90,7 +90,7 @@ export async function GET(req: NextRequest) {
                 "Queue timeout"
             );
             if (!queueResult.ok) throw new Error(queueResult.error ?? "Queue timeout");
-            const counts = queueResult.data;
+            const counts = queueResult.data as any;
             result.queue = { ...counts, status: (counts?.failed ?? 0) > 100 ? "degraded" : "ok" };
             if ((counts?.failed ?? 0) > 100) {
                 if (result.status === "ok") result.status = "degraded";

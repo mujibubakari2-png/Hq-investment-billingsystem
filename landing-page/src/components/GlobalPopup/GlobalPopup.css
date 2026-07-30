@@ -1,0 +1,184 @@
+.global-popup-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: var(--bg-modal-overlay, rgba(15, 23, 42, 0.7));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  backdrop-filter: blur(4px);
+}
+
+.global-popup-content {
+  background: var(--bg-card, #ffffff);
+  border-radius: var(--radius-lg, 20px);
+  padding: 2rem;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: var(--shadow-lg, 0 25px 50px rgba(15, 23, 42, 0.16));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--border-light, rgba(15, 23, 42, 0.08));
+}
+
+.global-popup-close-btn {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted, #64748b);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 50%;
+  transition: all 0.2s;
+}
+
+.global-popup-close-btn:hover {
+  background: var(--bg-hover, rgba(15, 23, 42, 0.06));
+  color: var(--text-primary, #0f172a);
+}
+
+.global-popup-icon-container {
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.global-popup-icon {
+  width: 64px;
+  height: 64px;
+}
+
+.global-popup-icon.loading {
+  color: var(--primary, #4f46e5);
+}
+
+.global-popup-icon.success {
+  color: var(--secondary, #10b981); /* Green check */
+}
+
+.global-popup-icon.error {
+  color: var(--danger, #ef4444); /* Red X */
+}
+
+.global-popup-icon.warning {
+  color: var(--warning, #f59e0b); /* Yellow warning */
+}
+
+.global-popup-icon.info {
+  color: var(--info, #3b82f6); /* Blue info */
+}
+
+.global-popup-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--text-primary, #0f172a);
+  margin-bottom: 0.75rem;
+  font-family: var(--font, 'Inter', sans-serif);
+}
+
+.global-popup-message {
+  font-size: 1rem;
+  color: var(--text-secondary, #475569);
+  margin-bottom: 2rem;
+  line-height: 1.5;
+  font-family: var(--font, 'Inter', sans-serif);
+}
+
+.global-popup-actions {
+  display: flex;
+  gap: 1rem;
+  width: 100%;
+}
+
+.global-popup-btn {
+  flex: 1;
+  padding: 0.75rem 1.5rem;
+  border-radius: var(--radius-sm, 10px);
+  font-weight: 500;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font, 'Inter', sans-serif);
+}
+
+.global-popup-btn-primary {
+  background: var(--primary, #4f46e5);
+  color: #ffffff;
+}
+
+.global-popup-btn-primary:hover {
+  background: var(--primary-hover, #4338ca);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm, 0 2px 8px rgba(15, 23, 42, 0.06));
+}
+
+.global-popup-btn-secondary {
+  background: transparent;
+  color: var(--text-secondary, #475569);
+  border: 1px solid var(--border, rgba(15, 23, 42, 0.12));
+}
+
+.global-popup-btn-secondary:hover {
+  background: var(--bg-hover, rgba(15, 23, 42, 0.06));
+  color: var(--text-primary, #0f172a);
+}
+
+/* Specific colors for success/error actions if needed */
+.global-popup-btn-success {
+  background: var(--secondary, #10b981);
+  color: #ffffff;
+}
+
+.global-popup-btn-success:hover {
+  background: #059669; /* slightly darker green */
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.global-popup-btn-error {
+  background: var(--danger, #ef4444);
+  color: #ffffff;
+}
+
+.global-popup-btn-error:hover {
+  background: #dc2626; /* slightly darker red */
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.global-popup-btn-warning {
+  background: var(--warning, #f59e0b);
+  color: #ffffff;
+}
+
+.global-popup-btn-warning:hover {
+  background: #d97706; /* slightly darker yellow */
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.global-popup-btn-info {
+  background: var(--info, #3b82f6);
+  color: #ffffff;
+}
+
+.global-popup-btn-info:hover {
+  background: #2563eb; /* slightly darker blue */
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}

@@ -133,19 +133,14 @@ module.exports = {
     },
 
     /**
-     * MikroTik Router Operations Worker
+     * Router Operations Worker
      * 
-     * MK-002: Processes MikroTik operations from the Redis queue asynchronously.
-     * Prevents API timeouts from router connectivity issues.
-     * Architecture: Event Queue → Router Worker → MikroTik API
+     * VENDOR-ADAPTER: Processes router operations (all vendors) from the Redis queue asynchronously.
      */
     {
-      name: 'mikrotik-worker',
+      name: 'router-ops-worker',
       cwd: BACKEND_DIR,
-      // FIX: script must be the actual JS file path, NOT 'node'.
-      // Using script:'node' + interpreter:'node' + args causes PM2 to invoke
-      // npm treating args as a package dir, producing ENOENT on package.json.
-      script: 'dist/workers/mikrotik.worker.js',
+      script: 'dist/workers/routerOps.worker.js',
       interpreter: 'node',
       instances: 1,
       exec_mode: 'fork',
@@ -154,20 +149,148 @@ module.exports = {
       exp_backoff_restart_delay: 100,
       max_restarts: 10,
       min_uptime: '10s',
-      error_file: `${PROJECT_DIR}/logs/mikrotik-worker-error.log`,
-      out_file: `${PROJECT_DIR}/logs/mikrotik-worker-out.log`,
+      error_file: `${PROJECT_DIR}/logs/router-ops-error.log`,
+      out_file: `${PROJECT_DIR}/logs/router-ops-out.log`,
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
       merge_logs: true,
-      // NOTE: Do NOT use env_file here.
-      // PM2's env_file loader does NOT strip surrounding quotes from values —
-      // so REDIS_URL="redis://..." becomes the literal string with quotes included,
-      // breaking URL parsing in redis.ts and silently losing the Redis password.
-      // Workers use `import 'dotenv/config'` at startup to load backend/.env
-      // correctly (dotenv DOES strip quotes). PM2 env vars only supplement that.
       env: {
         NODE_ENV: 'production',
         NEXT_TELEMETRY_DISABLED: '1',
-        // NODE_PATH allows @/ path aliases to resolve from the dist/ directory
+        NODE_PATH: `${BACKEND_DIR}/dist`,
+      },
+      env_production: {
+        NODE_ENV: 'production',
+        NEXT_TELEMETRY_DISABLED: '1',
+        NODE_PATH: `${BACKEND_DIR}/dist`,
+      }
+    },
+    {
+      name: 'router-discovery-worker',
+      cwd: BACKEND_DIR,
+      script: 'dist/workers/routerDiscovery.worker.js',
+      interpreter: 'node',
+      instances: 1,
+      exec_mode: 'fork',
+      watch: false,
+      max_memory_restart: '512M',
+      exp_backoff_restart_delay: 100,
+      max_restarts: 10,
+      min_uptime: '10s',
+      error_file: `${PROJECT_DIR}/logs/router-discovery-error.log`,
+      out_file: `${PROJECT_DIR}/logs/router-discovery-out.log`,
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      merge_logs: true,
+      env: {
+        NODE_ENV: 'production',
+        NEXT_TELEMETRY_DISABLED: '1',
+        NODE_PATH: `${BACKEND_DIR}/dist`,
+      },
+      env_production: {
+        NODE_ENV: 'production',
+        NEXT_TELEMETRY_DISABLED: '1',
+        NODE_PATH: `${BACKEND_DIR}/dist`,
+      }
+    },
+    {
+      name: 'router-sync-worker',
+      cwd: BACKEND_DIR,
+      script: 'dist/workers/routerSync.worker.js',
+      interpreter: 'node',
+      instances: 1,
+      exec_mode: 'fork',
+      watch: false,
+      max_memory_restart: '512M',
+      exp_backoff_restart_delay: 100,
+      max_restarts: 10,
+      min_uptime: '10s',
+      error_file: `${PROJECT_DIR}/logs/router-sync-error.log`,
+      out_file: `${PROJECT_DIR}/logs/router-sync-out.log`,
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      merge_logs: true,
+      env: {
+        NODE_ENV: 'production',
+        NEXT_TELEMETRY_DISABLED: '1',
+        NODE_PATH: `${BACKEND_DIR}/dist`,
+      },
+      env_production: {
+        NODE_ENV: 'production',
+        NEXT_TELEMETRY_DISABLED: '1',
+        NODE_PATH: `${BACKEND_DIR}/dist`,
+      }
+    },
+    {
+      name: 'router-health-worker',
+      cwd: BACKEND_DIR,
+      script: 'dist/workers/routerHealth.worker.js',
+      interpreter: 'node',
+      instances: 1,
+      exec_mode: 'fork',
+      watch: false,
+      max_memory_restart: '256M',
+      exp_backoff_restart_delay: 100,
+      max_restarts: 10,
+      min_uptime: '10s',
+      error_file: `${PROJECT_DIR}/logs/router-health-error.log`,
+      out_file: `${PROJECT_DIR}/logs/router-health-out.log`,
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      merge_logs: true,
+      env: {
+        NODE_ENV: 'production',
+        NEXT_TELEMETRY_DISABLED: '1',
+        NODE_PATH: `${BACKEND_DIR}/dist`,
+      },
+      env_production: {
+        NODE_ENV: 'production',
+        NEXT_TELEMETRY_DISABLED: '1',
+        NODE_PATH: `${BACKEND_DIR}/dist`,
+      }
+    },
+    {
+      name: 'router-provision-worker',
+      cwd: BACKEND_DIR,
+      script: 'dist/workers/routerProvision.worker.js',
+      interpreter: 'node',
+      instances: 1,
+      exec_mode: 'fork',
+      watch: false,
+      max_memory_restart: '512M',
+      exp_backoff_restart_delay: 100,
+      max_restarts: 10,
+      min_uptime: '10s',
+      error_file: `${PROJECT_DIR}/logs/router-provision-error.log`,
+      out_file: `${PROJECT_DIR}/logs/router-provision-out.log`,
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      merge_logs: true,
+      env: {
+        NODE_ENV: 'production',
+        NEXT_TELEMETRY_DISABLED: '1',
+        NODE_PATH: `${BACKEND_DIR}/dist`,
+      },
+      env_production: {
+        NODE_ENV: 'production',
+        NEXT_TELEMETRY_DISABLED: '1',
+        NODE_PATH: `${BACKEND_DIR}/dist`,
+      }
+    },
+    {
+      name: 'router-backup-worker',
+      cwd: BACKEND_DIR,
+      script: 'dist/workers/routerBackup.worker.js',
+      interpreter: 'node',
+      instances: 1,
+      exec_mode: 'fork',
+      watch: false,
+      max_memory_restart: '256M',
+      exp_backoff_restart_delay: 100,
+      max_restarts: 10,
+      min_uptime: '10s',
+      error_file: `${PROJECT_DIR}/logs/router-backup-error.log`,
+      out_file: `${PROJECT_DIR}/logs/router-backup-out.log`,
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      merge_logs: true,
+      env: {
+        NODE_ENV: 'production',
+        NEXT_TELEMETRY_DISABLED: '1',
         NODE_PATH: `${BACKEND_DIR}/dist`,
       },
       env_production: {

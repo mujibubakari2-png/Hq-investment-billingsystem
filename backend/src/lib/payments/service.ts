@@ -496,11 +496,11 @@ export class PaymentService {
         const type = client.serviceType === "HOTSPOT" ? "hotspot" : "pppoe";
         await enqueueActivateService(
           pkg.routerId,
+          pkg.tenantId ?? null,
           client.username,
           pwd,
           pkg.name,
           type,
-          pkg.tenantId ?? null,
           (newSub as any)?.expiresAt ?? result.expiresAt
         );
         if (newSub?.id) {
@@ -1070,11 +1070,11 @@ export class PaymentService {
         const type = client.serviceType === "HOTSPOT" ? "hotspot" : "pppoe";
         await enqueueActivateService(
           pkg.routerId,
+          pkg.tenantId ?? null,
           client.username,
           pwd,
           pkg.name,
           type,
-          pkg.tenantId ?? null,
           (newSub as any).expiresAt
         );
         if (newSub?.id) {

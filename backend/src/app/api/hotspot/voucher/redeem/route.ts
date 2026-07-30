@@ -160,11 +160,11 @@ export async function POST(req: NextRequest) {
             try {
                 await enqueueActivateService(
                     rId,
+                    pkg.tenantId ?? null,
                     client.username,
                     code,
                     pkg.name,
                     "hotspot",
-                    pkg.tenantId ?? null,
                     expiresAt
                 );
                 mikrotikQueueSuccess = true;

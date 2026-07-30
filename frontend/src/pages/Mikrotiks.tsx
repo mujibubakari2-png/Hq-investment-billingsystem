@@ -5,13 +5,12 @@ import SearchIcon from '@mui/icons-material/Search';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import VisibilityIcon from '@mui/icons-material/Visibility';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import CancelIcon from '@mui/icons-material/Cancel';
 import SettingsIcon from '@mui/icons-material/Settings';
 import PowerSettingsNewIcon from '@mui/icons-material/PowerSettingsNew';
 import SyncIcon from '@mui/icons-material/Sync';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import BugReportIcon from '@mui/icons-material/BugReport';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import { normalizeApiList } from '../utils/apiResponse';
 import { routersApi } from '../api';
 import AddRouterModal from '../modals/AddRouterModal';
@@ -23,6 +22,10 @@ import LanguageIcon from '@mui/icons-material/Language';
 import CellTowerIcon from '@mui/icons-material/CellTower';
 import type { Router } from '../types';
 import { formatDate } from '../utils/formatters';
+import { RouterVendorBadge } from '../components/RouterVendorBadge';
+import { RouterStatusBadge } from '../components/RouterStatusBadge';
+import { Popup } from '../stores/popupStore';
+import { isMikroTik, getVendorLabel, getVendorConsoleUrl } from '../utils/RouterCapabilities';
 
 interface RouterCreatePayload extends Record<string, unknown> {
     name: string;
@@ -122,7 +125,7 @@ export default function Mikrotiks() {
 
     useEffect(() => {
         if (!routerIds) return;
-        
+
         let isCancelled = false;
         const syncLiveStats = async () => {
             const ids = routerIds.split(',');
@@ -133,14 +136,14 @@ export default function Mikrotiks() {
                         const res = await routersApi.testConnection(id) as RouterTestResult;
                         if (!isCancelled && res?.success && res?.info) {
                             const info = res.info;
-                            setRouters(prev => prev.map(router => 
-                                router.id === id 
-                                    ? { 
-                                        ...router, 
+                            setRouters(prev => prev.map(router =>
+                                router.id === id
+                                    ? {
+                                        ...router,
                                         cpuLoad: info.cpuLoad ?? router.cpuLoad,
                                         status: 'Online',
                                         uptime: info.uptime || router.uptime
-                                      }
+                                    }
                                     : router
                             ));
                         } else if (!isCancelled && !res?.success) {
@@ -178,10 +181,15 @@ export default function Mikrotiks() {
             const res = await routersApi.create(payload);
             setShowAddModal(false);
             await fetchRouters();
-            alert(`Router "${(res as RouterCreateResult).name || 'unknown'}" created successfully! Open the router Details to download the MikroTik script.`);
+            // Vendor-aware success message
+            const createdName = (res as RouterCreateResult).name || 'unknown';
+            const vendorMsg = isMikroTik({ vendor: data.vendor, type: data.type ?? 'mikrotik' } as any)
+                ? 'Open the router Details to download the auto-configuration script.'
+                : `Open the router Details to connect to the ${getVendorLabel(data.vendor)} controller.`;
+            Popup.success('Router Created', `Router "${createdName}" created successfully! ${vendorMsg}`);
         } catch (err) {
             console.error('Failed to create router:', err);
-            alert('Failed to create router.');
+            Popup.error('Creation Failed', 'Failed to create router.');
         }
     };
 
@@ -201,11 +209,11 @@ export default function Mikrotiks() {
             await routersApi.update(selectedRouterToEdit.id, payload);
             setSelectedRouterToEdit(null);
             await fetchRouters();
-            alert('Router updated successfully!');
+            Popup.success('Update Successful', 'Router updated successfully!');
         } catch (err) {
             const message = err instanceof Error ? err.message : String(err);
             console.error('Failed to update router:', err);
-            alert(`Failed to update router: ${message || 'Unknown error'}`);
+            Popup.error('Update Failed', `Failed to update router: ${message || 'Unknown error'}`);
         }
     };
 
@@ -215,14 +223,15 @@ export default function Mikrotiks() {
             const result = await routersApi.testConnection(router.id);
             const connectionResult = result as RouterTestResult;
             if (connectionResult.success) {
-                alert(`✅ Connected! RouterOS ${connectionResult.info?.version || ''}`);
+                const versionInfo = connectionResult.info?.version ? ` — firmware v${connectionResult.info.version}` : '';
+                Popup.success('Connection Successful', `✅ ${getVendorLabel(router.vendor)} connected!${versionInfo}`);
             } else {
-                alert(`❌ Connection failed: ${connectionResult.message || 'Unknown error'}`);
+                Popup.error('Connection Failed', `❌ Connection failed: ${connectionResult.message || 'Unknown error'}`);
             }
             fetchRouters();
         } catch (err) {
             const message = err instanceof Error ? err.message : String(err);
-            alert(`❌ Connection failed: ${message || 'Unknown error'}`);
+            Popup.error('Connection Failed', `❌ Connection failed: ${message || 'Unknown error'}`);
         } finally {
             setTestingId('');
         }
@@ -233,17 +242,30 @@ export default function Mikrotiks() {
             await routersApi.delete(id);
             setDeleteRouter(null);
             fetchRouters();
-            alert('Router deleted successfully!');
+            Popup.success('Deleted', 'Router deleted successfully!');
         } catch (err) {
             console.error('Failed to delete router:', err);
-            alert('Failed to delete router');
+            Popup.error('Deletion Failed', 'Failed to delete router');
         }
     };
 
+    // ── Vendor-aware remote access ────────────────────────────────────────────
+    // Returns the correct console URL or null for MikroTik (WinBox)
+    const getRemoteAccessUrl = (router: Router): string | null => {
+        return getVendorConsoleUrl(router);
+    };
+
     const handleDirectConnect = async (router: Router) => {
+        const remoteUrl = getRemoteAccessUrl(router);
+        if (remoteUrl) {
+            // Non-MikroTik: open the vendor's own web console in a new tab
+            window.open(remoteUrl, '_blank', 'noopener,noreferrer');
+            return;
+        }
+
+        // MikroTik: use WinBox launcher
         setConnectingId(router.id);
         try {
-            // 1. Determine IP (prefer active VPN tunnel)
             let ip = router.host;
             if (router.vpnMode === 'wireguard') {
                 try {
@@ -252,7 +274,7 @@ export default function Mikrotiks() {
                         ip = wgConfig.routerTunnelIp;
                     }
                 } catch (e) {
-                    console.warn("Failed to check WG status", e);
+                    console.warn('Failed to check WG status', e);
                 }
             }
 
@@ -260,7 +282,6 @@ export default function Mikrotiks() {
             const rawPass = router.password || '';
 
             if (window.mikrotikApi) {
-                // Desktop App: Check, auto-download, and auto-login
                 const installed = await window.mikrotikApi.checkWinBoxInstalled();
                 if (!installed) {
                     setDownloadProgress({ id: router.id, percent: 0 });
@@ -271,23 +292,18 @@ export default function Mikrotiks() {
                 const launchRes = await window.mikrotikApi.launchWinBox(ip, rawUser, rawPass || undefined);
                 if (!launchRes.success) throw new Error(launchRes.error);
             } else {
-                // Web Browser: Use winbox:// scheme
                 const username = encodeURIComponent(rawUser);
                 const password = encodeURIComponent(rawPass);
                 const winboxUrl = `winbox://${username}:${password}@${ip}:8291`;
-                
-                // Attempt to launch
                 window.location.href = winboxUrl;
-                
-                // Fallback for missing protocol handler
                 setTimeout(() => {
-                    if (confirm("If WinBox did not open, it may not be installed. Download it from the official MikroTik website?")) {
+                    if (confirm('If WinBox did not open, it may not be installed. Download it from the official MikroTik website?')) {
                         window.open('https://mt.lv/winbox64', '_blank');
                     }
                 }, 2000);
             }
         } catch (err: any) {
-            alert(`Failed to connect: ${err.message}`);
+            Popup.error('Connection Error', `Failed to connect: ${err.message}`);
         } finally {
             setConnectingId(null);
         }
@@ -385,12 +401,13 @@ export default function Mikrotiks() {
                         <thead>
                             <tr>
                                 <th>Router Name <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>▼</span></th>
+                                <th>Vendor</th>
                                 <th>IP Address</th>
                                 <th>VPN Type</th>
                                 <th>Status</th>
                                 <th>Last Seen</th>
                                 <th>CPU Load</th>
-                                <th>Remote Access</th>
+                                <th>Console</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -411,9 +428,16 @@ export default function Mikrotiks() {
                                             </div>
                                             <div>
                                                 <div style={{ fontWeight: 600, color: 'var(--primary)' }}>{router.name}</div>
-                                                <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>{router.description || router.type || 'MikroTik'}</div>
+                                                <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>{router.description || router.firmwareVersion || ''}</div>
                                             </div>
                                         </div>
+                                    </td>
+                                    <td>
+                                        <RouterVendorBadge
+                                            vendor={router.vendor || router.type}
+                                            firmwareVersion={router.firmwareVersion}
+                                            showVersion
+                                        />
                                     </td>
                                     <td>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -437,15 +461,7 @@ export default function Mikrotiks() {
                                         </span>
                                     </td>
                                     <td>
-                                        <span style={{
-                                            display: 'inline-flex', alignItems: 'center', gap: 4,
-                                            padding: '4px 10px', borderRadius: 20, fontWeight: 500, fontSize: '0.78rem',
-                                            background: router.status === 'Online' ? '#d1fae5' : '#fee2e2',
-                                            color: router.status === 'Online' ? '#065f46' : '#dc2626',
-                                        }}>
-                                            {router.status === 'Online' ? <CheckCircleIcon style={{ fontSize: 12 }} /> : <CancelIcon style={{ fontSize: 12 }} />}
-                                            {router.status === 'Online' ? 'Connected' : 'Offline'}
-                                        </span>
+                                        <RouterStatusBadge router={router} simple />
                                     </td>
                                     <td>
                                         <span style={{ fontSize: '0.83rem', color: 'var(--text-secondary)' }}>
@@ -464,43 +480,55 @@ export default function Mikrotiks() {
                                         </div>
                                     </td>
                                     <td>
-                                        {router.status === 'Online' ? (
-                                            <button
-                                                className="btn"
-                                                onClick={() => handleDirectConnect(router)}
-                                                disabled={connectingId === router.id}
-                                                style={{
-                                                    display: 'inline-flex', alignItems: 'center', gap: 6,
-                                                    padding: '4px 12px', borderRadius: 20, fontWeight: 600, fontSize: '0.75rem',
-                                                    background: '#e0e7ff', color: '#4338ca', border: '1px solid #c7d2fe',
-                                                    transition: 'all 0.2s', cursor: connectingId === router.id ? 'wait' : 'pointer'
-                                                }}
-                                                onMouseOver={(e) => { if (connectingId !== router.id) (e.currentTarget as HTMLButtonElement).style.background = '#c7d2fe'; }}
-                                                onMouseOut={(e) => { if (connectingId !== router.id) (e.currentTarget as HTMLButtonElement).style.background = '#e0e7ff'; }}
-                                            >
-                                                {connectingId === router.id ? <SyncIcon style={{ fontSize: 13, animation: 'spin 1s linear infinite' }} /> : <LanguageIcon style={{ fontSize: 13 }} />} 
-                                                {connectingId === router.id 
-                                                    ? (downloadProgress?.id === router.id ? `Downloading ${downloadProgress.percent}%` : 'Connecting...') 
-                                                    : 'Connect'}
-                                            </button>
-                                        ) : (
-                                            <button
-                                                className="btn"
-                                                onClick={() => handleDirectConnect(router)}
-                                                disabled={connectingId === router.id}
-                                                style={{
-                                                    display: 'inline-flex', alignItems: 'center', gap: 6,
-                                                    padding: '4px 12px', borderRadius: 20, fontWeight: 500, fontSize: '0.75rem',
-                                                    background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca',
-                                                    transition: 'all 0.2s', cursor: connectingId === router.id ? 'wait' : 'pointer'
-                                                }}
-                                                onMouseOver={(e) => { if (connectingId !== router.id) (e.currentTarget as HTMLButtonElement).style.background = '#fecaca'; }}
-                                                onMouseOut={(e) => { if (connectingId !== router.id) (e.currentTarget as HTMLButtonElement).style.background = '#fef2f2'; }}
-                                            >
-                                                {connectingId === router.id ? <SyncIcon style={{ fontSize: 13, animation: 'spin 1s linear infinite' }} /> : <CellTowerIcon style={{ fontSize: 13 }} />}
-                                                {connectingId === router.id ? 'Connecting...' : 'Offline'}
-                                            </button>
-                                        )}
+                                        {(() => {
+                                            const remoteUrl = getRemoteAccessUrl(router);
+                                            const vendor = (router.vendor || router.type || 'mikrotik').toLowerCase();
+
+                                            if (remoteUrl) {
+                                                // Non-MikroTik: open vendor console in new tab
+                                                return (
+                                                    <a
+                                                        href={remoteUrl}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        style={{
+                                                            display: 'inline-flex', alignItems: 'center', gap: 5,
+                                                            padding: '4px 12px', borderRadius: 20, fontWeight: 600, fontSize: '0.75rem',
+                                                            background: router.status === 'Online' ? '#e0e7ff' : '#f3f4f6',
+                                                            color: router.status === 'Online' ? '#4338ca' : '#9ca3af',
+                                                            border: `1px solid ${router.status === 'Online' ? '#c7d2fe' : '#e5e7eb'}`,
+                                                            textDecoration: 'none', transition: 'all 0.2s',
+                                                        }}
+                                                    >
+                                                        <OpenInNewIcon style={{ fontSize: 12 }} />
+                                                        {vendor.includes('omada') ? 'Omada' : vendor.includes('unifi') ? 'UniFi' : 'Console'}
+                                                    </a>
+                                                );
+                                            }
+                                            // MikroTik: WinBox launcher button
+                                            return (
+                                                <button
+                                                    className="btn"
+                                                    onClick={() => handleDirectConnect(router)}
+                                                    disabled={connectingId === router.id}
+                                                    style={{
+                                                        display: 'inline-flex', alignItems: 'center', gap: 6,
+                                                        padding: '4px 12px', borderRadius: 20, fontWeight: 600, fontSize: '0.75rem',
+                                                        background: router.status === 'Online' ? '#e0e7ff' : '#fef2f2',
+                                                        color: router.status === 'Online' ? '#4338ca' : '#dc2626',
+                                                        border: `1px solid ${router.status === 'Online' ? '#c7d2fe' : '#fecaca'}`,
+                                                        transition: 'all 0.2s', cursor: connectingId === router.id ? 'wait' : 'pointer'
+                                                    }}
+                                                >
+                                                    {connectingId === router.id
+                                                        ? <SyncIcon style={{ fontSize: 13, animation: 'spin 1s linear infinite' }} />
+                                                        : router.status === 'Online' ? <LanguageIcon style={{ fontSize: 13 }} /> : <CellTowerIcon style={{ fontSize: 13 }} />}
+                                                    {connectingId === router.id
+                                                        ? (downloadProgress?.id === router.id ? `${downloadProgress.percent}%` : 'Connecting...')
+                                                        : (router.status === 'Online' ? 'WinBox' : 'Offline')}
+                                                </button>
+                                            );
+                                        })()}
                                     </td>
                                     <td>
                                         <div className="table-actions" style={{ display: 'flex', gap: 6, alignItems: 'center', position: 'relative' }}>
@@ -548,7 +576,7 @@ export default function Mikrotiks() {
                                                         transition: 'all 0.15s',
                                                     }}
                                                     title="More actions"
-                                                     onClick={(e) => {
+                                                    onClick={(e) => {
                                                         e.stopPropagation();
                                                         if (actionMenuId === router.id) {
                                                             setActionMenuId(null);
@@ -566,7 +594,7 @@ export default function Mikrotiks() {
                                                 </button>
 
                                                 {/* dropdown rendered via fixed portal below */}
-                                             </div>
+                                            </div>
                                         </div>
                                     </td>
                                 </tr>
@@ -619,87 +647,94 @@ export default function Mikrotiks() {
                     minWidth: 175, animation: 'fadeIn 0.15s ease-out',
                 }}>
                     <div style={{ padding: '6px 0' }}>
-                        <button
-                            onMouseDown={(e) => { 
-                                e.preventDefault();
-                                const r = routers.find(r => r.id === actionMenuId);
-                                if (r) setDiagnosisRouter(r); 
-                                setActionMenuId(null); 
-                                setMenuPosition(null);
-                            }}
-                            style={{
-                                display: 'flex', alignItems: 'center', gap: 10, width: '100%',
-                                padding: '9px 16px', border: 'none', background: 'transparent',
-                                cursor: 'pointer', fontSize: '0.82rem', color: '#374151',
-                                transition: 'background 0.15s',
-                            }}
-                            onMouseOver={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#f5f3ff'; }}
-                            onMouseOut={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
-                        >
-                            <BugReportIcon style={{ fontSize: 15, color: '#7c3aed' }} />
-                            <span>Diagnose</span>
-                        </button>
-                        <button
-                            onMouseDown={(e) => { 
-                                e.preventDefault();
-                                const r = routers.find(r => r.id === actionMenuId);
-                                if (r) setWizardRouter(r); 
-                                setActionMenuId(null); 
-                                setMenuPosition(null);
-                            }}
-                            style={{
-                                display: 'flex', alignItems: 'center', gap: 10, width: '100%',
-                                padding: '9px 16px', border: 'none', background: 'transparent',
-                                cursor: 'pointer', fontSize: '0.82rem', color: '#374151',
-                                transition: 'background 0.15s',
-                            }}
-                            onMouseOver={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#fefce8'; }}
-                            onMouseOut={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
-                        >
-                            <SettingsIcon style={{ fontSize: 15, color: '#d97706' }} />
-                            <span>Setup Wizard</span>
-                        </button>
-                        <button
-                            onMouseDown={(e) => { 
-                                e.preventDefault();
-                                const r = routers.find(r => r.id === actionMenuId);
-                                if (r) setSelectedRouterToEdit(r); 
-                                setActionMenuId(null); 
-                                setMenuPosition(null);
-                            }}
-                            style={{
-                                display: 'flex', alignItems: 'center', gap: 10, width: '100%',
-                                padding: '9px 16px', border: 'none', background: 'transparent',
-                                cursor: 'pointer', fontSize: '0.82rem', color: '#374151',
-                                transition: 'background 0.15s',
-                            }}
-                            onMouseOver={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#eff6ff'; }}
-                            onMouseOut={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
-                        >
-                            <EditIcon style={{ fontSize: 15, color: '#2563eb' }} />
-                            <span>Edit Router</span>
-                        </button>
-                        <div style={{ height: 1, background: '#f3f4f6', margin: '4px 12px' }} />
-                        <button
-                            onMouseDown={(e) => { 
-                                e.preventDefault();
-                                const r = routers.find(r => r.id === actionMenuId);
-                                if (r) setDeleteRouter(r); 
-                                setActionMenuId(null); 
-                                setMenuPosition(null);
-                            }}
-                            style={{
-                                display: 'flex', alignItems: 'center', gap: 10, width: '100%',
-                                padding: '9px 16px', border: 'none', background: 'transparent',
-                                cursor: 'pointer', fontSize: '0.82rem', color: '#dc2626',
-                                transition: 'background 0.15s',
-                            }}
-                            onMouseOver={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#fef2f2'; }}
-                            onMouseOut={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
-                        >
-                            <DeleteIcon style={{ fontSize: 15, color: '#dc2626' }} />
-                            <span>Delete Router</span>
-                        </button>
+                        {(() => {
+                            const r = routers.find(rt => rt.id === actionMenuId);
+                            const isRouterMikroTik = r ? isMikroTik(r) : true;
+                            return (
+                                <>
+                                    <button
+                                        onMouseDown={(e) => {
+                                            e.preventDefault();
+                                            if (r) setDiagnosisRouter(r);
+                                            setActionMenuId(null);
+                                            setMenuPosition(null);
+                                        }}
+                                        style={{
+                                            display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+                                            padding: '9px 16px', border: 'none', background: 'transparent',
+                                            cursor: 'pointer', fontSize: '0.82rem', color: '#374151',
+                                            transition: 'background 0.15s',
+                                        }}
+                                        onMouseOver={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#f5f3ff'; }}
+                                        onMouseOut={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
+                                    >
+                                        <BugReportIcon style={{ fontSize: 15, color: '#7c3aed' }} />
+                                        <span>Diagnose</span>
+                                    </button>
+                                    {isRouterMikroTik && (
+                                        <button
+                                            onMouseDown={(e) => {
+                                                e.preventDefault();
+                                                if (r) setWizardRouter(r);
+                                                setActionMenuId(null);
+                                                setMenuPosition(null);
+                                            }}
+                                            style={{
+                                                display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+                                                padding: '9px 16px', border: 'none', background: 'transparent',
+                                                cursor: 'pointer', fontSize: '0.82rem', color: '#374151',
+                                                transition: 'background 0.15s',
+                                            }}
+                                            onMouseOver={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#fefce8'; }}
+                                            onMouseOut={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
+                                        >
+                                            <SettingsIcon style={{ fontSize: 15, color: '#d97706' }} />
+                                            <span>Setup Wizard</span>
+                                        </button>
+                                    )}
+                                    <button
+                                        onMouseDown={(e) => {
+                                            e.preventDefault();
+                                            if (r) setSelectedRouterToEdit(r);
+                                            setActionMenuId(null);
+                                            setMenuPosition(null);
+                                        }}
+                                        style={{
+                                            display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+                                            padding: '9px 16px', border: 'none', background: 'transparent',
+                                            cursor: 'pointer', fontSize: '0.82rem', color: '#374151',
+                                            transition: 'background 0.15s',
+                                        }}
+                                        onMouseOver={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#eff6ff'; }}
+                                        onMouseOut={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
+                                    >
+                                        <EditIcon style={{ fontSize: 15, color: '#2563eb' }} />
+                                        <span>Edit Router</span>
+                                    </button>
+                                    <div style={{ height: 1, background: '#f3f4f6', margin: '4px 12px' }} />
+                                    <button
+                                        onMouseDown={(e) => {
+                                            e.preventDefault();
+                                            const r = routers.find(r => r.id === actionMenuId);
+                                            if (r) setDeleteRouter(r);
+                                            setActionMenuId(null);
+                                            setMenuPosition(null);
+                                        }}
+                                        style={{
+                                            display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+                                            padding: '9px 16px', border: 'none', background: 'transparent',
+                                            cursor: 'pointer', fontSize: '0.82rem', color: '#dc2626',
+                                            transition: 'background 0.15s',
+                                        }}
+                                        onMouseOver={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#fef2f2'; }}
+                                        onMouseOut={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
+                                    >
+                                        <DeleteIcon style={{ fontSize: 15, color: '#dc2626' }} />
+                                        <span>Delete Router</span>
+                                    </button>
+                                </>
+                            );
+                        })()}
                     </div>
                 </div>
             )}

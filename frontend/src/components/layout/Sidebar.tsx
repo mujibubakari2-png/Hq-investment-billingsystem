@@ -92,7 +92,7 @@ const navSections: NavSection[] = [
     {
         title: 'NETWORK MANAGEMENT',
         items: [
-            { label: 'Mikrotiks',   icon: 'router',   path: '/mikrotiks' },
+            { label: 'Routers',     icon: 'router',   path: '/routers' },
             { label: 'Equipments',  icon: 'devices',  path: '/equipments' },
             // VPN Management: Platform Super Admin ONLY — completely hidden from all tenant users
             { label: 'VPN Management', icon: 'vpn', path: '/vpn-management', platformOnly: true },

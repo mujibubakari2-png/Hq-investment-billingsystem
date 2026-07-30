@@ -51,11 +51,11 @@ export async function POST(req: NextRequest) {
                 const type = sub.client.serviceType === "HOTSPOT" ? "hotspot" : "pppoe";
                 await enqueueActivateService(
                     sub.routerId,
+                    sub.tenantId ?? null,
                     sub.client.username,
                     pwd,
                     sub.package.name,
                     type,
-                    sub.tenantId ?? null,
                     newExpiresDate
                 );
 

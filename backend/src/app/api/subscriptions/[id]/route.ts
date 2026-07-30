@@ -99,7 +99,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
                     // instead of leaving them connected until the old expiry hits.
                     await enqueueRadiusSuspendUser(username, tenantId, `sub-update-suspend-${sub.id}-${Date.now()}`);
                     if (sub.routerId) {
-                        await enqueueSuspendService(sub.routerId, username, sub.client.serviceType === "HOTSPOT" ? "hotspot" : "pppoe", tenantId);
+                        await enqueueSuspendService(sub.routerId, tenantId, username, sub.client.serviceType === "HOTSPOT" ? "hotspot" : "pppoe");
                     }
                 } else if (sub.status === "ACTIVE" || sub.status === "EXTENDED") {
                     const rateLimit = buildRadiusRateLimit({
@@ -124,11 +124,11 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
                     if (sub.routerId) {
                         await enqueueActivateService(
                             sub.routerId,
+                            tenantId,
                             username,
                             sub.client.phone || "123456",
                             sub.package.name,
                             sub.client.serviceType === "HOTSPOT" ? "hotspot" : "pppoe",
-                            tenantId,
                             sub.expiresAt
                         );
                     }
@@ -174,7 +174,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
             try {
                 await enqueueRadiusSuspendUser(existing.client.username, existing.tenantId ?? null, `sub-delete-${existing.id}`);
                 if (existing.routerId) {
-                    await enqueueSuspendService(existing.routerId, existing.client.username, existing.client.serviceType === "HOTSPOT" ? "hotspot" : "pppoe", existing.tenantId ?? null);
+                    await enqueueSuspendService(existing.routerId, existing.tenantId ?? null, existing.client.username, existing.client.serviceType === "HOTSPOT" ? "hotspot" : "pppoe");
                 }
             } catch (syncErr) {
                 logger.error("[SUBSCRIPTION DELETE] Failed to suspend RADIUS on delete", {

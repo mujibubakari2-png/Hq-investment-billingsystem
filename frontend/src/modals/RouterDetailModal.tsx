@@ -19,9 +19,11 @@ import OpenInBrowserIcon from '@mui/icons-material/OpenInBrowser';
 import TerminalIcon from '@mui/icons-material/Terminal';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import WireGuardConfigModal from './WireGuardConfigModal';
+import RouterCapabilityMatrix from '../components/RouterCapabilityMatrix';
 import { routersApi } from '../api';
 import type { Router } from '../types';
 import { formatDateTime } from '../utils/formatters';
+import { isMikroTik, hasCapability, getVendorLabel, getVendorConsoleUrl } from '../utils/RouterCapabilities';
 
 interface RouterDetailModalProps {
     router: Router;
@@ -124,6 +126,10 @@ export default function RouterDetailModal({ router, onClose, onDelete }: RouterD
     const isOnline = router.status === 'Online';
     const cpuColor = (router.cpuLoad || 0) > 80 ? '#ef4444' : (router.cpuLoad || 0) > 50 ? '#f59e0b' : '#22c55e';
     const memColor = (router.memoryUsed || 0) > 80 ? '#ef4444' : (router.memoryUsed || 0) > 60 ? '#f59e0b' : '#3b82f6';
+    // Use canonical utility — single source of truth for vendor checks
+    const isRouterMikroTik = isMikroTik(router);
+    const hasHotspot = hasCapability(router, 'hotspot');
+    const vendorConsoleUrl = getVendorConsoleUrl(router);
 
     return (
         <div className="modal-overlay" onClick={onClose}>
@@ -172,6 +178,13 @@ export default function RouterDetailModal({ router, onClose, onDelete }: RouterD
                         <StatCard icon={<PeopleIcon style={{ color: '#6366f1', fontSize: 22 }} />} label="Active Users" value={String(router.activeUsers || 0)} />
                         <StatCard icon={<AccessTimeIcon style={{ color: '#0891b2', fontSize: 22 }} />} label="Uptime" value={router.uptime || 'N/A'} small />
                     </div>
+
+                    <RouterCapabilityMatrix capabilities={{
+                        vendor: router.vendor || router.type || 'mikrotik',
+                        firmwareVersion: router.firmwareVersion,
+                        apiType: router.apiType,
+                        supportedFeatures: router.supportedFeatures || []
+                    }} />
 
                     {/* ── Two Column Layout (PC) ── */}
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16, marginBottom: 20 }}>
@@ -255,44 +268,63 @@ export default function RouterDetailModal({ router, onClose, onDelete }: RouterD
                                 border="#c7d2fe"
                                 onClick={() => setShowWireGuard(true)}
                             />
-                            <ActionBtn
-                                icon={<DownloadIcon fontSize="small" />}
-                                label={downloadingScript ? 'Downloading...' : 'Download Script'}
-                                desc="MikroTik .rsc setup"
-                                color="#0891b2"
-                                bg="#ecfeff"
-                                border="#a5f3fc"
-                                onClick={downloadScript}
-                                disabled={downloadingScript}
-                            />
-                            <ActionBtn
-                                icon={<LoginIcon fontSize="small" />}
-                                label="Login Page"
-                                desc="Hotspot customizer"
-                                color="#16a34a"
-                                bg="#f0fdf4"
-                                border="#86efac"
-                                onClick={() => { onClose(); navigate('/hotspot-customizer'); }}
-                            />
-                            <ActionBtn
-                                icon={<OpenInBrowserIcon fontSize="small" />}
-                                label="Open WebFig"
-                                desc="Router web GUI (browser)"
-                                color="#0e7490"
-                                bg="#ecfeff"
-                                border="#a5f3fc"
-                                onClick={() => setShowWebFig(true)}
-                            />
-                            <ActionBtn
-                                icon={<TerminalIcon fontSize="small" />}
-                                label={openingWinbox ? 'Opening...' : 'Open Winbox'}
-                                desc="Live TCP session for desktop Winbox"
-                                color="#7c3aed"
-                                bg="#f5f3ff"
-                                border="#ddd6fe"
-                                onClick={openWinbox}
-                                disabled={openingWinbox}
-                            />
+                            {isRouterMikroTik && (
+                                <ActionBtn
+                                    icon={<DownloadIcon fontSize="small" />}
+                                    label={downloadingScript ? 'Downloading...' : 'Download Script'}
+                                    desc="MikroTik .rsc auto-config"
+                                    color="#0891b2"
+                                    bg="#ecfeff"
+                                    border="#a5f3fc"
+                                    onClick={downloadScript}
+                                    disabled={downloadingScript}
+                                />
+                            )}
+                            {!isRouterMikroTik && vendorConsoleUrl && (
+                                <ActionBtn
+                                    icon={<OpenInBrowserIcon fontSize="small" />}
+                                    label={`Open ${getVendorLabel(router.vendor)} Console`}
+                                    desc="Open vendor web management UI"
+                                    color="#0891b2"
+                                    bg="#ecfeff"
+                                    border="#a5f3fc"
+                                    onClick={() => window.open(vendorConsoleUrl, '_blank', 'noopener,noreferrer')}
+                                />
+                            )}
+                            {hasHotspot && (
+                                <ActionBtn
+                                    icon={<LoginIcon fontSize="small" />}
+                                    label="Login Page"
+                                    desc="Hotspot customizer"
+                                    color="#16a34a"
+                                    bg="#f0fdf4"
+                                    border="#86efac"
+                                    onClick={() => { onClose(); navigate('/hotspot-customizer'); }}
+                                />
+                            )}
+                            {isRouterMikroTik && (
+                                <>
+                                    <ActionBtn
+                                        icon={<OpenInBrowserIcon fontSize="small" />}
+                                        label="Open WebFig"
+                                        desc="Router web GUI (browser)"
+                                        color="#0e7490"
+                                        bg="#ecfeff"
+                                        border="#a5f3fc"
+                                        onClick={() => setShowWebFig(true)}
+                                    />
+                                    <ActionBtn
+                                        icon={<TerminalIcon fontSize="small" />}
+                                        label={openingWinbox ? 'Opening...' : 'Open Winbox'}
+                                        desc="Live TCP session for desktop Winbox"
+                                        color="#7c3aed"
+                                        bg="#f5f3ff"
+                                        border="#ddd6fe"
+                                        onClick={openWinbox}
+                                        disabled={openingWinbox}
+                                    />
+                                </>
+                            )}
                         </div>
                         {winboxSession && (
                             <div style={{

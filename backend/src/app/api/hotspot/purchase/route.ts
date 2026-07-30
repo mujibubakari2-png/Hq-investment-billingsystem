@@ -387,11 +387,11 @@ async function completeHotspotPurchase(
       const username = client?.username || `HS-${clientId.slice(0, 8)}`;
       await enqueueActivateService(
         routerId,
+        pkg.tenantId ?? null,
         username,
         password,
         pkg.name,
         "hotspot",
-        pkg.tenantId ?? null,
         expiresAt
       );
 

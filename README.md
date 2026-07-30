@@ -153,8 +153,9 @@ http://localhost:3000/api/docs
 ```
 backend/src/
 ├── app/api/        Next.js API route handlers
-├── lib/            Shared utilities (auth, prisma, logger, encryption, mikrotik)
+├── lib/            Shared utilities (auth, prisma, logger, encryption, mikrotik, routerAdapters)
 ├── middleware/     CSRF, rate limiting, auth
+├── workers/        Provisioning, discovery, health, and router workers
 └── prisma/         Schema + migrations
 
 frontend/src/
@@ -163,3 +164,12 @@ frontend/src/
 ├── pages/          Route-level page components (lazy-loaded)
 └── stores/         Zustand state stores
 ```
+
+## Router Adapter Architecture
+
+The router management stack now uses a vendor adapter architecture.
+
+- MikroTikAdapter preserves the existing RouterOS functionality and integration path.
+- OmadaAdapter, UniFiAdapter, TPLinkAdapter, and FutureVendorAdapter provide a vendor-neutral extension point for future backends.
+- Capability detection and firmware-aware feature mapping are centralized in the adapter layer.
+- Router records now persist vendor, firmware, capability, and feature metadata.

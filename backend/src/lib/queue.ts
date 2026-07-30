@@ -1,188 +1,280 @@
+import { Queue } from "bullmq";
+import { getRedisConnection } from "./redis";
+import logger from "./logger";
+import { RouterVendor } from "./routerAdapters";
+import { getTenantClient } from "./tenantPrisma";
+
+export type RouterJobName =
+    | "activate-service"
+    | "suspend-service"
+    | "health-check"
+    | "sync-router"
+    | "backup-router"
+    | "reboot-router"
+    | "provision-router"
+    | "discover-router"
+    | "discovery-sweep";   // BullMQ repeatable cron sweep job
+
+
+export type RouterJobData = {
+    name: RouterJobName;
+    routerId: string;
+    tenantId: string | null;
+    vendor?: RouterVendor;
+    payload: Record<string, unknown>;
+    idempotencyKey?: string;
+};
+
 /**
- * MikroTik Job Queue — BullMQ
+ * Job Priority Constants (BullMQ: lower number = higher priority)
  *
- * MK-002 FIX: Moves all MikroTik write operations into an async job queue.
- * API routes enqueue a job and return 202 Accepted immediately.
- * A dedicated worker process executes the job with retries + backoff.
+ * ENTERPRISE-010: Priority queue — emergency ops run first.
  *
- * Redis requirement:
- *   Add REDIS_URL to .env: redis://127.0.0.1:6379
- *   Install Redis: sudo apt install redis-server && sudo systemctl enable redis
+ *   1  EMERGENCY_REBOOT   router is down, restore immediately
+ *   10 CRITICAL           security or billing-critical ops
+ *   50 PROVISION          initial/re-provisioning
+ *   70 HEALTH_CHECK       periodic health poll
+ *   100 SERVICE_OP        activate / suspend user service
+ *   150 SYNC              background sync
+ *   200 DISCOVERY         capability discovery sweep
  */
+export const JOB_PRIORITY = {
+    EMERGENCY_REBOOT: 1,
+    CRITICAL:         10,
+    PROVISION:        50,
+    HEALTH_CHECK:     70,
+    SERVICE_OP:       100,
+    SYNC:             150,
+    DISCOVERY:        200,
+} as const;
 
-import { Queue, Job } from 'bullmq';
-import logger from '@/lib/logger';
-import { getRedisConnection } from '@/lib/redis';
+// ENTERPRISE-014: Region-aware queue names
+// A worker binds to a specific region via WORKER_REGION env var.
+// E.g., if WORKER_REGION=AFRICA, it listens on "router-ops:africa".
+const workerRegion = process.env.WORKER_REGION ? `:${process.env.WORKER_REGION.toLowerCase()}` : '';
+const QUEUE_NAME = `router-ops${workerRegion}`;
+const DISCOVERY_QUEUE_NAME = `router-discovery${workerRegion}`;
 
-// Re-export so callers that previously imported from queue.ts still work.
-export { getRedisConnection } from '@/lib/redis';
+let _queue: Queue<RouterJobData> | null = null;
+let _discoveryQueue: Queue<any> | null = null;
 
-// ── Job Types ─────────────────────────────────────────────────────────────────
-
-export type MikroTikJobName =
-  | 'create-pppoe-user'
-  | 'delete-pppoe-user'
-  | 'update-pppoe-user'
-  | 'create-hotspot-user'
-  | 'delete-hotspot-user'
-  | 'update-hotspot-user'
-  | 'activate-service'
-  | 'suspend-service'
-  | 'disconnect-session'
-  | 'set-bandwidth'
-  | 'sync-subscription';
-
-export interface MikroTikJobData {
-  name: MikroTikJobName;
-  routerId: string;
-  idempotencyKey: string;
-  tenantId: string | null;
-  payload: Record<string, unknown>;
+/** Get a region-specific queue instance based on the target router's region */
+export function getRegionQueue(region?: string | null): Queue<RouterJobData> {
+    const r = region ? `:${region.toLowerCase()}` : '';
+    return new Queue(`router-ops${r}`, { connection: getRedisConnection() });
 }
 
-// ── Queue Singleton ───────────────────────────────────────────────────────────
-
-const QUEUE_NAME = 'mikrotik-ops';
-let _queue: Queue<MikroTikJobData> | null = null;
-
-export function getMikroTikQueue(): Queue<MikroTikJobData> {
-  if (!_queue) {
-    _queue = new Queue<MikroTikJobData>(QUEUE_NAME, {
-      connection: getRedisConnection(),
-      defaultJobOptions: {
-        attempts: 4,
-        backoff: { type: 'exponential', delay: 2000 },
-        removeOnComplete: { age: 24 * 3600 },
-        removeOnFail:    { age: 7 * 24 * 3600 },
-      },
-    });
-    _queue.on('error', (err) => {
-      logger.error('[MikroTik Queue] error', { error: err.message });
-    });
-  }
-  return _queue;
-}
-
-export async function closeMikroTikQueue(): Promise<void> {
-  if (_queue) {
-    try {
-      await _queue.close();
-    } catch {
-      // ignore — queue may already be closed
-    } finally {
-      _queue = null;
+export function getRouterQueue(): Queue<RouterJobData> {
+    if (!_queue) {
+        _queue = new Queue<RouterJobData>(QUEUE_NAME, {
+            connection: getRedisConnection(),
+            defaultJobOptions: {
+                attempts: 4,
+                backoff: { type: "exponential", delay: 2000 },
+                removeOnComplete: { age: 24 * 3600 },
+                removeOnFail: { age: 7 * 24 * 3600 },
+            },
+        });
+        _queue.on("error", (err) => {
+            logger.error("[Router Queue] error", { error: err.message });
+        });
     }
-  }
+    return _queue;
 }
 
-// ── Enqueue ───────────────────────────────────────────────────────────────────
-
-export async function enqueueMikroTikOp(
-  name: MikroTikJobName,
-  routerId: string,
-  payload: Record<string, unknown>,
-  tenantId: string | null,
-  idempotencyKey?: string
-): Promise<{ jobId: string }> {
-  const key = idempotencyKey ?? `${name}:${routerId}:${JSON.stringify(payload)}`;
-  const queue = getMikroTikQueue();
-  const job = await queue.add(
-    name,
-    { name, routerId, idempotencyKey: key, tenantId, payload },
-    { jobId: key } // BullMQ deduplication
-  );
-  logger.info('[MikroTik Queue] enqueued', { jobId: job.id, name, routerId });
-  return { jobId: job.id ?? key };
+export function getDiscoveryQueue(): Queue<RouterJobData> {
+    if (!_discoveryQueue) {
+        _discoveryQueue = new Queue<RouterJobData>(DISCOVERY_QUEUE_NAME, {
+            connection: getRedisConnection(),
+            defaultJobOptions: {
+                attempts: 2,
+                backoff: { type: "exponential", delay: 5000 },
+                removeOnComplete: { age: 6 * 3600 },
+                removeOnFail: { age: 24 * 3600 },
+            },
+        });
+        _discoveryQueue.on("error", (err) => {
+            logger.error("[Discovery Queue] error", { error: err.message });
+        });
+    }
+    return _discoveryQueue;
 }
 
-// ── Convenience Helpers ───────────────────────────────────────────────────────
+export async function closeRouterQueue(): Promise<void> {
+    if (_queue) {
+        try { await _queue.close(); } catch { /* ignore */ } finally { _queue = null; }
+    }
+    if (_discoveryQueue) {
+        try { await _discoveryQueue.close(); } catch { /* ignore */ } finally { _discoveryQueue = null; }
+    }
+}
 
-export const enqueuePPPoECreate = (
-  routerId: string, username: string, password: string, profile: string, tenantId: string | null
-) => enqueueMikroTikOp('create-pppoe-user', routerId, { username, password, profile }, tenantId, `create-pppoe:${routerId}:${username}`);
+export type EnqueueOptions = {
+    idempotencyKey?: string;
+    priority?: number;
+    delay?: number;
+    attempts?: number;
+};
 
-export const enqueuePPPoEDelete = (
-  routerId: string, username: string, tenantId: string | null
-) => enqueueMikroTikOp('delete-pppoe-user', routerId, { username }, tenantId, `delete-pppoe:${routerId}:${username}`);
+export async function enqueueRouterOp(
+    action: RouterJobName,
+    routerId: string,
+    tenantId: string | null,
+    payload: any,
+    opts?: { idempotencyKey?: string; priority?: number },
+    vendor?: RouterVendor
+): Promise<string> {
+    const db = getTenantClient(tenantId);
+    const routerRecord = await db.router.findUnique({
+        where: { id: routerId },
+        select: { vendor: true, region: true }
+    });
 
-export const enqueueHotspotCreate = (
-  routerId: string, username: string, password: string, profile: string, tenantId: string | null
-) => enqueueMikroTikOp('create-hotspot-user', routerId, { username, password, profile }, tenantId, `create-hotspot:${routerId}:${username}`);
+    const finalVendor = vendor ?? (routerRecord?.vendor as RouterVendor) ?? "mikrotik";
+    const region = routerRecord?.region; // Can be AFRICA, EUROPE etc.
 
-export const enqueueHotspotDelete = (
-  routerId: string, username: string, tenantId: string | null
-) => enqueueMikroTikOp('delete-hotspot-user', routerId, { username }, tenantId, `delete-hotspot:${routerId}:${username}`);
+    const jobId = opts?.idempotencyKey ?? crypto.randomUUID();
+    const data: RouterJobData = {
+        name: action,
+        routerId,
+        tenantId: tenantId ?? null,
+        payload,
+        vendor: finalVendor,
+        idempotencyKey: jobId
+    };
 
-export const enqueueDisconnectSession = (
-  routerId: string, sessionId: string, tenantId: string | null
-) => enqueueMikroTikOp('disconnect-session', routerId, { sessionId }, tenantId, `disconnect:${routerId}:${sessionId}`);
+    // Get the specific queue for this router's region
+    const targetQueue = getRegionQueue(region);
 
-/**
- * Queue a service activation (PPPoE or Hotspot) for async processing.
- * API returns immediately; MikroTik operation happens in background worker.
- *
- * RADIUS-001: The worker-side handler no longer creates/enables a local
- * MikroTik secret — RADIUS (see lib/radius.ts syncRadiusUser(), triggered
- * separately via enqueueRadiusSyncUser) is the sole source of truth for
- * customer auth. This call is kept so the RouterLog audit trail still
- * records an explicit activation event per customer/router.
- *
- * Architecture compliance: Event Queue → Router Worker → MikroTik API
- */
-export const enqueueActivateService = (
-  routerId: string,
-  username: string,
-  password: string,
-  profileName: string,
-  serviceType: 'pppoe' | 'hotspot',
-  tenantId: string | null,
-  expiresAt?: Date
-) => enqueueMikroTikOp(
-  'activate-service',
-  routerId,
-  { username, password, profileName, serviceType, expiresAt: expiresAt?.toISOString() },
-  tenantId,
-  `activate:${routerId}:${username}:${serviceType}`
-);
+    logger.info(`[Queue] Enqueueing ${action} for router ${routerId} to queue ${targetQueue.name}`, { jobId, priority: opts?.priority });
+    await targetQueue.add(action, data, {
+        jobId,
+        removeOnComplete: 100,
+        removeOnFail: 500,
+        priority: opts?.priority,
+    });
 
-/**
- * Queue a service suspension for async processing.
- * API returns immediately; MikroTik operation happens in background worker.
- *
- * RADIUS-001: The worker-side handler no longer disables a local MikroTik
- * secret (there isn't one anymore). It only force-disconnects the
- * customer's CURRENT active session so suspension takes effect immediately;
- * RADIUS suspension (see suspendRadiusUser() in lib/radius.ts, triggered
- * separately via enqueueRadiusSuspendUser) is what blocks any future
- * reconnect attempt.
- *
- * Architecture compliance: Event Queue → Router Worker → MikroTik API
- */
-export const enqueueSuspendService = (
-  routerId: string,
-  username: string,
-  serviceType: 'pppoe' | 'hotspot',
-  tenantId: string | null
-) => enqueueMikroTikOp(
-  'suspend-service',
-  routerId,
-  { username, serviceType },
-  tenantId,
-  `suspend:${routerId}:${username}:${serviceType}`
-);
+    return jobId;
+}
 
-// ── Job Status ────────────────────────────────────────────────────────────────
+export async function enqueueActivateService(
+    routerId: string,
+    tenantId: string | null,
+    username: string,
+    password?: string,
+    profileName?: string,
+    serviceType: "pppoe" | "hotspot" = "pppoe",
+    expiresAt?: Date,
+    vendor?: RouterVendor
+): Promise<string> {
+    return enqueueRouterOp(
+        "activate-service",
+        routerId,
+        tenantId,
+        { username, password, profileName, serviceType, expiresAt },
+        { idempotencyKey: `activate:${routerId}:${username}:${serviceType}`, priority: JOB_PRIORITY.SERVICE_OP },
+        vendor
+    );
+}
+
+export async function enqueueSuspendService(
+    routerId: string,
+    tenantId: string | null,
+    username: string,
+    serviceType: "pppoe" | "hotspot",
+    vendor?: RouterVendor
+): Promise<string> {
+    return enqueueRouterOp(
+        "suspend-service",
+        routerId,
+        tenantId,
+        { username, serviceType },
+        { idempotencyKey: `suspend:${routerId}:${username}:${serviceType}`, priority: JOB_PRIORITY.SERVICE_OP },
+        vendor
+    );
+}
+
+export async function enqueueDiscoverRouter(
+    routerId: string,
+    tenantId: string | null,
+    vendor?: RouterVendor
+): Promise<string> {
+    // Route to the dedicated discovery queue (consumed by routerDiscovery.worker.ts)
+    const key = `discover:${routerId}`;
+    const queue = getDiscoveryQueue();
+    const job = await queue.add(
+        "discover-router",
+        { name: "discover-router" as any, routerId, tenantId, vendor, payload: {}, idempotencyKey: key },
+        {
+            jobId: key,
+            attempts: 2,
+        }
+    );
+    logger.info(`[Discovery Queue] enqueued discover-router`, { jobId: job.id, routerId, vendor });
+    return job.id ?? key;
+}
+
+export async function enqueueHealthCheck(
+    routerId: string,
+    tenantId: string | null,
+    vendor?: RouterVendor
+): Promise<string> {
+    return enqueueRouterOp(
+        "health-check",
+        routerId,
+        tenantId,
+        {},
+        { idempotencyKey: `health:${routerId}`, priority: JOB_PRIORITY.HEALTH_CHECK },
+        vendor
+    );
+}
+
+export async function enqueueEmergencyReboot(
+    routerId: string,
+    tenantId: string | null,
+    reason: string,
+    vendor?: RouterVendor
+): Promise<string> {
+    return enqueueRouterOp(
+        "reboot-router",
+        routerId,
+        tenantId,
+        { reason, emergency: true },
+        // No idempotency key — every emergency reboot should run
+        { priority: JOB_PRIORITY.EMERGENCY_REBOOT },
+        vendor
+    );
+}
+
+export async function enqueueProvisionRouter(
+    routerId: string,
+    tenantId: string | null,
+    vendor?: RouterVendor
+): Promise<string> {
+    return enqueueRouterOp(
+        "provision-router",
+        routerId,
+        tenantId,
+        {},
+        { idempotencyKey: `provision:${routerId}`, priority: JOB_PRIORITY.PROVISION },
+        vendor
+    );
+}
 
 export async function getJobStatus(jobId: string): Promise<{
-  status: 'waiting' | 'active' | 'completed' | 'failed' | 'unknown';
-  result?: unknown;
-  error?: string;
+    status: "waiting" | "active" | "completed" | "failed" | "unknown";
+    result?: unknown;
+    error?: string;
 }> {
-  const job = await getMikroTikQueue().getJob(jobId);
-  if (!job) return { status: 'unknown' };
-  const state = await job.getState();
-  if (state === 'completed') return { status: 'completed', result: job.returnvalue };
-  if (state === 'failed')    return { status: 'failed',    error: job.failedReason };
-  if (state === 'active')    return { status: 'active' };
-  return { status: 'waiting' };
+    const job = await getRouterQueue().getJob(jobId);
+    if (!job) return { status: "unknown" };
+    const state = await job.getState();
+    if (state === "completed") return { status: "completed", result: job.returnvalue };
+    if (state === "failed") return { status: "failed", error: job.failedReason };
+    if (state === "active") return { status: "active" };
+    return { status: "waiting" };
 }
+
+export { getRedisConnection } from "./redis";
+export const getMikroTikQueue = getRouterQueue as any;
+export const closeMikroTikQueue = closeRouterQueue as any;

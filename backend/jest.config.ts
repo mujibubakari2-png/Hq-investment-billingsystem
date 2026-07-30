@@ -6,7 +6,7 @@ const config: Config = {
     setupFiles: ['<rootDir>/jest.setup.ts'],
     setupFilesAfterEnv: ['<rootDir>/jest.setupAfterEnv.ts'],
     globalTeardown: '<rootDir>/jest.globalTeardown.ts',
-    roots: ['<rootDir>/src/__tests__'],
+    roots: ['<rootDir>/src/__tests__', '<rootDir>/tests'],
     testMatch: ['**/*.test.ts'],
     transform: {
         '^.+\\.tsx?$': ['ts-jest', {

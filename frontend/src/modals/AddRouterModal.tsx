@@ -134,7 +134,7 @@ export default function AddRouterModal({ onClose, onSave, initialData }: AddRout
                         <div>
                             <div style={{ fontWeight: 700, fontSize: '1.05rem' }}>{isEdit ? 'Edit Router' : 'Add New Router'}</div>
                             <div style={{ fontSize: '0.75rem', opacity: 0.65, marginTop: 2 }}>
-                                {isEdit ? `Editing: ${initialData?.name}` : 'Connect a new MikroTik router to this system'}
+                                {isEdit ? `Editing: ${initialData?.name}` : 'Connect a new router to this system'}
                             </div>
                         </div>
                     </div>

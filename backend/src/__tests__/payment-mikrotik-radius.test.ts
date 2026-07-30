@@ -65,27 +65,27 @@ jest.mock('@/lib/prisma', () => ({
 // ── Require after mocks ───────────────────────────────────────────────────────
 // `export {}` makes this file an ES module so TypeScript gives it its own
 // isolated scope, preventing "Cannot redeclare" errors with other test files.
-export {};
+export { };
 
-const { getTenantClient }                         = require('@/lib/tenantPrisma');
+const { getTenantClient } = require('@/lib/tenantPrisma');
 const { getPaymentProvider, isSupportedProvider } = require('@/lib/payments/registry');
-const { syncRadiusUser }                          = require('@/lib/radius');
-const { enqueueRadiusSyncUser }                 = require('@/lib/radius-queue');
-const { enqueueActivateService }                  = require('@/lib/queue');
-const { getMikroTikService, sanitizeMikroTikName }= require('@/lib/mikrotik');
-const { paymentService }                          = require('@/lib/payments/service');
+const { syncRadiusUser } = require('@/lib/radius');
+const { enqueueRadiusSyncUser } = require('@/lib/radius-queue');
+const { enqueueActivateService } = require('@/lib/queue');
+const { getMikroTikService, sanitizeMikroTikName } = require('@/lib/mikrotik');
+const { paymentService } = require('@/lib/payments/service');
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  Constants
 // ═══════════════════════════════════════════════════════════════════════════════
 
-const TENANT_ID  = 'tenant-abc';
-const CLIENT_ID  = 'client-001';
+const TENANT_ID = 'tenant-abc';
+const CLIENT_ID = 'client-001';
 const PACKAGE_ID = 'pkg-001';
-const ROUTER_ID  = 'router-001';
-const TX_REF     = 'HP-TEST-001';
-const WL_ID      = 'wl-001';
-const SUB_ID     = 'sub-001';
+const ROUTER_ID = 'router-001';
+const TX_REF = 'HP-TEST-001';
+const WL_ID = 'wl-001';
+const SUB_ID = 'sub-001';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  Fixture factories
@@ -137,18 +137,18 @@ function makeTenantDb(tx: any, pkg: any, opts: {
             update: jest.fn(async () => ({})),
         },
         transaction: {
-            findFirst:  jest.fn(async () => tx),
+            findFirst: jest.fn(async () => tx),
             findUnique: jest.fn(async () => tx),
             updateMany: jest.fn(async () => ({ count: txUpdateCount })),
-            update:     jest.fn(async () => ({})),
+            update: jest.fn(async () => ({})),
         },
-        package:  { findFirst: jest.fn(async () => pkg) },
+        package: { findFirst: jest.fn(async () => pkg) },
         subscription: {
             findFirst: jest.fn(async () => existingSubInTx),
-            create:    jest.fn(async () => makeSub()),
-            update:    jest.fn(async () => makeSub({ expiresAt: new Date(Date.now() + 86_400_000 * 60) })),
+            create: jest.fn(async () => makeSub()),
+            update: jest.fn(async () => makeSub({ expiresAt: new Date(Date.now() + 86_400_000 * 60) })),
         },
-        client:    { update: jest.fn(async () => ({})) },
+        client: { update: jest.fn(async () => ({})) },
         routerLog: { create: jest.fn(async () => ({})) },
         $transaction: jest.fn(async (cb: any) => cb(db)),
     };
@@ -170,10 +170,10 @@ function makeGlobalDb(tx?: any) {
             update: jest.fn(async () => ({})),
         },
         transaction: {
-            findFirst:  jest.fn(async () => tx ?? null),
+            findFirst: jest.fn(async () => tx ?? null),
             findUnique: jest.fn(async () => tx ?? null),
             updateMany: jest.fn(async () => ({ count: tx ? 1 : 0 })),
-            update:     jest.fn(async () => ({})),
+            update: jest.fn(async () => ({})),
         },
     };
     return db;
@@ -218,14 +218,14 @@ interface RunOpts {
 }
 
 async function runWebhook(opts: RunOpts = {}) {
-    const tx  = opts.tx  ?? makeTx();
+    const tx = opts.tx ?? makeTx();
     // Distinguish "not provided" (default pkg) from "provided as null"
     const pkg = 'pkg' in opts ? opts.pkg : makePkg();
     const tenantId = 'tenantId' in opts ? opts.tenantId : TENANT_ID;
 
     const tenantDb = makeTenantDb(tx, pkg, {
         existingSubInTx: opts.existingSubInTx ?? null,
-        txUpdateCount:   opts.txUpdateCount   ?? 1,
+        txUpdateCount: opts.txUpdateCount ?? 1,
     });
     const globalDb = makeGlobalDb();
 
@@ -240,7 +240,7 @@ async function runWebhook(opts: RunOpts = {}) {
     );
 
     const rawBody = JSON.stringify({ transactionRef: TX_REF });
-    const result  = await paymentService.processWebhook(
+    const result = await paymentService.processWebhook(
         'ZENOPAY', { 'x-sig': 'valid' }, rawBody, tenantId,
     );
     return { result, tenantDb, globalDb };
@@ -441,8 +441,8 @@ describe('§4 – MikroTik Activation', () => {
         // sanitizes it internally. Our mock receives the raw name.
         await runWebhook({ pkg: makePkg({ routerId: ROUTER_ID, name: '50 Mbps / Home' }), mikrotikService: mk });
 
-        expect(enqueueActivateService).toHaveBeenCalledWith(ROUTER_ID, 
-            'john.doe', '255712345678', '50 Mbps / Home', 'hotspot', expect.any(String), expect.any(Date),
+        expect(enqueueActivateService).toHaveBeenCalledWith(ROUTER_ID, expect.any(String),
+            'john.doe', '255712345678', '50 Mbps / Home', 'hotspot', expect.any(Date),
         );
     });
 
@@ -451,8 +451,8 @@ describe('§4 – MikroTik Activation', () => {
         const tx = makeTx({ client: makeClient({ serviceType: 'PPPOE', username: 'pppoe.user' }) });
         await runWebhook({ tx, pkg: makePkg({ routerId: ROUTER_ID }), mikrotikService: mk });
 
-        expect(enqueueActivateService).toHaveBeenCalledWith(ROUTER_ID, 
-            'pppoe.user', expect.any(String), expect.any(String), 'pppoe', expect.any(String), expect.any(Date),
+        expect(enqueueActivateService).toHaveBeenCalledWith(ROUTER_ID, expect.any(String),
+            'pppoe.user', expect.any(String), expect.any(String), 'pppoe', expect.any(Date),
         );
     });
 
@@ -649,17 +649,17 @@ describe('§6 – Payment Channel Registry', () => {
 
 describe('§7 – MikroTik Name Sanitisation', () => {
     const cases: [string, string][] = [
-        ['10 Mbps Home',        '10-mbps-home'],
-        ['50 Mbps / Business',  '50-mbps-business'],
-        ['Gold Plan!!! 100M',   'gold-plan-100m'],
-        ['--leading-dash',      'leading-dash'],
-        ['trailing-dash--',     'trailing-dash'],
-        ['Multiple   Spaces',   'multiple-spaces'],
-        ['UPPERCASE',           'uppercase'],
-        ['',                    'unnamed'],
-        ['   ',                 'unnamed'],
-        ['a',                   'a'],
-        ['A1-Package',          'a1-package'],
+        ['10 Mbps Home', '10-mbps-home'],
+        ['50 Mbps / Business', '50-mbps-business'],
+        ['Gold Plan!!! 100M', 'gold-plan-100m'],
+        ['--leading-dash', 'leading-dash'],
+        ['trailing-dash--', 'trailing-dash'],
+        ['Multiple   Spaces', 'multiple-spaces'],
+        ['UPPERCASE', 'uppercase'],
+        ['', 'unnamed'],
+        ['   ', 'unnamed'],
+        ['a', 'a'],
+        ['A1-Package', 'a1-package'],
     ];
 
     test.each(cases)('sanitizeMikroTikName(%j) → %j', (input, expected) => {
@@ -811,7 +811,7 @@ describe('§10 – End-to-End: Payment → RADIUS → MikroTik', () => {
     beforeEach(() => jest.resetAllMocks());
 
     it('10.1 – full activation: COMPLETED, RADIUS synced, MikroTik activated, SYNCED', async () => {
-        const mk  = makeMikroTik();
+        const mk = makeMikroTik();
         const pkg = makePkg({ routerId: ROUTER_ID, name: 'Business 20Mbps' });
         const { result, tenantDb } = await runWebhook({ pkg, mikrotikService: mk });
 
@@ -827,8 +827,8 @@ describe('§10 – End-to-End: Payment → RADIUS → MikroTik', () => {
         );
 
         // MikroTik called with RAW pkg.name (service does not sanitize before passing)
-        expect(enqueueActivateService).toHaveBeenCalledWith(ROUTER_ID, 
-            'john.doe', '255712345678', 'Business 20Mbps', 'hotspot', expect.any(String), expect.any(Date),
+        expect(enqueueActivateService).toHaveBeenCalledWith(ROUTER_ID, expect.any(String),
+            'john.doe', '255712345678', 'Business 20Mbps', 'hotspot', expect.any(Date),
         );
 
         // Subscription SYNCED
@@ -846,7 +846,7 @@ describe('§10 – End-to-End: Payment → RADIUS → MikroTik', () => {
 
     it('10.2 – RADIUS fails: MikroTik still activates (independent error paths)', async () => {
         (enqueueRadiusSyncUser as jest.Mock).mockRejectedValue(new Error('RADIUS DB down'));
-        const mk  = makeMikroTik();
+        const mk = makeMikroTik();
         const pkg = makePkg({ routerId: ROUTER_ID });
         const { result } = await runWebhook({ pkg, mikrotikService: mk });
 
@@ -855,7 +855,7 @@ describe('§10 – End-to-End: Payment → RADIUS → MikroTik', () => {
     });
 
     it('10.3 – MikroTik fails: payment COMPLETED, RADIUS still ran', async () => {
-        const mk  = { activateService: jest.fn().mockRejectedValue(new Error('Network error')) };
+        const mk = { activateService: jest.fn().mockRejectedValue(new Error('Network error')) };
         const pkg = makePkg({ routerId: ROUTER_ID });
         const { result } = await runWebhook({ pkg, mikrotikService: mk });
 
@@ -885,8 +885,8 @@ describe('§10 – End-to-End: Payment → RADIUS → MikroTik', () => {
         const tx = makeTx({ client: makeClient({ phone: null, serviceType: 'PPPOE', username: 'pppoe.user' }) });
         await runWebhook({ tx, pkg: makePkg({ routerId: ROUTER_ID }), mikrotikService: mk });
 
-        expect(enqueueActivateService).toHaveBeenCalledWith(ROUTER_ID, 
-            'pppoe.user', '123456', expect.any(String), 'pppoe', expect.any(String), expect.any(Date),
+        expect(enqueueActivateService).toHaveBeenCalledWith(ROUTER_ID, expect.any(String),
+            'pppoe.user', '123456', expect.any(String), 'pppoe', expect.any(Date),
         );
     });
 });

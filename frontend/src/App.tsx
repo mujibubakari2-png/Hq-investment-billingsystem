@@ -23,6 +23,7 @@ const AllTransactions     = lazy(() => import('./pages/AllTransactions'));
 const MobileTransactions  = lazy(() => import('./pages/MobileTransactions'));
 const ExpenseTracking     = lazy(() => import('./pages/ExpenseTracking'));
 const Mikrotiks       = lazy(() => import('./pages/Mikrotiks'));
+const Routers         = lazy(() => import('./pages/Mikrotiks')); // alias for /routers route
 const Equipments      = lazy(() => import('./pages/Equipments'));
 const SmsMessages     = lazy(() => import('./pages/SmsMessages'));
 const MessageTemplates    = lazy(() => import('./pages/MessageTemplates'));
@@ -147,8 +148,10 @@ export default function App() {
                     <Route path="/router-setup/:id"     element={<RouterSetupWizard />} />
                   </Route>
 
-                  {/* NETWORK MANAGEMENT — Mikrotiks & Equipments available to all */}
-                  <Route path="/mikrotiks"  element={<Mikrotiks />} />
+                  {/* NETWORK MANAGEMENT */}
+                  {/* /routers is the canonical URL; /mikrotiks is kept as an alias for backward compat */}
+                  <Route path="/routers"    element={<Routers />} />
+                  <Route path="/mikrotiks" element={<Navigate to="/routers" replace />} />
                   <Route path="/equipments" element={<Equipments />} />
                   {/* VPN Management is restricted to Platform Super Admin (see SuperAdminGuard above) */}
 

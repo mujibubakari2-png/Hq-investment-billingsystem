@@ -21,7 +21,8 @@ const pageTitles: Record<string, string> = {
     '/mobile-transactions': 'Mobile Transactions',
     '/expense-tracking': 'Expense Tracking',
     '/invoices': 'Invoices',
-    '/mikrotiks': 'Mikrotiks',
+    '/routers':   'Routers',
+    '/mikrotiks': 'Routers',   // redirect alias — shows same title
     '/equipments': 'Equipments',
     '/sms-messages': 'SMS Messages',
     '/message-templates': 'Message Templates',
