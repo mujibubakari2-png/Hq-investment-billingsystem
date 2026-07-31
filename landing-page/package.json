@@ -9,6 +9,7 @@
   },
   "scripts": {
     "dev": "next dev --port 3001",
+    "prebuild": "pnpm --filter backend db:generate",
     "build": "next build",
     "start": "next start --hostname 127.0.0.1 --port ${PORT:-3001}",
     "lint": "next lint"
