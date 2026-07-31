@@ -1,16 +1,19 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "@/styles/globals.css";
 import { CartProvider } from "@/lib/cart";
+import { CommerceProvider } from "@/lib/commerce";
 import { ToastProvider } from "@/components/ui/Toast";
 import CartDrawer from "@/components/cart/CartDrawer";
+import { GlobalPopup } from "@/components/GlobalPopup/GlobalPopup";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "https://hqinvestment.co.tz"),
   title: {
-    default: "HQ Investment — ISP Billing & Marketplace",
+    default: "HQ Investment - ISP Billing & Marketplace",
     template: "%s | HQ Investment",
   },
   description:
-    "HQ Investment — your all-in-one platform for ISP billing management and premium product marketplace. Trusted by ISPs across East Africa.",
+    "HQ Investment - your all-in-one platform for ISP billing management and premium product marketplace. Trusted by ISPs across East Africa.",
   keywords: [
     "ISP Billing System",
     "MikroTik billing",
@@ -25,7 +28,7 @@ export const metadata: Metadata = {
     type: "website",
     locale: "en_US",
     siteName: "HQ Investment",
-    title: "HQ Investment — ISP Billing & Marketplace",
+    title: "HQ Investment - ISP Billing & Marketplace",
     description:
       "Automate your ISP billing and shop premium products at HQ Investment marketplace.",
   },
@@ -35,7 +38,12 @@ export const metadata: Metadata = {
     description: "ISP Billing & E-Commerce Marketplace",
   },
   robots: { index: true, follow: true },
-  viewport: { width: "device-width", initialScale: 1 },
+  alternates: { canonical: "/" },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({
@@ -46,16 +54,18 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        {/* Preconnect for Google Fonts */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       </head>
       <body className="antialiased font-sans">
         <ToastProvider>
-          <CartProvider>
-            {children}
-            <CartDrawer />
-          </CartProvider>
+          <CommerceProvider>
+            <CartProvider>
+              {children}
+              <CartDrawer />
+              <GlobalPopup />
+            </CartProvider>
+          </CommerceProvider>
         </ToastProvider>
       </body>
     </html>

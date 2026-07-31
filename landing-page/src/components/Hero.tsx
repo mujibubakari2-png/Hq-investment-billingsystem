@@ -1,14 +1,28 @@
 "use client";
+
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { ArrowRight, ShoppingBag, Zap, Shield, Star } from "lucide-react";
+import {
+  ArrowRight,
+  BadgeCheck,
+  Headphones,
+  Laptop,
+  PackageCheck,
+  Shield,
+  Shirt,
+  ShoppingBag,
+  Smartphone,
+  Sparkles,
+  Star,
+  Truck,
+  Zap,
+} from "lucide-react";
 
-// Floating product cards data
 const floatingCards = [
-  { emoji: "📱", label: "Smartphones", price: "TZS 450,000", color: "#3b82f6", delay: 0 },
-  { emoji: "💻", label: "Laptops", price: "TZS 1,200,000", color: "#10b981", delay: 0.5 },
-  { emoji: "🎧", label: "Electronics", price: "TZS 85,000", color: "#f59e0b", delay: 1 },
-  { emoji: "👗", label: "Fashion", price: "TZS 35,000", color: "#8b5cf6", delay: 1.5 },
+  { icon: Smartphone, label: "Smartphones", price: "TZS 450,000", color: "#3b82f6", delay: 0 },
+  { icon: Laptop, label: "Laptops", price: "TZS 1,200,000", color: "#10b981", delay: 0.5 },
+  { icon: Headphones, label: "Electronics", price: "TZS 85,000", color: "#f59e0b", delay: 1 },
+  { icon: Shirt, label: "Fashion", price: "TZS 35,000", color: "#8b5cf6", delay: 1.5 },
 ];
 
 const featureChips = [
@@ -17,45 +31,31 @@ const featureChips = [
   { icon: <Star size={14} />, text: "Top Quality" },
 ];
 
+const trustItems = [
+  { icon: <Truck size={18} />, title: "Same-day dispatch", text: "Dar es Salaam ready" },
+  { icon: <BadgeCheck size={18} />, title: "Verified sellers", text: "Quality controlled" },
+  { icon: <PackageCheck size={18} />, title: "Easy returns", text: "Buyer protection" },
+];
+
 export default function Hero() {
   return (
-    <section className="relative min-h-screen flex items-center overflow-hidden pt-16">
-      {/* ── Animated Gradient Background ── */}
+    <section className="relative min-h-screen flex items-center overflow-hidden pt-20">
       <div
         className="absolute inset-0 animate-gradient"
         style={{
-          background: "linear-gradient(-45deg, #0f172a, #1e3a8a, #0c4a6e, #1e3a8a, #0f172a)",
+          background: "linear-gradient(135deg, #070b16 0%, #15244a 42%, #083344 100%)",
           backgroundSize: "400% 400%",
         }}
       />
 
-      {/* ── Mesh / Orbs ── */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div
-          className="absolute w-[600px] h-[600px] rounded-full opacity-20 animate-pulse-glow"
-          style={{
-            background: "radial-gradient(circle, #3b82f6 0%, transparent 70%)",
-            top: "-10%",
-            right: "-5%",
-          }}
-        />
-        <div
-          className="absolute w-[400px] h-[400px] rounded-full opacity-15"
-          style={{
-            background: "radial-gradient(circle, #10b981 0%, transparent 70%)",
-            bottom: "5%",
-            left: "-5%",
-          }}
-        />
-        {/* Grid pattern */}
-        <div
-          className="absolute inset-0 opacity-[0.04]"
+          className="absolute inset-0 opacity-[0.06]"
           style={{
             backgroundImage: "linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)",
-            backgroundSize: "60px 60px",
+            backgroundSize: "64px 64px",
           }}
         />
-        {/* Floating particles */}
         {Array.from({ length: 12 }).map((_, i) => (
           <motion.div
             key={i}
@@ -80,10 +80,7 @@ export default function Hero() {
 
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 w-full">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-
-          {/* ── Left: Copy ── */}
           <div className="text-center lg:text-left">
-            {/* Badge */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -92,18 +89,17 @@ export default function Hero() {
             >
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
               <span className="text-sm font-semibold text-white/90">
-                🛍️ Premium Marketplace — East Africa
+                Premium Marketplace for East Africa
               </span>
             </motion.div>
 
-            {/* Headline */}
             <motion.h1
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.1 }}
               className="font-display text-4xl md:text-5xl xl:text-6xl font-extrabold text-white leading-[1.1] mb-6"
             >
-              Shop Smart.{" "}
+              Premium shopping.{" "}
               <span className="relative">
                 <span
                   className="relative z-10"
@@ -114,7 +110,7 @@ export default function Hero() {
                     backgroundClip: "text",
                   }}
                 >
-                  Live Better.
+                  Real products.
                 </span>
                 <motion.span
                   className="absolute -bottom-1 left-0 h-1 rounded-full"
@@ -125,21 +121,19 @@ export default function Hero() {
                 />
               </span>
               <br />
-              <span className="text-white/90">Sell Smarter.</span>
+              <span className="text-white/90">Built to convert.</span>
             </motion.h1>
 
-            {/* Sub */}
             <motion.p
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.25 }}
               className="text-lg text-white/70 mb-10 leading-relaxed max-w-lg mx-auto lg:mx-0"
             >
-              HQ Investment combines a world-class marketplace with powerful ISP billing tools.
-              Find top products from verified vendors — delivered fast, priced fairly.
+              HQ Investment brings verified sellers, fast delivery, protected payments,
+              curated deals, and a commerce engine ready for daily campaigns at scale.
             </motion.p>
 
-            {/* Feature Chips */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -157,7 +151,6 @@ export default function Hero() {
               ))}
             </motion.div>
 
-            {/* CTAs */}
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -179,15 +172,14 @@ export default function Hero() {
               </Link>
 
               <Link
-                href="/#pricing"
-                id="hero-pricing-cta"
+                href="/products?sort=popular"
+                id="hero-trending-cta"
                 className="flex items-center justify-center gap-2 px-8 py-4 rounded-full font-bold text-sm transition-all hover:-translate-y-1 btn-ghost"
               >
-                ISP Billing Plans
+                Explore Trending
               </Link>
             </motion.div>
 
-            {/* Stats row */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -197,7 +189,7 @@ export default function Hero() {
               {[
                 { label: "Products", value: "10,000+" },
                 { label: "Happy Customers", value: "50,000+" },
-                { label: "ISP Partners", value: "500+" },
+                { label: "Verified Sellers", value: "500+" },
               ].map((s) => (
                 <div key={s.label} className="text-center lg:text-left">
                   <p className="text-2xl font-black text-white">{s.value}</p>
@@ -207,17 +199,7 @@ export default function Hero() {
             </motion.div>
           </div>
 
-          {/* ── Right: Floating Cards ── */}
           <div className="hidden lg:flex relative items-center justify-center h-[520px]">
-            {/* Central glow */}
-            <div
-              className="absolute w-80 h-80 rounded-full"
-              style={{
-                background: "radial-gradient(circle, rgba(59,130,246,0.2) 0%, transparent 70%)",
-              }}
-            />
-
-            {/* Main card */}
             <motion.div
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -226,10 +208,12 @@ export default function Hero() {
               style={{ animation: "float 6s ease-in-out infinite" }}
             >
               <div className="flex items-center gap-3 mb-4">
-                <div className="text-4xl">🛒</div>
+                <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-blue-50 text-primary">
+                  <Sparkles size={25} />
+                </div>
                 <div>
-                  <p className="font-bold text-slate-900">Featured Products</p>
-                  <p className="text-sm text-slate-500">Best deals today</p>
+                  <p className="font-bold text-slate-900">Flash Deals</p>
+                  <p className="text-sm text-slate-500">Live campaign stack</p>
                 </div>
               </div>
               <div className="space-y-2">
@@ -248,11 +232,10 @@ export default function Hero() {
                 className="mt-4 w-full py-2.5 rounded-full text-center text-sm font-bold text-white"
                 style={{ background: "var(--gradient-primary)" }}
               >
-                View All
+                02h 18m left
               </div>
             </motion.div>
 
-            {/* Floating product chips */}
             {floatingCards.map((card, i) => {
               const positions = [
                 { top: "5%", left: "-10%" },
@@ -261,6 +244,7 @@ export default function Hero() {
                 { bottom: "5%", right: "-8%" },
               ];
               const pos = positions[i];
+              const Icon = card.icon;
 
               return (
                 <motion.div
@@ -278,7 +262,7 @@ export default function Hero() {
                     className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0"
                     style={{ background: `${card.color}20` }}
                   >
-                    {card.emoji}
+                    <Icon size={20} color={card.color} />
                   </div>
                   <div>
                     <p className="text-xs font-semibold text-slate-700">{card.label}</p>
@@ -289,9 +273,27 @@ export default function Hero() {
             })}
           </div>
         </div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 18 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.8, duration: 0.5 }}
+          className="mt-14 grid grid-cols-1 md:grid-cols-3 gap-4"
+        >
+          {trustItems.map((item) => (
+            <div key={item.title} className="glass rounded-2xl px-5 py-4 flex items-center gap-3">
+              <span className="w-10 h-10 rounded-xl bg-white/10 text-white flex items-center justify-center">
+                {item.icon}
+              </span>
+              <span>
+                <span className="block text-sm font-bold text-white">{item.title}</span>
+                <span className="block text-xs text-white/55">{item.text}</span>
+              </span>
+            </div>
+          ))}
+        </motion.div>
       </div>
 
-      {/* Bottom wave */}
       <div className="absolute bottom-0 left-0 right-0">
         <svg viewBox="0 0 1440 80" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M0 80L1440 80L1440 20C1200 80 960 0 720 40C480 80 240 0 0 20V80Z" fill="white" />

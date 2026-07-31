@@ -12,7 +12,7 @@ import MobileMoneyForm from "@/components/checkout/MobileMoneyForm";
 
 export default function CheckoutPage() {
   const router = useRouter();
-  const { state: cartState, clearCart } = useCart();
+  const { state: cartState } = useCart();
   const [mounted, setMounted] = useState(false);
   
   // Checkout state
@@ -59,9 +59,9 @@ export default function CheckoutPage() {
           <div className="w-20 h-20 bg-emerald-100 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6">
             <CheckCircle2 size={40} />
           </div>
-          <h1 className="text-3xl font-display font-bold text-slate-900 mb-2">Order Confirmed!</h1>
+          <h1 className="text-3xl font-display font-bold text-slate-900 mb-2">Order Received!</h1>
           <p className="text-slate-500 mb-8">
-            Thank you for your purchase. Your order ID is <span className="font-bold text-slate-800">#{orderCompleteId.substring(0, 8).toUpperCase()}</span>. We've sent a confirmation email.
+            Thank you for your purchase. Your order ID is <span className="font-bold text-slate-800">#{orderCompleteId.substring(0, 8).toUpperCase()}</span>. Mobile money orders are completed after provider confirmation.
           </p>
           <Link
             href="/products"
@@ -229,8 +229,8 @@ export default function CheckoutPage() {
                           <span className="font-bold text-slate-900">Mobile Money</span>
                         </div>
                         <div className="flex gap-2">
-                          <span className="text-xs font-bold bg-[#00A651] text-white px-2 py-1 rounded">M-Pesa</span>
-                          <span className="text-xs font-bold bg-[#004A96] text-white px-2 py-1 rounded">Tigo Pesa</span>
+                          <span className="text-xs font-bold bg-emerald-600 text-white px-2 py-1 rounded">PalmPesa</span>
+                          <span className="text-xs font-bold bg-sky-600 text-white px-2 py-1 rounded">ZenoPay</span>
                         </div>
                       </div>
                     </label>

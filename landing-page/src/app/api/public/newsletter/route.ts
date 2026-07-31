@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { isValidEmail, normalizeEmail, publicApiError } from "@/lib/publicApi";
 
 export async function POST(req: NextRequest) {
   try {
-    const { email } = await req.json();
-    if (!email || !email.includes("@")) {
+    const { email: rawEmail } = await req.json();
+    const email = normalizeEmail(rawEmail);
+
+    if (!isValidEmail(email)) {
       return NextResponse.json(
         { success: false, error: "Invalid email address" },
         { status: 400 }
@@ -21,11 +24,7 @@ export async function POST(req: NextRequest) {
       success: true,
       message: "Subscribed successfully!",
     });
-  } catch (error) {
-    console.error("[PUBLIC/newsletter] Error:", error);
-    return NextResponse.json(
-      { success: false, error: "Subscription failed" },
-      { status: 500 }
-    );
+  } catch (error: unknown) {
+    return publicApiError("newsletter", error, "Subscription failed");
   }
 }

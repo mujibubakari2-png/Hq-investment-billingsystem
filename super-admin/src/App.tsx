@@ -16,6 +16,7 @@ const SystemPage         = lazy(() => import('./pages/SystemPage'));
 const WebhooksPage       = lazy(() => import('./pages/WebhooksPage'));
 const NotificationsPage  = lazy(() => import('./pages/NotificationsPage'));
 const ReportsPage        = lazy(() => import('./pages/ReportsPage'));
+const EcommercePage      = lazy(() => import('./pages/EcommercePage'));
 const MainLayout         = lazy(() => import('./components/MainLayout'));
 
 function PageLoader() {
@@ -59,6 +60,8 @@ export default function App() {
             <Route path="/invoices"        element={<InvoicesPage />} />
             <Route path="/plans"           element={<SaasPlansPage />} />
             <Route path="/reports"         element={<ReportsPage />} />
+            <Route path="/ecommerce"       element={<EcommercePage />} />
+            <Route path="/ecommerce/:module" element={<EcommercePage />} />
             <Route path="/admins"          element={<AdminsPage />} />
             <Route path="/notifications"   element={<NotificationsPage />} />
             <Route path="/webhooks"        element={<WebhooksPage />} />

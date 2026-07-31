@@ -1,123 +1,81 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { calcDiscountedPrice } from "@/lib/utils";
+import {
+  createEcomOrder,
+  normalizeMobileMoneyProvider,
+  parseCheckoutItems,
+  parseCustomerInfo,
+  resolveCheckoutItems,
+} from "@/lib/checkout";
+import { getErrorMessage } from "@/lib/utils";
 
-function generateOrderNumber() {
-  const prefix = "ORD";
-  const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-  const randomStr = Math.random().toString(36).substring(2, 6).toUpperCase();
-  return `${prefix}-${dateStr}-${randomStr}`;
+interface PaymentChannelConfig {
+  apiUrl?: string;
 }
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { phone, provider, items, customerInfo } = body;
+    const phone = typeof body.phone === "string" ? body.phone.trim() : "";
+    const provider = normalizeMobileMoneyProvider(body.provider);
+    const checkoutItems = parseCheckoutItems(body.items);
+    const customerInfo = parseCustomerInfo(body.customerInfo);
 
-    if (!phone || !provider || !items || !customerInfo) {
-      return NextResponse.json({ success: false, error: "Missing required fields" }, { status: 400 });
+    if (!phone) {
+      return NextResponse.json({ success: false, error: "Phone number is required" }, { status: 400 });
     }
 
-    // Recalculate secure total
-    const productIds = items.map((i: any) => i.productId);
-    const dbProducts = await prisma.product.findMany({
-      where: { id: { in: productIds } },
-    });
-
-    let totalTzs = 0;
-    const orderItemsToCreate = [];
-
-    for (const item of items) {
-      const dbProduct = dbProducts.find((p: any) => p.id === item.productId);
-      if (!dbProduct) continue;
-
-      const effectivePrice = calcDiscountedPrice(
-        Number(dbProduct.price), 
-        dbProduct.discountType, 
-        dbProduct.discountValue ? Number(dbProduct.discountValue) : null
-      );
-      
-      const lineTotal = effectivePrice * item.quantity;
-      totalTzs += lineTotal;
-
-      orderItemsToCreate.push({
-        productId: item.productId,
-        quantity: item.quantity,
-        unitPrice: effectivePrice,
-        total: lineTotal,
-      });
-    }
-
-    const orderNumber = generateOrderNumber();
-
-    // Create Order in Database as PENDING
-    const order = await prisma.ecomOrder.create({
-      data: {
-        orderNumber,
-        customerName: customerInfo.name,
-        customerEmail: customerInfo.email,
-        customerPhone: phone,
-        shippingAddress: customerInfo.address ? {
-          street: customerInfo.address,
-          city: customerInfo.city,
-        } : undefined,
-        totalAmount: totalTzs,
-        status: "PENDING",
-        paymentMethod: provider,
-        paymentStatus: "PENDING",
-        items: {
-          create: orderItemsToCreate,
-        },
-      },
-    });
-
-    // 1. Fetch super admin channel for the selected provider
+    const { totalTzs, orderItems } = await resolveCheckoutItems(checkoutItems);
     const channel = await prisma.paymentChannel.findFirst({
       where: { provider, status: "ACTIVE", tenantId: null },
     });
 
     if (!channel || !channel.apiKey) {
-      // If we don't have real credentials, just simulate success for local dev
-      console.warn(`[CHECKOUT] No active super admin credentials found for ${provider}. Simulating success.`);
-      return NextResponse.json({ success: true, data: { orderId: order.orderNumber } });
+      return NextResponse.json(
+        { success: false, error: `${provider} payment channel is not configured` },
+        { status: 503 },
+      );
     }
 
-    // 2. Decrypt API key
     const { decrypt } = await import("@/lib/encryption");
     const apiKey = decrypt(channel.apiKey);
-    
+
     if (!apiKey) {
-      console.warn(`[CHECKOUT] Could not decrypt API key for ${provider}. Simulating success.`);
-      return NextResponse.json({ success: true, data: { orderId: order.orderNumber } });
+      return NextResponse.json(
+        { success: false, error: `${provider} payment channel credentials are invalid` },
+        { status: 503 },
+      );
     }
 
-    // 3. Initiate real mobile money push USSD
+    const order = await createEcomOrder({
+      customerInfo,
+      customerPhone: phone,
+      totalTzs,
+      paymentMethod: provider,
+      paymentStatus: "PENDING",
+      orderItems,
+    });
+
     const { initiateEcomMobilePayment } = await import("@/lib/payments");
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (req.headers.get("origin") ?? "http://localhost:3001");
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || req.headers.get("origin") || "http://localhost:3001";
     const webhookUrl = `${baseUrl}/api/public/checkout/mobile-money/webhook?provider=${provider}`;
+    const channelConfig = channel.config as PaymentChannelConfig | null;
 
-    try {
-      await initiateEcomMobilePayment({
-        provider,
-        apiKey,
-        apiUrl: (channel.config as any)?.apiUrl,
-        reference: order.orderNumber,
-        amount: totalTzs,
-        phone,
-        buyerName: customerInfo.name,
-        buyerEmail: customerInfo.email,
-        webhookUrl,
-      });
-      console.log(`[CHECKOUT] Triggered push USSD via ${provider} for order ${order.orderNumber}`);
-    } catch (paymentErr: any) {
-      console.error("[CHECKOUT] Payment Gateway Error:", paymentErr);
-      // In a real app we might fail the order, but we can also just return the error
-      return NextResponse.json({ success: false, error: paymentErr.message }, { status: 400 });
-    }
-    
+    await initiateEcomMobilePayment({
+      provider,
+      apiKey,
+      apiUrl: channelConfig?.apiUrl,
+      reference: order.orderNumber,
+      amount: totalTzs,
+      phone,
+      buyerName: customerInfo.name,
+      buyerEmail: customerInfo.email,
+      webhookUrl,
+    });
+
     return NextResponse.json({ success: true, data: { orderId: order.orderNumber } });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[PUBLIC/checkout/mobile-money] Error:", error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ success: false, error: getErrorMessage(error) }, { status: 500 });
   }
 }

@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import { authApi } from '../api';
+import { commerceNavigationItems } from '../config/ecommerceModules';
 import {
   LayoutDashboard, Users, FileText, CreditCard, Shield,
   Settings, LogOut, Menu, X, Zap, Receipt, BarChart3,
@@ -10,28 +11,29 @@ import {
 
 interface NavItem {
   to: string;
-  icon: React.ReactNode;
+  icon: ReactNode;
   label: string;
   section?: string;
   badge?: { value: number; type: 'danger' | 'warning' | 'info' };
 }
 
 const NAV_ITEMS: NavItem[] = [
-  // ── Platform ──────────────────────────────────
-  { section: 'Platform', to: '/dashboard',     icon: <LayoutDashboard size={16} />, label: 'Overview' },
-  { to: '/tenants',      icon: <Users size={16} />,       label: 'Tenants' },
-  { to: '/licenses',     icon: <FileText size={16} />,    label: 'Licenses' },
-  { to: '/invoices',     icon: <Receipt size={16} />,     label: 'Invoices' },
-  { to: '/plans',        icon: <CreditCard size={16} />,  label: 'SaaS Plans' },
-  { to: '/reports',      icon: <BarChart3 size={16} />,   label: 'Reports' },
-  // ── Communications ────────────────────────────
+  // Platform
+  { section: 'Platform', to: '/dashboard', icon: <LayoutDashboard size={16} />, label: 'Overview' },
+  { to: '/tenants', icon: <Users size={16} />, label: 'Tenants' },
+  { to: '/licenses', icon: <FileText size={16} />, label: 'Licenses' },
+  { to: '/invoices', icon: <Receipt size={16} />, label: 'Invoices' },
+  { to: '/plans', icon: <CreditCard size={16} />, label: 'SaaS Plans' },
+  { to: '/reports', icon: <BarChart3 size={16} />, label: 'Reports' },
+  ...commerceNavigationItems,
+  // Communications
   { section: 'Communications', to: '/notifications', icon: <Bell size={16} />, label: 'Notifications' },
-  // ── System ────────────────────────────────────
-  { section: 'System',   to: '/admins',         icon: <UserCog size={16} />,    label: 'Admins' },
-  { to: '/webhooks',     icon: <Webhook size={16} />,     label: 'Webhooks' },
-  { to: '/audit-logs',   icon: <Shield size={16} />,      label: 'Audit Logs' },
-  { to: '/system',       icon: <Server size={16} />,      label: 'System Health' },
-  { to: '/settings',     icon: <Settings size={16} />,    label: 'Settings' },
+  // System
+  { section: 'System', to: '/admins', icon: <UserCog size={16} />, label: 'Admins' },
+  { to: '/webhooks', icon: <Webhook size={16} />, label: 'Webhooks' },
+  { to: '/audit-logs', icon: <Shield size={16} />, label: 'Audit Logs' },
+  { to: '/system', icon: <Server size={16} />, label: 'System Health' },
+  { to: '/settings', icon: <Settings size={16} />, label: 'Settings' },
 ];
 
 function useClock() {
@@ -45,18 +47,19 @@ function useClock() {
 
 function getPageTitle(pathname: string): { name: string; breadcrumb: string } {
   const map: Record<string, { name: string; breadcrumb: string }> = {
-    '/dashboard':      { name: 'Platform Overview',    breadcrumb: 'Dashboard / Overview' },
-    '/tenants':        { name: 'Tenant Management',    breadcrumb: 'Dashboard / Tenants' },
-    '/licenses':       { name: 'License Management',   breadcrumb: 'Dashboard / Licenses' },
-    '/invoices':       { name: 'SaaS Invoices',        breadcrumb: 'Dashboard / Invoices' },
-    '/plans':          { name: 'SaaS Plans',           breadcrumb: 'Dashboard / Plans' },
-    '/reports':        { name: 'Platform Reports',     breadcrumb: 'Dashboard / Reports' },
-    '/notifications':  { name: 'Notifications',        breadcrumb: 'Communications / Notifications' },
-    '/admins':         { name: 'Platform Admins',      breadcrumb: 'System / Admins' },
-    '/webhooks':       { name: 'Webhook Logs',         breadcrumb: 'System / Webhooks' },
-    '/audit-logs':     { name: 'Audit Logs',           breadcrumb: 'System / Security' },
-    '/system':         { name: 'System Health',        breadcrumb: 'System / Health' },
-    '/settings':       { name: 'Platform Settings',    breadcrumb: 'System / Settings' },
+    '/dashboard': { name: 'Platform Overview', breadcrumb: 'Dashboard / Overview' },
+    '/tenants': { name: 'Tenant Management', breadcrumb: 'Dashboard / Tenants' },
+    '/licenses': { name: 'License Management', breadcrumb: 'Dashboard / Licenses' },
+    '/invoices': { name: 'SaaS Invoices', breadcrumb: 'Dashboard / Invoices' },
+    '/plans': { name: 'SaaS Plans', breadcrumb: 'Dashboard / Plans' },
+    '/reports': { name: 'Platform Reports', breadcrumb: 'Dashboard / Reports' },
+    '/ecommerce': { name: 'E-Commerce', breadcrumb: 'E-Commerce / Command Center' },
+    '/notifications': { name: 'Notifications', breadcrumb: 'Communications / Notifications' },
+    '/admins': { name: 'Platform Admins', breadcrumb: 'System / Admins' },
+    '/webhooks': { name: 'Webhook Logs', breadcrumb: 'System / Webhooks' },
+    '/audit-logs': { name: 'Audit Logs', breadcrumb: 'System / Security' },
+    '/system': { name: 'System Health', breadcrumb: 'System / Health' },
+    '/settings': { name: 'Platform Settings', breadcrumb: 'System / Settings' },
   };
   const key = Object.keys(map).find(k => pathname.startsWith(k) && (k === pathname || pathname[k.length] === '/')) ?? '/dashboard';
   return map[key] ?? { name: 'Super Admin', breadcrumb: 'Dashboard' };
@@ -69,13 +72,12 @@ export default function MainLayout() {
   const clock = useClock();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // Close sidebar on route change (mobile)
   useEffect(() => { setSidebarOpen(false); }, [location.pathname]);
 
   const { name: pageName, breadcrumb } = getPageTitle(location.pathname);
 
   const handleLogout = async () => {
-    try { await authApi.logout(); } catch { /* ignore — clear local state regardless */ }
+    try { await authApi.logout(); } catch { /* clear local state regardless */ }
     logout();
     navigate('/login', { replace: true });
   };
@@ -86,15 +88,12 @@ export default function MainLayout() {
 
   return (
     <div className="sa-app">
-      {/* Sidebar Overlay (mobile) */}
       <div
         className={`sa-sidebar-overlay ${sidebarOpen ? 'open' : ''}`}
         onClick={() => setSidebarOpen(false)}
       />
 
-      {/* ── Sidebar ─────────────────────────────────────── */}
       <aside className={`sa-sidebar ${sidebarOpen ? 'open' : ''}`}>
-        {/* Logo */}
         <div className="sa-sidebar-logo">
           <div className="sa-sidebar-logo-icon">
             <Zap size={20} color="white" />
@@ -105,9 +104,8 @@ export default function MainLayout() {
           </div>
         </div>
 
-        {/* Nav */}
         <nav className="sa-sidebar-nav">
-          {NAV_ITEMS.map((item, i) => (
+          {NAV_ITEMS.map((item) => (
             <div key={item.to}>
               {item.section && (
                 <div className="sa-sidebar-section-label">{item.section}</div>
@@ -128,7 +126,6 @@ export default function MainLayout() {
           ))}
         </nav>
 
-        {/* User Footer */}
         <div className="sa-sidebar-footer">
           <div className="sa-sidebar-user">
             <div className="sa-sidebar-user-avatar">{initials}</div>
@@ -142,6 +139,7 @@ export default function MainLayout() {
               className="sa-sidebar-logout-btn"
               onClick={handleLogout}
               title="Sign out"
+              type="button"
             >
               <LogOut size={15} />
             </button>
@@ -149,14 +147,13 @@ export default function MainLayout() {
         </div>
       </aside>
 
-      {/* ── Main ────────────────────────────────────────── */}
       <div className="sa-main">
-        {/* Topbar */}
         <header className="sa-topbar">
           <button
             className="sa-topbar-hamburger"
             onClick={() => setSidebarOpen(o => !o)}
             aria-label="Toggle menu"
+            type="button"
           >
             {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
@@ -177,7 +174,6 @@ export default function MainLayout() {
           </div>
         </header>
 
-        {/* Page Content */}
         <main className="sa-content">
           <Outlet />
         </main>

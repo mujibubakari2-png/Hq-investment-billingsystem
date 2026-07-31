@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { publicApiError } from "@/lib/publicApi";
 
 export const dynamic = "force-dynamic";
 
@@ -18,11 +19,7 @@ export async function GET() {
     });
 
     return NextResponse.json({ success: true, data: categories });
-  } catch (error) {
-    console.error("[PUBLIC/categories] Error:", error);
-    return NextResponse.json(
-      { success: false, error: "Failed to load categories" },
-      { status: 500 }
-    );
+  } catch (error: unknown) {
+    return publicApiError("categories", error, "Failed to load categories");
   }
 }

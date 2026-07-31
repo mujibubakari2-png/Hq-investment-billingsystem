@@ -4,7 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Menu, X, Search, ChevronDown, Grid3X3, Zap, TrendingUp,
-  Star, Tag, Sparkles, Store
+  Star, Tag, Sparkles, Store, Heart, Scale, User, Bell, Globe2,
+  MapPin, Truck, Headphones, MessageCircle, Moon, Sun, Languages
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import CartIcon from "@/components/cart/CartIcon";
@@ -188,6 +189,7 @@ export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [categories, setCategories] = useState<ProductCategory[]>([]);
+  const [darkMode, setDarkMode] = useState(false);
   const pathname = usePathname();
 
   useEffect(() => {
@@ -203,10 +205,27 @@ export default function Navbar() {
       .catch(() => { });
   }, []);
 
+  useEffect(() => {
+    const savedTheme = window.localStorage.getItem("hq-store-theme");
+    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    setDarkMode(savedTheme ? savedTheme === "dark" : prefersDark);
+  }, []);
+
+  useEffect(() => {
+    const theme = darkMode ? "dark" : "light";
+    document.documentElement.dataset.theme = theme;
+    window.localStorage.setItem("hq-store-theme", theme);
+  }, [darkMode]);
+
   // Close mobile menu on route change
   useEffect(() => { setMobileOpen(false); }, [pathname]);
 
   const billingUrl = process.env.NEXT_PUBLIC_BILLING_SYSTEM_URL ?? "/billing";
+  const utilityLinks = [
+    { href: "/track-order", label: "Track Order", icon: Truck },
+    { href: "/support", label: "Support", icon: Headphones },
+    { href: "/contact", label: "Contact", icon: MessageCircle },
+  ];
 
   return (
     <nav
@@ -215,6 +234,28 @@ export default function Navbar() {
           : "bg-white/80 backdrop-blur-sm"
         }`}
     >
+      <div className="hidden md:block bg-slate-950 text-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-9 flex items-center justify-between gap-4 text-xs">
+          <div className="flex items-center gap-2 min-w-0">
+            <Zap size={13} className="text-amber-300 shrink-0" />
+            <span className="font-semibold truncate">
+              Free shipping on selected Dar es Salaam orders - Flash sale ends in 02:18:44
+            </span>
+          </div>
+          <div className="flex items-center gap-5 shrink-0">
+            <span className="inline-flex items-center gap-1.5 text-white/75">
+              <MapPin size={13} /> Store location
+            </span>
+            {utilityLinks.map(({ href, label, icon: Icon }) => (
+              <Link key={label} href={href} className="inline-flex items-center gap-1.5 text-white/75 hover:text-white">
+                <Icon size={13} />
+                {label}
+              </Link>
+            ))}
+          </div>
+        </div>
+      </div>
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center h-16 gap-4">
           {/* Logo */}
@@ -236,8 +277,14 @@ export default function Navbar() {
           </div>
 
           {/* Desktop Nav */}
-          <div className="hidden md:flex items-center gap-6 shrink-0">
+          <div className="hidden md:flex items-center gap-5 shrink-0">
             <CategoriesDropdown categories={categories} />
+            <Link href="/products?collection=deals" className="text-sm text-slate-600 hover:text-primary font-medium transition-colors">
+              Deals
+            </Link>
+            <Link href="/recently-viewed" className="text-sm text-slate-600 hover:text-primary font-medium transition-colors">
+              Recent
+            </Link>
             <Link href="/#features" className="text-sm text-slate-600 hover:text-primary font-medium transition-colors">
               Features
             </Link>
@@ -247,13 +294,48 @@ export default function Navbar() {
             <Link href="/#contact" className="text-sm text-slate-600 hover:text-primary font-medium transition-colors">
               Contact
             </Link>
-            <Link href={`${billingUrl}/login`} className="text-sm text-slate-600 hover:text-primary font-medium transition-colors border-l border-slate-200 pl-6">
+            <Link href={`${billingUrl}/login`} className="text-sm text-slate-600 hover:text-primary font-medium transition-colors border-l border-slate-200 pl-5">
               Login
             </Link>
           </div>
 
           {/* Right Actions */}
           <div className="flex items-center gap-2 ml-auto md:ml-0 shrink-0">
+            <div className="hidden xl:flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2 py-1">
+              <button className="p-1.5 rounded-full hover:bg-white text-slate-500" aria-label="Change language">
+                <Languages size={15} />
+              </button>
+              <span className="text-xs font-bold text-slate-500">EN</span>
+              <span className="h-4 w-px bg-slate-200" />
+              <button className="p-1.5 rounded-full hover:bg-white text-slate-500" aria-label="Change currency">
+                <Globe2 size={15} />
+              </button>
+              <span className="text-xs font-bold text-slate-500">TZS</span>
+            </div>
+            <button
+              onClick={() => setDarkMode((value) => !value)}
+              className="hidden lg:flex w-9 h-9 rounded-full border border-slate-200 bg-white text-slate-500 items-center justify-center hover:text-primary hover:border-primary/30 transition-all"
+              aria-label={darkMode ? "Switch to light theme" : "Switch to dark theme"}
+              title={darkMode ? "Light theme" : "Dark theme"}
+            >
+              {darkMode ? <Sun size={16} /> : <Moon size={16} />}
+            </button>
+            {[
+              { href: "/wishlist", label: "Wishlist", icon: Heart },
+              { href: "/compare", label: "Compare products", icon: Scale },
+              { href: `${billingUrl}/login`, label: "Customer account", icon: User },
+              { href: "/notifications", label: "Notifications", icon: Bell },
+            ].map(({ href, label, icon: Icon }) => (
+              <Link
+                key={label}
+                href={href}
+                className="hidden lg:flex w-9 h-9 rounded-full border border-slate-200 bg-white text-slate-500 items-center justify-center hover:text-primary hover:border-primary/30 transition-all"
+                aria-label={label}
+                title={label}
+              >
+                <Icon size={16} />
+              </Link>
+            ))}
             <CartIcon />
             <div className="hidden md:block">
               <Link
@@ -297,6 +379,17 @@ export default function Navbar() {
                 <Store size={18} className="text-primary" />
                 All Products
               </Link>
+              {[
+                { href: "/wishlist", label: "Wishlist" },
+                { href: "/compare", label: "Compare Products" },
+                { href: "/recently-viewed", label: "Recently Viewed" },
+                { href: "/track-order", label: "Order Tracking" },
+                { href: "/support", label: "Help Center" },
+              ].map((item) => (
+                <Link key={item.label} href={item.href} className="block px-3 py-2.5 rounded-xl hover:bg-slate-50 text-sm text-slate-700">
+                  {item.label}
+                </Link>
+              ))}
               {categories.slice(0, 6).map((cat) => (
                 <Link key={cat.id} href={`/products?category=${cat.slug}`}
                   className="flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-slate-50 text-sm text-slate-600">

@@ -2,7 +2,8 @@
 import { useState } from "react";
 import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
 import { useCart } from "@/lib/cart";
-import { useToast } from "@/components/ui/Toast";
+import { Popup } from "@/stores/popupStore";
+import { getErrorMessage } from "@/lib/utils";
 
 interface PayPalButtonProps {
   amount: number;
@@ -16,20 +17,15 @@ interface PayPalButtonProps {
   };
 }
 
-export default function PayPalButton({ amount, currency, onSuccess, customerInfo }: PayPalButtonProps) {
+export default function PayPalButton({ amount: _amount, currency, onSuccess, customerInfo }: PayPalButtonProps) {
   const [error, setError] = useState<string | null>(null);
   const { clearCart, state: cartState } = useCart();
-  const { error: toastError } = useToast();
 
   const initialOptions = {
     clientId: process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || "test",
     currency: currency === "TZS" ? "USD" : currency,
     intent: "capture",
   };
-
-  // Note: PayPal doesn't support TZS directly. If currency is TZS, we convert to USD for PayPal.
-  // In a real app, you should fetch a live exchange rate. Here we use a fixed rate of 2500 TZS = 1 USD for demonstration.
-  const paypalAmount = currency === "TZS" ? (amount / 2500).toFixed(2) : amount.toFixed(2);
 
   return (
     <div className="w-full">
@@ -53,9 +49,10 @@ export default function PayPalButton({ amount, currency, onSuccess, customerInfo
                 throw new Error(orderData.error || "Failed to create order");
               }
               return orderData.id; // Return PayPal Order ID
-            } catch (err: any) {
-              setError(err.message);
-              toastError(err.message);
+            } catch (err: unknown) {
+              const message = getErrorMessage(err, "Failed to create PayPal order");
+              setError(message);
+              Popup.error("PayPal Error", message, { text: "Try Again", onAction: () => Popup.close() });
               throw err;
             }
           }}
@@ -73,14 +70,16 @@ export default function PayPalButton({ amount, currency, onSuccess, customerInfo
               const captureData = await res.json();
 
               if (captureData.success) {
+                Popup.success("Payment Successful!", "Your PayPal payment was captured successfully.", { text: "OK", onAction: () => Popup.close() });
                 clearCart();
                 onSuccess(captureData.data.id);
               } else {
                 throw new Error(captureData.error || "Failed to capture payment");
               }
-            } catch (err: any) {
-              setError(err.message);
-              toastError(err.message);
+            } catch (err: unknown) {
+              const message = getErrorMessage(err, "Failed to capture PayPal payment");
+              setError(message);
+              Popup.error("Payment Failed", message, { text: "Close", onAction: () => Popup.close() });
             }
           }}
         />

@@ -1,53 +1,32 @@
 import { NextResponse } from "next/server";
+import { CATALOGUE_MAX_PAGE_SIZE, CATALOGUE_PAGE_SIZE } from "@/config/catalogue";
 import { prisma } from "@/lib/prisma";
+import { parseBoundedInt } from "@/lib/publicApi";
+import { getReviewSummary } from "@/lib/reviews";
 
 export const dynamic = "force-dynamic";
 
 // GET /api/public/products
-// Query params:
-//   featured=true|false
-//   trending=true|false
-//   latest=true        → sort by createdAt desc
-//   bestSeller=true
-//   category=slug
-//   search=term        → name, tags
-//   minPrice=number
-//   maxPrice=number
-//   minRating=1-5
-//   inStock=true       → quantity > 0
-//   page=1
-//   limit=12
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
 
     const featured = searchParams.get("featured") === "true" ? true : undefined;
     const trending = searchParams.get("trending") === "true" ? true : undefined;
-    const bestSeller =
-      searchParams.get("bestSeller") === "true" ? true : undefined;
+    const bestSeller = searchParams.get("bestSeller") === "true" ? true : undefined;
     const isNew = searchParams.get("isNew") === "true" ? true : undefined;
     const categorySlug = searchParams.get("category") || undefined;
     const search = searchParams.get("search") || undefined;
-    const minPrice = searchParams.get("minPrice")
-      ? parseFloat(searchParams.get("minPrice")!)
-      : undefined;
-    const maxPrice = searchParams.get("maxPrice")
-      ? parseFloat(searchParams.get("maxPrice")!)
-      : undefined;
+    const minPrice = searchParams.get("minPrice") ? parseFloat(searchParams.get("minPrice")!) : undefined;
+    const maxPrice = searchParams.get("maxPrice") ? parseFloat(searchParams.get("maxPrice")!) : undefined;
     const inStock = searchParams.get("inStock") === "true" ? true : undefined;
     const latest = searchParams.get("latest") === "true";
-    const sort = searchParams.get("sort") || undefined; // price-asc | price-desc | discount | popular
-    const minRating = searchParams.get("minRating")
-      ? parseFloat(searchParams.get("minRating")!)
-      : undefined;
-    const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
-    const limit = Math.min(
-      50,
-      Math.max(1, parseInt(searchParams.get("limit") || "12", 10))
-    );
+    const sort = searchParams.get("sort") || undefined;
+    const minRating = searchParams.get("minRating") ? parseFloat(searchParams.get("minRating")!) : undefined;
+    const page = parseBoundedInt(searchParams.get("page"), 1, 1, Number.MAX_SAFE_INTEGER);
+    const limit = parseBoundedInt(searchParams.get("limit"), CATALOGUE_PAGE_SIZE, 1, CATALOGUE_MAX_PAGE_SIZE);
     const skip = (page - 1) * limit;
 
-    // Build where clause
     const where: Record<string, unknown> = {
       status: "PUBLISHED",
       deletedAt: null,
@@ -110,17 +89,12 @@ export async function GET(request: Request) {
       }),
     ]);
 
-    // Compute average rating
-    const data = products.map((p: any) => {
-      const avgRating =
-        p.reviews.length > 0
-          ? p.reviews.reduce((sum: number, r: { rating: number }) => sum + r.rating, 0) / p.reviews.length
-          : 0;
-      const { reviews, ...rest } = p;
+    const data = products.map((product) => {
+      const { reviews, ...rest } = product;
+
       return {
         ...rest,
-        avgRating: Math.round(avgRating * 10) / 10,
-        reviewCount: reviews.length,
+        ...getReviewSummary(reviews),
       };
     });
 
@@ -133,7 +107,7 @@ export async function GET(request: Request) {
     console.error("[PUBLIC/products] Error:", error);
     return NextResponse.json(
       { success: false, error: "Failed to load products" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

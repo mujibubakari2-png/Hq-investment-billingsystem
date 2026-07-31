@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Navbar from "@/components/Navbar";
+import JsonLd from "@/components/JsonLd";
 import Footer from "@/components/Footer";
 import Breadcrumb from "@/components/product/Breadcrumb";
 import ProductGallery from "@/components/product/ProductGallery";
@@ -68,9 +69,47 @@ export default async function ProductPage({ params }: PageProps) {
     ...(product.category ? [{ label: product.category.name, href: `/products?category=${product.category.slug}` }] : []),
     { label: product.name },
   ];
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://hqinvestment.co.tz";
+  const imageUrl = product.ogImage ?? product.images?.[0]?.url;
+  const productSchema = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: product.name,
+    image: imageUrl ? [imageUrl] : undefined,
+    description: product.seoDescription ?? product.description ?? undefined,
+    sku: product.sku ?? undefined,
+    brand: product.brand ? { "@type": "Brand", name: product.brand } : undefined,
+    category: product.category?.name,
+    aggregateRating: product.avgRating
+      ? {
+          "@type": "AggregateRating",
+          ratingValue: product.avgRating,
+          reviewCount: product.reviewCount ?? 0,
+        }
+      : undefined,
+    offers: {
+      "@type": "Offer",
+      url: `${appUrl}/products/${product.slug}`,
+      priceCurrency: product.currency,
+      price: Number(product.price),
+      availability: product.quantity > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+      itemCondition: "https://schema.org/NewCondition",
+    },
+  };
+  const breadcrumbSchema = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: breadcrumbs.map((item, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      name: item.label,
+      item: item.href ? `${appUrl}${item.href}` : `${appUrl}/products/${product.slug}`,
+    })),
+  };
 
   return (
     <>
+      <JsonLd data={[productSchema, breadcrumbSchema]} />
       <Navbar />
       <main className="min-h-screen bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pt-24">

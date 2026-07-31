@@ -1,7 +1,8 @@
 "use client";
+
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Package, Users, ShoppingBag, Calendar } from "lucide-react";
+import { Calendar, Package, ShoppingBag, Users } from "lucide-react";
 import AnimatedCounter from "@/components/ui/AnimatedCounter";
 import type { Stats } from "@/types";
 
@@ -45,8 +46,8 @@ export default function Statistics() {
 
   useEffect(() => {
     fetch("/api/public/stats")
-      .then((r) => r.json())
-      .then((d) => setStats(d.data ?? null))
+      .then((response) => response.json())
+      .then((data) => setStats(data.data ?? null))
       .catch(() => {});
   }, []);
 
@@ -59,36 +60,18 @@ export default function Statistics() {
       className="py-20 relative overflow-hidden"
       style={{ background: "var(--gradient-hero)" }}
     >
-      {/* Background decoration */}
       <div className="absolute inset-0 pointer-events-none">
-        <div
-          className="absolute w-96 h-96 rounded-full opacity-10"
-          style={{
-            background: "radial-gradient(circle, #3b82f6 0%, transparent 70%)",
-            top: "-10%",
-            right: "10%",
-          }}
-        />
-        <div
-          className="absolute w-64 h-64 rounded-full opacity-10"
-          style={{
-            background: "radial-gradient(circle, #10b981 0%, transparent 70%)",
-            bottom: "-5%",
-            left: "5%",
-          }}
-        />
-        {/* Grid */}
         <div
           className="absolute inset-0 opacity-[0.03]"
           style={{
-            backgroundImage: "linear-gradient(rgba(255,255,255,1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,1) 1px, transparent 1px)",
+            backgroundImage:
+              "linear-gradient(rgba(255,255,255,1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,1) 1px, transparent 1px)",
             backgroundSize: "40px 40px",
           }}
         />
       </div>
 
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -99,11 +82,10 @@ export default function Statistics() {
             Trusted by Thousands
           </h2>
           <p className="text-white/60 text-lg max-w-xl mx-auto">
-            Numbers that speak for themselves — growing stronger every day across East Africa.
+            Numbers that speak for themselves, growing stronger every day across East Africa.
           </p>
         </motion.div>
 
-        {/* Stats grid */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
           {STAT_CONFIGS.map(({ key, label, icon: Icon, suffix, color, delay }) => (
             <motion.div

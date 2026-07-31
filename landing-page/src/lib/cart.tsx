@@ -1,16 +1,16 @@
 "use client";
+
 import {
   createContext,
-  useContext,
-  useReducer,
-  useEffect,
   useCallback,
+  useContext,
+  useEffect,
+  useReducer,
   type ReactNode,
 } from "react";
 import type { CartItem, CartState } from "@/types";
 import { calcDiscountedPrice } from "@/lib/utils";
 
-// ─── Cart Actions ─────────────────────────────────────────────
 type CartAction =
   | { type: "ADD_ITEM"; payload: CartItem }
   | { type: "REMOVE_ITEM"; payload: string }
@@ -21,34 +21,66 @@ type CartAction =
   | { type: "TOGGLE" }
   | { type: "HYDRATE"; payload: CartItem[] };
 
-// ─── Cart Reducer ─────────────────────────────────────────────
+const CART_KEY = "hq_cart_v1";
+
+function isCartItem(value: unknown): value is CartItem {
+  if (!value || typeof value !== "object") return false;
+
+  const item = value as Partial<CartItem>;
+
+  return (
+    typeof item.id === "string" &&
+    typeof item.productId === "string" &&
+    typeof item.name === "string" &&
+    typeof item.slug === "string" &&
+    typeof item.price === "number" &&
+    typeof item.currency === "string" &&
+    typeof item.quantity === "number" &&
+    typeof item.maxQuantity === "number"
+  );
+}
+
+function readStoredCart(): CartItem[] {
+  try {
+    const stored = localStorage.getItem(CART_KEY);
+    if (!stored) return [];
+
+    const parsed: unknown = JSON.parse(stored);
+    return Array.isArray(parsed) ? parsed.filter(isCartItem) : [];
+  } catch {
+    return [];
+  }
+}
+
 function cartReducer(state: CartState, action: CartAction): CartState {
   switch (action.type) {
     case "HYDRATE":
       return { ...state, items: action.payload };
     case "ADD_ITEM": {
-      const existing = state.items.find((i) => i.id === action.payload.id);
+      const existing = state.items.find((item) => item.id === action.payload.id);
+
       if (existing) {
         return {
           ...state,
-          items: state.items.map((i) =>
-            i.id === action.payload.id
-              ? { ...i, quantity: Math.min(i.quantity + action.payload.quantity, i.maxQuantity) }
-              : i
+          items: state.items.map((item) =>
+            item.id === action.payload.id
+              ? { ...item, quantity: Math.min(item.quantity + action.payload.quantity, item.maxQuantity) }
+              : item,
           ),
         };
       }
+
       return { ...state, items: [...state.items, action.payload] };
     }
     case "REMOVE_ITEM":
-      return { ...state, items: state.items.filter((i) => i.id !== action.payload) };
+      return { ...state, items: state.items.filter((item) => item.id !== action.payload) };
     case "UPDATE_QTY":
       return {
         ...state,
-        items: state.items.map((i) =>
-          i.id === action.payload.id
-            ? { ...i, quantity: Math.min(Math.max(1, action.payload.quantity), i.maxQuantity) }
-            : i
+        items: state.items.map((item) =>
+          item.id === action.payload.id
+            ? { ...item, quantity: Math.min(Math.max(1, action.payload.quantity), item.maxQuantity) }
+            : item,
         ),
       };
     case "CLEAR":
@@ -64,21 +96,20 @@ function cartReducer(state: CartState, action: CartAction): CartState {
   }
 }
 
-// ─── Selectors ────────────────────────────────────────────────
 export function getCartTotals(items: CartItem[]) {
   const subtotal = items.reduce((sum, item) => {
     const effectivePrice = calcDiscountedPrice(item.price, item.discountType, item.discountValue);
     return sum + effectivePrice * item.quantity;
   }, 0);
-  const totalItems = items.reduce((sum, i) => sum + i.quantity, 0);
+  const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
   const savings = items.reduce((sum, item) => {
     const discounted = calcDiscountedPrice(item.price, item.discountType, item.discountValue);
     return sum + (item.price - discounted) * item.quantity;
   }, 0);
+
   return { subtotal, totalItems, savings };
 }
 
-// ─── Context ──────────────────────────────────────────────────
 interface CartContextValue {
   state: CartState;
   addItem: (item: CartItem) => void;
@@ -99,22 +130,19 @@ export function useCart() {
   return ctx;
 }
 
-// ─── Provider ─────────────────────────────────────────────────
-const CART_KEY = "hq_cart_v1";
-
 export function CartProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(cartReducer, { items: [], isOpen: false });
 
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(CART_KEY);
-      if (stored) dispatch({ type: "HYDRATE", payload: JSON.parse(stored) as CartItem[] });
-    } catch { /* ignore */ }
+    dispatch({ type: "HYDRATE", payload: readStoredCart() });
   }, []);
 
   useEffect(() => {
-    try { localStorage.setItem(CART_KEY, JSON.stringify(state.items)); }
-    catch { /* ignore */ }
+    try {
+      localStorage.setItem(CART_KEY, JSON.stringify(state.items));
+    } catch {
+      // Ignore storage failures in private mode or locked browsers.
+    }
   }, [state.items]);
 
   const addItem = useCallback((item: CartItem) => {
@@ -122,8 +150,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
     dispatch({ type: "OPEN" });
   }, []);
   const removeItem = useCallback((id: string) => dispatch({ type: "REMOVE_ITEM", payload: id }), []);
-  const updateQty = useCallback((id: string, quantity: number) =>
-    dispatch({ type: "UPDATE_QTY", payload: { id, quantity } }), []);
+  const updateQty = useCallback(
+    (id: string, quantity: number) => dispatch({ type: "UPDATE_QTY", payload: { id, quantity } }),
+    [],
+  );
   const clearCart = useCallback(() => dispatch({ type: "CLEAR" }), []);
   const openCart = useCallback(() => dispatch({ type: "OPEN" }), []);
   const closeCart = useCallback(() => dispatch({ type: "CLOSE" }), []);
@@ -131,15 +161,18 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const totals = getCartTotals(state.items);
   const value: CartContextValue = {
-    state, addItem, removeItem, updateQty,
-    clearCart, openCart, closeCart, toggleCart, totals,
+    state,
+    addItem,
+    removeItem,
+    updateQty,
+    clearCart,
+    openCart,
+    closeCart,
+    toggleCart,
+    totals,
   };
 
-  return (
-    <CartContext.Provider value={value}>
-      {children}
-    </CartContext.Provider>
-  );
+  return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }
 
 export default CartProvider;

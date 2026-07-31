@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getReviewSummary } from "@/lib/reviews";
 
 export const dynamic = "force-dynamic";
 
@@ -39,56 +40,43 @@ export async function GET(
       .update({ where: { id: product.id }, data: { viewCount: { increment: 1 } } })
       .catch(() => {});
 
-    // Calculate avg rating
-    const avgRating =
-      product.reviews.length > 0
-        ? product.reviews.reduce((sum: number, r: { rating: number }) => sum + r.rating, 0) / product.reviews.length
-        : 0;
-
     // Related products (same category, excluding current)
-    let related: typeof product[] = [];
-    if (product.categoryId) {
-      related = await prisma.product.findMany({
-        where: {
-          categoryId: product.categoryId,
-          id: { not: product.id },
-          status: "PUBLISHED",
-          deletedAt: null,
-        },
-        take: 8,
-        orderBy: [{ featured: "desc" }, { viewCount: "desc" }],
-        include: {
-          category: { select: { id: true, name: true, slug: true } },
-          images: {
-            orderBy: [{ isFeatured: "desc" }, { sortOrder: "asc" }],
-            take: 1,
+    const related = product.categoryId
+      ? await prisma.product.findMany({
+          where: {
+            categoryId: product.categoryId,
+            id: { not: product.id },
+            status: "PUBLISHED",
+            deletedAt: null,
           },
-          reviews: {
-            where: { isApproved: true },
-            select: { rating: true },
+          take: 8,
+          orderBy: [{ featured: "desc" }, { viewCount: "desc" }],
+          include: {
+            category: { select: { id: true, name: true, slug: true } },
+            images: {
+              orderBy: [{ isFeatured: "desc" }, { sortOrder: "asc" }],
+              take: 1,
+            },
+            reviews: {
+              where: { isApproved: true },
+              select: { rating: true },
+            },
           },
-        },
-      });
-    }
+        })
+      : [];
 
-    const relatedWithRating = related.map((p: any) => {
-      const avg =
-        p.reviews.length > 0
-          ? p.reviews.reduce((s: number, r: { rating: number }) => s + r.rating, 0) / p.reviews.length
-          : 0;
-      const { reviews, ...rest } = p;
+    const relatedWithRating = related.map((relatedProduct) => {
+      const { reviews, ...rest } = relatedProduct;
       return {
         ...rest,
-        avgRating: Math.round(avg * 10) / 10,
-        reviewCount: reviews.length,
+        ...getReviewSummary(reviews),
       };
     });
 
     const { reviews, ...productRest } = product;
     const data = {
       ...productRest,
-      avgRating: Math.round(avgRating * 10) / 10,
-      reviewCount: reviews.length,
+      ...getReviewSummary(reviews),
       reviews,
       related: relatedWithRating,
     };

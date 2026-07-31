@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Facebook, Twitter, Instagram, Linkedin, Mail, Phone, MapPin, Youtube, MessageCircle } from "lucide-react";
+import { Mail, Phone, MapPin, MessageCircle, Share2, MessageSquare, Camera, Video } from "lucide-react";
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();
@@ -29,10 +29,10 @@ export default function Footer() {
             {/* Social */}
             <div className="flex flex-wrap gap-3">
               {[
-                { icon: Facebook, label: "Facebook", href: "#" },
-                { icon: Twitter, label: "X (Twitter)", href: "#" },
-                { icon: Instagram, label: "Instagram", href: "#" },
-                { icon: Youtube, label: "YouTube", href: "#" },
+                { icon: Share2, label: "Facebook", href: "#" },
+                { icon: MessageSquare, label: "X (Twitter)", href: "#" },
+                { icon: Camera, label: "Instagram", href: "#" },
+                { icon: Video, label: "YouTube", href: "#" },
                 { icon: MessageCircle, label: "WhatsApp", href: "#" },
               ].map(({ icon: Icon, label, href }) => (
                 <Link
@@ -105,9 +105,9 @@ export default function Footer() {
                 </a>
               </li>
               <li>
-                <a href="tel:+255700000001" className="flex items-start gap-3 text-sm text-slate-400 hover:text-white transition-colors group">
+                <a href="tel:+255621085215" className="flex items-start gap-3 text-sm text-slate-400 hover:text-white transition-colors group">
                   <Phone size={16} className="shrink-0 mt-0.5 group-hover:text-secondary transition-colors" />
-                  +255 700 000 001
+                  +255 621085215
                 </a>
               </li>
               <li className="flex items-start gap-3 text-sm text-slate-400">

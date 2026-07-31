@@ -277,44 +277,44 @@ function ProductSection({
 }
 
 // ─── Exported named sections ───────────────────────────────────
+const PRODUCT_SECTION_CONFIG = {
+  featured: {
+    id: "featured-products",
+    title: "Featured Products",
+    subtitle: "Hand-picked by our team - the best products at unbeatable prices",
+    badge: "Editor's Pick",
+    badgeColor: "bg-amber-50 text-amber-700",
+    queryParams: "featured=true",
+    viewAllHref: "/products?featured=true",
+  },
+  latest: {
+    id: "latest-products",
+    title: "Newly Arrived",
+    subtitle: "Fresh arrivals added daily - be the first to shop",
+    badge: "Just In",
+    badgeColor: "bg-emerald-50 text-emerald-700",
+    queryParams: "latest=true",
+    viewAllHref: "/products?sort=latest",
+  },
+  trending: {
+    id: "trending-products",
+    title: "Trending Now",
+    subtitle: "Most viewed and talked-about products this week",
+    badge: "Trending",
+    badgeColor: "bg-rose-50 text-rose-600",
+    queryParams: "trending=true",
+    viewAllHref: "/products?sort=popular",
+  },
+} satisfies Record<string, ProductSectionProps>;
+
 export function FeaturedProducts() {
-  return (
-    <ProductSection
-      id="featured-products"
-      title="Featured Products"
-      subtitle="Hand-picked by our team — the best products at unbeatable prices"
-      badge="⭐ Editor's Pick"
-      badgeColor="bg-amber-50 text-amber-700"
-      queryParams="featured=true"
-      viewAllHref="/products?featured=true"
-    />
-  );
+  return <ProductSection {...PRODUCT_SECTION_CONFIG.featured} />;
 }
 
 export function LatestProducts() {
-  return (
-    <ProductSection
-      id="latest-products"
-      title="Newly Arrived"
-      subtitle="Fresh arrivals added daily — be the first to shop"
-      badge="🆕 Just In"
-      badgeColor="bg-emerald-50 text-emerald-700"
-      queryParams="latest=true"
-      viewAllHref="/products?sort=latest"
-    />
-  );
+  return <ProductSection {...PRODUCT_SECTION_CONFIG.latest} />;
 }
 
 export function TrendingProducts() {
-  return (
-    <ProductSection
-      id="trending-products"
-      title="Trending Now"
-      subtitle="Most viewed and talked-about products this week"
-      badge="🔥 Trending"
-      badgeColor="bg-rose-50 text-rose-600"
-      queryParams="trending=true"
-      viewAllHref="/products?sort=popular"
-    />
-  );
+  return <ProductSection {...PRODUCT_SECTION_CONFIG.trending} />;
 }

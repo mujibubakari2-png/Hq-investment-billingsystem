@@ -1,29 +1,33 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readDb, writeDb } from "@/lib/db";
+import { isValidEmail, normalizeEmail, publicApiError } from "@/lib/publicApi";
 
 export async function POST(req: NextRequest) {
   try {
-    const { name, email, message } = await req.json();
+    const body = await req.json();
+    const name = typeof body.name === "string" ? body.name.trim() : "";
+    const email = normalizeEmail(body.email);
+    const message = typeof body.message === "string" ? body.message.trim() : "";
 
-    if (!name || !email || !message) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    if (!name || !isValidEmail(email) || !message) {
+      return NextResponse.json(
+        { success: false, error: "Name, valid email, and message are required" },
+        { status: 400 },
+      );
     }
 
     const db = await readDb();
-    const newContact = {
+    db.contacts.push({
       id: Date.now().toString(),
       name,
       email,
       message,
       createdAt: new Date().toISOString(),
-    };
-
-    db.contacts.push(newContact);
+    });
     await writeDb(db);
 
-    return NextResponse.json({ message: "Message sent successfully" });
-  } catch (error) {
-    console.error("API Error:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    return NextResponse.json({ success: true, message: "Message sent successfully" });
+  } catch (error: unknown) {
+    return publicApiError("contact", error, "Failed to send message");
   }
 }

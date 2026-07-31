@@ -1,9 +1,10 @@
 "use client";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, ShoppingBag, Minus, Plus, Trash2, ArrowRight, Package } from "lucide-react";
+import { X, ShoppingBag, Trash2, Package } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useCart, getCartTotals } from "@/lib/cart";
+import CartQuantityControls from "@/components/cart/CartQuantityControls";
+import { useCart } from "@/lib/cart";
 import { formatPrice, calcDiscountedPrice } from "@/lib/utils";
 
 function EmptyCart() {
@@ -146,27 +147,11 @@ export default function CartDrawer() {
                             )}
                             <div className="flex items-center justify-between mt-2">
                               {/* Qty controls */}
-                              <div className="flex items-center gap-1 rounded-full border border-slate-200 bg-white p-0.5">
-                                <button
-                                  onClick={() => updateQty(item.id, item.quantity - 1)}
-                                  disabled={item.quantity <= 1}
-                                  className="w-7 h-7 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-100 disabled:opacity-30 transition-all"
-                                  aria-label="Decrease quantity"
-                                >
-                                  <Minus size={12} />
-                                </button>
-                                <span className="text-sm font-bold w-5 text-center text-slate-800">
-                                  {item.quantity}
-                                </span>
-                                <button
-                                  onClick={() => updateQty(item.id, item.quantity + 1)}
-                                  disabled={item.quantity >= item.maxQuantity}
-                                  className="w-7 h-7 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-100 disabled:opacity-30 transition-all"
-                                  aria-label="Increase quantity"
-                                >
-                                  <Plus size={12} />
-                                </button>
-                              </div>
+                              <CartQuantityControls
+                                quantity={item.quantity}
+                                maxQuantity={item.maxQuantity}
+                                onChange={(quantity) => updateQty(item.id, quantity)}
+                              />
 
                               {/* Price */}
                               <div className="text-right">

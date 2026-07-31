@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { parseBoundedInt, publicApiError } from "@/lib/publicApi";
 
 export const dynamic = "force-dynamic";
 
@@ -9,7 +10,7 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const q = searchParams.get("q")?.trim() ?? "";
-    const limit = Math.min(10, Math.max(1, parseInt(searchParams.get("limit") ?? "6", 10)));
+    const limit = parseBoundedInt(searchParams.get("limit"), 6, 1, 10);
 
     if (q.length < 2) {
       return NextResponse.json({ success: true, data: [] });
@@ -44,24 +45,20 @@ export async function GET(request: Request) {
       },
     });
 
-    const data = products.map((p: any) => ({
-      id: p.id,
-      name: p.name,
-      slug: p.slug,
-      brand: p.brand,
-      price: Number(p.price),
-      currency: p.currency,
-      category: p.category?.name ?? null,
-      categorySlug: p.category?.slug ?? null,
-      image: p.images[0]?.url ?? null,
+    const data = products.map((product) => ({
+      id: product.id,
+      name: product.name,
+      slug: product.slug,
+      brand: product.brand,
+      price: Number(product.price),
+      currency: product.currency,
+      category: product.category?.name ?? null,
+      categorySlug: product.category?.slug ?? null,
+      image: product.images[0]?.url ?? null,
     }));
 
     return NextResponse.json({ success: true, data });
-  } catch (error) {
-    console.error("[PUBLIC/products/search] Error:", error);
-    return NextResponse.json(
-      { success: false, error: "Search failed" },
-      { status: 500 }
-    );
+  } catch (error: unknown) {
+    return publicApiError("products/search", error, "Search failed");
   }
 }

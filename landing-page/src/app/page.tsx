@@ -1,7 +1,11 @@
 import Navbar from "@/components/Navbar";
+import JsonLd from "@/components/JsonLd";
 import Hero from "@/components/Hero";
 import Categories from "@/components/Categories";
 import { FeaturedProducts, LatestProducts, TrendingProducts } from "@/components/ProductSections";
+import CommerceHighlights from "@/components/CommerceHighlights";
+import CommerceExperience from "@/components/CommerceExperience";
+import RecentlyViewedSection from "@/components/RecentlyViewedSection";
 import PromoBanner from "@/components/PromoBanner";
 import Features from "@/components/Features";
 import Pricing from "@/components/Pricing";
@@ -13,49 +17,55 @@ import Contact from "@/components/Contact";
 import Footer from "@/components/Footer";
 
 export default function LandingPage() {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://hqinvestment.co.tz";
+  const structuredData = [
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      name: "HQ Investment",
+      url: appUrl,
+      logo: `${appUrl}/icon.png`,
+      contactPoint: {
+        "@type": "ContactPoint",
+        contactType: "customer support",
+        telephone: "+255700000001",
+        areaServed: "TZ",
+        availableLanguage: ["English", "Swahili"],
+      },
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      name: "HQ Investment Marketplace",
+      url: appUrl,
+      potentialAction: {
+        "@type": "SearchAction",
+        target: `${appUrl}/products?search={search_term_string}`,
+        "query-input": "required name=search_term_string",
+      },
+    },
+  ];
+
   return (
     <main className="min-h-screen overflow-x-hidden">
+      <JsonLd data={structuredData} />
       <Navbar />
-      {/* ── Hero ── */}
       <Hero />
-
-      {/* ── Shop Categories ── */}
       <Categories />
-
-      {/* ── Featured Products ── */}
+      <CommerceHighlights />
       <FeaturedProducts />
-
-      {/* ── Promo Banner ── */}
       <PromoBanner />
-
-      {/* ── Latest Arrivals ── */}
       <LatestProducts />
-
-      {/* ── Trending Products ── */}
       <TrendingProducts />
-
-      {/* ── Statistics ── */}
+      <CommerceExperience />
+      <RecentlyViewedSection />
       <Statistics />
-
-      {/* ── Customer Testimonials ── */}
       <Testimonials />
-
-      {/* ── ISP Features (preserved) ── */}
       <Features />
-
-      {/* ── ISP Pricing Plans (preserved) ── */}
       <Pricing />
-
-      {/* ── Newsletter ── */}
       <Newsletter />
-
-      {/* ── FAQ ── */}
       <FAQ />
-
-      {/* ── Contact (preserved) ── */}
       <Contact />
-
-      {/* ── Footer ── */}
       <Footer />
     </main>
   );

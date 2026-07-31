@@ -1,9 +1,11 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useCallback, useState } from "react";
+import type { ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { SlidersHorizontal, X, ChevronDown, ChevronUp, LayoutGrid, LayoutList } from "lucide-react";
+import { SlidersHorizontal, X, ChevronDown, ChevronUp } from "lucide-react";
 import type { ProductCategory, ProductFilters } from "@/types";
 import StarRating from "@/components/ui/StarRating";
+import { catalogueSortOptions, ratingFilterOptions } from "@/config/catalogue";
 
 interface ProductFiltersProps {
   filters: ProductFilters;
@@ -11,16 +13,8 @@ interface ProductFiltersProps {
   categories: ProductCategory[];
 }
 
-const SORT_OPTIONS = [
-  { value: "latest", label: "Newest First" },
-  { value: "popular", label: "Most Popular" },
-  { value: "discount", label: "Biggest Discount" },
-  { value: "price-asc", label: "Price: Low to High" },
-  { value: "price-desc", label: "Price: High to Low" },
-] as const;
-
 function FilterSection({ title, children, defaultOpen = true }: {
-  title: string; children: React.ReactNode; defaultOpen?: boolean;
+  title: string; children: ReactNode; defaultOpen?: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
@@ -86,14 +80,14 @@ export default function ProductFiltersPanel({ filters, onChange, categories }: P
       {/* Sort */}
       <FilterSection title="Sort By">
         <div className="space-y-1">
-          {SORT_OPTIONS.map((opt) => (
+          {catalogueSortOptions.map((opt) => (
             <label key={opt.value} className="flex items-center gap-3 cursor-pointer py-1.5 group">
               <input
                 type="radio"
                 name="sort"
                 value={opt.value}
                 checked={filters.sort === opt.value}
-                onChange={() => onChange({ sort: opt.value as ProductFilters["sort"] })}
+                onChange={() => onChange({ sort: opt.value })}
                 className="accent-primary w-4 h-4"
               />
               <span className="text-sm text-slate-600 group-hover:text-slate-900 transition-colors">{opt.label}</span>
@@ -167,7 +161,7 @@ export default function ProductFiltersPanel({ filters, onChange, categories }: P
       {/* Rating */}
       <FilterSection title="Minimum Rating">
         <div className="space-y-2">
-          {[4, 3, 2, 1].map((r) => (
+          {ratingFilterOptions.map((r) => (
             <label key={r} className="flex items-center gap-3 cursor-pointer py-1">
               <input
                 type="radio" name="rating" value={r}

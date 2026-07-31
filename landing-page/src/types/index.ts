@@ -1,6 +1,4 @@
-// ─────────────────────────────────────────────────────────────
-// E-Commerce TypeScript Types
-// ─────────────────────────────────────────────────────────────
+// E-commerce TypeScript types
 
 export type ProductStatus = "DRAFT" | "PUBLISHED" | "ARCHIVED" | "SCHEDULED";
 
@@ -118,8 +116,6 @@ export interface Faq {
   updatedAt: string;
 }
 
-// ─── Cart Types ────────────────────────────────────────────────
-
 export interface CartItem {
   id: string;
   productId: string;
@@ -140,8 +136,6 @@ export interface CartState {
   isOpen: boolean;
 }
 
-// ─── API Response Types ───────────────────────────────────────
-
 export interface ApiResponse<T> {
   success: boolean;
   data?: T;
@@ -160,8 +154,6 @@ export interface PaginatedResponse<T> {
   };
 }
 
-// ─── Filter Types ─────────────────────────────────────────────
-
 export interface ProductFilters {
   category?: string;
   minPrice?: number;
@@ -177,16 +169,12 @@ export interface ProductFilters {
   limit?: number;
 }
 
-// ─── Stats Types ──────────────────────────────────────────────
-
 export interface Stats {
   products: number;
   customers: number;
   orders: number;
   yearsInBusiness: number;
 }
-
-// ─── Toast Types ─────────────────────────────────────────────
 
 export type ToastType = "success" | "error" | "info" | "warning";
 

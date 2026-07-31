@@ -1,9 +1,10 @@
 "use client";
 import { useState } from "react";
 import { Loader2, Smartphone } from "lucide-react";
+import { mobileMoneyProviderOptions, type MobileMoneyProvider } from "@/config/payments";
 import { useCart } from "@/lib/cart";
-import { useToast } from "@/components/ui/Toast";
-import { formatPrice } from "@/lib/utils";
+import { Popup } from "@/stores/popupStore";
+import { formatPrice, getErrorMessage } from "@/lib/utils";
 
 interface MobileMoneyFormProps {
   amount: number;
@@ -20,18 +21,18 @@ interface MobileMoneyFormProps {
 export default function MobileMoneyForm({ amount, currency, onSuccess, customerInfo }: MobileMoneyFormProps) {
   const [loading, setLoading] = useState(false);
   const [phone, setPhone] = useState(customerInfo.phone || "");
-  const [provider, setProvider] = useState("MPESA");
+  const [provider, setProvider] = useState<MobileMoneyProvider>("PALMPESA");
   const { clearCart, state: cartState } = useCart();
-  const { success, error } = useToast();
 
   const handlePayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!phone) {
-      error("Please enter a valid phone number");
+      Popup.warning("Validation Error", "Please enter a valid phone number");
       return;
     }
 
     setLoading(true);
+    Popup.loading("Waiting for payment provider...");
     try {
       const res = await fetch("/api/public/checkout/mobile-money", {
         method: "POST",
@@ -46,14 +47,14 @@ export default function MobileMoneyForm({ amount, currency, onSuccess, customerI
       const data = await res.json();
 
       if (data.success) {
-        success("Payment request sent to your phone. Please confirm.");
+        Popup.success("Payment Request Sent", "Check your phone and approve the payment prompt to complete the order.", { text: "OK", onAction: () => Popup.close() });
         clearCart();
         onSuccess(data.data.orderId);
       } else {
         throw new Error(data.error || "Payment failed");
       }
-    } catch (err: any) {
-      error(err.message);
+    } catch (err: unknown) {
+      Popup.error("Payment Failed", getErrorMessage(err, "Payment failed"), { text: "Try Again", onAction: () => Popup.close() });
     } finally {
       setLoading(false);
     }
@@ -64,26 +65,16 @@ export default function MobileMoneyForm({ amount, currency, onSuccess, customerI
       <div>
         <label className="block text-sm font-semibold text-slate-700 mb-2">Select Provider</label>
         <div className="grid grid-cols-2 gap-3">
-          <button
-            type="button"
-            onClick={() => setProvider("MPESA")}
-            className={`p-3 rounded-xl border-2 text-sm font-bold transition-all ${provider === "MPESA"
-                ? "border-emerald-500 bg-emerald-50 text-emerald-700"
-                : "border-slate-200 text-slate-500 hover:border-slate-300 bg-white"
-              }`}
-          >
-            M-Pesa
-          </button>
-          <button
-            type="button"
-            onClick={() => setProvider("TIGOPESA")}
-            className={`p-3 rounded-xl border-2 text-sm font-bold transition-all ${provider === "TIGOPESA"
-                ? "border-blue-500 bg-blue-50 text-blue-700"
-                : "border-slate-200 text-slate-500 hover:border-slate-300 bg-white"
-              }`}
-          >
-            Tigo Pesa
-          </button>
+          {mobileMoneyProviderOptions.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => setProvider(option.value)}
+              className={getProviderButtonClass(option.tone, provider === option.value)}
+            >
+              {option.label}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -122,4 +113,19 @@ export default function MobileMoneyForm({ amount, currency, onSuccess, customerI
       </button>
     </form>
   );
+}
+
+function getProviderButtonClass(tone: "emerald" | "sky" | "amber" | "violet", active: boolean) {
+  if (!active) {
+    return "p-3 rounded-xl border-2 text-sm font-bold transition-all border-slate-200 text-slate-500 hover:border-slate-300 bg-white";
+  }
+
+  const toneClasses = {
+    emerald: "border-emerald-500 bg-emerald-50 text-emerald-700",
+    sky: "border-sky-500 bg-sky-50 text-sky-700",
+    amber: "border-amber-500 bg-amber-50 text-amber-700",
+    violet: "border-violet-500 bg-violet-50 text-violet-700",
+  };
+
+  return `p-3 rounded-xl border-2 text-sm font-bold transition-all ${toneClasses[tone]}`;
 }

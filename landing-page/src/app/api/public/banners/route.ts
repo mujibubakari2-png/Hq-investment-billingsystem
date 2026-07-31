@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { publicApiError } from "@/lib/publicApi";
 
 export const dynamic = "force-dynamic";
 
@@ -19,11 +20,7 @@ export async function GET() {
       orderBy: { position: "asc" },
     });
     return NextResponse.json({ success: true, data: banners });
-  } catch (error) {
-    console.error("[PUBLIC/banners] Error:", error);
-    return NextResponse.json(
-      { success: false, error: "Failed to load banners" },
-      { status: 500 }
-    );
+  } catch (error: unknown) {
+    return publicApiError("banners", error, "Failed to load banners");
   }
 }

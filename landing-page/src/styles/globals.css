@@ -65,6 +65,58 @@
   --soft-bg: #f8fafc;
 }
 
+html[data-theme="dark"] {
+  --background: #020617;
+  --foreground: #f8fafc;
+  --surface: #0f172a;
+  --surface-2: #111827;
+  --border: rgba(148, 163, 184, 0.22);
+}
+
+html[data-theme="dark"] body {
+  background: #020617;
+  color: #f8fafc;
+}
+
+html[data-theme="dark"] .bg-white {
+  background-color: #0f172a !important;
+}
+
+html[data-theme="dark"] .bg-slate-50 {
+  background-color: #020617 !important;
+}
+
+html[data-theme="dark"] .bg-slate-950,
+html[data-theme="dark"] .bg-slate-900 {
+  background-color: #020617 !important;
+}
+
+html[data-theme="dark"] .text-slate-950,
+html[data-theme="dark"] .text-slate-900,
+html[data-theme="dark"] .text-slate-800,
+html[data-theme="dark"] .text-slate-700 {
+  color: #f8fafc !important;
+}
+
+html[data-theme="dark"] .text-slate-600,
+html[data-theme="dark"] .text-slate-500,
+html[data-theme="dark"] .text-slate-400 {
+  color: #cbd5e1 !important;
+}
+
+html[data-theme="dark"] .border-slate-200,
+html[data-theme="dark"] .border-slate-100,
+html[data-theme="dark"] .border-slate-800 {
+  border-color: rgba(148, 163, 184, 0.22) !important;
+}
+
+html[data-theme="dark"] .shadow-sm,
+html[data-theme="dark"] .shadow-md,
+html[data-theme="dark"] .shadow-lg,
+html[data-theme="dark"] .shadow-xl {
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.35) !important;
+}
+
 /* ─── Base Styles ────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; }
 

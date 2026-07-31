@@ -1,33 +1,42 @@
 "use client";
+
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Mail, Sparkles } from "lucide-react";
-import { useToast } from "@/components/ui/Toast";
+import { Popup } from "@/stores/popupStore";
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function Newsletter() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
-  const { success, error } = useToast();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email.includes("@")) { error("Please enter a valid email address."); return; }
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+
+    if (!EMAIL_PATTERN.test(email.trim())) {
+      Popup.error("Invalid Email", "Please enter a valid email address.");
+      return;
+    }
+
     setLoading(true);
+
     try {
-      const res = await fetch("/api/public/newsletter", {
+      const response = await fetch("/api/public/newsletter", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
       });
-      const data = await res.json();
+      const data = await response.json();
+
       if (data.success) {
-        success("You're subscribed! 🎉 Watch your inbox for deals.");
+        Popup.success("Subscribed!", "You have successfully subscribed to our newsletter.");
         setEmail("");
       } else {
-        error(data.error ?? "Subscription failed. Please try again.");
+        Popup.error("Subscription Failed", data.error || "Failed to subscribe.");
       }
     } catch {
-      error("Network error. Please try again.");
+      Popup.warning("Network Error", "Network error. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -44,12 +53,6 @@ export default function Newsletter() {
           className="relative overflow-hidden rounded-3xl p-10 md:p-16 text-center"
           style={{ background: "var(--gradient-primary)" }}
         >
-          {/* Decorative orbs */}
-          <div className="absolute top-0 right-0 w-64 h-64 rounded-full opacity-20"
-            style={{ background: "radial-gradient(circle, white 0%, transparent 70%)", transform: "translate(30%, -30%)" }} />
-          <div className="absolute bottom-0 left-0 w-48 h-48 rounded-full opacity-15"
-            style={{ background: "radial-gradient(circle, #10b981 0%, transparent 70%)", transform: "translate(-30%, 30%)" }} />
-
           <div className="relative">
             <div className="flex justify-center mb-5">
               <div className="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center">
@@ -71,7 +74,7 @@ export default function Newsletter() {
                   type="email"
                   id="newsletter-email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(event) => setEmail(event.target.value)}
                   required
                   placeholder="Enter your email address"
                   className="w-full pl-11 pr-4 py-4 rounded-full text-slate-800 text-sm font-medium outline-none border-2 border-transparent focus:border-white/50 transition-all bg-white"
@@ -83,7 +86,7 @@ export default function Newsletter() {
                 disabled={loading}
                 className="px-8 py-4 rounded-full font-bold text-sm text-primary bg-white hover:bg-slate-50 transition-all disabled:opacity-60 disabled:cursor-not-allowed hover:-translate-y-0.5 whitespace-nowrap shadow-lg"
               >
-                {loading ? "Subscribing…" : "Subscribe Free"}
+                {loading ? "Subscribing..." : "Subscribe Free"}
               </button>
             </form>
 

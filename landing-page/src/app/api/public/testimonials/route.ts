@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { publicApiError } from "@/lib/publicApi";
 
 export const dynamic = "force-dynamic";
 
@@ -10,11 +11,7 @@ export async function GET() {
       orderBy: { sortOrder: "asc" },
     });
     return NextResponse.json({ success: true, data: testimonials });
-  } catch (error) {
-    console.error("[PUBLIC/testimonials] Error:", error);
-    return NextResponse.json(
-      { success: false, error: "Failed to load testimonials" },
-      { status: 500 }
-    );
+  } catch (error: unknown) {
+    return publicApiError("testimonials", error, "Failed to load testimonials");
   }
 }
