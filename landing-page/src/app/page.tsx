@@ -5,6 +5,7 @@ import Categories from "@/components/Categories";
 import { FeaturedProducts, LatestProducts, TrendingProducts } from "@/components/ProductSections";
 import CommerceHighlights from "@/components/CommerceHighlights";
 import CommerceExperience from "@/components/CommerceExperience";
+import CommerceCommandSection from "@/components/CommerceCommandSection";
 import RecentlyViewedSection from "@/components/RecentlyViewedSection";
 import PromoBanner from "@/components/PromoBanner";
 import Features from "@/components/Features";
@@ -58,6 +59,7 @@ export default function LandingPage() {
       <LatestProducts />
       <TrendingProducts />
       <CommerceExperience />
+      <CommerceCommandSection />
       <RecentlyViewedSection />
       <Statistics />
       <Testimonials />

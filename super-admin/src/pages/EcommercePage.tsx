@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Search, Settings, Shield, ShoppingBag, Star } from 'lucide-react';
+import { ArrowRight, CheckCircle2, ClipboardList, Search, Settings, Shield, ShoppingBag, Star } from 'lucide-react';
 import {
   commerceModules,
+  commerceReadinessItems,
   commerceStatusClass,
   matchesCommerceModule,
 } from '../config/ecommerceModules';
@@ -21,6 +22,7 @@ export default function EcommercePage() {
   );
   const operationalCount = commerceModules.filter((item) => item.status === 'Operational').length;
   const integrationCount = commerceModules.filter((item) => item.status === 'Integration Required').length;
+  const configuredCount = commerceModules.filter((item) => item.status === 'Configured').length;
 
   return (
     <div>
@@ -65,6 +67,14 @@ export default function EcommercePage() {
         </div>
         <div className="sa-stat-card">
           <div className="sa-stat-header">
+            <span className="sa-stat-label">Configured Areas</span>
+            <div className="sa-stat-icon info"><ClipboardList size={18} /></div>
+          </div>
+          <div className="sa-stat-value">{configuredCount}</div>
+          <div className="sa-stat-footer"><span className="sa-stat-sub">Ready for data and provider rollout</span></div>
+        </div>
+        <div className="sa-stat-card">
+          <div className="sa-stat-header">
             <span className="sa-stat-label">Customer Experience</span>
             <div className="sa-stat-icon accent"><Star size={18} /></div>
           </div>
@@ -81,13 +91,43 @@ export default function EcommercePage() {
               <div className="sa-card-title">Selected Module</div>
               <h2>{activeModule.label}</h2>
               <p>{activeModule.description}</p>
+              <div className="sa-ecom-meta-row">
+                <span>Owner: {activeModule.owner}</span>
+                <span>{activeModule.metric}</span>
+              </div>
             </div>
             <span className={`sa-ecom-status ${commerceStatusClass[activeModule.status]}`}>
               {activeModule.status}
             </span>
           </div>
+          <div className="sa-ecom-action-row">
+            {activeModule.actions.map((action) => (
+              <button key={action} className="sa-ecom-action-chip" type="button">
+                {action} <ArrowRight size={13} />
+              </button>
+            ))}
+          </div>
         </div>
       )}
+
+      <div className="sa-card sa-mb-24">
+        <div className="sa-card-header">
+          <span className="sa-card-title">Production Readiness</span>
+          <span className="sa-ecom-note">No duplicated commerce modules; each area has one owner and one navigation entry.</span>
+        </div>
+        <div className="sa-ecom-readiness-grid">
+          {commerceReadinessItems.map((item) => (
+            <div key={item.label} className="sa-ecom-readiness-card">
+              <div className="sa-ecom-readiness-top">
+                <CheckCircle2 size={17} />
+                <span className={`sa-ecom-status ${commerceStatusClass[item.status]}`}>{item.status}</span>
+              </div>
+              <h3>{item.label}</h3>
+              <p>{item.detail}</p>
+            </div>
+          ))}
+        </div>
+      </div>
 
       <div className="sa-card sa-mb-24">
         <div className="sa-card-header">
@@ -115,8 +155,11 @@ export default function EcommercePage() {
                 <span className="sa-ecom-module-title">{item.label}</span>
                 <span className="sa-ecom-module-text">{item.description}</span>
                 <span className="sa-ecom-module-footer">
-                  <span>{item.metric}</span>
+                  <span>{item.owner} / {item.metric}</span>
                   <span className={`sa-ecom-status ${commerceStatusClass[item.status]}`}>{item.status}</span>
+                </span>
+                <span className="sa-ecom-module-actions">
+                  {item.actions.slice(0, 2).map((action) => <span key={action}>{action}</span>)}
                 </span>
               </span>
             </button>

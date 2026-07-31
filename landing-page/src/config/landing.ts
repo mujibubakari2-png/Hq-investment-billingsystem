@@ -5,18 +5,23 @@ import {
   Boxes,
   Building2,
   CheckCircle2,
+  ClipboardCheck,
   CreditCard,
   Gift,
   Globe2,
   HeartHandshake,
+  LineChart,
   MapPin,
   PackageCheck,
   QrCode,
+  RotateCcw,
   ShieldCheck,
   Smartphone,
   Star,
   Store,
+  Tags,
   Truck,
+  UserRound,
   type LucideIcon,
 } from "lucide-react";
 
@@ -44,6 +49,20 @@ export interface LandingMetric {
   label: string;
   value: string;
   icon: LucideIcon;
+}
+
+export interface LandingJourneyStep {
+  icon: LucideIcon;
+  title: string;
+  text: string;
+  href: string;
+  cta: string;
+}
+
+export interface LandingControlArea {
+  title: string;
+  text: string;
+  status: "Live" | "Configurable" | "Ready";
 }
 
 export const landingCollections: LandingCollection[] = [
@@ -149,3 +168,50 @@ export const landingExperienceCards = {
   social: { icon: Smartphone, title: "Social commerce" },
   checklist: CheckCircle2,
 };
+
+export const landingJourneySteps: LandingJourneyStep[] = [
+  {
+    icon: Store,
+    title: "Discover",
+    text: "Search, category filters, curated collections, deals, and SEO-friendly product pages help customers find the right product fast.",
+    href: "/products",
+    cta: "Browse products",
+  },
+  {
+    icon: Tags,
+    title: "Compare and save",
+    text: "Wishlist, compare, recently viewed, quick view, reviews, stock signals, and share links support confident buying decisions.",
+    href: "/compare",
+    cta: "Compare items",
+  },
+  {
+    icon: CreditCard,
+    title: "Checkout",
+    text: "Persistent cart, cart drawer, quantity validation, mobile money, PayPal, coupons, and secure payment messaging are ready for conversion.",
+    href: "/cart",
+    cta: "Open cart",
+  },
+  {
+    icon: ClipboardCheck,
+    title: "After purchase",
+    text: "Order confirmation, customer support, delivery tracking architecture, refunds, warranty messaging, and account handoff are represented.",
+    href: "/track-order",
+    cta: "Track order",
+  },
+];
+
+export const landingAdminControlAreas: LandingControlArea[] = [
+  { title: "Homepage merchandising", text: "Hero content, promo banners, featured shelves, collections, flash sales, testimonials, FAQs, and trust copy.", status: "Configurable" },
+  { title: "Catalogue operations", text: "Products, categories, pricing, SEO fields, stock visibility, badges, reviews, and campaign placement.", status: "Live" },
+  { title: "Checkout operations", text: "Payment providers, coupons, order notes, delivery messaging, tax readiness, and audit-friendly payment flows.", status: "Ready" },
+  { title: "Growth and analytics", text: "Product impressions, cart events, checkout starts, conversion funnels, pixels, and reporting exports.", status: "Configurable" },
+];
+
+export const landingServicePromises: LandingIconBlock[] = [
+  { icon: ShieldCheck, title: "Secure payments", text: "Encrypted checkout, duplicate payment prevention architecture, and provider webhooks." },
+  { icon: Truck, title: "Delivery clarity", text: "Delivery estimates, pickup options, order status messaging, and courier-ready workflows." },
+  { icon: RotateCcw, title: "Returns ready", text: "Refund, warranty, replacement, and customer support paths are visible before checkout." },
+  { icon: UserRound, title: "Customer account", text: "Saved carts, order history, wishlist, reviews, notifications, and future loyalty hooks." },
+  { icon: LineChart, title: "Behavior analytics", text: "Views, clicks, add-to-cart, removals, search terms, and checkout conversion events." },
+  { icon: BadgeCheck, title: "Verified trust", text: "Ratings, verified products, secure badges, payment partners, and policy content." },
+];
