@@ -6,7 +6,7 @@
 
 // We import from the backend's generated prisma output which both services share.
 // In production, ensure DATABASE_URL is set in landing-page/.env
-import { PrismaClient } from "../../../backend/src/generated/prisma";
+import { PrismaClient } from "backend/src/generated/prisma";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
 
