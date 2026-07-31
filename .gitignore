@@ -25,6 +25,9 @@ build/
 out/
 *.tar.gz
 
+# Duplicate/stray files cleaned up during code review (safe backup, not needed in git)
+/_duplicate_files_removed/
+
 # Environment Variables
 .env
 .env.local

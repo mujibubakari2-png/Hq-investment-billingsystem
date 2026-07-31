@@ -112,16 +112,41 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
             }
 
             try {
-                const allWgRouters = await db.router.findMany({
+                // WG-PEER-ID-001: cross-tenant lookup is required here — wg0 is a
+                // single shared interface, so an IP taken by ANY tenant's router
+                // must be treated as used, not just this tenant's rows.
+                const globalDbForIp = getTenantClient(null);
+                const allWgRouters = await globalDbForIp.router.findMany({
                     where: { id: { not: id }, wgTunnelIp: { not: null } },
                     select: { wgTunnelIp: true }
                 });
-                const usedIps = allWgRouters.map(r => r.wgTunnelIp);
+                const usedIps = new Set(allWgRouters.map(r => r.wgTunnelIp));
+
+                // WG-PEER-ID-001: also check the live kernel state on wg0, not just
+                // the DB, so a candidate IP already held by an orphaned/undeleted
+                // peer (DB drift) is skipped too instead of being reassigned and
+                // silently stealing it from whatever peer currently has it.
+                try {
+                    const livePeers = await wireguardManager.listPeers();
+                    for (const peer of livePeers) {
+                        if (peer.allowedIps && peer.allowedIps !== '(none)') {
+                            for (const cidr of peer.allowedIps.split(',')) {
+                                usedIps.add(cidr.trim().replace('/32', ''));
+                            }
+                        }
+                    }
+                } catch {
+                    // wg not reachable — proceed with DB-only view (unique constraint
+                    // at the DB layer is still the final safety net)
+                }
 
                 // Find first free IP from 200 to 250
                 let nextIp = 200;
-                while (usedIps.includes(`${subnetPrefix}.${nextIp}`) && nextIp < 250) {
+                while (usedIps.has(`${subnetPrefix}.${nextIp}`) && nextIp < 250) {
                     nextIp++;
+                }
+                if (usedIps.has(`${subnetPrefix}.${nextIp}`)) {
+                    return errorResponse("No free WireGuard tunnel IPs available in this subnet (200-250 all in use). Contact platform support.", 409);
                 }
                 tunnelIp = `${subnetPrefix}.${nextIp}`;
                 await updateRouterWgFields(db, id, { wgTunnelIp: tunnelIp });

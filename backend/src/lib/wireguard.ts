@@ -116,13 +116,50 @@ export const wireguardManager = {
     },
 
     /**
+     * WG-PEER-ID-001: Find out whether an allowed-ip is already held by a
+     * DIFFERENT peer on wg0. WireGuard enforces one peer per allowed-ip at
+     * the kernel level — assigning it to a second peer silently steals it
+     * from the first, breaking that peer's tunnel with no error anywhere.
+     * Callers use this to refuse/avoid that collision instead of causing it.
+     *
+     * @returns the conflicting peer's publicKey, or null if the IP is free
+     *          (or already assigned to `expectedPublicKey` itself — that's
+     *          not a collision, just re-adding the same peer).
+     */
+    findPeerHoldingIp: async (allowedIp: string, expectedPublicKey?: string): Promise<string | null> => {
+        try {
+            const { stdout } = await execFileAsync('sudo', ['wg', 'show', 'wg0', 'dump']);
+            const lines = stdout.trim().split('\n').slice(1); // Skip the interface line
+            for (const line of lines) {
+                const parts = line.split('\t');
+                const peerKey = parts[0] ?? '';
+                const peerAllowedIps = parts[3] ?? '';
+                const holdsIp = peerAllowedIps.split(',').some(a => a.trim() === `${allowedIp}/32`);
+                if (holdsIp && peerKey !== expectedPublicKey) {
+                    return peerKey;
+                }
+            }
+            return null;
+        } catch (error) {
+            logger.error('[WireGuard Error] Failed to check IP ownership:', { error: error instanceof Error ? error.message : String(error) });
+            return null; // fail-open on read errors — the DB-level unique constraint is the primary guard
+        }
+    },
+
+    /**
      * Add a new peer to the WireGuard interface (wg0).
      *
      * CRIT-001 FIX: All arguments passed as array to execFile.
      * Preshared key written to a temp file to avoid any shell exposure,
      * then securely deleted after use.
      *
-     * @param publicKey    - Router's WireGuard public key (44-char Base64)
+     * WG-PEER-ID-001 FIX: Before assigning allowedIp to publicKey, verify no
+     * OTHER peer already holds that IP. Without this check, `wg set` would
+     * silently strip the IP from whichever peer had it, breaking that
+     * router's tunnel with zero error output — the exact "peer breaks peer"
+     * failure mode this fix closes.
+     *
+     * @param publicKey    - Router's WireGuard public key (44-char Base64) — this IS the peer's unique ID
      * @param allowedIp    - Router's assigned tunnel IP (without /32)
      * @param presharedKey - Optional preshared key for post-quantum hardening
      */
@@ -131,6 +168,18 @@ export const wireguardManager = {
         validateAllowedIp(allowedIp);
         if (presharedKey) {
             validateWgKey(presharedKey, 'presharedKey');
+        }
+
+        // WG-PEER-ID-001: refuse to steal an IP that already belongs to a
+        // different peer instead of silently breaking that peer's tunnel.
+        const conflictingPeer = await wireguardManager.findPeerHoldingIp(allowedIp, publicKey);
+        if (conflictingPeer) {
+            throw new Error(
+                `WireGuard IP ${allowedIp} is already assigned to a different peer ` +
+                `(publicKey ending in ...${conflictingPeer.slice(-8)}). Refusing to add peer ` +
+                `...${publicKey.slice(-8)} with the same IP — this would silently disconnect the ` +
+                `other router. Free the IP first or assign a different tunnel IP.`
+            );
         }
 
         let tmpFile: string | null = null;

@@ -275,9 +275,23 @@ model Router {
   wgPeerPublicKey  String?
   wgPresharedKey   String?
   wgPrivateKey     String?
-  wgPublicKey      String?
+  // WG-PEER-ID-001: wgPublicKey IS the WireGuard peer's identity — it is how
+  // the kernel (wg0 on the server) and the router BOTH identify this specific
+  // tunnel. It must be unique per router: two routers sharing a public key
+  // would collide into a single kernel peer entry.
+  wgPublicKey      String?                 @unique
   wgServerEndpoint String?
-  wgTunnelIp       String?                 @default("10.200.0.1")
+  // WG-PEER-ID-001: wgTunnelIp is the peer's allowed-ip on the server side.
+  // WireGuard enforces ONE peer per allowed-ip at the kernel level — assigning
+  // an IP already held by another peer silently STEALS it from that peer,
+  // breaking its tunnel with no error. This unique constraint makes that
+  // collision impossible to persist at the DB layer (Postgres allows multiple
+  // NULLs, so routers without a tunnel IP yet are unaffected).
+  // NOTE: static @default removed — it is unsafe together with @unique
+  // (every router created without an explicit tunnel IP would collide on the
+  // same default value). Tunnel IPs are now assigned exclusively by
+  // /api/routers/[id]/wireguard, which picks the next free address.
+  wgTunnelIp       String?                 @unique
   // ── Wireless configuration fields (optional, for AP-bridge mode) ───────────
   wlanEnabled      Boolean                 @default(false) // Enable wlan1 (2.4GHz) and wlan2 (5GHz)
   wlan1Ssid        String? // SSID for wlan1, defaults to "MikroTik-<MAC>"
