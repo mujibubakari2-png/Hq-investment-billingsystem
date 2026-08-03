@@ -228,7 +228,7 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
         // known-insecure legacy static default, instead of silently shipping
         // an empty/guessable value to the router.
         if (!radiusSecret || KNOWN_INSECURE_SECRETS.has(radiusSecret)) {
-            alert('RADIUS shared secret haipo au si salama. Tafadhali subiri ipakiwe kiotomatiki au weka secret yako kwenye Hatua 2.');
+            alert('RADIUS shared secret inakosekana. Tafadhali tumia kitufe cha "Auto-Push" ili mfumo uitengeneze na kuiweka kwenye router yako moja kwa moja.');
             return '';
         }
 

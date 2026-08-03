@@ -5,7 +5,8 @@ import { requirePermission } from "@/lib/rbac";
 import { canAccessTenant } from "@/lib/tenant";
 import { getMikroTikService, sanitizeMikroTikName } from "@/lib/mikrotik";
 import { wireguardManager } from "@/lib/wireguard";
-import { encryptRouterFields, decryptRouterFields } from "@/lib/encryption";
+import { encrypt, encryptRouterFields, decryptRouterFields } from "@/lib/encryption";
+import { generateRadiusSecret } from "@/lib/routerProvisioning";
 import { exec } from "child_process";
 import { promisify } from "util";
 import logger from "@/lib/logger";
@@ -33,6 +34,7 @@ async function getRouterWgFields(db: ReturnType<typeof getTenantClient>, routerI
             apiPort: true,
             password: true,
             username: true,
+            radiusSecret: true,
         },
     });
     return router ? decryptRouterFields(router) : null;
@@ -999,10 +1001,43 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                     }
                 } catch { }
 
+                // SEC-ROUTER-003 FIX: Use the router's dedicated radiusSecret.
+                // If missing (legacy router), generate one ONCE, persist it to the
+                // Router table AND RadiusNas table so it is never regenerated.
+                let currentRadiusSecret = router.radiusSecret as string | undefined;
+                if (!currentRadiusSecret) {
+                    currentRadiusSecret = generateRadiusSecret();
+                    logger.info(`[PUSH-CONFIG] Router ${id} had no radiusSecret — generated and persisting.`);
+                    // Save encrypted secret to Router table
+                    await updateRouterWgFields(db, id, { radiusSecret: encrypt(currentRadiusSecret) });
+                    // Save plaintext secret to RadiusNas table (FreeRADIUS reads it directly)
+                    const nasIp = tunnelIp || router.host;
+                    const existingNas = await db.radiusNas.findFirst({
+                        where: { tenantId: router.tenantId, nasName: nasIp }
+                    });
+                    if (existingNas) {
+                        await db.radiusNas.update({
+                            where: { id: existingNas.id },
+                            data: { secret: currentRadiusSecret }
+                        });
+                    } else {
+                        await db.radiusNas.create({
+                            data: {
+                                nasName: nasIp,
+                                shortName: router.name,
+                                secret: currentRadiusSecret,
+                                type: "other",
+                                tenantId: router.tenantId,
+                                description: "Auto-synced from push-config"
+                            }
+                        });
+                    }
+                }
+
                 try {
                     await service.apiRequestPublic("/radius", "PUT", {
                         address: wgServerIp,
-                        secret: process.env.RADIUS_NAS_SECRET || router.password || 'hqinvestment_radius_secret',
+                        secret: currentRadiusSecret,
                         service: "hotspot,ppp",
                         "authentication-port": "1812",
                         "accounting-port": "1813",
@@ -1086,9 +1121,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                     });
                 } catch (e: any) { if (!e.message?.includes("already")) logger.warn("Walled garden VPN note:", { error: e.message instanceof Error ? e.message.message : String(e.message) }); }
 
-                // Verification Step: Wait for tunnel to establish, then check real handshake
-                // We wait up to 15 seconds to allow Mikrotik to retry handshake if needed
-                await new Promise(resolve => setTimeout(resolve, 15000));
+                // Verification Step: Wait briefly for tunnel, then check real handshake.
+                // FIX-504: Reduced from 15s to 3s to prevent gateway timeout (504).
+                // Full verification happens in Step 6 of the wizard.
+                await new Promise(resolve => setTimeout(resolve, 3000));
                 const tunnelVerified = await wireguardManager.checkPeerHandshake(router.wgPublicKey);
 
                 // Update router state
