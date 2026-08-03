@@ -6,7 +6,7 @@ import { commerceNavigationItems } from '../config/ecommerceModules';
 import {
   LayoutDashboard, Users, FileText, CreditCard, Shield,
   Settings, LogOut, Menu, X, Zap, Receipt, BarChart3,
-  UserCog, Bell, Webhook, Server,
+  UserCog, Bell, Webhook, Server, Image, Star, MessageSquare,
 } from 'lucide-react';
 
 interface NavItem {
@@ -26,6 +26,15 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/plans', icon: <CreditCard size={16} />, label: 'SaaS Plans' },
   { to: '/reports', icon: <BarChart3 size={16} />, label: 'Reports' },
   ...commerceNavigationItems,
+  // CMS
+  { section: 'CMS & Storefront', to: '/cms/banners', icon: <Image size={16} />, label: 'Banners' },
+  { to: '/cms/testimonials', icon: <Star size={16} />, label: 'Testimonials' },
+  { to: '/cms/faqs', icon: <FileText size={16} />, label: 'FAQs' },
+  { to: '/cms/subscribers', icon: <Users size={16} />, label: 'Subscribers' },
+  { to: '/cms/blogs', icon: <FileText size={16} />, label: 'Blog Posts' },
+  { to: '/cms/pages', icon: <FileText size={16} />, label: 'Custom Pages' },
+  { to: '/cms/contacts', icon: <MessageSquare size={16} />, label: 'Inquiries' },
+  { to: '/cms/storefront-settings', icon: <Settings size={16} />, label: 'Store Settings' },
   // Communications
   { section: 'Communications', to: '/notifications', icon: <Bell size={16} />, label: 'Notifications' },
   // System
@@ -60,6 +69,14 @@ function getPageTitle(pathname: string): { name: string; breadcrumb: string } {
     '/audit-logs': { name: 'Audit Logs', breadcrumb: 'System / Security' },
     '/system': { name: 'System Health', breadcrumb: 'System / Health' },
     '/settings': { name: 'Platform Settings', breadcrumb: 'System / Settings' },
+    '/cms/banners': { name: 'Banners', breadcrumb: 'CMS / Banners' },
+    '/cms/testimonials': { name: 'Testimonials', breadcrumb: 'CMS / Testimonials' },
+    '/cms/faqs': { name: 'FAQs', breadcrumb: 'CMS / FAQs' },
+    '/cms/subscribers': { name: 'Newsletter Subscribers', breadcrumb: 'CMS / Subscribers' },
+    '/cms/blogs': { name: 'Blog Posts', breadcrumb: 'CMS / Blog Posts' },
+    '/cms/pages': { name: 'Custom Pages', breadcrumb: 'CMS / Custom Pages' },
+    '/cms/contacts': { name: 'Contact Inquiries', breadcrumb: 'CMS / Inquiries' },
+    '/cms/storefront-settings': { name: 'Storefront Settings', breadcrumb: 'CMS / Settings' },
   };
   const key = Object.keys(map).find(k => pathname.startsWith(k) && (k === pathname || pathname[k.length] === '/')) ?? '/dashboard';
   return map[key] ?? { name: 'Super Admin', breadcrumb: 'Dashboard' };

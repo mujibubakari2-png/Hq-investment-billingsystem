@@ -2,11 +2,10 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowRight, Banknote, Gift, ShieldCheck, Sparkles } from "lucide-react";
+import { ArrowRight, Gift, ShieldCheck, Sparkles } from "lucide-react";
 import {
   landingBuyingGuides,
   landingExperienceCards,
-  landingPaymentMethods,
   landingPriceBands,
   landingSocialPosts,
   landingStyleCollections,
@@ -20,7 +19,6 @@ export default function CommerceExperience() {
   const MobileAppIcon = landingExperienceCards.mobileApp.icon;
   const LocationsIcon = landingExperienceCards.locations.icon;
   const GuidesIcon = landingExperienceCards.guides.icon;
-  const CertificationIcon = landingExperienceCards.certification.icon;
   const DiscoveryIcon = landingExperienceCards.discovery.icon;
 
   return (
@@ -70,27 +68,6 @@ export default function CommerceExperience() {
               ))}
             </div>
           </div>
-
-          <div className="mt-8 rounded-3xl border border-slate-200 bg-slate-50 p-5 md:p-6">
-            <div className="flex flex-col lg:flex-row lg:items-center gap-5">
-              <div className="flex items-center gap-3 min-w-fit">
-                <div className="w-11 h-11 rounded-xl bg-white text-primary flex items-center justify-center shadow-sm">
-                  <Banknote size={20} />
-                </div>
-                <div>
-                  <h3 className="font-bold text-slate-950">Supported payment methods</h3>
-                  <p className="text-sm text-slate-500">Ready for local and international checkout flows.</p>
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-2 lg:ml-auto">
-                {landingPaymentMethods.map((method) => (
-                  <span key={method} className="rounded-full bg-white border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700">
-                    {method}
-                  </span>
-                ))}
-              </div>
-            </div>
-          </div>
         </div>
       </section>
 
@@ -136,11 +113,11 @@ export default function CommerceExperience() {
               <div className="flex flex-wrap gap-3">
                 {landingStyleCollections.map((style) => (
                   <Link
-                    key={style}
-                    href={`/products?style=${style.toLowerCase()}`}
+                    key={style.label}
+                    href={style.href}
                     className="rounded-full bg-white/10 border border-white/10 px-4 py-2 text-sm font-bold hover:bg-white hover:text-slate-950 transition-all"
                   >
-                    {style}
+                    {style.label}
                   </Link>
                 ))}
               </div>
@@ -219,13 +196,6 @@ export default function CommerceExperience() {
                     </Link>
                   ))}
                 </div>
-              </div>
-              <div className="rounded-3xl border border-slate-200 bg-slate-950 p-6 text-white">
-                <div className="flex items-center gap-3">
-                  <CertificationIcon size={20} className="text-cyan-300" />
-                  <span className="font-bold">Certifications and enterprise readiness</span>
-                </div>
-                <p className="text-sm text-white/55 mt-2">SSL, secure checkout, audit logs, analytics pixels, SEO schemas, and campaign scheduling are represented in the storefront architecture.</p>
               </div>
             </div>
           </div>

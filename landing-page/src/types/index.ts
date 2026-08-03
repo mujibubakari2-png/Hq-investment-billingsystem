@@ -161,6 +161,7 @@ export interface ProductFilters {
   minRating?: number;
   inStock?: boolean;
   search?: string;
+  brand?: string;
   sort?: "latest" | "popular" | "discount" | "price-asc" | "price-desc";
   featured?: boolean;
   trending?: boolean;

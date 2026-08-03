@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { ArrowRight, BadgePercent, Gem, Timer } from "lucide-react";
-import { landingCollections, landingDealProducts, landingOperations } from "@/config/landing";
+import { landingCollections, landingDealProducts } from "@/config/landing";
 
 export default function CommerceHighlights() {
   return (
@@ -121,21 +121,6 @@ export default function CommerceHighlights() {
         </div>
       </section>
 
-      <section className="py-16 bg-slate-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-            {landingOperations.map(({ icon: Icon, ...item }) => (
-              <div key={item.title} className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-                <div className="w-11 h-11 rounded-xl bg-blue-50 text-primary flex items-center justify-center mb-4">
-                  <Icon size={20} />
-                </div>
-                <h3 className="font-bold text-slate-950">{item.title}</h3>
-                <p className="text-sm text-slate-500 mt-2">{item.text}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
     </>
   );
 }

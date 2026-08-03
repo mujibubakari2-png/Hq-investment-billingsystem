@@ -2,20 +2,14 @@ import {
   BadgeCheck,
   Banknote,
   BookOpen,
-  Boxes,
-  Building2,
   CheckCircle2,
   ClipboardCheck,
   CreditCard,
-  Gift,
   Globe2,
   HeartHandshake,
-  LineChart,
   MapPin,
   PackageCheck,
   QrCode,
-  RotateCcw,
-  ShieldCheck,
   Smartphone,
   Star,
   Store,
@@ -69,25 +63,25 @@ export const landingCollections: LandingCollection[] = [
   {
     name: "Electronics",
     detail: "Phones, laptops, audio, and smart devices",
-    href: "/products?collection=electronics",
+    href: "/products?category=electronics",
     accent: "from-blue-500 to-cyan-400",
   },
   {
     name: "Fashion",
     detail: "Daily fits, premium sneakers, watches, and bags",
-    href: "/products?collection=fashion",
+    href: "/products?category=fashion",
     accent: "from-rose-500 to-orange-400",
   },
   {
     name: "Home & Living",
     detail: "Appliances, decor, kitchen, and workspace upgrades",
-    href: "/products?collection=home",
+    href: "/products?category=home-living",
     accent: "from-emerald-500 to-teal-400",
   },
   {
     name: "Luxury Picks",
     detail: "Curated high-value products from trusted sellers",
-    href: "/products?collection=luxury",
+    href: "/products?minPrice=1000000&sort=price-desc",
     accent: "from-violet-500 to-fuchsia-400",
   },
 ];
@@ -96,13 +90,6 @@ export const landingDealProducts: LandingDealProduct[] = [
   { name: "Samsung Galaxy A55", price: "TZS 750,000", oldPrice: "TZS 890,000", stock: 72 },
   { name: "HP EliteBook Core i7", price: "TZS 1,450,000", oldPrice: "TZS 1,720,000", stock: 38 },
   { name: "Nike Air Max", price: "TZS 165,000", oldPrice: "TZS 220,000", stock: 54 },
-];
-
-export const landingOperations: LandingIconBlock[] = [
-  { icon: Boxes, title: "Inventory-ready", text: "Stock states, warehouses, SKU control, and low-stock signals." },
-  { icon: Gift, title: "Campaign-ready", text: "Banners, flash sales, coupons, collections, and dynamic promos." },
-  { icon: ShieldCheck, title: "Trust-first checkout", text: "Secure payments, audit-friendly flows, returns, and order tracking." },
-  { icon: Truck, title: "Delivery focused", text: "Shipping methods, delivery estimates, pickup options, and courier support." },
 ];
 
 export const landingTrustMetrics: LandingMetric[] = [
@@ -119,31 +106,20 @@ export const landingTrustBlocks: LandingIconBlock[] = [
   { icon: HeartHandshake, title: "After-sale support", text: "Live chat, support center, product Q&A, and customer account notifications." },
 ];
 
-export const landingPaymentMethods = [
-  "Visa",
-  "Mastercard",
-  "PayPal",
-  "Apple Pay",
-  "Google Pay",
-  "Mobile Money",
-  "Bank Transfer",
-  "Cash on Delivery",
-];
-
 export const landingPriceBands = [
-  { name: "Budget", detail: "Smart picks under everyday budgets", href: "/products?maxPrice=100000" },
-  { name: "Standard", detail: "Balanced quality and price", href: "/products?minPrice=100000&maxPrice=500000" },
-  { name: "Premium", detail: "Higher-end products and warranties", href: "/products?minPrice=500000" },
-  { name: "Luxury", detail: "Curated statement pieces", href: "/products?collection=luxury" },
+  { name: "Budget", detail: "Smart picks under TZS 50,000", href: "/products?maxPrice=50000" },
+  { name: "Standard", detail: "Quality picks TZS 50k–300k", href: "/products?minPrice=50000&maxPrice=300000" },
+  { name: "Premium", detail: "Higher-end TZS 300k–1M", href: "/products?minPrice=300000&maxPrice=1000000" },
+  { name: "Luxury", detail: "Statement pieces above TZS 1M", href: "/products?minPrice=1000000&sort=price-desc" },
 ];
 
 export const landingStyleCollections = [
-  "Office",
-  "Outdoor",
-  "Travel",
-  "Gaming",
-  "Minimalist",
-  "Luxury",
+  { label: "Office", href: "/products?search=office" },
+  { label: "Outdoor", href: "/products?search=outdoor" },
+  { label: "Travel", href: "/products?search=travel" },
+  { label: "Gaming", href: "/products?search=gaming" },
+  { label: "Minimalist", href: "/products?search=minimalist" },
+  { label: "Luxury", href: "/products?minPrice=1000000&sort=price-desc" },
 ];
 
 export const landingSocialPosts = [
@@ -163,7 +139,6 @@ export const landingExperienceCards = {
   mobileApp: { icon: QrCode, title: "Mobile app ready" },
   locations: { icon: MapPin, title: "Store locations and partners" },
   guides: { icon: BookOpen, title: "Buying guides" },
-  certification: { icon: Building2, title: "Certifications and enterprise readiness" },
   discovery: { icon: Store, title: "Shop by lifestyle" },
   social: { icon: Smartphone, title: "Social commerce" },
   checklist: CheckCircle2,
@@ -207,11 +182,3 @@ export const landingAdminControlAreas: LandingControlArea[] = [
   { title: "Growth and analytics", text: "Product impressions, cart events, checkout starts, conversion funnels, pixels, and reporting exports.", status: "Configurable" },
 ];
 
-export const landingServicePromises: LandingIconBlock[] = [
-  { icon: ShieldCheck, title: "Secure payments", text: "Encrypted checkout, duplicate payment prevention architecture, and provider webhooks." },
-  { icon: Truck, title: "Delivery clarity", text: "Delivery estimates, pickup options, order status messaging, and courier-ready workflows." },
-  { icon: RotateCcw, title: "Returns ready", text: "Refund, warranty, replacement, and customer support paths are visible before checkout." },
-  { icon: UserRound, title: "Customer account", text: "Saved carts, order history, wishlist, reviews, notifications, and future loyalty hooks." },
-  { icon: LineChart, title: "Behavior analytics", text: "Views, clicks, add-to-cart, removals, search terms, and checkout conversion events." },
-  { icon: BadgeCheck, title: "Verified trust", text: "Ratings, verified products, secure badges, payment partners, and policy content." },
-];

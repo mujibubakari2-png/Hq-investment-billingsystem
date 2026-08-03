@@ -31,6 +31,7 @@ function ProductsInner() {
 
     return {
       category: params.get("category") ?? undefined,
+      brand: params.get("brand") ?? undefined,
       search: params.get("search") ?? undefined,
       minPrice: params.get("minPrice") ? Number(params.get("minPrice")) : undefined,
       maxPrice: params.get("maxPrice") ? Number(params.get("maxPrice")) : undefined,
@@ -74,6 +75,7 @@ function ProductsInner() {
     try {
       const params = buildQueryString({
         ...(filters.category && { category: filters.category }),
+        ...(filters.brand && { brand: filters.brand }),
         ...(filters.search && { search: filters.search }),
         ...(filters.minPrice !== undefined && { minPrice: filters.minPrice }),
         ...(filters.maxPrice !== undefined && { maxPrice: filters.maxPrice }),
@@ -116,12 +118,40 @@ function ProductsInner() {
     fetch("/api/public/categories")
       .then((response) => response.json())
       .then((data) => setCategories(data.data ?? []))
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   const searchQuery = filters.search;
   const currentPage = filters.page ?? 1;
-  const currentCategoryName = categories.find((category) => category.slug === filters.category)?.name;
+  const currentCategoryName = categories.find((cat) => cat.slug === filters.category)?.name;
+
+  const activeBrandName = filters.brand
+    ? filters.brand.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+    : null;
+
+  // Human-readable price range label
+  const priceRangeLabel = (() => {
+    const min = filters.minPrice;
+    const max = filters.maxPrice;
+    if (!min && max === 50000) return "Budget (under TZS 50k)";
+    if (min === 50000 && max === 300000) return "Standard (TZS 50k–300k)";
+    if (min === 300000 && max === 1000000) return "Premium (TZS 300k–1M)";
+    if (min === 1000000 && !max) return "Luxury (above TZS 1M)";
+    if (min || max) return `Price: ${min ? `from TZS ${min.toLocaleString()}` : ""} ${max ? `to TZS ${max.toLocaleString()}` : ""}`;
+    return null;
+  })();
+
+  const pageTitle = searchQuery
+    ? `Results for "${searchQuery}"`
+    : activeBrandName
+      ? `${activeBrandName} Products`
+      : currentCategoryName
+        ? `${currentCategoryName}`
+        : priceRangeLabel
+          ? priceRangeLabel
+          : "All Products";
+
+  const hasActiveFilters = !!(activeBrandName || filters.category || priceRangeLabel || searchQuery);
 
   return (
     <>
@@ -130,11 +160,75 @@ function ProductsInner() {
         <div className="bg-white border-b border-slate-100">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             <h1 className="font-display font-extrabold text-3xl text-slate-900 mb-1">
-              {searchQuery ? `Results for "${searchQuery}"` : currentCategoryName ?? "All Products"}
+              {pageTitle}
             </h1>
             <p className="text-slate-500 text-sm">
               {loading ? "Loading..." : `${total.toLocaleString()} product${total !== 1 ? "s" : ""} found`}
             </p>
+
+            {/* Active filter badges */}
+            {hasActiveFilters && (
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                {activeBrandName && (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-sm font-semibold">
+                    Brand: {activeBrandName}
+                    <button
+                      onClick={() => updateFilters({ brand: undefined })}
+                      className="ml-1 w-4 h-4 rounded-full bg-blue-200 hover:bg-blue-300 flex items-center justify-center transition-colors"
+                      aria-label={`Remove ${activeBrandName} brand filter`}
+                    >
+                      <span aria-hidden="true" className="text-[10px] leading-none font-black">✕</span>
+                    </button>
+                  </span>
+                )}
+
+                {filters.category && (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm font-semibold">
+                    {currentCategoryName ?? filters.category}
+                    <button
+                      onClick={() => updateFilters({ category: undefined })}
+                      className="ml-1 w-4 h-4 rounded-full bg-emerald-200 hover:bg-emerald-300 flex items-center justify-center transition-colors"
+                      aria-label="Remove category filter"
+                    >
+                      <span aria-hidden="true" className="text-[10px] leading-none font-black">✕</span>
+                    </button>
+                  </span>
+                )}
+
+                {priceRangeLabel && (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-50 border border-amber-200 text-amber-700 text-sm font-semibold">
+                    {priceRangeLabel}
+                    <button
+                      onClick={() => updateFilters({ minPrice: undefined, maxPrice: undefined })}
+                      className="ml-1 w-4 h-4 rounded-full bg-amber-200 hover:bg-amber-300 flex items-center justify-center transition-colors"
+                      aria-label="Remove price filter"
+                    >
+                      <span aria-hidden="true" className="text-[10px] leading-none font-black">✕</span>
+                    </button>
+                  </span>
+                )}
+
+                {searchQuery && (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-violet-50 border border-violet-200 text-violet-700 text-sm font-semibold">
+                    &quot;{searchQuery}&quot;
+                    <button
+                      onClick={() => updateFilters({ search: undefined })}
+                      className="ml-1 w-4 h-4 rounded-full bg-violet-200 hover:bg-violet-300 flex items-center justify-center transition-colors"
+                      aria-label="Remove search filter"
+                    >
+                      <span aria-hidden="true" className="text-[10px] leading-none font-black">✕</span>
+                    </button>
+                  </span>
+                )}
+
+                <button
+                  onClick={() => router.push("/products")}
+                  className="text-sm text-slate-400 hover:text-rose-500 transition-colors font-semibold"
+                >
+                  Clear all
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -196,11 +290,10 @@ function ProductsInner() {
                             key={page}
                             onClick={() => setPage(page)}
                             aria-current={isActive ? "page" : undefined}
-                            className={`w-10 h-10 rounded-xl text-sm font-bold transition-all ${
-                              isActive
+                            className={`w-10 h-10 rounded-xl text-sm font-bold transition-all ${isActive
                                 ? "text-white shadow-md"
                                 : "border border-slate-200 text-slate-600 hover:border-primary hover:text-primary"
-                            }`}
+                              }`}
                             style={isActive ? { background: "var(--gradient-primary)" } : {}}
                           >
                             {page}

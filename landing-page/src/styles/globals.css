@@ -595,3 +595,98 @@ body {
   overflow-y: auto;
   position: relative;
 }
+
+/* ─── bg-primary/8 helper (Tailwind opacity shorthand not always JIT'd) ── */
+.bg-primary\/8 {
+  background-color: rgba(30, 58, 138, 0.08);
+}
+
+/* ─── Dark Mode: Testimonial Cards ───────────────────────────────── */
+html[data-theme="dark"] .testimonial-card {
+  background: #0f172a;
+  border-color: rgba(148, 163, 184, 0.15);
+}
+
+/* ─── Dark Mode: Accordion ──────────────────────────────────────── */
+html[data-theme="dark"] .accordion-item {
+  background: #0f172a;
+  border-color: rgba(148, 163, 184, 0.15);
+}
+html[data-theme="dark"] .accordion-trigger {
+  color: #f8fafc;
+}
+html[data-theme="dark"] .accordion-trigger:hover {
+  background: #111827;
+}
+html[data-theme="dark"] .accordion-content {
+  color: #94a3b8;
+}
+
+/* ─── Dark Mode: Filter Section ─────────────────────────────────── */
+html[data-theme="dark"] .filter-section {
+  background: #0f172a;
+  border-color: rgba(148, 163, 184, 0.15);
+}
+
+/* ─── Dark Mode: Cards ──────────────────────────────────────────── */
+html[data-theme="dark"] .card {
+  background: #0f172a;
+  border-color: rgba(148, 163, 184, 0.15);
+}
+html[data-theme="dark"] .card-product {
+  background: #0f172a;
+  border-color: rgba(148, 163, 184, 0.15);
+}
+
+/* ─── Dark Mode: Modal ──────────────────────────────────────────── */
+html[data-theme="dark"] .modal-box {
+  background: #0f172a;
+}
+
+/* ─── Dark Mode: Cart Drawer ────────────────────────────────────── */
+html[data-theme="dark"] .cart-drawer {
+  background: #0f172a;
+}
+
+/* ─── Dark Mode: Search Suggestions ────────────────────────────── */
+html[data-theme="dark"] .search-suggestions {
+  background: #0f172a;
+  border-color: rgba(148, 163, 184, 0.15);
+}
+
+/* ─── Skeleton dark mode ────────────────────────────────────────── */
+html[data-theme="dark"] .skeleton {
+  background: linear-gradient(90deg, #1e293b 25%, #334155 50%, #1e293b 75%);
+  background-size: 400% 100%;
+  animation: skeleton-wave 1.5s ease-in-out infinite;
+}
+
+/* ─── Brand Carousel Infinite Scroll ───────────────────────────── */
+@keyframes brand-scroll {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+/* ─── Accessibility: Reduced Motion ────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ─── Focus Visible ─────────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--secondary);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* ─── Print ─────────────────────────────────────────────────────── */
+@media print {
+  nav, footer, .cart-drawer, .cart-overlay, [data-floating] {
+    display: none !important;
+  }
+}
+

@@ -50,7 +50,7 @@ export default function Categories() {
     fetch("/api/public/categories")
       .then((r) => r.json())
       .then((d) => setCategories(d.data ?? []))
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setLoading(false));
   }, []);
 
@@ -92,78 +92,78 @@ export default function Categories() {
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-4 gap-4">
           {loading
             ? Array.from({ length: 8 }).map((_, i) => (
-                <CategorySkeleton key={i} />
-              ))
+              <CategorySkeleton key={i} />
+            ))
             : categories.slice(0, 8).map((cat, i) => (
-                <motion.div
-                  key={cat.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.4, delay: i * 0.07 }}
-                >
-                  <Link href={`/products?category=${cat.slug}`} aria-label={cat.name}>
-                    <div
-                      className="relative overflow-hidden rounded-2xl cursor-pointer group"
-                      style={{ aspectRatio: "3/4" }}
-                    >
-                      {/* Background */}
-                      {cat.image ? (
-                        <Image
-                          src={cat.image}
-                          alt={cat.name}
-                          fill
-                          className="object-cover transition-transform duration-500 group-hover:scale-110"
-                          sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-                        />
-                      ) : (
-                        <div
-                          className="absolute inset-0"
-                          style={{ background: BG_GRADIENTS[i % BG_GRADIENTS.length] }}
-                        />
-                      )}
+              <motion.div
+                key={cat.id}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.4, delay: i * 0.07 }}
+              >
+                <Link href={`/products?category=${cat.slug}`} aria-label={cat.name}>
+                  <div
+                    className="relative overflow-hidden rounded-2xl cursor-pointer group"
+                    style={{ aspectRatio: "3/4" }}
+                  >
+                    {/* Background */}
+                    {cat.image ? (
+                      <Image
+                        src={cat.image}
+                        alt={cat.name}
+                        fill
+                        className="object-cover transition-transform duration-500 group-hover:scale-110"
+                        sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                      />
+                    ) : (
+                      <div
+                        className="absolute inset-0"
+                        style={{ background: BG_GRADIENTS[i % BG_GRADIENTS.length] }}
+                      />
+                    )}
 
-                      {/* Overlay */}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent transition-opacity duration-300 group-hover:from-black/90" />
+                    {/* Overlay */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent transition-opacity duration-300 group-hover:from-black/90" />
 
-                      {/* Content */}
-                      <div className="absolute inset-0 flex flex-col items-center justify-end p-4 pb-5">
-                        <div
-                          className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl mb-3 shadow-lg transition-transform duration-300 group-hover:scale-110 group-hover:-translate-y-1"
-                          style={{ background: "rgba(255,255,255,0.15)", backdropFilter: "blur(8px)" }}
-                        >
-                          {getIcon(cat)}
-                        </div>
-                        <h3 className="text-white font-bold text-sm text-center leading-tight mb-1.5">
-                          {cat.name}
-                        </h3>
-                        {cat._count && (
-                          <span
-                            className="text-xs font-semibold px-3 py-1 rounded-full"
-                            style={{
-                              background: "rgba(255,255,255,0.2)",
-                              color: "white",
-                              backdropFilter: "blur(8px)",
-                            }}
-                          >
-                            {cat._count.products} items
-                          </span>
-                        )}
+                    {/* Content */}
+                    <div className="absolute inset-0 flex flex-col items-center justify-end p-4 pb-5">
+                      <div
+                        className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl mb-3 shadow-lg transition-transform duration-300 group-hover:scale-110 group-hover:-translate-y-1"
+                        style={{ background: "rgba(255,255,255,0.15)", backdropFilter: "blur(8px)" }}
+                      >
+                        {getIcon(cat)}
                       </div>
-
-                      {/* Hover badge */}
-                      <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                        <div
-                          className="px-2.5 py-1 rounded-full text-xs font-bold text-white"
-                          style={{ background: "var(--gradient-accent)" }}
+                      <h3 className="text-white font-bold text-sm text-center leading-tight mb-1.5">
+                        {cat.name}
+                      </h3>
+                      {cat._count && (
+                        <span
+                          className="text-xs font-semibold px-3 py-1 rounded-full"
+                          style={{
+                            background: "rgba(255,255,255,0.2)",
+                            color: "white",
+                            backdropFilter: "blur(8px)",
+                          }}
                         >
-                          Shop →
-                        </div>
+                          {cat._count.products} items
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Hover badge */}
+                    <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                      <div
+                        className="px-2.5 py-1 rounded-full text-xs font-bold text-white"
+                        style={{ background: "var(--gradient-accent)" }}
+                      >
+                        Shop →
                       </div>
                     </div>
-                  </Link>
-                </motion.div>
-              ))}
+                  </div>
+                </Link>
+              </motion.div>
+            ))}
         </div>
 
         {/* Mobile view all */}

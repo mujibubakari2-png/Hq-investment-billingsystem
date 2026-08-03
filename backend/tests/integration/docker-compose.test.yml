@@ -1,0 +1,53 @@
+version: "3.8"
+
+# ENTERPRISE-016: Carrier-Grade Integration Test Lab
+# Bootstraps a full MikroTik CHR alongside Redis and Postgres for E2E testing.
+# Supports testing against the official MikroTik CHR image.
+
+services:
+  # ── PostgreSQL Database ──────────────────────────────────────────────────────
+  test-db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: testuser
+      POSTGRES_PASSWORD: testpassword
+      POSTGRES_DB: hqinvestment_test
+    ports:
+      - "5433:5432" # Exposed on 5433 to avoid port conflict with dev DB
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U testuser -d hqinvestment_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ── Redis Cache / Queue ──────────────────────────────────────────────────────
+  test-redis:
+    image: redis:7-alpine
+    ports:
+      - "6380:6379" # Exposed on 6380 to avoid port conflict with dev Redis
+
+  # ── MikroTik CHR (Cloud Hosted Router) ───────────────────────────────────────
+  # Official or community MikroTik CHR image for integration testing
+  test-mikrotik-v7:
+    image: evilfreelancer/docker-routeros:latest
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+    environment:
+      - ROUTEROS_VERSION=7.15.2
+    ports:
+      - "8729:8728" # API
+      - "8081:80"   # WebFig / REST API
+      - "2223:22"   # SSH
+      - "1813:1812/udp" # RADIUS
+    volumes:
+      - mikrotik_data:/routeros
+    healthcheck:
+      # Wait for the API port to be listening
+      test: ["CMD-SHELL", "nc -z localhost 8728 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  mikrotik_data:

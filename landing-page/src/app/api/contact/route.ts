@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readDb, writeDb } from "@/lib/db";
+import { prisma } from "@/lib/prisma";
 import { isValidEmail, normalizeEmail, publicApiError } from "@/lib/publicApi";
 
 export async function POST(req: NextRequest) {
@@ -16,15 +16,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const db = await readDb();
-    db.contacts.push({
-      id: Date.now().toString(),
-      name,
-      email,
-      message,
-      createdAt: new Date().toISOString(),
+    await prisma.contactMessage.create({
+      data: { name, email, message },
     });
-    await writeDb(db);
 
     return NextResponse.json({ success: true, message: "Message sent successfully" });
   } catch (error: unknown) {

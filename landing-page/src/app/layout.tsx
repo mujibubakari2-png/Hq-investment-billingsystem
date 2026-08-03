@@ -5,6 +5,7 @@ import { CommerceProvider } from "@/lib/commerce";
 import { ToastProvider } from "@/components/ui/Toast";
 import CartDrawer from "@/components/cart/CartDrawer";
 import { GlobalPopup } from "@/components/GlobalPopup/GlobalPopup";
+import FloatingActions from "@/components/FloatingActions";
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "https://hqinvestment.co.tz"),
@@ -57,13 +58,14 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       </head>
-      <body className="antialiased font-sans">
+      <body className="antialiased font-sans overflow-x-hidden">
         <ToastProvider>
           <CommerceProvider>
             <CartProvider>
               {children}
               <CartDrawer />
               <GlobalPopup />
+              <FloatingActions />
             </CartProvider>
           </CommerceProvider>
         </ToastProvider>

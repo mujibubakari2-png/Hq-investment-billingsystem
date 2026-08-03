@@ -14,11 +14,11 @@ interface ModalProps {
 }
 
 const sizeMap = {
-  sm: "max-w-md",
-  md: "max-w-xl",
-  lg: "max-w-3xl",
-  xl: "max-w-5xl",
-  full: "max-w-[95vw]",
+  sm: "max-w-[min(92vw,24rem)]",
+  md: "max-w-[min(92vw,36rem)]",
+  lg: "max-w-[min(92vw,42rem)]",
+  xl: "max-w-[min(92vw,56rem)]",
+  full: "max-w-[min(96vw,96vw)]",
 };
 
 export default function Modal({
@@ -26,7 +26,7 @@ export default function Modal({
   onClose,
   children,
   title,
-  size = "lg",
+  size = "md",
   className,
 }: ModalProps) {
   const handleKey = useCallback(
@@ -69,12 +69,12 @@ export default function Modal({
             aria-modal="true"
             aria-label={title}
             className={cn(
-              "fixed inset-0 z-[1001] flex items-center justify-center p-4 pointer-events-none"
+              "fixed inset-0 z-[1001] flex items-center justify-center p-2 sm:p-4 pointer-events-none"
             )}
           >
             <div
               className={cn(
-                "modal-box pointer-events-auto w-full",
+                "modal-box pointer-events-auto w-full max-h-[90dvh] overflow-y-auto rounded-2xl bg-white shadow-2xl",
                 sizeMap[size],
                 className
               )}
@@ -82,7 +82,7 @@ export default function Modal({
             >
               {/* Header */}
               {title && (
-                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+                <div className="flex items-center justify-between px-4 py-3 sm:px-6 sm:py-4 border-b border-slate-100">
                   <h2 className="text-lg font-bold text-slate-900">{title}</h2>
                   <button
                     onClick={onClose}

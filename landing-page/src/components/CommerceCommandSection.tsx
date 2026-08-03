@@ -6,7 +6,6 @@ import { ArrowRight, CheckCircle2, ShieldCheck } from "lucide-react";
 import {
   landingAdminControlAreas,
   landingJourneySteps,
-  landingServicePromises,
 } from "@/config/landing";
 
 const statusClass = {
@@ -84,15 +83,6 @@ export default function CommerceCommandSection() {
           </div>
         </div>
 
-        <div className="mt-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {landingServicePromises.map(({ icon: Icon, title, text }) => (
-            <div key={title} className="rounded-2xl bg-white/[0.06] border border-white/10 p-5">
-              <Icon size={20} className="text-cyan-200" />
-              <h3 className="font-bold mt-4">{title}</h3>
-              <p className="text-sm text-white/55 leading-relaxed mt-2">{text}</p>
-            </div>
-          ))}
-        </div>
       </div>
     </section>
   );

@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import Link from "next/link";
+import { useState, useEffect } from "react";
 import {
   ArrowRight,
   BadgeCheck,
@@ -16,28 +17,56 @@ import {
   Star,
   Truck,
   Zap,
+  HelpCircle,
 } from "lucide-react";
 
-const floatingCards = [
-  { icon: Smartphone, label: "Smartphones", price: "TZS 450,000", color: "#3b82f6", delay: 0 },
-  { icon: Laptop, label: "Laptops", price: "TZS 1,200,000", color: "#10b981", delay: 0.5 },
-  { icon: Headphones, label: "Electronics", price: "TZS 85,000", color: "#f59e0b", delay: 1 },
-  { icon: Shirt, label: "Fashion", price: "TZS 35,000", color: "#8b5cf6", delay: 1.5 },
+const ICON_MAP: Record<string, any> = {
+  Smartphone, Laptop, Headphones, Shirt, Zap, Shield, Star, Truck, BadgeCheck, PackageCheck
+};
+
+const defaultFloatingCards = [
+  { icon: "Smartphone", label: "Smartphones", price: "TZS 450,000", color: "#3b82f6", delay: 0 },
+  { icon: "Laptop", label: "Laptops", price: "TZS 1,200,000", color: "#10b981", delay: 0.5 },
+  { icon: "Headphones", label: "Electronics", price: "TZS 85,000", color: "#f59e0b", delay: 1 },
+  { icon: "Shirt", label: "Fashion", price: "TZS 35,000", color: "#8b5cf6", delay: 1.5 },
 ];
 
-const featureChips = [
-  { icon: <Zap size={14} />, text: "Fast Delivery" },
-  { icon: <Shield size={14} />, text: "Secure Payments" },
-  { icon: <Star size={14} />, text: "Top Quality" },
+const defaultFeatureChips = [
+  { icon: "Zap", title: "Fast Delivery" },
+  { icon: "Shield", title: "Secure Payments" },
+  { icon: "Star", title: "Top Quality" },
 ];
 
-const trustItems = [
-  { icon: <Truck size={18} />, title: "Same-day dispatch", text: "Dar es Salaam ready" },
-  { icon: <BadgeCheck size={18} />, title: "Verified sellers", text: "Quality controlled" },
-  { icon: <PackageCheck size={18} />, title: "Easy returns", text: "Buyer protection" },
+const defaultTrustItems = [
+  { icon: "Truck", title: "Same-day dispatch", text: "Dar es Salaam ready" },
+  { icon: "BadgeCheck", title: "Verified sellers", text: "Quality controlled" },
+  { icon: "PackageCheck", title: "Easy returns", text: "Buyer protection" },
 ];
 
 export default function Hero() {
+  const [config, setConfig] = useState<any>(null);
+  const [features, setFeatures] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetch("/api/public/storefront/settings")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data?.data) {
+          if (data.data.HERO_CONFIG) setConfig(data.data.HERO_CONFIG);
+          if (data.data.STORE_FEATURES) setFeatures(data.data.STORE_FEATURES);
+        }
+      })
+      .catch(console.error);
+  }, []);
+
+  const badgeText = config?.badgeText || "Premium Marketplace for East Africa";
+  const title = config?.title || "Premium shopping.";
+  const subtitle = config?.subtitle || "Real products.";
+
+  const floatingCards = config?.floatingCards?.length ? config.floatingCards : defaultFloatingCards;
+  const trustItems = config?.trustItems?.length ? config.trustItems : defaultTrustItems;
+  const featureChips = features?.length ? features : defaultFeatureChips;
+
   return (
     <section className="relative min-h-screen flex items-center overflow-hidden pt-20">
       <div
@@ -89,7 +118,7 @@ export default function Hero() {
             >
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
               <span className="text-sm font-semibold text-white/90">
-                Premium Marketplace for East Africa
+                {badgeText}
               </span>
             </motion.div>
 
@@ -99,7 +128,7 @@ export default function Hero() {
               transition={{ duration: 0.6, delay: 0.1 }}
               className="font-display text-4xl md:text-5xl xl:text-6xl font-extrabold text-white leading-[1.1] mb-6"
             >
-              Premium shopping.{" "}
+              {title}{" "}
               <span className="relative">
                 <span
                   className="relative z-10"
@@ -110,7 +139,7 @@ export default function Hero() {
                     backgroundClip: "text",
                   }}
                 >
-                  Real products.
+                  {subtitle}
                 </span>
                 <motion.span
                   className="absolute -bottom-1 left-0 h-1 rounded-full"
@@ -140,15 +169,18 @@ export default function Hero() {
               transition={{ duration: 0.5, delay: 0.35 }}
               className="flex flex-wrap gap-3 justify-center lg:justify-start mb-10"
             >
-              {featureChips.map((chip) => (
-                <div
-                  key={chip.text}
-                  className="flex items-center gap-2 px-4 py-2 rounded-full glass text-sm text-white/80 font-medium"
-                >
-                  {chip.icon}
-                  {chip.text}
-                </div>
-              ))}
+              {featureChips.slice(0, 4).map((chip: any) => {
+                const IconComp = ICON_MAP[chip.icon] || HelpCircle;
+                return (
+                  <div
+                    key={chip.title}
+                    className="flex items-center gap-2 px-4 py-2 rounded-full glass text-sm text-white/80 font-medium"
+                  >
+                    <IconComp size={14} />
+                    {chip.title}
+                  </div>
+                );
+              })}
             </motion.div>
 
             <motion.div
@@ -178,24 +210,6 @@ export default function Hero() {
               >
                 Explore Trending
               </Link>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.7 }}
-              className="grid grid-cols-3 gap-6 mt-14 pt-10 border-t border-white/10"
-            >
-              {[
-                { label: "Products", value: "10,000+" },
-                { label: "Happy Customers", value: "50,000+" },
-                { label: "Verified Sellers", value: "500+" },
-              ].map((s) => (
-                <div key={s.label} className="text-center lg:text-left">
-                  <p className="text-2xl font-black text-white">{s.value}</p>
-                  <p className="text-sm text-white/50 mt-0.5">{s.label}</p>
-                </div>
-              ))}
             </motion.div>
           </div>
 
@@ -236,33 +250,33 @@ export default function Hero() {
               </div>
             </motion.div>
 
-            {floatingCards.map((card, i) => {
+            {floatingCards.map((card: any, i: number) => {
               const positions = [
                 { top: "5%", left: "-10%" },
                 { top: "10%", right: "-10%" },
                 { bottom: "10%", left: "-15%" },
                 { bottom: "5%", right: "-8%" },
               ];
-              const pos = positions[i];
-              const Icon = card.icon;
+              const pos = positions[i % 4];
+              const IconComp = ICON_MAP[card.icon] || HelpCircle;
 
               return (
                 <motion.div
-                  key={card.label}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5, delay: 0.5 + card.delay }}
+                  key={i}
+                  initial={{ opacity: 0, scale: 0.5 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.5, delay: 0.5 + (card.delay || (i * 0.5)) }}
                   className="absolute glass-card rounded-2xl p-3 flex items-center gap-3 shadow-lg w-44"
                   style={{
                     ...pos,
-                    animation: `float ${6 + i}s ease-in-out infinite ${card.delay}s`,
+                    animation: `float ${6 + i}s ease-in-out infinite ${(card.delay || i * 0.5)}s`,
                   }}
                 >
                   <div
                     className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0"
                     style={{ background: `${card.color}20` }}
                   >
-                    <Icon size={20} color={card.color} />
+                    <IconComp size={20} color={card.color} />
                   </div>
                   <div>
                     <p className="text-xs font-semibold text-slate-700">{card.label}</p>
@@ -280,25 +294,58 @@ export default function Hero() {
           transition={{ delay: 0.8, duration: 0.5 }}
           className="mt-14 grid grid-cols-1 md:grid-cols-3 gap-4"
         >
-          {trustItems.map((item) => (
-            <div key={item.title} className="glass rounded-2xl px-5 py-4 flex items-center gap-3">
-              <span className="w-10 h-10 rounded-xl bg-white/10 text-white flex items-center justify-center">
-                {item.icon}
-              </span>
-              <span>
-                <span className="block text-sm font-bold text-white">{item.title}</span>
-                <span className="block text-xs text-white/55">{item.text}</span>
-              </span>
-            </div>
-          ))}
+          {trustItems.slice(0, 3).map((item: any) => {
+            const IconComp = ICON_MAP[item.icon] || HelpCircle;
+            return (
+              <div key={item.title} className="glass rounded-2xl px-5 py-4 flex items-center gap-3">
+                <span className="w-10 h-10 rounded-xl bg-white/10 text-white flex items-center justify-center">
+                  <IconComp size={18} />
+                </span>
+                <span>
+                  <span className="block text-sm font-bold text-white">{item.title}</span>
+                  <span className="block text-xs text-white/55">{item.text}</span>
+                </span>
+              </div>
+            );
+          })}
         </motion.div>
       </div>
 
-      <div className="absolute bottom-0 left-0 right-0">
-        <svg viewBox="0 0 1440 80" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M0 80L1440 80L1440 20C1200 80 960 0 720 40C480 80 240 0 0 20V80Z" fill="white" />
+      {/* Bottom wave — theme-aware */}
+      <div className="absolute bottom-0 left-0 right-0 pointer-events-none">
+        <svg
+          viewBox="0 0 1440 80"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+          preserveAspectRatio="none"
+          className="w-full block"
+          aria-hidden="true"
+        >
+          <path
+            d="M0 80L1440 80L1440 20C1200 80 960 0 720 40C480 80 240 0 0 20V80Z"
+            className="fill-slate-50"
+          />
         </svg>
       </div>
+
+      {/* Scroll indicator */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 1.2, duration: 0.6 }}
+        className="absolute bottom-20 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5 text-white/40"
+        aria-hidden="true"
+      >
+        <span className="text-[10px] uppercase tracking-widest font-semibold">Scroll</span>
+        <motion.div
+          animate={{ y: [0, 6, 0] }}
+          transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <path d="M6 9l6 6 6-6" />
+          </svg>
+        </motion.div>
+      </motion.div>
     </section>
   );
 }

@@ -281,7 +281,7 @@ const PRODUCT_SECTION_CONFIG = {
   featured: {
     id: "featured-products",
     title: "Featured Products",
-    subtitle: "Hand-picked by our team - the best products at unbeatable prices",
+    subtitle: "Hand-picked by our team — the best products at unbeatable prices",
     badge: "Editor's Pick",
     badgeColor: "bg-amber-50 text-amber-700",
     queryParams: "featured=true",
@@ -290,7 +290,7 @@ const PRODUCT_SECTION_CONFIG = {
   latest: {
     id: "latest-products",
     title: "Newly Arrived",
-    subtitle: "Fresh arrivals added daily - be the first to shop",
+    subtitle: "Fresh arrivals added daily — be the first to shop",
     badge: "Just In",
     badgeColor: "bg-emerald-50 text-emerald-700",
     queryParams: "latest=true",
@@ -305,6 +305,15 @@ const PRODUCT_SECTION_CONFIG = {
     queryParams: "trending=true",
     viewAllHref: "/products?sort=popular",
   },
+  bestSellers: {
+    id: "best-sellers",
+    title: "Best Sellers",
+    subtitle: "Our customers' top picks — proven quality and trusted by thousands",
+    badge: "🏆 Best Selling",
+    badgeColor: "bg-violet-50 text-violet-700",
+    queryParams: "bestSeller=true",
+    viewAllHref: "/products?bestSeller=true",
+  },
 } satisfies Record<string, ProductSectionProps>;
 
 export function FeaturedProducts() {
@@ -312,9 +321,22 @@ export function FeaturedProducts() {
 }
 
 export function LatestProducts() {
-  return <ProductSection {...PRODUCT_SECTION_CONFIG.latest} />;
+  return (
+    <ProductSection
+      {...PRODUCT_SECTION_CONFIG.latest}
+      id="latest-products"
+    />
+  );
 }
 
 export function TrendingProducts() {
   return <ProductSection {...PRODUCT_SECTION_CONFIG.trending} />;
+}
+
+export function BestSellers() {
+  return (
+    <ProductSection
+      {...PRODUCT_SECTION_CONFIG.bestSellers}
+    />
+  );
 }

@@ -16,6 +16,7 @@ export async function GET(request: Request) {
     const bestSeller = searchParams.get("bestSeller") === "true" ? true : undefined;
     const isNew = searchParams.get("isNew") === "true" ? true : undefined;
     const categorySlug = searchParams.get("category") || undefined;
+    const brandSlug = searchParams.get("brand") || undefined;
     const search = searchParams.get("search") || undefined;
     const minPrice = searchParams.get("minPrice") ? parseFloat(searchParams.get("minPrice")!) : undefined;
     const maxPrice = searchParams.get("maxPrice") ? parseFloat(searchParams.get("maxPrice")!) : undefined;
@@ -48,11 +49,14 @@ export async function GET(request: Request) {
           { name: { contains: search, mode: "insensitive" } },
           { tags: { has: search } },
           { description: { contains: search, mode: "insensitive" } },
-          { brand: { contains: search, mode: "insensitive" } },
+          { brand: { is: { name: { contains: search, mode: "insensitive" } } } },
         ],
       }),
       ...(categorySlug && {
         category: { slug: categorySlug },
+      }),
+      ...(brandSlug && {
+        brand: { name: { equals: brandSlug.replace(/-/g, " "), mode: "insensitive" as const } },
       }),
     };
 
@@ -77,6 +81,7 @@ export async function GET(request: Request) {
         take: limit,
         include: {
           category: { select: { id: true, name: true, slug: true } },
+          brand: { select: { id: true, name: true } },
           images: {
             orderBy: [{ isFeatured: "desc" }, { sortOrder: "asc" }],
             take: 1,

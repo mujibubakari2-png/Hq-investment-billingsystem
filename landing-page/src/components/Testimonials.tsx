@@ -17,7 +17,7 @@ export default function Testimonials() {
     fetch("/api/public/testimonials")
       .then((r) => r.json())
       .then((d) => setTestimonials(d.data ?? []))
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setLoading(false));
   }, []);
 
@@ -159,9 +159,8 @@ function TestimonialCard({ testimonial, featured }: { testimonial: Testimonial; 
 
   return (
     <div
-      className={`testimonial-card flex flex-col gap-4 ${
-        featured ? "ring-2 ring-primary/20 shadow-card-hover" : ""
-      }`}
+      className={`testimonial-card flex flex-col gap-4 ${featured ? "ring-2 ring-primary/20 shadow-card-hover" : ""
+        }`}
     >
       {/* Quote icon */}
       <Quote size={32} className="text-primary/20 shrink-0" />

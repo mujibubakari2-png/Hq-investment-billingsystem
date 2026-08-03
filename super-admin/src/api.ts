@@ -121,6 +121,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 const get  = <T>(p: string) => request<T>(p);
 const post = <T>(p: string, b: unknown) => request<T>(p, { method: 'POST', body: JSON.stringify(b) });
 const patch = <T>(p: string, b: unknown) => request<T>(p, { method: 'PATCH', body: JSON.stringify(b) });
+const put = <T>(p: string, b: unknown) => request<T>(p, { method: 'PUT', body: JSON.stringify(b) });
 const del  = <T>(p: string, b?: unknown) => request<T>(p, { method: 'DELETE', body: b ? JSON.stringify(b) : undefined });
 
 // ── API Modules ──────────────────────────────────────────────────────────────
@@ -423,3 +424,323 @@ export interface ReportsData {
 export const reportsApi = {
   get: (period = '12') => get<ReportsData>(`/reports?period=${period}`),
 };
+
+// ── E-Commerce ────────────────────────────────────────────────────────────────
+export interface ProductCategory {
+  id: string;
+  name: string;
+  slug: string;
+  icon: string | null;
+  image: string | null;
+  description: string | null;
+  sortOrder: number;
+  isActive: boolean;
+  productCount?: number;
+}
+
+export interface Product {
+  id: string;
+  name: string;
+  slug: string;
+  sku: string | null;
+  barcode: string | null;
+  categoryId: string | null;
+  brand: string | null;
+  price: string | number;
+  discountType: string;
+  discountValue: string | number | null;
+  currency: string;
+  quantity: number;
+  status: string;
+  featured: boolean;
+  category?: { id: string; name: string };
+  images?: { id: string; url: string; isFeatured: boolean }[];
+  createdAt: string;
+}
+
+export interface EcomOrder {
+  id: string;
+  orderNumber: string;
+  customerName: string;
+  customerEmail: string | null;
+  totalAmount: string | number;
+  status: string;
+  paymentStatus: string;
+  createdAt: string;
+  _count?: { items: number };
+}
+
+export interface Promotion {
+  id: string;
+  name: string;
+  description: string;
+  type: 'COUPON' | 'FLASH_SALE' | 'DISCOUNT';
+  status: 'DRAFT' | 'ACTIVE' | 'EXPIRED';
+  discountValue: number;
+  startDate: string;
+  endDate: string;
+  usageLimit: number;
+  usedCount: number;
+  createdAt: string;
+}
+
+export interface Customer {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  status: 'ACTIVE' | 'INACTIVE' | 'BLOCKED';
+  totalOrders: number;
+  totalSpent: number;
+  lastActive: string;
+  notes?: string;
+  createdAt: string;
+}
+
+export interface StockMovement {
+  id: string;
+  productId: string;
+  product?: any; // Add Product interface if needed
+  type: 'IN' | 'OUT' | 'ADJUSTMENT';
+  quantity: number;
+  notes?: string;
+  createdAt: string;
+}
+
+export interface MediaAsset {
+  id: string;
+  url: string;
+  filename: string;
+  fileType: 'IMAGE' | 'VIDEO' | 'DOCUMENT';
+  mimeType?: string;
+  sizeBytes: number;
+  altText?: string;
+  createdAt: string;
+}
+
+export interface ApiKey {
+  id: string;
+  name: string;
+  keyPrefix: string;
+  lastUsedAt?: string;
+  createdAt: string;
+}
+
+export const ecommerceApi = {
+  categories: {
+    list: () => get<{ data: ProductCategory[] }>('/ecommerce/categories'),
+    create: (body: Partial<ProductCategory>) => post<{ data: ProductCategory }>('/ecommerce/categories', body),
+    update: (id: string, body: Partial<ProductCategory>) => put<{ data: ProductCategory }>(`/ecommerce/categories/${id}`, body),
+    delete: (id: string) => del<{ message: string }>(`/ecommerce/categories/${id}`)
+  },
+  products: {
+    list: (params?: Record<string, string>) => {
+      const q = params ? '?' + new URLSearchParams(params).toString() : '';
+      return get<{ data: Product[]; total: number; page: number; pages: number }>(`/ecommerce/products${q}`);
+    },
+    get: (id: string) => get<{ data: Product }>(`/ecommerce/products/${id}`),
+    create: (body: any) => post<{ data: Product }>('/ecommerce/products', body),
+    update: (id: string, body: any) => put<{ data: Product }>(`/ecommerce/products/${id}`, body),
+    delete: (id: string) => del<{ message: string }>(`/ecommerce/products/${id}`)
+  },
+  orders: {
+    list: (params?: Record<string, string>) => {
+      const q = params ? '?' + new URLSearchParams(params).toString() : '';
+      return get<{ data: EcomOrder[]; total: number; page: number; pages: number }>(`/ecommerce/orders${q}`);
+    },
+    get: (id: string) => get<{ data: EcomOrder }>(`/ecommerce/orders/${id}`),
+    update: (id: string, body: { status?: string; paymentStatus?: string }) => put<{ data: EcomOrder }>(`/ecommerce/orders/${id}`, body)
+  },
+  reviews: {
+    list: (params?: Record<string, string>) => {
+      const q = params ? '?' + new URLSearchParams(params).toString() : '';
+      return get<{ data: any[]; total: number; page: number; pages: number }>(`/ecommerce/reviews${q}`);
+    },
+    update: (id: string, body: { isApproved: boolean }) => put<{ data: any }>(`/ecommerce/reviews/${id}`, body),
+    delete: (id: string) => del<{ message: string }>(`/ecommerce/reviews/${id}`)
+  },
+  brands: {
+    list: (params?: Record<string, string>) => {
+      const q = params ? '?' + new URLSearchParams(params).toString() : '';
+      return get<{ data: any[]; total: number; page: number; pages: number }>(`/ecommerce/brands${q}`);
+    },
+    create: (body: any) => post<{ data: any }>('/ecommerce/brands', body),
+    update: (id: string, body: any) => put<{ data: any }>(`/ecommerce/brands/${id}`, body),
+    delete: (id: string) => del<{ message: string }>(`/ecommerce/brands/${id}`)
+  },
+  collections: {
+    list: (params?: Record<string, string>) => {
+      const q = params ? '?' + new URLSearchParams(params).toString() : '';
+      return get<{ data: any[]; total: number; page: number; pages: number }>(`/ecommerce/collections${q}`);
+    },
+    create: (body: any) => post<{ data: any }>('/ecommerce/collections', body),
+    update: (id: string, body: any) => put<{ data: any }>(`/ecommerce/collections/${id}`, body),
+    delete: (id: string) => del<{ message: string }>(`/ecommerce/collections/${id}`)
+  },
+  warehouses: {
+    list: (params?: Record<string, string>) => {
+      const q = params ? '?' + new URLSearchParams(params).toString() : '';
+      return get<{ data: any[]; total: number; page: number; pages: number }>(`/ecommerce/warehouses${q}`);
+    },
+    create: (body: any) => post<{ data: any }>('/ecommerce/warehouses', body),
+    update: (id: string, body: any) => put<{ data: any }>(`/ecommerce/warehouses/${id}`, body),
+    delete: (id: string) => del<{ message: string }>(`/ecommerce/warehouses/${id}`)
+  },
+  shipping: {
+    list: (params?: Record<string, string>) => {
+      const q = params ? '?' + new URLSearchParams(params).toString() : '';
+      return get<{ data: any[]; total: number; page: number; pages: number }>(`/ecommerce/shipping${q}`);
+    },
+    create: (body: any) => post<{ data: any }>('/ecommerce/shipping', body),
+    update: (id: string, body: any) => put<{ data: any }>(`/ecommerce/shipping/${id}`, body),
+    delete: (id: string) => del<{ message: string }>(`/ecommerce/shipping/${id}`)
+  },
+  taxes: {
+    list: (params?: Record<string, string>) => {
+      const q = params ? '?' + new URLSearchParams(params).toString() : '';
+      return get<{ data: any[]; total: number; page: number; pages: number }>(`/ecommerce/taxes${q}`);
+    },
+    create: (body: any) => post<{ data: any }>('/ecommerce/taxes', body),
+    update: (id: string, body: any) => put<{ data: any }>(`/ecommerce/taxes/${id}`, body),
+    delete: (id: string) => del<{ message: string }>(`/ecommerce/taxes/${id}`)
+  },
+  coupons: {
+    list: (params?: Record<string, string>) => {
+      const q = params ? '?' + new URLSearchParams(params).toString() : '';
+      return get<{ data: any[]; total: number; page: number; pages: number }>(`/ecommerce/coupons${q}`);
+    },
+    create: (body: any) => post<{ data: any }>('/ecommerce/coupons', body),
+    update: (id: string, body: any) => put<{ data: any }>(`/ecommerce/coupons/${id}`, body),
+    delete: (id: string) => del<{ message: string }>(`/ecommerce/coupons/${id}`)
+  },
+  flashSales: {
+    list: (params?: Record<string, string>) => {
+      const q = params ? '?' + new URLSearchParams(params).toString() : '';
+      return get<{ data: any[]; total: number; page: number; pages: number }>(`/ecommerce/flash-sales${q}`);
+    },
+    create: (body: any) => post<{ data: any }>('/ecommerce/flash-sales', body),
+    update: (id: string, body: any) => put<{ data: any }>(`/ecommerce/flash-sales/${id}`, body),
+    delete: (id: string) => del<{ message: string }>(`/ecommerce/flash-sales/${id}`)
+  },
+  inventory: {
+    list: (params?: Record<string, string>) => {
+      const q = params ? '?' + new URLSearchParams(params).toString() : '';
+      return get<{ data: any[]; meta: any }>(`/ecommerce/inventory${q}`);
+    },
+    addMovement: (body: any) => post<{ data: any }>('/ecommerce/inventory', body)
+  },
+  customers: {
+    list: (params?: Record<string, string>) => {
+      const q = params ? '?' + new URLSearchParams(params).toString() : '';
+      return get<{ data: any[]; meta: any }>(`/ecommerce/customers${q}`);
+    },
+    create: (body: any) => post<{ data: any }>('/ecommerce/customers', body),
+    update: (id: string, body: any) => put<{ data: any }>(`/ecommerce/customers/${id}`, body),
+    delete: (id: string) => del<{ message: string }>(`/ecommerce/customers/${id}`)
+  },
+  menus: {
+    list: (params?: Record<string, string>) => {
+      const q = params ? '?' + new URLSearchParams(params).toString() : '';
+      return get<{ data: any[]; meta: any }>(`/ecommerce/menus${q}`);
+    },
+    create: (body: any) => post<{ data: any }>('/ecommerce/menus', body),
+    update: (id: string, body: any) => put<{ data: any }>(`/ecommerce/menus/${id}`, body),
+    delete: (id: string) => del<{ message: string }>(`/ecommerce/menus/${id}`)
+  },
+  media: {
+    list: (params?: Record<string, string>) => {
+      const q = params ? '?' + new URLSearchParams(params).toString() : '';
+      return get<{ data: any[]; meta: any }>(`/ecommerce/media${q}`);
+    },
+    create: (body: any) => post<{ data: any }>('/ecommerce/media', body),
+    delete: (id: string) => del<{ message: string }>(`/ecommerce/media/${id}`)
+  },
+  promotions: {
+    list: (params?: Record<string, string>) => {
+      const q = params ? '?' + new URLSearchParams(params).toString() : '';
+      return get<{ data: any[]; meta: any }>(`/ecommerce/promotions${q}`);
+    },
+    create: (body: any) => post<{ data: any }>('/ecommerce/promotions', body),
+    update: (id: string, body: any) => put<{ data: any }>(`/ecommerce/promotions/${id}`, body),
+    delete: (id: string) => del<{ message: string }>(`/ecommerce/promotions/${id}`)
+  }
+};
+
+export const developerApi = {
+  apiKeys: {
+    list: (params?: Record<string, string>) => {
+      const q = params ? '?' + new URLSearchParams(params).toString() : '';
+      return get<{ data: any[]; meta: any }>(`/developer/api-keys${q}`);
+    },
+    create: (body: any) => post<{ rawKey: string; message: string }>('/developer/api-keys', body),
+    revoke: (id: string) => del<{ message: string }>(`/developer/api-keys/${id}`)
+  }
+};
+
+// ── CMS ───────────────────────────────────────────────────────────────────────
+export const cmsApi = {
+  settings: {
+    get: () => get<{ data: Record<string, any> }>('/cms/settings'),
+    update: (body: Record<string, any>) => put<{ message: string }>('/cms/settings', body),
+  },
+  banners: {
+    list: (params?: Record<string, string>) => {
+      const q = params ? '?' + new URLSearchParams(params).toString() : '';
+      return get<{ data: any[]; total: number; page: number; pages: number }>(`/cms/banners${q}`);
+    },
+    create: (body: any) => post<{ data: any }>('/cms/banners', body),
+    update: (id: string, body: any) => put<{ data: any }>(`/cms/banners/${id}`, body),
+    delete: (id: string) => del<{ message: string }>(`/cms/banners/${id}`)
+  },
+  testimonials: {
+    list: (params?: Record<string, string>) => {
+      const q = params ? '?' + new URLSearchParams(params).toString() : '';
+      return get<{ data: any[]; total: number; page: number; pages: number }>(`/cms/testimonials${q}`);
+    },
+    create: (body: any) => post<{ data: any }>('/cms/testimonials', body),
+    update: (id: string, body: any) => put<{ data: any }>(`/cms/testimonials/${id}`, body),
+    delete: (id: string) => del<{ message: string }>(`/cms/testimonials/${id}`)
+  },
+  faqs: {
+    list: (params?: Record<string, string>) => {
+      const q = params ? '?' + new URLSearchParams(params).toString() : '';
+      return get<{ data: any[]; total: number; page: number; pages: number }>(`/cms/faqs${q}`);
+    },
+    create: (body: any) => post<{ data: any }>('/cms/faqs', body),
+    update: (id: string, body: any) => put<{ data: any }>(`/cms/faqs/${id}`, body),
+    delete: (id: string) => del<{ message: string }>(`/cms/faqs/${id}`)
+  },
+  subscribers: {
+    list: (params?: Record<string, string>) => {
+      const q = params ? '?' + new URLSearchParams(params).toString() : '';
+      return get<{ data: any[]; total: number; page: number; pages: number }>(`/cms/subscribers${q}`);
+    }
+  },
+  blogs: {
+    list: (params?: Record<string, string>) => {
+      const q = params ? '?' + new URLSearchParams(params).toString() : '';
+      return get<{ data: any[]; total: number; page: number; pages: number }>(`/cms/blogs${q}`);
+    },
+    create: (body: any) => post<{ data: any }>('/cms/blogs', body),
+    update: (id: string, body: any) => put<{ data: any }>(`/cms/blogs/${id}`, body),
+    delete: (id: string) => del<{ message: string }>(`/cms/blogs/${id}`)
+  },
+  pages: {
+    list: (params?: Record<string, string>) => {
+      const q = params ? '?' + new URLSearchParams(params).toString() : '';
+      return get<{ data: any[]; total: number; page: number; pages: number }>(`/cms/pages${q}`);
+    },
+    create: (body: any) => post<{ data: any }>('/cms/pages', body),
+    update: (id: string, body: any) => put<{ data: any }>(`/cms/pages/${id}`, body),
+    delete: (id: string) => del<{ message: string }>(`/cms/pages/${id}`)
+  },
+  contacts: {
+    list: (params?: Record<string, string>) => {
+      const q = params ? '?' + new URLSearchParams(params).toString() : '';
+      return get<{ data: any[]; total: number; page: number; pages: number }>(`/cms/contacts${q}`);
+    },
+    updateStatus: (id: string, status: string) => put<{ data: any }>(`/cms/contacts/${id}`, { status }),
+    delete: (id: string) => del<{ message: string }>(`/cms/contacts/${id}`)
+  }
+};
+

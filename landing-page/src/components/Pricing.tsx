@@ -1,6 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
 import PricingCard from "./PricingCard";
+
 
 interface SaasPlan {
     id: string;
@@ -84,8 +86,11 @@ export default function Pricing() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        fetch("/api/saas-plans")
-            .then((res) => res.json())
+        fetch("/api/plans")
+            .then((res) => {
+                if (!res.ok) throw new Error("Failed to fetch plans");
+                return res.json();
+            })
             .then((data: SaasPlan[]) =>
                 setPlans(Array.isArray(data) ? data : [])
             )
@@ -97,16 +102,24 @@ export default function Pricing() {
     const popularIndex = plans.length > 1 ? Math.floor(plans.length / 2) : 0;
 
     return (
-        <section id="pricing" className="py-20 bg-softBg">
+        <section id="pricing" className="py-20 bg-slate-50">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="text-center mb-16">
-                    <span className="inline-block text-sm font-semibold text-secondary uppercase tracking-widest mb-3">
-                        Pricing Plans
-                    </span>
-                    <h2 className="text-3xl md:text-5xl font-bold text-primary mb-4">
-                        Choose Your Plan
-                    </h2>
-                </div>
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  className="text-center mb-14"
+                >
+                  <span className="inline-block text-xs font-bold uppercase tracking-widest text-primary bg-primary/8 px-4 py-2 rounded-full mb-4">
+                    ISP Billing Plans
+                  </span>
+                  <h2 className="section-title font-display mb-4">
+                    Choose Your Plan
+                  </h2>
+                  <p className="section-subtitle mx-auto">
+                    Transparent pricing built for ISP operators of every size.
+                  </p>
+                </motion.div>
 
                 {loading ? (
                     <div className="flex justify-center py-16">
