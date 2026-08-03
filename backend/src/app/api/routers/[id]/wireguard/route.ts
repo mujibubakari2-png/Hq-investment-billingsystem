@@ -596,12 +596,42 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                     } catch (err) { logger.warn("[PUSH-CONFIG] Failed to update bridge ports"); }
                 }
 
-                // Clean up old IP addresses on the bridge to prevent duplicates
+                // WAN PROTECTION: Detect and remove WAN-like interfaces from the LAN bridge.
+                // Many MikroTik routers ship with a default bridge that includes ALL ports
+                // including ether1 (WAN). If the hotspot is created on this bridge, it
+                // intercepts WAN traffic and the router becomes unreachable.
+                // Detection: check for ether1, sfp*, lte*, wan* — covers most MikroTik models.
+                try {
+                    const allBridgePorts = await service.apiRequestPublic("/interface/bridge/port");
+                    if (Array.isArray(allBridgePorts)) {
+                        const wanPatterns = /^(ether1|sfp[\d-]|lte[\d-]|wan)/i;
+                        for (const bp of allBridgePorts) {
+                            if (bp.bridge === lanBridgeName && wanPatterns.test(bp.interface)) {
+                                // Only remove if the operator did NOT explicitly select this port as LAN
+                                if (!lanPorts.includes(bp.interface)) {
+                                    try {
+                                        await service.apiRequestPublic(`/interface/bridge/port/${bp[".id"]}`, "DELETE");
+                                        logger.info(`[PUSH-CONFIG] CRITICAL: Removed WAN interface ${bp.interface} from ${lanBridgeName} to protect WAN connectivity`);
+                                    } catch (e) {
+                                        logger.warn(`[PUSH-CONFIG] Failed to remove ${bp.interface} from bridge: ${e}`);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } catch (e) {
+                    logger.warn(`[PUSH-CONFIG] WAN detection failed (non-fatal): ${e}`);
+                }
+
+                // Clean up old IP addresses — WHITELIST APPROACH:
+                // Only delete addresses that WE created (identified by "HQ INVESTMENT" comment).
+                // Never delete addresses without our comment — they may be management IPs
+                // (e.g. 192.168.88.1/24) that the operator needs for local access.
                 try {
                     const oldAddrs = await service.apiRequestPublic("/ip/address");
                     if (Array.isArray(oldAddrs)) {
                         for (const addr of oldAddrs) {
-                            if (addr.interface === lanBridgeName || addr.comment?.includes("HQ INVESTMENT")) {
+                            if (addr.comment?.includes("HQ INVESTMENT")) {
                                 try { await service.apiRequestPublic(`/ip/address/${addr[".id"]}`, "DELETE"); } catch {}
                             }
                         }
@@ -904,64 +934,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 }
 
                 // ──────────────────────────────────────────────────────────
-                // STEP 4: FIREWALL RULES (COMPLETE HOTSPOT PROTECTION!)
+                // STEP 4: MOVED TO AFTER STEP 7b (PHASED PROVISIONING)
+                // Firewall lockdown is now applied AFTER all services
+                // (NAT, Route, RADIUS, Walled Garden) are configured.
+                // This prevents self-lockout: DROP ether1 was killing the
+                // push-config connection before it could finish.
                 // ──────────────────────────────────────────────────────────
-                logger.info("[PUSH-CONFIG] Setting up Firewall...");
 
                 const restPort = router.apiPort || (router.port === 8728 || router.port === 8729 ? 80 : router.port) || 80;
-
-                // ── FIREWALL RULES ────────────────────────────────────────────────
-                // IMPORTANT: The "Allow Hotspot to Internet" forward rule is intentionally
-                // ABSENT. The MikroTik Hotspot engine intercepts all traffic from the bridge
-                // and only forwards it to WAN AFTER successful authentication (voucher/payment).
-                // Adding an unconditional forward rule here would bypass authentication entirely,
-                // allowing any device to get free internet access.
-                const firewallRules = [
-                    // ── INPUT CHAIN: allow management & services ──
-                    { chain: "input", protocol: "udp", "dst-port": String(listenPort), action: "accept", comment: "Allow WireGuard - HQ INVESTMENT" },
-                    { chain: "input", "in-interface": "wg-hq", action: "accept", comment: "Allow WireGuard interface input - HQ INVESTMENT" },
-                    { chain: "input", protocol: "icmp", "src-address": `${subnetPrefix}.0/24`, action: "accept", comment: "Allow ICMP from VPN - HQ INVESTMENT" },
-                    { chain: "input", protocol: "tcp", "dst-port": String(restPort), "src-address": `${subnetPrefix}.0/24`, action: "accept", comment: "Allow REST API from VPN - HQ INVESTMENT" },
-                    { chain: "input", protocol: "tcp", "dst-port": "8291", "src-address": `${subnetPrefix}.0/24`, action: "accept", comment: "Allow Winbox from VPN - HQ INVESTMENT" },
-                    { chain: "input", protocol: "udp", "dst-port": "3799", "src-address": `${subnetPrefix}.0/24`, action: "accept", comment: "Allow RADIUS CoA from VPN - HQ INVESTMENT" },
-                    { chain: "input", protocol: "tcp", "dst-port": "80,443", "src-address": `${subnetPrefix}.0/24`, action: "accept", comment: "Allow Web from VPN - HQ INVESTMENT" },
-                    { chain: "input", protocol: "tcp", "dst-port": "8728,8729", "src-address": `${subnetPrefix}.0/24`, action: "accept", comment: "Allow API from VPN - HQ INVESTMENT" },
-                    { chain: "input", protocol: "udp", "dst-port": "53,67", "in-interface": lanBridgeName, action: "accept", comment: "Allow DNS & DHCP from LAN - HQ INVESTMENT" },
-                    { chain: "input", protocol: "icmp", action: "accept", comment: "Allow Ping - HQ INVESTMENT" },
-                    { chain: "input", "connection-state": "established,related", action: "accept", comment: "Allow Established Input - HQ INVESTMENT" },
-                    { chain: "input", "in-interface": lanBridgeName, protocol: "tcp", "dst-port": "80,443", action: "accept", comment: "Allow Hotspot Captive Portal - HQ INVESTMENT" },
-                    { chain: "input", "in-interface": lanBridgeName, protocol: "udp", "dst-port": "67", action: "accept", comment: "Allow Hotspot DHCP - HQ INVESTMENT" },
-                    { chain: "input", "in-interface": lanBridgeName, protocol: "udp", "dst-port": "53", action: "accept", comment: "Allow Hotspot DNS - HQ INVESTMENT" },
-                    // ── FORWARD CHAIN: authenticated PPPoE only ──
-                    // NOTE: Hotspot-authenticated forward is handled automatically by the hotspot
-                    // engine. Do NOT add a blanket bridge->ether1 accept rule here!
-                    { chain: "forward", "in-interface": "all-ppp", "out-interface": "ether1", action: "accept", comment: "Allow PPPoE to Internet - HQ INVESTMENT" },
-                    { chain: "forward", "connection-state": "established,related", action: "accept", comment: "Allow Established Forward - HQ INVESTMENT" },
-                    { chain: "forward", "in-interface": "wg-hq", action: "accept", comment: "Allow WG traffic - HQ INVESTMENT" },
-                    { chain: "forward", "out-interface": "wg-hq", action: "accept", comment: "Allow WG return - HQ INVESTMENT" },
-                    // ── DROP RULES: must come LAST (lowest priority) ──
-                    { chain: "input", "in-interface": "ether1", action: "drop", comment: "Drop WAN input - HQ INVESTMENT" },
-                    // SECURITY: Block unauthenticated LAN/bridge clients from reaching WAN.
-                    // The Hotspot engine creates DYNAMIC accept rules for authenticated users, so
-                    // authenticated clients are NOT affected by this drop rule.
-                    // PPPoE clients use the all-ppp forward rule above and are also unaffected.
-                    { chain: "forward", "in-interface": lanBridgeName, action: "drop", comment: "Drop unauthenticated LAN forward - HQ INVESTMENT" },
-                ];
-
-                // Reverse the array so that by putting them at index 0, they end up in the correct order at the very top.
-                const reversedRules = [...firewallRules].reverse();
-
-                let fwFailCount = 0;
-                for (const rule of reversedRules) {
-                    try {
-                        await service.apiRequestPublic("/ip/firewall/filter", "PUT", { ...rule, "place-before": "0" });
-                    } catch (e: any) {
-                        if (!e.message?.includes('already')) fwFailCount++;
-                        logger.warn("FW note:", { error: e.message instanceof Error ? e.message.message : String(e.message) });
-                    }
-                }
-                // Report as a single aggregate step — individual rule failures are logged above
-                trackStep('Firewall: push rules', fwFailCount === 0, fwFailCount > 0 ? `${fwFailCount} rule(s) failed` : undefined);
 
                 // ──────────────────────────────────────────────────────────
                 // STEP 5: NAT (FIXED CONFLICT! - ONLY ETHER1!)
@@ -1120,6 +1100,89 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                         comment: "VPN Subnet - HQ INVESTMENT"
                     });
                 } catch (e: any) { if (!e.message?.includes("already")) logger.warn("Walled garden VPN note:", { error: e.message instanceof Error ? e.message.message : String(e.message) }); }
+
+                // ──────────────────────────────────────────────────────────
+                // STEP 8: FIREWALL RULES (PHASED — applied LAST)
+                // All services (WireGuard, NAT, Route, RADIUS, Walled Garden)
+                // are now configured. It is safe to apply firewall lockdown
+                // because even if the DROP ether1 rule cuts WAN access,
+                // all required configs are already in place.
+                // ──────────────────────────────────────────────────────────
+                logger.info("[PUSH-CONFIG] Phase 3: Applying firewall lockdown...");
+
+                // Resolve the HQ server's public IP for restricted WAN management.
+                // Only this IP can manage the router via WAN — not the entire internet.
+                const hqServerIp = process.env.SERVER_PUBLIC_IP || serverEndpoint;
+                const isValidIp = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hqServerIp);
+
+                // ── FIREWALL RULES ────────────────────────────────────────────────
+                // IMPORTANT: The "Allow Hotspot to Internet" forward rule is intentionally
+                // ABSENT. The MikroTik Hotspot engine intercepts all traffic from the bridge
+                // and only forwards it to WAN AFTER successful authentication (voucher/payment).
+                // Adding an unconditional forward rule here would bypass authentication entirely,
+                // allowing any device to get free internet access.
+                const firewallRules: Record<string, string>[] = [
+                    // ── INPUT CHAIN: allow management & services ──
+                    { chain: "input", protocol: "udp", "dst-port": String(listenPort), action: "accept", comment: "Allow WireGuard - HQ INVESTMENT" },
+                    { chain: "input", "in-interface": "wg-hq", action: "accept", comment: "Allow WireGuard interface input - HQ INVESTMENT" },
+                    { chain: "input", protocol: "icmp", "src-address": `${subnetPrefix}.0/24`, action: "accept", comment: "Allow ICMP from VPN - HQ INVESTMENT" },
+                    { chain: "input", protocol: "tcp", "dst-port": String(restPort), "src-address": `${subnetPrefix}.0/24`, action: "accept", comment: "Allow REST API from VPN - HQ INVESTMENT" },
+                    { chain: "input", protocol: "tcp", "dst-port": "8291", "src-address": `${subnetPrefix}.0/24`, action: "accept", comment: "Allow Winbox from VPN - HQ INVESTMENT" },
+                    { chain: "input", protocol: "udp", "dst-port": "3799", "src-address": `${subnetPrefix}.0/24`, action: "accept", comment: "Allow RADIUS CoA from VPN - HQ INVESTMENT" },
+                    { chain: "input", protocol: "tcp", "dst-port": "80,443", "src-address": `${subnetPrefix}.0/24`, action: "accept", comment: "Allow Web from VPN - HQ INVESTMENT" },
+                    { chain: "input", protocol: "tcp", "dst-port": "8728,8729", "src-address": `${subnetPrefix}.0/24`, action: "accept", comment: "Allow API from VPN - HQ INVESTMENT" },
+                    { chain: "input", protocol: "udp", "dst-port": "53,67", "in-interface": lanBridgeName, action: "accept", comment: "Allow DNS & DHCP from LAN - HQ INVESTMENT" },
+                    { chain: "input", protocol: "icmp", action: "accept", comment: "Allow Ping - HQ INVESTMENT" },
+                    { chain: "input", "connection-state": "established,related", action: "accept", comment: "Allow Established Input - HQ INVESTMENT" },
+                    { chain: "input", "in-interface": lanBridgeName, protocol: "tcp", "dst-port": "80,443", action: "accept", comment: "Allow Hotspot Captive Portal - HQ INVESTMENT" },
+                    { chain: "input", "in-interface": lanBridgeName, protocol: "udp", "dst-port": "67", action: "accept", comment: "Allow Hotspot DHCP - HQ INVESTMENT" },
+                    { chain: "input", "in-interface": lanBridgeName, protocol: "udp", "dst-port": "53", action: "accept", comment: "Allow Hotspot DNS - HQ INVESTMENT" },
+                    // ── FORWARD CHAIN: authenticated PPPoE only ──
+                    // NOTE: Hotspot-authenticated forward is handled automatically by the hotspot
+                    // engine. Do NOT add a blanket bridge->ether1 accept rule here!
+                    { chain: "forward", "in-interface": "all-ppp", "out-interface": "ether1", action: "accept", comment: "Allow PPPoE to Internet - HQ INVESTMENT" },
+                    { chain: "forward", "connection-state": "established,related", action: "accept", comment: "Allow Established Forward - HQ INVESTMENT" },
+                    { chain: "forward", "in-interface": "wg-hq", action: "accept", comment: "Allow WG traffic - HQ INVESTMENT" },
+                    { chain: "forward", "out-interface": "wg-hq", action: "accept", comment: "Allow WG return - HQ INVESTMENT" },
+                ];
+
+                // HQ SERVER MANAGEMENT: Allow management from the HQ server's public
+                // IP ONLY (not the entire internet). This ensures push-config can still
+                // communicate with the router after the DROP rule, and provides emergency
+                // access if the WireGuard tunnel goes down — without opening attack surface.
+                if (isValidIp) {
+                    firewallRules.push(
+                        { chain: "input", "in-interface": "ether1", protocol: "tcp", "dst-port": `${restPort},8728,8729,8291`, "src-address": hqServerIp, action: "accept", comment: "HQ Server Management - HQ INVESTMENT" },
+                    );
+                    logger.info(`[PUSH-CONFIG] Added WAN management rule restricted to HQ server IP: ${hqServerIp}`);
+                } else {
+                    logger.warn(`[PUSH-CONFIG] SERVER_PUBLIC_IP not a valid IP (${hqServerIp}). Skipping WAN management rule — router may only be reachable via VPN.`);
+                }
+
+                // ── DROP RULES: must come LAST (lowest priority) ──
+                firewallRules.push(
+                    { chain: "input", "in-interface": "ether1", action: "drop", comment: "Drop WAN input - HQ INVESTMENT" },
+                    // SECURITY: Block unauthenticated LAN/bridge clients from reaching WAN.
+                    // The Hotspot engine creates DYNAMIC accept rules for authenticated users, so
+                    // authenticated clients are NOT affected by this drop rule.
+                    // PPPoE clients use the all-ppp forward rule above and are also unaffected.
+                    { chain: "forward", "in-interface": lanBridgeName, action: "drop", comment: "Drop unauthenticated LAN forward - HQ INVESTMENT" },
+                );
+
+                // Reverse the array so that by putting them at index 0, they end up in the correct order at the very top.
+                const reversedRules = [...firewallRules].reverse();
+
+                let fwFailCount = 0;
+                for (const rule of reversedRules) {
+                    try {
+                        await service.apiRequestPublic("/ip/firewall/filter", "PUT", { ...rule, "place-before": "0" });
+                    } catch (e: any) {
+                        if (!e.message?.includes('already')) fwFailCount++;
+                        logger.warn("FW note:", { error: e.message instanceof Error ? e.message.message : String(e.message) });
+                    }
+                }
+                // Report as a single aggregate step — individual rule failures are logged above
+                trackStep('Firewall: push rules', fwFailCount === 0, fwFailCount > 0 ? `${fwFailCount} rule(s) failed` : undefined);
 
                 // Verification Step: Wait briefly for tunnel, then check real handshake.
                 // FIX-504: Reduced from 15s to 3s to prevent gateway timeout (504).
