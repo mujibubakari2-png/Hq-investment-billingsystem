@@ -323,7 +323,7 @@ export default function Navbar() {
             {[
               { href: "/wishlist", label: "Wishlist", icon: Heart },
               { href: "/compare", label: "Compare products", icon: Scale },
-              { href: `${billingUrl}/login`, label: "Customer account", icon: User },
+              { href: `${billingUrl}billing/login`, label: "Customer account", icon: User },
               { href: "/notifications", label: "Notifications", icon: Bell },
             ].map(({ href, label, icon: Icon }) => {
               const isExternal = href.startsWith('http') || href.startsWith(billingUrl);
