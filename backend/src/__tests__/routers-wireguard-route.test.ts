@@ -207,6 +207,7 @@ describe('WireGuard route', () => {
       password: 'admin',
       port: 8728,
       apiPort: 8728,
+      radiusSecret: 'test-secret',
     });
 
     const service = {
@@ -222,6 +223,11 @@ describe('WireGuard route', () => {
       },
       routerLog: {
         create: jest.fn().mockResolvedValue({}),
+      },
+      radiusNas: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockResolvedValue({}),
+        update: jest.fn().mockResolvedValue({}),
       },
     };
     mockGetTenantClient.mockReturnValue(db);
@@ -268,6 +274,7 @@ describe('WireGuard route', () => {
       password: 'admin',
       port: 8728,
       apiPort: 8728,
+      radiusSecret: 'test-secret',
     });
 
     const service = {
@@ -283,6 +290,11 @@ describe('WireGuard route', () => {
       },
       routerLog: {
         create: jest.fn().mockResolvedValue({}),
+      },
+      radiusNas: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockResolvedValue({}),
+        update: jest.fn().mockResolvedValue({}),
       },
     };
     mockGetTenantClient.mockReturnValue(db);
