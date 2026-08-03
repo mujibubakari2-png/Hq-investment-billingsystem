@@ -18,6 +18,7 @@ import logger from "@/lib/logger";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import { getRouterAdapter, normalizeRouterVendor } from "@/lib/routerAdapters";
 import { enqueueSuspendService, enqueueActivateService } from "@/lib/queue";
+import { closePrisma } from "@/lib/prisma";
 
 void env;
 
@@ -158,8 +159,31 @@ export async function runFullSync(tenantId?: string | null): Promise<void> {
 // ── Entry Point ───────────────────────────────────────────────────────────────
 
 if (require.main === module) {
-    runFullSync().then(() => process.exit(0)).catch((err) => {
-        logger.error("[RouterSync] Fatal error", { error: err.message });
-        process.exit(1);
-    });
+    logger.info("[RouterSync] Starting sync worker daemon...");
+
+    const SYNC_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+
+    const loop = async () => {
+        try {
+            await runFullSync();
+        } catch (err: any) {
+            logger.error("[RouterSync] Error during sync run", { error: err.message });
+        } finally {
+            setTimeout(loop, SYNC_INTERVAL_MS);
+        }
+    };
+
+    // Start first run
+    loop();
+
+    // Graceful shutdown hooks
+    const shutdown = async () => {
+        logger.info("[RouterSync] Shutting down...");
+        try {
+            await closePrisma();
+        } catch {}
+        process.exit(0);
+    };
+    process.on("SIGTERM", shutdown);
+    process.on("SIGINT", shutdown);
 }
