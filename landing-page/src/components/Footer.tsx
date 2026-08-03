@@ -56,7 +56,7 @@ const HELP_LINKS = [
   { label: "Returns & Refunds", href: "/returns" },
   { label: "Shipping Policy", href: "/shipping" },
   { label: "Payment Methods", href: "/payments" },
-  { label: "Contact Us", href: "/contact" },
+  { label: "Contact Us", href: "/support" },
 ];
 
 const COMPANY_LINKS = [
@@ -258,12 +258,12 @@ export default function Footer() {
                 </li>
               ))}
               <li>
-                <Link
+                <a
                   href={`${billingUrl}/login`}
                   className="text-slate-400 hover:text-white text-sm transition-colors hover:translate-x-1 inline-block"
                 >
                   ISP Platform Login
-                </Link>
+                </a>
               </li>
             </ul>
           </div>

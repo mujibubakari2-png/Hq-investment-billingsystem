@@ -224,14 +224,14 @@ export default function Navbar() {
   const utilityLinks = [
     { href: "/track-order", label: "Track Order", icon: Truck },
     { href: "/support", label: "Support", icon: Headphones },
-    { href: "/contact", label: "Contact", icon: MessageCircle },
+    { href: "/support", label: "Contact", icon: MessageCircle },
   ];
 
   return (
     <nav
       className={`fixed top-0 w-full z-50 transition-all duration-300 ${scrolled
-          ? "bg-white/90 backdrop-blur-lg shadow-md border-b border-slate-100"
-          : "bg-white/80 backdrop-blur-sm"
+        ? "bg-white/90 backdrop-blur-lg shadow-md border-b border-slate-100"
+        : "bg-white/80 backdrop-blur-sm"
         }`}
     >
       <div className="hidden md:block bg-slate-950 text-white">
@@ -294,9 +294,9 @@ export default function Navbar() {
             <Link href="/#contact" className="text-sm text-slate-600 hover:text-primary font-medium transition-colors">
               Contact
             </Link>
-            <Link href={`${billingUrl}/login`} className="text-sm text-slate-600 hover:text-primary font-medium transition-colors border-l border-slate-200 pl-5">
+            <a href={`${billingUrl}billing/login`} className="text-sm text-slate-600 hover:text-primary font-medium transition-colors border-l border-slate-200 pl-5">
               Login
-            </Link>
+            </a>
           </div>
 
           {/* Right Actions */}
@@ -325,17 +325,30 @@ export default function Navbar() {
               { href: "/compare", label: "Compare products", icon: Scale },
               { href: `${billingUrl}/login`, label: "Customer account", icon: User },
               { href: "/notifications", label: "Notifications", icon: Bell },
-            ].map(({ href, label, icon: Icon }) => (
-              <Link
-                key={label}
-                href={href}
-                className="hidden lg:flex w-9 h-9 rounded-full border border-slate-200 bg-white text-slate-500 items-center justify-center hover:text-primary hover:border-primary/30 transition-all"
-                aria-label={label}
-                title={label}
-              >
-                <Icon size={16} />
-              </Link>
-            ))}
+            ].map(({ href, label, icon: Icon }) => {
+              const isExternal = href.startsWith('http') || href.startsWith(billingUrl);
+              const linkClasses = "hidden lg:flex w-9 h-9 rounded-full border border-slate-200 bg-white text-slate-500 items-center justify-center hover:text-primary hover:border-primary/30 transition-all";
+
+              if (isExternal) {
+                return (
+                  <a key={label} href={href} className={linkClasses} aria-label={label} title={label}>
+                    <Icon size={18} strokeWidth={2} />
+                  </a>
+                );
+              }
+
+              return (
+                <Link
+                  key={label}
+                  href={href}
+                  className={linkClasses}
+                  aria-label={label}
+                  title={label}
+                >
+                  <Icon size={18} strokeWidth={2} />
+                </Link>
+              );
+            })}
             <CartIcon />
             <div className="hidden md:block">
               <Link
@@ -401,7 +414,7 @@ export default function Navbar() {
                 <Link href="/#features" className="block px-3 py-2.5 rounded-xl hover:bg-slate-50 text-sm text-slate-700">Features</Link>
                 <Link href="/#pricing" className="block px-3 py-2.5 rounded-xl hover:bg-slate-50 text-sm text-slate-700">Pricing</Link>
                 <Link href="/#contact" className="block px-3 py-2.5 rounded-xl hover:bg-slate-50 text-sm text-slate-700">Contact</Link>
-                <Link href={`${billingUrl}/login`} className="block px-3 py-2.5 rounded-xl hover:bg-slate-50 text-sm text-slate-700 font-medium">Login</Link>
+                <a href={`${billingUrl}billing/login`} className="block px-3 py-2.5 rounded-xl hover:bg-slate-50 text-sm text-slate-700 font-medium">Login</a>
               </div>
               <Link
                 href="/#pricing"
