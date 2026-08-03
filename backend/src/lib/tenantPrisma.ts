@@ -78,6 +78,7 @@ const TENANT_MODELS = new Set([
     'user',
     'radUserGroup',
     'radPostAuth',
+    'routerProvisioningLog',
 ]);
 
 // ── Soft-delete models (also have deletedAt column) ───────────────────────────
