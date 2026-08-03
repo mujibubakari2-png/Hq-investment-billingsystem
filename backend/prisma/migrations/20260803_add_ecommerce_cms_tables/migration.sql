@@ -1,3 +1,29 @@
+DO $ $
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'ProductStatus') THEN
+    CREATE TYPE "ProductStatus" AS ENUM ('DRAFT', 'PUBLISHED', 'ARCHIVED', 'SCHEDULED');
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'OrderStatus') THEN
+    CREATE TYPE "OrderStatus" AS ENUM ('PENDING', 'CONFIRMED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED', 'REFUNDED');
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'StockMovementType') THEN
+    CREATE TYPE "StockMovementType" AS ENUM ('IN', 'OUT', 'ADJUST');
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'EcomCustomerStatus') THEN
+    CREATE TYPE "EcomCustomerStatus" AS ENUM ('ACTIVE', 'INACTIVE', 'BLOCKED');
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'PromotionType') THEN
+    CREATE TYPE "PromotionType" AS ENUM ('DISCOUNT', 'BOGO', 'FREE_SHIPPING', 'BUNDLE');
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'PromotionStatus') THEN
+    CREATE TYPE "PromotionStatus" AS ENUM ('DRAFT', 'ACTIVE', 'SCHEDULED', 'EXPIRED');
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'MediaAssetType') THEN
+    CREATE TYPE "MediaAssetType" AS ENUM ('IMAGE', 'VIDEO', 'DOCUMENT', 'OTHER');
+  END IF;
+END
+$$;
+
 -- Migration: 20260803_add_ecommerce_cms_tables
 -- Purpose: Creates 26 ecommerce and CMS tables that exist in schema.prisma but not in DB.
 
@@ -413,106 +439,108 @@ ALTER TABLE "reviews" ADD CONSTRAINT "reviews_productId_fkey" FOREIGN KEY ("prod
 
 ALTER TABLE "stock_movements" ADD CONSTRAINT "stock_movements_productId_fkey" FOREIGN KEY ("productId") REFERENCES "products"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
-CREATE UNIQUE INDEX "api_keys_keyHash_key" ON "api_keys"("keyHash");
+CREATE UNIQUE INDEX IF NOT EXISTS "api_keys_keyHash_key" ON "api_keys"("keyHash");
 
-CREATE INDEX "banners_isActive_idx" ON "banners"("isActive");
+CREATE INDEX IF NOT EXISTS "banners_isActive_idx" ON "banners"("isActive");
 
-CREATE INDEX "banners_position_idx" ON "banners"("position");
+CREATE INDEX IF NOT EXISTS "banners_position_idx" ON "banners"("position");
 
-CREATE UNIQUE INDEX "blog_posts_slug_key" ON "blog_posts"("slug");
+CREATE UNIQUE INDEX IF NOT EXISTS "blog_posts_slug_key" ON "blog_posts"("slug");
 
-CREATE UNIQUE INDEX "coupons_code_key" ON "coupons"("code");
+CREATE UNIQUE INDEX IF NOT EXISTS "coupons_code_key" ON "coupons"("code");
 
-CREATE UNIQUE INDEX "custom_pages_slug_key" ON "custom_pages"("slug");
+CREATE UNIQUE INDEX IF NOT EXISTS "custom_pages_slug_key" ON "custom_pages"("slug");
 
-CREATE INDEX "custom_pages_slug_idx" ON "custom_pages"("slug");
+CREATE INDEX IF NOT EXISTS "custom_pages_slug_idx" ON "custom_pages"("slug");
 
-CREATE UNIQUE INDEX "ecom_customers_email_key" ON "ecom_customers"("email");
+CREATE UNIQUE INDEX IF NOT EXISTS "ecom_customers_email_key" ON "ecom_customers"("email");
 
-CREATE INDEX "ecom_customers_email_idx" ON "ecom_customers"("email");
+CREATE INDEX IF NOT EXISTS "ecom_customers_email_idx" ON "ecom_customers"("email");
 
-CREATE INDEX "ecom_customers_status_idx" ON "ecom_customers"("status");
+CREATE INDEX IF NOT EXISTS "ecom_customers_status_idx" ON "ecom_customers"("status");
 
-CREATE INDEX "ecom_order_items_orderId_idx" ON "ecom_order_items"("orderId");
+CREATE INDEX IF NOT EXISTS "ecom_order_items_orderId_idx" ON "ecom_order_items"("orderId");
 
-CREATE INDEX "ecom_order_items_productId_idx" ON "ecom_order_items"("productId");
+CREATE INDEX IF NOT EXISTS "ecom_order_items_productId_idx" ON "ecom_order_items"("productId");
 
-CREATE UNIQUE INDEX "ecom_orders_orderNumber_key" ON "ecom_orders"("orderNumber");
+CREATE UNIQUE INDEX IF NOT EXISTS "ecom_orders_orderNumber_key" ON "ecom_orders"("orderNumber");
 
-CREATE INDEX "ecom_orders_orderNumber_idx" ON "ecom_orders"("orderNumber");
+CREATE INDEX IF NOT EXISTS "ecom_orders_orderNumber_idx" ON "ecom_orders"("orderNumber");
 
-CREATE INDEX "ecom_orders_status_idx" ON "ecom_orders"("status");
+CREATE INDEX IF NOT EXISTS "ecom_orders_status_idx" ON "ecom_orders"("status");
 
-CREATE INDEX "ecom_orders_paymentStatus_idx" ON "ecom_orders"("paymentStatus");
+CREATE INDEX IF NOT EXISTS "ecom_orders_paymentStatus_idx" ON "ecom_orders"("paymentStatus");
 
-CREATE INDEX "ecom_orders_customerEmail_idx" ON "ecom_orders"("customerEmail");
+CREATE INDEX IF NOT EXISTS "ecom_orders_customerEmail_idx" ON "ecom_orders"("customerEmail");
 
-CREATE INDEX "ecom_orders_customerId_idx" ON "ecom_orders"("customerId");
+CREATE INDEX IF NOT EXISTS "ecom_orders_customerId_idx" ON "ecom_orders"("customerId");
 
-CREATE INDEX "ecom_orders_createdAt_idx" ON "ecom_orders"("createdAt");
+CREATE INDEX IF NOT EXISTS "ecom_orders_createdAt_idx" ON "ecom_orders"("createdAt");
 
-CREATE INDEX "faqs_isActive_idx" ON "faqs"("isActive");
+CREATE INDEX IF NOT EXISTS "faqs_isActive_idx" ON "faqs"("isActive");
 
-CREATE INDEX "faqs_category_idx" ON "faqs"("category");
+CREATE INDEX IF NOT EXISTS "faqs_category_idx" ON "faqs"("category");
 
-CREATE INDEX "media_assets_fileType_idx" ON "media_assets"("fileType");
+CREATE INDEX IF NOT EXISTS "media_assets_fileType_idx" ON "media_assets"("fileType");
 
-CREATE INDEX "menu_items_menuId_idx" ON "menu_items"("menuId");
+CREATE INDEX IF NOT EXISTS "menu_items_menuId_idx" ON "menu_items"("menuId");
 
-CREATE UNIQUE INDEX "menus_slug_key" ON "menus"("slug");
+CREATE UNIQUE INDEX IF NOT EXISTS "menus_slug_key" ON "menus"("slug");
 
-CREATE UNIQUE INDEX "newsletter_subscribers_email_key" ON "newsletter_subscribers"("email");
+CREATE UNIQUE INDEX IF NOT EXISTS "newsletter_subscribers_email_key" ON "newsletter_subscribers"("email");
 
-CREATE INDEX "newsletter_subscribers_email_idx" ON "newsletter_subscribers"("email");
+CREATE INDEX IF NOT EXISTS "newsletter_subscribers_email_idx" ON "newsletter_subscribers"("email");
 
-CREATE INDEX "newsletter_subscribers_isActive_idx" ON "newsletter_subscribers"("isActive");
+CREATE INDEX IF NOT EXISTS "newsletter_subscribers_isActive_idx" ON "newsletter_subscribers"("isActive");
 
-CREATE UNIQUE INDEX "product_categories_slug_key" ON "product_categories"("slug");
+CREATE UNIQUE INDEX IF NOT EXISTS "product_categories_slug_key" ON "product_categories"("slug");
 
-CREATE INDEX "product_categories_slug_idx" ON "product_categories"("slug");
+CREATE INDEX IF NOT EXISTS "product_categories_slug_idx" ON "product_categories"("slug");
 
-CREATE INDEX "product_categories_isActive_idx" ON "product_categories"("isActive");
+CREATE INDEX IF NOT EXISTS "product_categories_isActive_idx" ON "product_categories"("isActive");
 
-CREATE INDEX "product_images_productId_idx" ON "product_images"("productId");
+CREATE INDEX IF NOT EXISTS "product_images_productId_idx" ON "product_images"("productId");
 
-CREATE UNIQUE INDEX "products_slug_key" ON "products"("slug");
+CREATE UNIQUE INDEX IF NOT EXISTS "products_slug_key" ON "products"("slug");
 
-CREATE UNIQUE INDEX "products_sku_key" ON "products"("sku");
+CREATE UNIQUE INDEX IF NOT EXISTS "products_sku_key" ON "products"("sku");
 
-CREATE INDEX "products_slug_idx" ON "products"("slug");
+CREATE INDEX IF NOT EXISTS "products_slug_idx" ON "products"("slug");
 
-CREATE INDEX "products_categoryId_idx" ON "products"("categoryId");
+CREATE INDEX IF NOT EXISTS "products_categoryId_idx" ON "products"("categoryId");
 
-CREATE INDEX "products_brandId_idx" ON "products"("brandId");
+CREATE INDEX IF NOT EXISTS "products_brandId_idx" ON "products"("brandId");
 
-CREATE INDEX "products_collectionId_idx" ON "products"("collectionId");
+CREATE INDEX IF NOT EXISTS "products_collectionId_idx" ON "products"("collectionId");
 
-CREATE INDEX "products_status_idx" ON "products"("status");
+CREATE INDEX IF NOT EXISTS "products_status_idx" ON "products"("status");
 
-CREATE INDEX "products_featured_idx" ON "products"("featured");
+CREATE INDEX IF NOT EXISTS "products_featured_idx" ON "products"("featured");
 
-CREATE INDEX "products_trending_idx" ON "products"("trending");
+CREATE INDEX IF NOT EXISTS "products_trending_idx" ON "products"("trending");
 
-CREATE INDEX "products_bestSeller_idx" ON "products"("bestSeller");
+CREATE INDEX IF NOT EXISTS "products_bestSeller_idx" ON "products"("bestSeller");
 
-CREATE INDEX "products_createdAt_idx" ON "products"("createdAt");
+CREATE INDEX IF NOT EXISTS "products_createdAt_idx" ON "products"("createdAt");
 
-CREATE INDEX "products_deletedAt_idx" ON "products"("deletedAt");
+CREATE INDEX IF NOT EXISTS "products_deletedAt_idx" ON "products"("deletedAt");
 
-CREATE INDEX "promotions_status_idx" ON "promotions"("status");
+CREATE INDEX IF NOT EXISTS "promotions_status_idx" ON "promotions"("status");
 
-CREATE INDEX "promotions_type_idx" ON "promotions"("type");
+CREATE INDEX IF NOT EXISTS "promotions_type_idx" ON "promotions"("type");
 
-CREATE INDEX "reviews_productId_idx" ON "reviews"("productId");
+CREATE INDEX IF NOT EXISTS "reviews_productId_idx" ON "reviews"("productId");
 
-CREATE INDEX "reviews_isApproved_idx" ON "reviews"("isApproved");
+CREATE INDEX IF NOT EXISTS "reviews_isApproved_idx" ON "reviews"("isApproved");
 
-CREATE INDEX "stock_movements_productId_idx" ON "stock_movements"("productId");
+CREATE INDEX IF NOT EXISTS "stock_movements_productId_idx" ON "stock_movements"("productId");
 
-CREATE INDEX "stock_movements_type_idx" ON "stock_movements"("type");
+CREATE INDEX IF NOT EXISTS "stock_movements_type_idx" ON "stock_movements"("type");
 
-CREATE INDEX "stock_movements_createdAt_idx" ON "stock_movements"("createdAt");
+CREATE INDEX IF NOT EXISTS "stock_movements_createdAt_idx" ON "stock_movements"("createdAt");
 
-CREATE INDEX "testimonials_isActive_idx" ON "testimonials"("isActive");
+CREATE INDEX IF NOT EXISTS "testimonials_isActive_idx" ON "testimonials"("isActive");
+
+
 
 
