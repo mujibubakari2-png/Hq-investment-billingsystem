@@ -126,7 +126,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
         const firmwareVersion = update.firmwareVersion || body.firmwareVersion || body.firmware || existingRouterData.firmwareVersion || null;
         if (update.firmwareVersion || body.firmwareVersion || body.firmware || existingRouterData.firmwareVersion || hasVendorChange || (update.architecture || body.architecture || existingRouterData.architecture)) {
-            const resolvedFirmwareVersion = firmwareVersion || (vendor === "mikrotik" ? "6.49.10" : "1.0.0");
+            const resolvedFirmwareVersion = firmwareVersion || (vendor === "mikrotik" ? "7.15.3" : "1.0.0");
             const capabilities = detectRouterCapabilities(
                 vendor,
                 resolvedFirmwareVersion,

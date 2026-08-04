@@ -148,7 +148,7 @@ export class MikroTikAdapter implements RouterAdapter {
     }
 
     private get firmware(): string {
-        return this.context.firmwareVersion ?? "6.49";
+        return this.context.firmwareVersion ?? "7.15.3";
     }
 
     private async request(path: string, method = "GET", body?: unknown): Promise<any> {

@@ -120,7 +120,7 @@ export function detectApiType(vendor: RouterVendor, firmwareVersion: string): Ap
 
 export function getCompatibilityRules(vendor: string, firmwareVersion?: string | null): CompatibilityRule[] {
     const normalized = (vendor || "mikrotik").toLowerCase() as RouterVendor;
-    const version = firmwareVersion || "6.49";
+    const version = firmwareVersion || "7.15.3";
     const rules: CompatibilityRule[] = [];
 
     if (normalized === "mikrotik") {
