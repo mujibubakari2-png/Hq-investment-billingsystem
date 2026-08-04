@@ -2,13 +2,20 @@
  * Step 2 — Service selection (Hotspot / PPPoE / Both)
  * Step 3 — VPN tunnel configuration
  * FE-001: Extracted from RouterSetupWizard.tsx
+ * BUG-003 FIX: Added RADIUS settings section (address + secret) that was
+ *   passed as props but never rendered — users could not view or correct them.
  */
 
+import { useState } from 'react';
 import SettingsIcon from '@mui/icons-material/Settings';
 import DnsIcon from '@mui/icons-material/Dns';
 import WifiIcon from '@mui/icons-material/Wifi';
 import DeviceHubIcon from '@mui/icons-material/DeviceHub';
 import VpnKeyIcon from '@mui/icons-material/VpnKey';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
+import LockIcon from '@mui/icons-material/Lock';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import type { ServiceType, VpnMode } from './WizardTypes';
 
 // ── Step 2: Services ──────────────────────────────────────────────────────────
@@ -27,6 +34,9 @@ interface Step2Props {
 }
 
 export function Step2Services(p: Step2Props) {
+    const [showSecret, setShowSecret] = useState(false);
+    const [showRadiusSection, setShowRadiusSection] = useState(false);
+
     const svcOptions: { key: ServiceType; label: string; desc: string; icon: React.ReactNode; detail: string }[] = [
         {
             key: 'pppoe', label: 'PPPoE Server Only',
@@ -52,9 +62,10 @@ export function Step2Services(p: Step2Props) {
         <div style={{ textAlign: 'center', padding: '30px 0' }}>
             <SettingsIcon style={{ fontSize: 56, color: 'var(--text-secondary)', marginBottom: 16 }} />
             <h2 style={{ marginBottom: 6 }}>Choose Services to Configure</h2>
-            <p style={{ color: 'var(--text-secondary)', marginBottom: 30 }}>Select which services you want to configure</p>
+            <p style={{ color: 'var(--text-secondary)', marginBottom: 30 }}>Select which services you want to configure on this router</p>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, maxWidth: 750, margin: '0 auto' }}>
+            {/* Service type cards */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, maxWidth: 750, margin: '0 auto 32px' }}>
                 {svcOptions.map(svc => (
                     <div key={svc.key} onClick={() => p.setServiceType(svc.key)} style={{
                         border: p.serviceType === svc.key ? '2px solid #0d9488' : '1px solid var(--border)',
@@ -74,10 +85,139 @@ export function Step2Services(p: Step2Props) {
                 ))}
             </div>
 
+            {/* ── BUG-003 FIX: RADIUS Settings Section ────────────────────── */}
+            <div style={{ maxWidth: 750, margin: '0 auto', textAlign: 'left' }}>
+                {/* Collapsible toggle header */}
+                <button
+                    onClick={() => setShowRadiusSection(!showRadiusSection)}
+                    style={{
+                        width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        padding: '12px 18px',
+                        border: '1px solid var(--border-light)',
+                        borderRadius: showRadiusSection ? 'var(--radius-md) var(--radius-md) 0 0' : 'var(--radius-md)',
+                        background: showRadiusSection ? '#f0fdf4' : '#f9fafb',
+                        cursor: 'pointer', transition: 'all 0.2s', outline: 'none',
+                    }}
+                >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <LockIcon style={{ fontSize: 18, color: '#0d9488' }} />
+                        <span style={{ fontWeight: 600, fontSize: '0.9rem', color: '#374151' }}>
+                            RADIUS Authentication Settings
+                        </span>
+                        {p.radiusSecret ? (
+                            <span style={{ background: '#dcfce7', color: '#166534', padding: '1px 8px', borderRadius: 10, fontSize: '0.7rem', fontWeight: 600 }}>
+                                ✓ Configured
+                            </span>
+                        ) : (
+                            <span style={{ background: '#fef9c3', color: '#854d0e', padding: '1px 8px', borderRadius: 10, fontSize: '0.7rem', fontWeight: 600 }}>
+                                ⚠ Not set
+                            </span>
+                        )}
+                    </div>
+                    <span style={{ fontSize: '0.8rem', color: '#6b7280', display: 'inline-block', transform: showRadiusSection ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>▼</span>
+                </button>
 
+                {showRadiusSection && (
+                    <div style={{
+                        border: '1px solid var(--border-light)', borderTop: 'none',
+                        borderRadius: '0 0 var(--radius-md) var(--radius-md)',
+                        padding: 20, background: '#fff',
+                    }}>
+                        {/* Info note */}
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 14px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 'var(--radius-sm)', marginBottom: 20 }}>
+                            <InfoOutlinedIcon style={{ fontSize: 18, color: '#1d4ed8', marginTop: 2, flexShrink: 0 }} />
+                            <div style={{ fontSize: '0.82rem', color: '#1e40af', lineHeight: 1.6 }}>
+                                <strong>Auto-configured:</strong> These values were generated automatically by the server and saved to your router.
+                                They are pre-filled here for reference. <strong>Only edit if you know what you're doing</strong> — changing the RADIUS secret
+                                here updates the generated RSC file but <em>not</em> the FreeRADIUS NAS table automatically.
+                                Use <strong>Auto-Push</strong> to apply all changes to the router at once.
+                            </div>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                            {/* RADIUS Server Address */}
+                            <div>
+                                <label htmlFor="radius-address-input" style={{ fontSize: '0.82rem', fontWeight: 600, color: '#374151', display: 'block', marginBottom: 6 }}>
+                                    RADIUS Server Address
+                                </label>
+                                <input
+                                    id="radius-address-input"
+                                    type="text"
+                                    value={p.radiusAddress}
+                                    onChange={e => p.setRadiusAddress(e.target.value)}
+                                    placeholder="e.g. 10.0.0.1"
+                                    style={{
+                                        width: '100%', padding: '9px 12px', border: '1px solid var(--border)',
+                                        borderRadius: 'var(--radius-sm)', fontSize: '0.85rem', fontFamily: 'monospace',
+                                        background: '#f9fafb', boxSizing: 'border-box',
+                                    }}
+                                />
+                                <p style={{ fontSize: '0.72rem', color: '#6b7280', marginTop: 4, marginBottom: 0 }}>
+                                    VPN tunnel IP of the billing server (serverTunnelIp)
+                                </p>
+                            </div>
+
+                            {/* RADIUS Shared Secret */}
+                            <div>
+                                <label htmlFor="radius-secret-input" style={{ fontSize: '0.82rem', fontWeight: 600, color: '#374151', display: 'block', marginBottom: 6 }}>
+                                    RADIUS Shared Secret
+                                </label>
+                                <div style={{ position: 'relative' }}>
+                                    <input
+                                        id="radius-secret-input"
+                                        type={showSecret ? 'text' : 'password'}
+                                        value={p.radiusSecret}
+                                        onChange={e => p.setRadiusSecret(e.target.value)}
+                                        placeholder="Auto-generated by server"
+                                        style={{
+                                            width: '100%', padding: '9px 40px 9px 12px',
+                                            border: `1px solid ${!p.radiusSecret ? '#f59e0b' : 'var(--border)'}`,
+                                            borderRadius: 'var(--radius-sm)', fontSize: '0.85rem', fontFamily: 'monospace',
+                                            background: '#f9fafb', boxSizing: 'border-box',
+                                        }}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowSecret(!showSecret)}
+                                        title={showSecret ? 'Hide secret' : 'Show secret'}
+                                        style={{
+                                            position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
+                                            background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                                            color: '#6b7280', display: 'flex', alignItems: 'center',
+                                        }}
+                                    >
+                                        {showSecret
+                                            ? <VisibilityOffIcon style={{ fontSize: 18 }} />
+                                            : <VisibilityIcon style={{ fontSize: 18 }} />
+                                        }
+                                    </button>
+                                </div>
+                                {!p.radiusSecret ? (
+                                    <p style={{ fontSize: '0.72rem', color: '#d97706', marginTop: 4, marginBottom: 0 }}>
+                                        ⚠ Missing — Auto-Push itatengeneza moja kwa moja
+                                    </p>
+                                ) : (
+                                    <p style={{ fontSize: '0.72rem', color: '#16a34a', marginTop: 4, marginBottom: 0 }}>
+                                        ✓ Secret imewekwa ({p.radiusSecret.length} chars)
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Footer note */}
+                        <div style={{ marginTop: 16, padding: '10px 14px', background: '#f9fafb', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <VpnKeyIcon style={{ fontSize: 16, color: '#0d9488' }} />
+                            <span style={{ fontSize: '0.8rem', color: '#374151' }}>
+                                Mipangilio hii itawekwa kwenye RSC config na kutumwa kwa MikroTik kupitia Auto-Push (Step 5).
+                            </span>
+                        </div>
+                    </div>
+                )}
+            </div>
         </div>
     );
 }
+
 
 // ── Step 3: VPN Configuration ─────────────────────────────────────────────────
 

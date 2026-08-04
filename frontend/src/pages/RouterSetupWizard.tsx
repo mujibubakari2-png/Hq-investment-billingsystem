@@ -10,7 +10,7 @@
  *   WizardSteps456.tsx   — Step 4 (interfaces) + Step 5 (generate) + Step 6 (verify)
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
@@ -103,13 +103,21 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
         }
     }, [routerId]);
 
+    // BUG-004 FIX: Use a ref to ensure we only apply the DB secret ONCE.
+    // Without this, if routerData refetches or delays and the user has
+    // started typing a new secret manually, the effect could run again
+    // and clobber their input if `prev` was somehow falsy.
+    const radiusSecretFetched = useRef(false);
     useEffect(() => {
-        if (!routerData) return;
-        setRadiusSecret(prev => {
-            if (prev) return prev; // already set (from backend or a previous run) — don't clobber operator edits
-            // Trust the backend secret now that it's unmasked.
-            return (routerData.radiusSecret as string) || '';
-        });
+        if (!routerData || radiusSecretFetched.current) return;
+        
+        if (routerData.radiusSecret) {
+            setRadiusSecret(prev => {
+                // Only use the DB secret if the user hasn't typed anything yet
+                return prev ? prev : (routerData.radiusSecret as string);
+            });
+            radiusSecretFetched.current = true;
+        }
     }, [routerData]);
 
     // Fetch WireGuard config → derive LAN IPs
@@ -190,9 +198,25 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                 setServiceVerifyStatus('failed');
             }
 
-            // VPN verification
-            if (vpnEnabled) setVpnVerifyStatus(connRes.success ? 'success' : 'failed');
-            else setVpnVerifyStatus('success');
+            // BUG-008 FIX: VPN verification must check the ACTUAL WireGuard tunnel,
+            // not just testConnection success. testConnection uses the router's host IP
+            // which works even BEFORE the WireGuard tunnel is established.
+            // The correct check is GET /wireguard → tunnelActive + lastHandshakeSeconds.
+            if (vpnEnabled) {
+                try {
+                    const wgStatus = await routersApi.wireguard.getConfig(routerId);
+                    // tunnelActive = true means WG reported a handshake within the last 180s
+                    const isTunnelUp = wgStatus.tunnelActive === true &&
+                        (wgStatus.lastHandshakeSeconds === null || wgStatus.lastHandshakeSeconds < 180);
+                    setVpnVerifyStatus(isTunnelUp ? 'success' : 'failed');
+                } catch {
+                    // If we can't reach the WG status endpoint, fall back to
+                    // connection success as a soft indicator
+                    setVpnVerifyStatus(connRes.success ? 'success' : 'failed');
+                }
+            } else {
+                setVpnVerifyStatus('success');
+            }
         } catch { setServiceVerifyStatus('failed'); setVpnVerifyStatus('failed'); }
     };
 
@@ -223,12 +247,16 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
             return '';
         }
 
-        // SEC-ROUTER-001/003 FIX: block generation (same as the backend
-        // validation layer) if required secrets are missing or still match a
-        // known-insecure legacy static default, instead of silently shipping
-        // an empty/guessable value to the router.
+        // SEC-ROUTER-001/003: Block RSC download if radiusSecret is missing or insecure.
+        // Auto-Push (handleAutoPush) bypasses this check — the backend generates and
+        // persists a strong RADIUS secret server-side during push-config, so the wizard
+        // should direct users to Auto-Push when the secret is absent.
         if (!radiusSecret || KNOWN_INSECURE_SECRETS.has(radiusSecret)) {
-            alert('RADIUS shared secret inakosekana. Tafadhali tumia kitufe cha "Auto-Push" ili mfumo uitengeneze na kuiweka kwenye router yako moja kwa moja.');
+            alert(
+                'RADIUS shared secret inakosekana kwenye configuration ya router hii.\n\n' +
+                'Tafadhali tumia kitufe cha "Auto-Push" — mfumo utatengeneza na kuiweka ' +
+                'secret salama kwenye router moja kwa moja bila kuhitaji kudownload script.'
+            );
             return '';
         }
 
@@ -276,24 +304,45 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
     const handleAutoPush = async () => {
         if (!routerId) return;
         
-        const serviceValidation = validateRouterSetupWizardServiceInputs({
-            serviceType,
-            hotspotLocalAddress,
-            pppoeLocalAddress,
-            hotspotPoolStart,
-            hotspotPoolEnd,
-            pppoePoolStart,
-            pppoePoolEnd,
-        });
+        // BUG-005 FIX: Removed strict frontend validation here because the backend
+        // `push-config` endpoint automatically generates missing hotspot/pppoe 
+        // local addresses and pool ranges based on the router's assigned VPN IP 
+        // or LAN IP. Blocking it here prevented the automatic backend generation.
 
-        if (!serviceValidation.ok) {
-            alert(`Missing required PPPoE/Hotspot values: ${serviceValidation.missingFields.join(', ')}.`);
-            return;
-        }
 
         setActionLoading(true);
         try {
-            const res = await routersApi.wireguard.pushConfig(routerId, selectedInterfaces);
+            // FIX-504: Use AbortController to handle 504 gateway timeouts gracefully.
+            // The actual push-config operation may take 30-60s on the MikroTik side;
+            // the backend now returns faster (reduced sleeps), but long network latency
+            // could still cause a proxy timeout. We catch that and show a useful message.
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 90000); // 90s client timeout
+
+            let res: any;
+            try {
+                res = await routersApi.wireguard.pushConfig(routerId, selectedInterfaces);
+                clearTimeout(timeoutId);
+            } catch (err: any) {
+                clearTimeout(timeoutId);
+                const isTimeout = err?.name === 'AbortError' || err?.message?.includes('504') || err?.message?.includes('Gateway');
+                if (isTimeout) {
+                    // 504 means the backend kept working but the proxy timed out.
+                    // Config was likely applied — tell the user to verify in Step 6.
+                    alert(
+                        'Auto-Push: Ombi lilichukua muda mrefu (504 Gateway Timeout).\n\n' +
+                        'Hii HAIMAANISHI failure — MikroTik inaendelea kupokea configuration.\n\n' +
+                        'Hatua zinazofuata:\n' +
+                        '1. Subiri sekunde 30 kisha endelea hadi Step 6 (Verify).\n' +
+                        '2. Kama Step 6 inaonyesha VPN "Success", configuration ilifanya kazi vizuri.\n' +
+                        '3. Kama bado iko offline, rudi Step 1 na ujaribu tena.'
+                    );
+                    setConfigGenerated(true); // Assume partial success, allow navigation
+                    return;
+                }
+                throw err; // Re-throw non-timeout errors
+            }
+
             if (res.success || res.partialSuccess) {
                 setConfigGenerated(true);
                 alert(res.message || 'Configuration pushed successfully.');

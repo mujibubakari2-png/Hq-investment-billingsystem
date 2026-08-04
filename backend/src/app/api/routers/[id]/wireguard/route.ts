@@ -5,7 +5,7 @@ import { requirePermission } from "@/lib/rbac";
 import { canAccessTenant } from "@/lib/tenant";
 import { getMikroTikService, sanitizeMikroTikName } from "@/lib/mikrotik";
 import { wireguardManager } from "@/lib/wireguard";
-import { encrypt, encryptRouterFields, decryptRouterFields } from "@/lib/encryption";
+import { encryptRouterFields, decryptRouterFields } from "@/lib/encryption";
 import { generateRadiusSecret } from "@/lib/routerProvisioning";
 import { exec } from "child_process";
 import { promisify } from "util";
@@ -988,8 +988,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 if (!currentRadiusSecret) {
                     currentRadiusSecret = generateRadiusSecret();
                     logger.info(`[PUSH-CONFIG] Router ${id} had no radiusSecret — generated and persisting.`);
-                    // Save encrypted secret to Router table
-                    await updateRouterWgFields(db, id, { radiusSecret: encrypt(currentRadiusSecret) });
+                    // BUG-FIX (double-encryption): updateRouterWgFields calls encryptRouterFields
+                    // internally, so we pass the PLAINTEXT here — NOT encrypt(plaintext).
+                    // Passing encrypt(currentRadiusSecret) would encrypt twice: the DB would store
+                    // enc:v1:...:enc:v1:... which decryptRouterFields cannot reverse, causing every
+                    // subsequent read to return a broken ciphertext instead of the real secret.
+                    await updateRouterWgFields(db, id, { radiusSecret: currentRadiusSecret });
                     // Save plaintext secret to RadiusNas table (FreeRADIUS reads it directly)
                     const nasIp = tunnelIp || router.host;
                     const existingNas = await db.radiusNas.findFirst({
@@ -1185,10 +1189,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 trackStep('Firewall: push rules', fwFailCount === 0, fwFailCount > 0 ? `${fwFailCount} rule(s) failed` : undefined);
 
                 // Verification Step: Wait briefly for tunnel, then check real handshake.
-                // FIX-504: Reduced from 15s to 3s to prevent gateway timeout (504).
-                // Full verification happens in Step 6 of the wizard.
-                await new Promise(resolve => setTimeout(resolve, 3000));
-                const tunnelVerified = await wireguardManager.checkPeerHandshake(router.wgPublicKey);
+                // FIX-504: Reduced to 1s — enough for an in-progress handshake to complete
+                // without triggering a 504 gateway timeout from Nginx/reverse proxy.
+                // Full tunnel verification happens in Step 6 of the wizard.
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                const tunnelVerified = router.wgPublicKey
+                    ? await wireguardManager.checkPeerHandshake(router.wgPublicKey).catch(() => false)
+                    : false;
 
                 // Update router state
                 const updateData: Record<string, any> = {
@@ -1296,9 +1303,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             return errorResponse("Failed to add peer to server", 500);
         }
 
-        // Wait a few seconds for MikroTik to complete the WireGuard handshake
-        await new Promise(resolve => setTimeout(resolve, 8000));
-        const peerConnected = await wireguardManager.checkPeerHandshake(router.wgPublicKey);
+        // Wait briefly for MikroTik to initiate the WireGuard handshake.
+        // FIX-504: Reduced from 8s → 4s. The 8s blocking wait inside a Next.js
+        // API route was reliably causing 504 timeouts from the reverse proxy.
+        // The user can trigger verification again from Step 6 of the wizard.
+        await new Promise(resolve => setTimeout(resolve, 4000));
+        const peerConnected = router.wgPublicKey
+            ? await wireguardManager.checkPeerHandshake(router.wgPublicKey).catch(() => false)
+            : false;
 
         const activateData: Record<string, any> = {
             wgEnabled: true,

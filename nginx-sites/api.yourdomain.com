@@ -115,6 +115,42 @@ server {
         add_header Cache-Control "no-cache, must-revalidate";
     }
 
+    # ── Long-running router provisioning routes ──────────────────────────────
+    # push-config sends many sequential MikroTik API calls (cleanup + WG +
+    # RADIUS + firewall). Script download can also take a few seconds.
+    # These need a much longer read timeout than the general /api/ block.
+    # NOTE: This block must come BEFORE the general /api/ block (nginx uses
+    # the most specific matching location, not first-match).
+    location ~ ^/api/routers/[^/]+/wireguard {
+        limit_req  zone=api burst=5 nodelay;
+        limit_req_status 429;
+
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout                 120s;
+        proxy_connect_timeout              10s;
+        proxy_send_timeout                 120s;
+        proxy_buffering                    off;
+    }
+
+    location ~ ^/api/routers/[^/]+/script {
+        limit_req  zone=api burst=5 nodelay;
+        limit_req_status 429;
+
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout                 90s;
+        proxy_connect_timeout              10s;
+    }
+
     location /api/ {
         limit_req  zone=api burst=20 nodelay;
         limit_conn addr 20;

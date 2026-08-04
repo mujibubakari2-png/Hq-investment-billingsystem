@@ -26,7 +26,16 @@ interface Step0Props {
 export function Step0Download({ routerName, wgConfig }: Step0Props) {
     const handleDownload = () => {
         if (!wgConfig) return;
-        const subnetAddress = `${wgConfig.routerTunnelIp.split('.').slice(0, 3).join('.')}.0/24`;
+        // BUG-002 FIX: guard against null routerTunnelIp (router may not have been
+        // assigned a tunnel IP yet if GET /wireguard ran before DB write completed)
+        const tunnelIp = wgConfig.routerTunnelIp || '10.0.0.200';
+        const subnetAddress = `${tunnelIp.split('.').slice(0, 3).join('.')}.0/24`;
+        // BUG-006 FIX: include preshared-key if present.
+        // Backend push-config always sets a PSK on the server-side peer; without
+        // matching PSK on the router side the WireGuard handshake will fail.
+        const pskLine = wgConfig.presharedKey
+            ? ` preshared-key="${wgConfig.presharedKey}"`
+            : '';
         const script = [
             `# WireGuard VPN Setup Script for ${routerName}`,
             `:if ([:len [/interface wireguard find name="wg-hq"]] = 0) do={`,
@@ -35,13 +44,13 @@ export function Step0Download({ routerName, wgConfig }: Step0Props) {
             `    /interface wireguard set [find name="wg-hq"] listen-port=${wgConfig.listenPort} private-key="${wgConfig.routerPrivateKey}"`,
             `}`,
             `:if ([:len [/interface wireguard peers find interface="wg-hq" public-key="${wgConfig.serverPublicKey}"]] = 0) do={`,
-            `    /interface wireguard peers add interface="wg-hq" public-key="${wgConfig.serverPublicKey}" endpoint-address=${wgConfig.serverEndpoint} endpoint-port=${wgConfig.serverPort} allowed-address=${subnetAddress} persistent-keepalive=25s comment="HQ INVESTMENT ISP Server"`,
+            `    /interface wireguard peers add interface="wg-hq" public-key="${wgConfig.serverPublicKey}"${pskLine} endpoint-address=${wgConfig.serverEndpoint} endpoint-port=${wgConfig.serverPort} allowed-address=${subnetAddress} persistent-keepalive=25s comment="HQ INVESTMENT ISP Server"`,
             `} else={`,
-            `    /interface wireguard peers set [find interface="wg-hq" public-key="${wgConfig.serverPublicKey}"] endpoint-address=${wgConfig.serverEndpoint} endpoint-port=${wgConfig.serverPort} allowed-address=${subnetAddress} persistent-keepalive=25s`,
+            `    /interface wireguard peers set [find interface="wg-hq" public-key="${wgConfig.serverPublicKey}"]${pskLine} endpoint-address=${wgConfig.serverEndpoint} endpoint-port=${wgConfig.serverPort} allowed-address=${subnetAddress} persistent-keepalive=25s`,
             `}`,
             `# /24 required for subnet routing — /32 causes server-to-router packet loss`,
             `:foreach addr in=[/ip address find interface="wg-hq"] do={ /ip address remove $addr }`,
-            `/ip address add address=${wgConfig.routerTunnelIp}/24 interface="wg-hq" comment="HQ INVESTMENT VPN Address"`,
+            `/ip address add address=${tunnelIp}/24 interface="wg-hq" comment="HQ INVESTMENT VPN Address"`,
             `# Firewall Rules for WireGuard`,
             `:if ([:len [/ip firewall filter find comment="Dummy HQ Rule"]] = 0) do={ /ip firewall filter add chain=input action=passthrough comment="Dummy HQ Rule" }`,
             `:if ([:len [/ip firewall filter find where comment="Allow WireGuard - HQ INVESTMENT"]] = 0) do={`,

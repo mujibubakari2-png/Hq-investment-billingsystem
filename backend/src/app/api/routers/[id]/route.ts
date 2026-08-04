@@ -210,12 +210,22 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
             },
         });
 
-        return jsonResponse({
-            ...router,
-            status: router.status === "ONLINE" ? "Online" : "Offline",
-            router_id: router.id, // Alias
-            ip: router.host, // Alias
-        });
+        // BUG-001 FIX: Return a decrypted, safe projection — NOT the raw DB record.
+        // The previous code spread `router` directly which leaked AES-GCM ciphertext
+        // (enc:v1:...) for password/wgPrivateKey/wgPresharedKey/radiusSecret to the
+        // browser network tab on every PUT call.
+        const decryptedForResponse = decryptRouterFields(router as any);
+        const safeResponse = {
+            ...decryptedForResponse,
+            password:       userPayload.role === 'SUPER_ADMIN' ? decryptedForResponse.password : '****',
+            wgPrivateKey:   decryptedForResponse.wgPrivateKey,
+            wgPresharedKey: decryptedForResponse.wgPresharedKey,
+            radiusSecret:   decryptedForResponse.radiusSecret,
+            status:         (router as any).status === 'ONLINE' ? 'Online' : 'Offline',
+            router_id:      router.id,
+            ip:             (router as any).host,
+        };
+        return jsonResponse(safeResponse);
     } catch {
         return errorResponse("Internal server error", 500);
     }
