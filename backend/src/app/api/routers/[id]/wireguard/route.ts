@@ -1,4 +1,7 @@
 import { NextRequest } from "next/server";
+
+export const maxDuration = 300; // Allow up to 5 minutes for Auto-Push provisioning (fixes 504 Gateway Timeout)
+
 import { getTenantClient } from "@/lib/tenantPrisma";
 import { jsonResponse, errorResponse } from "@/lib/auth";
 import { requirePermission } from "@/lib/rbac";
