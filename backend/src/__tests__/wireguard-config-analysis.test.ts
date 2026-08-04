@@ -15,7 +15,7 @@ describe('WireGuard Configuration Analysis', () => {
     peer: {
       publicKey: 'b7ADpdTy6UooXmb7Ve+PgGeXjGFLVFXqsuz32dYNaxA=',
       presharedKey: '+HjQAEn8GA2tU+HuZNdVfYw9TaqL277IqPMovrqTxls=',
-      allowedIps: '10.0.0.200/32',
+      allowedIps: '10.0.0.200/24',
       endpoint: '0.0.0.0:51820',
       persistentKeepalive: 25,
     },
@@ -74,7 +74,7 @@ describe('WireGuard Configuration Analysis', () => {
       const [ip, cidr] = wgConfig.peer.allowedIps.split('/');
       const ipRegex = /^(\d{1,3}\.){3}\d{1,3}$/;
       expect(ip).toMatch(ipRegex);
-      expect(parseInt(cidr)).toBe(32);
+      expect(parseInt(cidr)).toBe(24);
     });
   });
 
@@ -91,14 +91,14 @@ describe('WireGuard Configuration Analysis', () => {
       const [ifaceIp, ifaceCidr] = wgConfig.interface.address.split('/');
       const [allowedIp, allowedCidr] = wgConfig.peer.allowedIps.split('/');
       const interfaceSubnet = '10.0.0.0/24';
-      const allowedIpAddr = '10.0.0.200/32';
+      const allowedIpAddr = '10.0.0.200/24';
 
       // Check if allowed IP is within interface subnet
       const ifaceOctets = ifaceIp.split('.').map(Number);
       const allowedOctets = allowedIp.split('.').map(Number);
 
       // Interface has 10.0.0.x/24 (covers 10.0.0.0 - 10.0.0.255)
-      // Peer is allowed 10.0.0.200/32
+      // Peer is allowed 10.0.0.200/24
       // This means router can reach peer at 10.0.0.200, but:
       // - Router itself is at 10.0.0.1
       // - This doesn't create a proper tunnel
@@ -111,18 +111,18 @@ describe('WireGuard Configuration Analysis', () => {
     it('ISSUE: Router cannot route traffic if AllowedIPs only specifies single peer IP', () => {
       // In a typical setup:
       // - Server: 10.0.0.1/24 (or separate management subnet)
-      // - Router: 10.0.0.2/32 (or different subnet)
+      // - Router: 10.0.0.2/24 (or different subnet)
       // - AllowedIPs should be what traffic to route through peer
 
-      const allowedIps = wgConfig.peer.allowedIps; // 10.0.0.200/32
+      const allowedIps = wgConfig.peer.allowedIps; // 10.0.0.200/24
       const interfaceSubnet = wgConfig.interface.address; // 10.0.0.1/24
 
       // The current config says:
-      // "Route 10.0.0.200/32 traffic through this peer"
+      // "Route 10.0.0.200/24 traffic through this peer"
       // But 10.0.0.1/24 means the router owns 10.0.0.0/24 and
       // already has 10.0.0.200 locally - no need to route through peer!
 
-      const issue = allowedIps === '10.0.0.200/32' && interfaceSubnet === '10.0.0.1/24';
+      const issue = allowedIps === '10.0.0.200/24' && interfaceSubnet === '10.0.0.1/24';
       expect(issue).toBe(true);
     });
 
@@ -132,7 +132,7 @@ describe('WireGuard Configuration Analysis', () => {
         interface: {
           // Router gets its own unique IP, not the subnet owner
           privateKey: 'kI56+MCLvtZnHyKjzce8iXKfqKr313SYZlYdho5WK18=',
-          address: '10.0.0.200/32', // Router's single IP
+          address: '10.0.0.200/24', // Router's single IP
           listenPort: 51820,
         },
         peer: {
@@ -145,7 +145,7 @@ describe('WireGuard Configuration Analysis', () => {
         },
       };
 
-      expect(correctedConfig.interface.address).toBe('10.0.0.200/32');
+      expect(correctedConfig.interface.address).toBe('10.0.0.200/24');
       expect(correctedConfig.peer.allowedIps).toBe('10.0.0.0/24');
       expect(correctedConfig.peer.endpoint).not.toBe('0.0.0.0:51820');
     });
@@ -238,12 +238,12 @@ describe('WireGuard Configuration Analysis', () => {
           severity: 'CRITICAL',
           issue: 'Interface Address should not be /24 subnet owner (10.0.0.1/24)',
           reason:
-            'Router should have a single /32 IP (e.g., 10.0.0.200/32), not own the entire subnet',
-          fix: 'Change Address to 10.0.0.200/32 or appropriate single IP',
+            'Router should have a single /24 IP (e.g., 10.0.0.200/24), not own the entire subnet',
+          fix: 'Change Address to 10.0.0.200/24 or appropriate single IP',
         },
         {
           severity: 'HIGH',
-          issue: 'AllowedIPs = 10.0.0.200/32 conflicts with Interface subnet',
+          issue: 'AllowedIPs = 10.0.0.200/24 conflicts with Interface subnet',
           reason: 'Router owns 10.0.0.0/24, so 10.0.0.200 is already local, no need to route',
           fix: 'Change AllowedIPs to 10.0.0.0/24 to route tunnel subnet traffic through peer',
         },
@@ -264,7 +264,7 @@ describe('WireGuard Configuration Analysis', () => {
 [Interface]
 # Router's unique IP on the tunnel (NOT subnet owner)
 PrivateKey = kI56+MCLvtZnHyKjzce8iXKfqKr313SYZlYdho5WK18=
-Address = 10.0.0.200/32
+Address = 10.0.0.200/24
 ListenPort = 51820
 DNS = 8.8.8.8, 1.1.1.1
 
@@ -279,7 +279,7 @@ Endpoint = ISP_PUBLIC_IP:51820
 PersistentKeepalive = 25
       `.trim();
 
-      expect(corrected).toContain('10.0.0.200/32');
+      expect(corrected).toContain('10.0.0.200/24');
       expect(corrected).toContain('10.0.0.0/24');
       expect(corrected).toContain('ISP_PUBLIC_IP:51820');
     });

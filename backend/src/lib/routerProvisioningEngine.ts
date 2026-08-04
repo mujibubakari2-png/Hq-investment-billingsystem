@@ -213,7 +213,7 @@ function buildMikroTikSteps(
             params: {
                 interface: "wg0",
                 publicKey: router.wgPeerPublicKey,
-                allowedAddress: router.wgTunnelIp ? `${router.wgTunnelIp}/32` : "10.200.0.0/24",
+                allowedAddress: router.wgTunnelIp ? `${router.wgTunnelIp}/24` : "10.200.0.0/24",
                 presharedKey: router.wgPresharedKey || "",
             },
             dependsOn: ["discover-capabilities"],

@@ -134,7 +134,7 @@ export const wireguardManager = {
                 const parts = line.split('\t');
                 const peerKey = parts[0] ?? '';
                 const peerAllowedIps = parts[3] ?? '';
-                const holdsIp = peerAllowedIps.split(',').some(a => a.trim() === `${allowedIp}/32`);
+                const holdsIp = peerAllowedIps.split(',').some(a => a.trim() === `${allowedIp}/24`);
                 if (holdsIp && peerKey !== expectedPublicKey) {
                     return peerKey;
                 }
@@ -160,7 +160,7 @@ export const wireguardManager = {
      * failure mode this fix closes.
      *
      * @param publicKey    - Router's WireGuard public key (44-char Base64) — this IS the peer's unique ID
-     * @param allowedIp    - Router's assigned tunnel IP (without /32)
+     * @param allowedIp    - Router's assigned tunnel IP (without /24)
      * @param presharedKey - Optional preshared key for post-quantum hardening
      */
     addPeer: async (publicKey: string, allowedIp: string, presharedKey?: string) => {
@@ -193,14 +193,14 @@ export const wireguardManager = {
                 await execFileAsync('sudo', [
                     'wg', 'set', 'wg0',
                     'peer', publicKey,
-                    'allowed-ips', `${allowedIp}/32`,
+                    'allowed-ips', `${allowedIp}/24`,
                     'preshared-key', tmpFile,
                 ]);
             } else {
                 await execFileAsync('sudo', [
                     'wg', 'set', 'wg0',
                     'peer', publicKey,
-                    'allowed-ips', `${allowedIp}/32`,
+                    'allowed-ips', `${allowedIp}/24`,
                 ]);
             }
 

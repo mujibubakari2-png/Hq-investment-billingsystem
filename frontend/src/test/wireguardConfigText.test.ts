@@ -45,7 +45,7 @@ describe('buildWireGuardConfigText', () => {
 
         expect(config).toContain('/interface wireguard');
         expect(config).toContain('private-key="server-private"');
-        expect(config).toContain('allowed-address=10.0.0.200/32');
+        expect(config).toContain('allowed-address=10.0.0.200/24');
         expect(config).toContain('add address=10.0.0.1/24 interface="wg-hq"');
         expect(config).not.toContain('[Peer]');
     });

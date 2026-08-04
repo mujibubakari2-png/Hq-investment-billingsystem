@@ -133,7 +133,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
                     for (const peer of livePeers) {
                         if (peer.allowedIps && peer.allowedIps !== '(none)') {
                             for (const cidr of peer.allowedIps.split(',')) {
-                                usedIps.add(cidr.trim().replace('/32', ''));
+                                usedIps.add(cidr.trim().replace(/\/(32|24)/, ''));
                             }
                         }
                     }

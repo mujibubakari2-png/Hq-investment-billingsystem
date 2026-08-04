@@ -121,7 +121,7 @@ export async function POST(req: NextRequest) {
                 // 1. Push to MikroTik
                 let allowedAddress = remoteAddress || "";
                 if (allowedAddress && !allowedAddress.includes("/")) {
-                    allowedAddress += "/32";
+                    allowedAddress += "/24";
                 }
 
                 await mt.createWireGuardPeer({

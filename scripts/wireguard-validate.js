@@ -105,7 +105,7 @@ const wgConfig = {
   peer: {
     publicKey: 'b7ADpdTy6UooXmb7Ve+PgGeXjGFLVFXqsuz32dYNaxA=',
     presharedKey: '+HjQAEn8GA2tU+HuZNdVfYw9TaqL277IqPMovrqTxls=',
-    allowedIps: '10.0.0.200/32',
+    allowedIps: '10.0.0.200/24',
     endpoint: '0.0.0.0:51820',
     persistentKeepalive: 25,
   },
@@ -176,7 +176,7 @@ if (parseInt(ifaceCidr) === 24) {
     'CRITICAL',
     'Interface Address',
     `Address = ${wgConfig.interface.address} means router OWNS 10.0.0.0/24\n` +
-      `   This creates routing conflicts with peer allocation. Should be /32 for single IP.`
+      `   This creates routing conflicts with peer allocation. Should be /24 for single IP.`
   );
   criticalIssues++;
 } else {
@@ -309,19 +309,19 @@ if (criticalIssues > 0 || highIssues > 0) {
 
   console.log(`${colors.bright}REQUIRED FIXES:${colors.reset}`);
   console.log(`1. Replace Endpoint: 0.0.0.0:51820 → ISP_PUBLIC_IP:51820`);
-  console.log(`2. Change Address: 10.0.0.1/24 → 10.0.0.200/32`);
-  console.log(`3. Change AllowedIPs: 10.0.0.200/32 → 10.0.0.0/24`);
+  console.log(`2. Change Address: 10.0.0.1/24 → 10.0.0.200/24`);
+  console.log(`3. Change AllowedIPs: 10.0.0.200/24 → 10.0.0.0/24`);
 
   console.log(`\n${colors.bright}CORRECTED CONFIGURATION:${colors.reset}\n`);
   console.log(`[Interface]`);
   console.log(`PrivateKey = kI56+MCLvtZnHyKjzce8iXKfqKr313SYZlYdho5WK18=`);
-  console.log(`Address = 10.0.0.200/32              # CHANGED from 10.0.0.1/24`);
+  console.log(`Address = 10.0.0.200/24              # CHANGED from 10.0.0.1/24`);
   console.log(`ListenPort = 51820`);
   console.log(`DNS = 8.8.8.8, 1.1.1.1\n`);
   console.log(`[Peer]`);
   console.log(`PublicKey = b7ADpdTy6UooXmb7Ve+PgGeXjGFLVFXqsuz32dYNaxA=`);
   console.log(`PresharedKey = +HjQAEn8GA2tU+HuZNdVfYw9TaqL277IqPMovrqTxls=`);
-  console.log(`AllowedIPs = 10.0.0.0/24             # CHANGED from 10.0.0.200/32`);
+  console.log(`AllowedIPs = 10.0.0.0/24             # CHANGED from 10.0.0.200/24`);
   console.log(`Endpoint = ISP_ACTUAL_IP:51820       # CHANGED from 0.0.0.0:51820`);
   console.log(`PersistentKeepalive = 25\n`);
 

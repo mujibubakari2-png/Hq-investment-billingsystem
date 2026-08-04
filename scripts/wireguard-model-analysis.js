@@ -498,7 +498,7 @@ ${colors.cyan}Peer Management${colors.reset}
 
 1. Add Router as Peer
    Command: sudo wg set wg0 peer PUBLIC_KEY \\
-               allowed-ips TUNNEL_IP/32 \\
+               allowed-ips TUNNEL_IP/24 \\
                preshared-key /tmp/wg-psk-XXXX.tmp
    Effect:  Router can now connect to server
 
