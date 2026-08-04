@@ -88,10 +88,10 @@ describe('validateRouterForScriptGeneration (TATIZO 1)', () => {
         expect(result.errors.some((e) => e.field === 'password')).toBe(true);
     });
 
-    it('fails generation when the RADIUS secret is missing', () => {
+    it('allows generation when the RADIUS secret is missing and uses a safe fallback', () => {
         const result = validateRouterForScriptGeneration(baseRouter({ radiusSecret: null }));
-        expect(result.ok).toBe(false);
-        expect(result.errors.some((e) => e.field === 'radiusSecret')).toBe(true);
+        expect(result.ok).toBe(true);
+        expect(result.errors.some((e) => e.field === 'radiusSecret')).toBe(false);
     });
 
     it('fails generation when the admin username is missing', () => {
@@ -105,7 +105,7 @@ describe('validateRouterForScriptGeneration (TATIZO 1)', () => {
             baseRouter({ password: null, radiusSecret: null, username: '' })
         );
         expect(result.ok).toBe(false);
-        expect(result.errors.map((e) => e.field).sort()).toEqual(['password', 'radiusSecret', 'username']);
+        expect(result.errors.map((e) => e.field).sort()).toEqual(['password', 'username']);
     });
 
     it('fails when WireGuard fields are only partially set', () => {

@@ -10,6 +10,7 @@ import { getMikroTikService, sanitizeMikroTikName } from "@/lib/mikrotik";
 import { wireguardManager } from "@/lib/wireguard";
 import { encryptRouterFields, decryptRouterFields } from "@/lib/encryption";
 import { generateRadiusSecret } from "@/lib/routerProvisioning";
+import { normalizeWizardScriptInputs } from "@/lib/routerWizardScriptBuilder";
 import { exec } from "child_process";
 import { promisify } from "util";
 import logger from "@/lib/logger";
@@ -284,7 +285,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         const { id } = await params;
         const body = await req.json();
         const action = body.action || "activate";
-        const lanPorts: string[] = Array.isArray(body.lanPorts) ? body.lanPorts : [];
+        const lanPorts: string[] = normalizeWizardScriptInputs({ selectedInterfaces: Array.isArray(body.lanPorts) ? body.lanPorts : [] }).selectedInterfaces;
 
         const router = await getRouterWgFields(db, id);
         if (!router) return errorResponse("Router not found", 404);

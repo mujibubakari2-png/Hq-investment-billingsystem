@@ -37,8 +37,11 @@ const res = await fetch(`${apiUrl.replace(/\/$/, "")}/api/order-status`, {
 });
 const data = await res.json();
 const inner = Array.isArray(data?.data) ? data.data[0] ?? {} : data ?? {};
-        const rawStatus = String(inner?.payment_status ?? "").trim().toUpperCase();
-return rawStatus === "COMPLETED" || rawStatus === "SUCCESS";
+        const rawStatus = String(
+            inner?.payment_status ?? data?.result ?? data?.resultcode ?? ""
+        ).trim().toUpperCase();
+        // Matches backend PalmPesaProvider.checkStatus() exactly (same 3 success codes).
+        return rawStatus === "COMPLETED" || rawStatus === "SUCCESS" || rawStatus === "000";
     } catch {
         return false; // fail closed — unverifiable status is treated as NOT paid
     }

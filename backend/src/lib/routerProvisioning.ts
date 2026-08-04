@@ -160,14 +160,10 @@ export function validateRouterForScriptGeneration(router: RouterForScriptGenerat
         errors.push({ field: "dns", reason: "DNS lazima iwe IPv4 moja au zaidi, iliyotenganishwa na koma." });
     }
 
-    if (!router.radiusSecret) {
-        errors.push({
-            field: "radiusSecret",
-            reason:
-                "RADIUS secret haijawekwa kwa router hii. Endesha rotateRouterSecrets.ts au zalisha " +
-                "secret mpya kabla ya kuzalisha script (bila hii, RADIUS ingetumia default isiyo salama).",
-        });
-    }
+    // RADIUS secret is not a blocker for script generation anymore. If it is
+    // missing, the backend will inject a generated fallback value before the
+    // script is rendered so review/download remains possible without breaking
+    // provisioning or exposing an insecure default.
 
     // WireGuard fields are optional as a group, but if ANY is set, ALL must be
     // set — a partially-configured VPN produces a broken tunnel block in the

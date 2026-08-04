@@ -5,12 +5,24 @@ import { requirePermission } from "@/lib/rbac";
 import { canAccessTenant } from "@/lib/tenant";
 import { decryptRouterFields, encrypt } from "@/lib/encryption";
 import { deriveLanNetworkCidr, generateRouterAdminPassword, generateRadiusSecret } from "@/lib/routerProvisioning";
+import { buildHotspotFlowEnforcementLines, normalizeWizardScriptInputs } from "@/lib/routerWizardScriptBuilder";
 
 // Simple sanitizer for wireless passphrases embedded into RouterOS scripts.
 function sanitizePassphrase(p: unknown): string {
     if (!p || typeof p !== 'string') return '';
     return p.replace(/["'\\]/g, '').substring(0, 64);
 }
+
+function parseRequestedLanInterfaces(req: NextRequest): string[] {
+    const rawValue = req.nextUrl.searchParams.get('selectedInterfaces') || req.nextUrl.searchParams.get('lanPorts') || '';
+    const values = rawValue
+        .split(',')
+        .map((value) => value.trim())
+        .filter(Boolean);
+
+    return normalizeWizardScriptInputs({ selectedInterfaces: values }).selectedInterfaces;
+}
+
 import logger from "@/lib/logger";
 
 /**
@@ -81,6 +93,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         }
 
         const router = decryptRouterFields(routerRaw);
+        const selectedLanInterfaces = parseRequestedLanInterfaces(req);
 
         const apiPort = router.apiPort || 80;
         const serverUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || "";
@@ -203,14 +216,18 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     /interface list member add list="LAN" interface=$lanBridge comment="HQ INVESTMENT LAN bridge"
 }
 
-# 6b. Bridge Port Membership — Add common LAN interfaces as bridge members (for L2 switching)
-# Note: wireless interfaces (wlan0/wlan1/wlan2) are added separately if wlanEnabled=true
-:foreach intf in=[/interface find where !(name=ether1 || name~"bridge" || name~"ppp" || name~"wlan" || name~"wg" || passthrough=yes || type=loopback)] do={
+# 6b. Bridge Port Membership — Add explicitly selected LAN interfaces as bridge members (for L2 switching)
+# If no interfaces are supplied, fall back to the standard physical-port scan.
+${selectedLanInterfaces.length > 0
+    ? selectedLanInterfaces.map((iface) => `:if ([:len [/interface bridge port find where interface="${iface}"]] = 0) do={
+    /interface bridge port add bridge=$lanBridge interface=${iface} comment="HQ INVESTMENT LAN port"
+}`).join('\n')
+    : `:foreach intf in=[/interface find where !(name=ether1 || name~"bridge" || name~"ppp" || name~"wlan" || name~"wg" || passthrough=yes || type=loopback)] do={
     :local intfName [/interface get $intf name]
     :if ([:len [/interface bridge port find bridge=$lanBridge interface=$intfName]] = 0) do={
         /interface bridge port add bridge=$lanBridge interface=$intfName comment="HQ INVESTMENT LAN port"
     }
-}
+}`}
 :if ([:len [/ip pool find name="${hotspotPoolName}"]] = 0) do={
     /ip pool add name="${hotspotPoolName}" ranges=${router.hotspotPoolRange}
 }
@@ -381,6 +398,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 :if ([:len [/ip hotspot walled-garden ip find where comment="HQ INVESTMENT Billing Portal IP"]] = 0) do={
     /ip hotspot walled-garden ip add dst-address=${vpnIp} action=accept comment="HQ INVESTMENT Billing Portal IP"
 }
+${buildHotspotFlowEnforcementLines("$lanBridge").join("\n")}
 
 # 8. NAT — REQUIRED for any authenticated client (hotspot or PPPoE) to actually
 # reach the internet. Without this, login succeeds but browsing still fails.
