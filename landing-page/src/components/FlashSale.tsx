@@ -188,13 +188,22 @@ function FlashProductCard({ product, index }: { product: Product; index: number 
   );
 }
 
+// ─── Flash Sale Campaign Info ─────────────────────────────────────
+interface FlashSaleCampaign {
+  title: string;
+  endDate: string;
+  discountPercentage: number;
+}
+
 // ─── Main Section ─────────────────────────────────────────────────
 export default function FlashSale() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [campaign, setCampaign] = useState<FlashSaleCampaign | null>(null);
 
-  // End time: midnight of the current day (or 6 hours from now as fallback)
+  // Use the real campaign end date if available, otherwise fall back to midnight
   const endTime = (() => {
+    if (campaign?.endDate) return new Date(campaign.endDate);
     const d = new Date();
     d.setHours(23, 59, 59, 0);
     return d;
@@ -205,7 +214,13 @@ export default function FlashSale() {
   useEffect(() => {
     fetch("/api/public/products?flashSale=true&limit=6")
       .then((r) => r.json())
-      .then((d) => setProducts(d.data ?? []))
+      .then((d) => {
+        setProducts(d.data ?? []);
+        // Capture campaign metadata from the API response
+        if (d.meta?.flashSaleCampaign) {
+          setCampaign(d.meta.flashSaleCampaign as FlashSaleCampaign);
+        }
+      })
       .catch(() => setProducts([]))
       .finally(() => setLoading(false));
   }, []);
@@ -242,12 +257,16 @@ export default function FlashSale() {
               <Zap size={14} className="text-amber-400" />
             </div>
             <h2 className="font-display text-3xl md:text-4xl lg:text-5xl font-extrabold text-white leading-tight">
-              Today&apos;s Lightning<br />
+              {campaign?.title ?? "Today\u2019s Lightning"}<br />
               <span style={{ background: "linear-gradient(135deg, #f43f5e, #f59e0b)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
-                Deals
+                {campaign ? "Deals" : "Deals"}
               </span>
             </h2>
-            <p className="text-white/55 mt-2 text-sm">Limited quantities · Ends at midnight</p>
+            <p className="text-white/55 mt-2 text-sm">
+              {campaign?.endDate
+                ? `Limited quantities · Ends ${new Date(campaign.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}`
+                : "Limited quantities · Ends at midnight"}
+            </p>
           </div>
 
           {/* Countdown */}

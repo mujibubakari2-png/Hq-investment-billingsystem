@@ -6,6 +6,19 @@ import { getReviewSummary } from "@/lib/reviews";
 
 export const dynamic = "force-dynamic";
 
+/** Returns the active flash sale campaign if one is running right now. */
+async function getActiveFlashSale() {
+  const now = new Date();
+  return prisma.flashSale.findFirst({
+    where: {
+      isActive: true,
+      startDate: { lte: now },
+      endDate: { gte: now },
+    },
+    orderBy: { endDate: "asc" },
+  });
+}
+
 // GET /api/public/products
 export async function GET(request: Request) {
   try {
@@ -15,6 +28,7 @@ export async function GET(request: Request) {
     const trending = searchParams.get("trending") === "true" ? true : undefined;
     const bestSeller = searchParams.get("bestSeller") === "true" ? true : undefined;
     const isNew = searchParams.get("isNew") === "true" ? true : undefined;
+    const flashSale = searchParams.get("flashSale") === "true";
     const categorySlug = searchParams.get("category") || undefined;
     const brandSlug = searchParams.get("brand") || undefined;
     const search = searchParams.get("search") || undefined;
@@ -28,6 +42,9 @@ export async function GET(request: Request) {
     const limit = parseBoundedInt(searchParams.get("limit"), CATALOGUE_PAGE_SIZE, 1, CATALOGUE_MAX_PAGE_SIZE);
     const skip = (page - 1) * limit;
 
+    // Resolve active flash sale campaign (used for filtering & metadata)
+    const activeCampaign = flashSale ? await getActiveFlashSale() : null;
+
     const where: Record<string, unknown> = {
       status: "PUBLISHED",
       deletedAt: null,
@@ -35,6 +52,10 @@ export async function GET(request: Request) {
       ...(trending !== undefined && { trending }),
       ...(bestSeller !== undefined && { bestSeller }),
       ...(isNew !== undefined && { isNew }),
+      // flashSale=true: return products with a discount (any type, value > 0)
+      ...(flashSale && {
+        discountValue: { gt: 0 },
+      }),
       ...(inStock && { quantity: { gt: 0 } }),
       ...(minPrice !== undefined || maxPrice !== undefined
         ? {
@@ -106,7 +127,20 @@ export async function GET(request: Request) {
     return NextResponse.json({
       success: true,
       data,
-      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+        // Flash sale campaign info for the countdown timer
+        flashSaleCampaign: activeCampaign
+          ? {
+              title: activeCampaign.title,
+              endDate: activeCampaign.endDate.toISOString(),
+              discountPercentage: Number(activeCampaign.discountPercentage),
+            }
+          : null,
+      },
     });
   } catch (error) {
     console.error("[PUBLIC/products] Error:", error);

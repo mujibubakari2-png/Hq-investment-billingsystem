@@ -1,23 +1,20 @@
 import { NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
 
-// GET /api/plans — Fetch SaaS plans from backend and expose to landing page
+// GET /api/plans — Fetch SaaS plans from DB and expose to landing page
 export async function GET() {
     try {
-        const backendUrl = process.env.BACKEND_API_URL || 'http://localhost:3000';
-        const res = await fetch(`${backendUrl}/api/saas-plans`, {
-            cache: 'no-store',
-            headers: { 'Content-Type': 'application/json' },
+        // Only return paid plans — the free trial (price=0) is granted
+        // automatically to every new tenant and should NOT appear as
+        // a selectable plan on the landing page pricing section.
+        const plans = await prisma.saasPlan.findMany({
+            where: { price: { gt: 0 } },
+            orderBy: { price: 'asc' },
         });
 
-        if (!res.ok) {
-            console.error('Backend plans fetch failed:', res.status);
-            return NextResponse.json([], { status: 200 });
-        }
-
-        const plans = await res.json();
         return NextResponse.json(plans);
     } catch (error) {
-        console.error('Plans proxy error:', error);
+        console.error('Fetch SaaS plans error:', error);
         // Return empty array instead of error so landing page degrades gracefully
         return NextResponse.json([], { status: 200 });
     }

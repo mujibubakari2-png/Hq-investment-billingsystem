@@ -120,10 +120,17 @@ function SearchBar({ onClose }: { onClose?: () => void }) {
   );
 }
 
-// ─── Categories Dropdown ───────────────────────────────────────
-function CategoriesDropdown({ categories }: { categories: ProductCategory[] }) {
+// ─── Shop Mega Menu Dropdown ───────────────────────────────────────
+function ShopDropdown({ categories }: { categories: ProductCategory[] }) {
   const [open, setOpen] = useState(false);
   const icons = [Grid3X3, Zap, Star, Tag, TrendingUp, Sparkles];
+
+  const quickLinks = [
+    { href: "/products?collection=deals", label: "Deals", icon: Tag },
+    { href: "/recently-viewed", label: "Recently Viewed", icon: TrendingUp },
+    { href: "/wishlist", label: "Wishlist", icon: Heart },
+    { href: "/compare", label: "Compare Products", icon: Scale },
+  ];
 
   return (
     <div className="relative" onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
@@ -131,7 +138,7 @@ function CategoriesDropdown({ categories }: { categories: ProductCategory[] }) {
         className="flex items-center gap-1.5 text-slate-700 hover:text-primary font-medium text-sm transition-colors py-2"
         aria-haspopup="true"
         aria-expanded={open}
-        id="categories-dropdown-btn"
+        id="shop-dropdown-btn"
       >
         <Store size={16} />
         Shop
@@ -148,35 +155,27 @@ function CategoriesDropdown({ categories }: { categories: ProductCategory[] }) {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 8, scale: 0.97 }}
             transition={{ duration: 0.15 }}
-            className="absolute top-full left-0 mt-2 bg-white rounded-2xl shadow-premium border border-slate-100 min-w-[240px] z-50 overflow-hidden py-2"
+            className="absolute top-full left-0 mt-2 bg-white rounded-2xl shadow-premium border border-slate-100 min-w-[240px] z-50 overflow-hidden p-2"
           >
-            <Link
-              href="/products"
-              className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-sm font-semibold text-primary border-b border-slate-100 mb-1"
-            >
-              <Grid3X3 size={16} className="text-primary" />
-              All Products
-            </Link>
-            {categories.slice(0, 8).map((cat, i) => {
-              const Icon = icons[i % icons.length];
-              return (
+            <div className="space-y-1">
+              <Link
+                href="/products"
+                className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 transition-colors text-sm font-semibold text-primary"
+              >
+                <Grid3X3 size={16} className="text-primary" />
+                All Products
+              </Link>
+              {quickLinks.map((link) => (
                 <Link
-                  key={cat.id}
-                  href={`/products?category=${cat.slug}`}
-                  className="flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-slate-50 transition-colors text-sm text-slate-700 hover:text-primary"
+                  key={link.label}
+                  href={link.href}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 transition-colors text-sm text-slate-700 hover:text-primary"
                 >
-                  <div className="flex items-center gap-3">
-                    <Icon size={15} className="text-slate-400" />
-                    {cat.name}
-                  </div>
-                  {cat._count && (
-                    <span className="text-xs text-slate-400 font-medium">
-                      {cat._count.products}
-                    </span>
-                  )}
+                  <link.icon size={15} className="text-slate-400" />
+                  {link.label}
                 </Link>
-              );
-            })}
+              ))}
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -184,13 +183,58 @@ function CategoriesDropdown({ categories }: { categories: ProductCategory[] }) {
   );
 }
 
-// ─── Main Navbar ───────────────────────────────────────────────
+// ─── Flash Sale Countdown Hook ──────────────────────────────────────
+/**
+ * Fetches the active flash sale campaign and provides a live countdown.
+ * Returns null if no campaign is active.
+ */
+function useFlashSaleCountdown() {
+  const [endDate, setEndDate] = useState<Date | null>(null);
+  const [label, setLabel] = useState<string>("");
+  const [timeStr, setTimeStr] = useState<string>("");
+
+  // Fetch active campaign on mount
+  useEffect(() => {
+    fetch("/api/public/products?flashSale=true&limit=1")
+      .then((r) => r.json())
+      .then((d) => {
+        const campaign = d.meta?.flashSaleCampaign;
+        if (campaign?.endDate) {
+          setEndDate(new Date(campaign.endDate));
+          setLabel(campaign.title ?? "Flash Sale");
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // Tick every second
+  useEffect(() => {
+    if (!endDate) return;
+    const tick = () => {
+      const diff = Math.max(0, endDate.getTime() - Date.now());
+      const h = Math.floor(diff / 3_600_000);
+      const m = Math.floor((diff % 3_600_000) / 60_000);
+      const s = Math.floor((diff % 60_000) / 1_000);
+      setTimeStr(
+        `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`,
+      );
+    };
+    tick();
+    const id = setInterval(tick, 1_000);
+    return () => clearInterval(id);
+  }, [endDate]);
+
+  return endDate ? { label, timeStr } : null;
+}
+
+// ─── Main Navbar ──────────────────────────────────────────────
 export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [darkMode, setDarkMode] = useState(false);
   const pathname = usePathname();
+  const flashSale = useFlashSaleCountdown();
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
@@ -239,7 +283,9 @@ export default function Navbar() {
           <div className="flex items-center gap-2 min-w-0">
             <Zap size={13} className="text-amber-300 shrink-0" />
             <span className="font-semibold truncate">
-              Free shipping on selected Dar es Salaam orders - Flash sale ends in 02:18:44
+              {flashSale
+                ? `${flashSale.label} — ends in ${flashSale.timeStr}`
+                : "Free shipping on orders above Tsh 50,000 — Shop now"}
             </span>
           </div>
           <div className="flex items-center gap-5 shrink-0">
@@ -278,13 +324,7 @@ export default function Navbar() {
 
           {/* Desktop Nav */}
           <div className="hidden md:flex items-center gap-5 shrink-0">
-            <CategoriesDropdown categories={categories} />
-            <Link href="/products?collection=deals" className="text-sm text-slate-600 hover:text-primary font-medium transition-colors">
-              Deals
-            </Link>
-            <Link href="/recently-viewed" className="text-sm text-slate-600 hover:text-primary font-medium transition-colors">
-              Recent
-            </Link>
+            <ShopDropdown categories={categories} />
             <Link href="/#features" className="text-sm text-slate-600 hover:text-primary font-medium transition-colors">
               Features
             </Link>
@@ -314,15 +354,13 @@ export default function Navbar() {
             </div>
             <button
               onClick={() => setDarkMode((value) => !value)}
-              className="hidden lg:flex w-9 h-9 rounded-full border border-slate-200 bg-white text-slate-500 items-center justify-center hover:text-primary hover:border-primary/30 transition-all"
+              className="flex w-9 h-9 rounded-full border border-slate-200 bg-white text-slate-500 items-center justify-center hover:text-primary hover:border-primary/30 transition-all"
               aria-label={darkMode ? "Switch to light theme" : "Switch to dark theme"}
               title={darkMode ? "Light theme" : "Dark theme"}
             >
               {darkMode ? <Sun size={16} /> : <Moon size={16} />}
             </button>
             {[
-              { href: "/wishlist", label: "Wishlist", icon: Heart },
-              { href: "/compare", label: "Compare products", icon: Scale },
               { href: `${billingUrl}billing/login`, label: "Customer account", icon: User },
               { href: "/notifications", label: "Notifications", icon: Bell },
             ].map(({ href, label, icon: Icon }) => {
@@ -388,33 +426,44 @@ export default function Navbar() {
             className="md:hidden overflow-hidden bg-white border-t border-slate-100 shadow-lg"
           >
             <div className="px-4 py-4 space-y-1 max-h-[70vh] overflow-y-auto">
-              <Link href="/products" className="flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-slate-50 text-slate-700 font-medium">
-                <Store size={18} className="text-primary" />
-                All Products
-              </Link>
-              {[
-                { href: "/wishlist", label: "Wishlist" },
-                { href: "/compare", label: "Compare Products" },
-                { href: "/recently-viewed", label: "Recently Viewed" },
-                { href: "/track-order", label: "Order Tracking" },
-                { href: "/support", label: "Help Center" },
-              ].map((item) => (
-                <Link key={item.label} href={item.href} className="block px-3 py-2.5 rounded-xl hover:bg-slate-50 text-sm text-slate-700">
-                  {item.label}
+              <div className="space-y-1">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 px-3 py-2">Shop</h3>
+                <Link href="/products" className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 text-slate-700 font-medium">
+                  <Grid3X3 size={16} className="text-primary" />
+                  All Products
                 </Link>
-              ))}
-              {categories.slice(0, 6).map((cat) => (
-                <Link key={cat.id} href={`/products?category=${cat.slug}`}
-                  className="flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-slate-50 text-sm text-slate-600">
-                  <span>{cat.name}</span>
-                  {cat._count && <span className="text-xs text-slate-400">{cat._count.products}</span>}
-                </Link>
-              ))}
+                {[
+                  { href: "/products?collection=deals", label: "Deals", icon: Tag },
+                  { href: "/recently-viewed", label: "Recently Viewed", icon: TrendingUp },
+                  { href: "/wishlist", label: "Wishlist", icon: Heart },
+                  { href: "/compare", label: "Compare Products", icon: Scale },
+                ].map((item) => (
+                  <Link key={item.label} href={item.href} className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 text-sm text-slate-700">
+                    <item.icon size={15} className="text-slate-400" />
+                    {item.label}
+                  </Link>
+                ))}
+              </div>
+              
+
               <div className="pt-2 border-t border-slate-100 space-y-1">
-                <Link href="/#features" className="block px-3 py-2.5 rounded-xl hover:bg-slate-50 text-sm text-slate-700">Features</Link>
-                <Link href="/#pricing" className="block px-3 py-2.5 rounded-xl hover:bg-slate-50 text-sm text-slate-700">Pricing</Link>
-                <Link href="/#contact" className="block px-3 py-2.5 rounded-xl hover:bg-slate-50 text-sm text-slate-700">Contact</Link>
-                <a href={`${billingUrl}billing/login`} className="block px-3 py-2.5 rounded-xl hover:bg-slate-50 text-sm text-slate-700 font-medium">Login</a>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 px-3 py-2">Links</h3>
+                {[
+                  { href: "/track-order", label: "Order Tracking", icon: Truck },
+                  { href: "/support", label: "Help Center", icon: Headphones },
+                  { href: "/#features", label: "Features", icon: Star },
+                  { href: "/#pricing", label: "Pricing", icon: Tag },
+                  { href: "/#contact", label: "Contact", icon: MessageCircle },
+                ].map((item) => (
+                  <Link key={item.label} href={item.href} className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 text-sm text-slate-700">
+                    <item.icon size={15} className="text-slate-400" />
+                    {item.label}
+                  </Link>
+                ))}
+                <a href={`${billingUrl}billing/login`} className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 text-sm text-slate-700 font-medium">
+                  <User size={15} className="text-slate-400" />
+                  Login
+                </a>
               </div>
               <Link
                 href="/#pricing"
