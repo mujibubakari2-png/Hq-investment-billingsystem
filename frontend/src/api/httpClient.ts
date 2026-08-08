@@ -6,6 +6,7 @@ import authStore from '../stores/authStore';
 const API_URL = (import.meta.env.VITE_API_URL as string) ?? '';
 export const CLEAN_API_URL = API_URL.endsWith('/') ? API_URL.slice(0, -1) : API_URL;
 const BASE = `${CLEAN_API_URL}/api`;
+export const NON_JSON_API_RESPONSE_CODE = 'AUTO_PUSH_API_NON_JSON_RESPONSE';
 
 let memoryCsrfToken: string | null = null;
 
@@ -96,6 +97,38 @@ function forceLogout(): never {
     throw new Error('Unauthorized');
 }
 
+async function parseJsonResponse<T>(res: Response, fullUrl: string): Promise<T> {
+    if (res.status === 204) return undefined as T;
+
+    const contentType = res.headers.get('content-type') || '';
+    const lowerContentType = contentType.toLowerCase();
+    const isJson = lowerContentType.includes('application/json') || lowerContentType.includes('+json');
+
+    if (!isJson) {
+        let snippet = '';
+        try {
+            snippet = (await res.text()).replace(/\s+/g, ' ').trim().slice(0, 160);
+        } catch {
+            // Status and content type are enough when the body cannot be read.
+        }
+
+        const details = [
+            `${NON_JSON_API_RESPONSE_CODE}: Expected JSON from ${fullUrl}`,
+            `status=${res.status} ${res.statusText || ''}`.trim(),
+            `contentType=${contentType || 'missing'}`,
+            snippet ? `body="${snippet}"` : null,
+        ].filter(Boolean).join('; ');
+
+        throw new Error(details);
+    }
+
+    try {
+        return await res.json() as T;
+    } catch {
+        throw new Error(`${NON_JSON_API_RESPONSE_CODE}: Invalid JSON from ${fullUrl}; status=${res.status} ${res.statusText || ''}`.trim());
+    }
+}
+
 export async function request<T>(path: string, init?: RequestInit): Promise<T> {
     const fullUrl = `${BASE}${path}`;
     
@@ -138,21 +171,14 @@ export async function request<T>(path: string, init?: RequestInit): Promise<T> {
                         ...(init?.headers as Record<string, string>),
                     },
                 });
-                if (retryRes.ok) {
-                    return await retryRes.json() as T;
-                }
+                if (retryRes.ok) return parseJsonResponse<T>(retryRes, fullUrl);
             }
             // Refresh failed or retry failed — force logout
             forceLogout();
         }
 
         // Safely parse JSON — handle non-JSON responses (e.g., nginx HTML error pages)
-        let data: any;
-        try {
-            data = await res.json();
-        } catch {
-            throw new Error(`Server error: ${res.status} ${res.statusText}`);
-        }
+        const data = await parseJsonResponse<any>(res, fullUrl);
         if (!res.ok) throw new Error(data?.error || data?.message || 'Request failed');
         return data as T;
     } catch (error: unknown) {
@@ -173,14 +199,7 @@ export const put = <T>(path: string, body: unknown) => request<T>(path, { method
 export const patch = <T>(path: string, body: unknown) => request<T>(path, { method: 'PATCH', body: JSON.stringify(body) });
 export const del = <T>(path: string) => request<T>(path, { method: 'DELETE' });
 
-/**
- * Fetch a non-JSON file response (e.g. the generated .rsc router script) with
- * the same auth/CSRF/refresh handling as request(), and trigger a browser
- * download. Use this instead of generating security-sensitive config
- * client-side — the backend is the single source of truth for router
- * provisioning scripts (credentials never need to touch browser JS this way).
- */
-export async function downloadFile(path: string, suggestedFilename?: string): Promise<void> {
+async function fetchFileResponse(path: string): Promise<Response> {
     const fullUrl = `${BASE}${path}`;
 
     let res = await fetch(fullUrl, {
@@ -201,13 +220,28 @@ export async function downloadFile(path: string, suggestedFilename?: string): Pr
 
     if (!res.ok) {
         let message = `Request failed (${res.status})`;
-        try {
-            const data = await res.json();
-            message = data?.error || data?.message || message;
-        } catch { /* not JSON, keep default message */ }
+        const contentType = res.headers.get('content-type') || '';
+        if (contentType.toLowerCase().includes('application/json')) {
+            try {
+                const data = await res.json();
+                message = data?.error || data?.message || message;
+            } catch { /* keep default message */ }
+        }
         throw new Error(message);
     }
 
+    return res;
+}
+
+/**
+ * Fetch a non-JSON file response (e.g. the generated .rsc router script) with
+ * the same auth/CSRF/refresh handling as request(), and trigger a browser
+ * download. Use this instead of generating security-sensitive config
+ * client-side — the backend is the single source of truth for router
+ * provisioning scripts (credentials never need to touch browser JS this way).
+ */
+export async function downloadFile(path: string, suggestedFilename?: string): Promise<void> {
+    const res = await fetchFileResponse(path);
     const blob = await res.blob();
     const contentDisposition = res.headers.get('content-disposition') || '';
     const match = contentDisposition.match(/filename="?([^";]+)"?/);
@@ -221,4 +255,9 @@ export async function downloadFile(path: string, suggestedFilename?: string): Pr
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+}
+
+export async function getTextFile(path: string): Promise<string> {
+    const res = await fetchFileResponse(path);
+    return res.text();
 }

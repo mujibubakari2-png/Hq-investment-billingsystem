@@ -1,5 +1,5 @@
 // ── Network (Routers, VPN, Equipments) API ───────────────────────────────────
-import { get, post, put, del, downloadFile, CLEAN_API_URL } from './httpClient';
+import { get, post, put, del, downloadFile, getTextFile, CLEAN_API_URL } from './httpClient';
 import type { Router } from '../types';
 
 export interface WireGuardConfig {
@@ -20,6 +20,13 @@ export interface WireGuardConfig {
     tunnelActive: boolean;
     lastHandshakeSeconds: number | null;
     tunnelStatusMessage: string;
+}
+
+function scriptPath(id: string, lanPorts?: string[]): string {
+    const qs = lanPorts?.length
+        ? `?selectedInterfaces=${encodeURIComponent(lanPorts.join(','))}`
+        : '';
+    return `/routers/${id}/script${qs}`;
 }
 
 export const routersApi = {
@@ -74,8 +81,10 @@ export const routersApi = {
 
     // Router setup script (.rsc) — generated and signed server-side; never
     // built in the browser, so credentials never need to reach client JS.
-    downloadScript: (id: string, routerName?: string) =>
-        downloadFile(`/routers/${id}/script`, routerName ? `setup-${routerName}.rsc` : undefined),
+    getScript: (id: string, lanPorts?: string[]) =>
+        getTextFile(scriptPath(id, lanPorts)),
+    downloadScript: (id: string, routerName?: string, lanPorts?: string[]) =>
+        downloadFile(scriptPath(id, lanPorts), routerName ? `setup-${routerName}.rsc` : undefined),
 
     // Direct remote access — WebFig (browser) and Winbox (desktop) via the
     // backend's credential-safe relay. See lib/winboxRelay.ts + webfig proxy.

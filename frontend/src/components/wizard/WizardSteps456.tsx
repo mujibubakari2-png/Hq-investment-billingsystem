@@ -115,8 +115,8 @@ interface Step5Props {
     pppoeLocalAddress: string;
     configGenerated: boolean;
     showPreview: boolean;
-    setShowPreview: (v: boolean) => void;
     getGeneratedScript: () => string;
+    onPreview: () => void;
     onDownload: () => void;
     onAutoPush: () => void;
     actionLoading: boolean;
@@ -124,6 +124,10 @@ interface Step5Props {
 
 export function Step5Generate(p: Step5Props) {
     const safeName = sanitizeMikroTikName(p.routerName);
+    const missingServiceAddress =
+        ((p.serviceType === 'hotspot' || p.serviceType === 'both') && !p.hotspotLocalAddress) ||
+        ((p.serviceType === 'pppoe' || p.serviceType === 'both') && !p.pppoeLocalAddress);
+
     return (
         <div style={{ textAlign: 'center', padding: '30px 0' }}>
             <DescriptionIcon style={{ fontSize: 56, color: 'var(--text-secondary)', marginBottom: 16 }} />
@@ -166,7 +170,7 @@ export function Step5Generate(p: Step5Props) {
                 <h3 style={{ marginBottom: 6 }}>Ready to Generate Configuration</h3>
                 <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: 20 }}>Click to create your custom RSC configuration file</p>
                 <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-                    <button className="btn" style={{ background: '#3b82f6', color: '#fff', fontWeight: 600, padding: '10px 24px' }} onClick={() => p.setShowPreview(!p.showPreview)}>
+                    <button className="btn" style={{ background: '#3b82f6', color: '#fff', fontWeight: 600, padding: '10px 24px' }} onClick={p.onPreview}>
                         <ListIcon fontSize="small" /> {p.showPreview ? 'Hide Preview' : 'Preview Script'}
                     </button>
                     <button className="btn" style={{ background: '#16a34a', color: '#fff', fontWeight: 600, padding: '10px 24px' }} onClick={p.onDownload}>
@@ -180,7 +184,7 @@ export function Step5Generate(p: Step5Props) {
                 {p.showPreview && (
                     <div style={{ marginTop: 20, textAlign: 'left', background: '#1e293b', borderRadius: 'var(--radius-md)', padding: '16px', overflowX: 'auto' }}>
                         <div style={{ color: '#94a3b8', fontSize: '0.75rem', marginBottom: 8, fontWeight: 600, textTransform: 'uppercase' }}>Script Preview</div>
-                        {(!p.hotspotLocalAddress || !p.pppoeLocalAddress) ? (
+                        {missingServiceAddress ? (
                             <div style={{ color: '#f87171', fontSize: '0.85rem', padding: '12px 0' }}>⚠️ VPN IP not loaded yet. Please wait for WireGuard config to finish loading.</div>
                         ) : (
                             <pre style={{ margin: 0, color: '#e2e8f0', fontSize: '0.8rem', fontFamily: 'monospace', whiteSpace: 'pre-wrap', maxHeight: 300, overflowY: 'auto' }}>
