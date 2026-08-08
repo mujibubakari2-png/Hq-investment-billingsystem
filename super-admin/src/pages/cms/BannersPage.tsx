@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { cmsApi } from '../../api';
+import { cmsApi, type CmsBanner } from '../../api';
 import { StatusBadge, ConfirmModal, Alert, fmtDate } from '../../components/ui';
 import { Search, Plus, Edit, Trash2, XCircle, Save } from 'lucide-react';
 
@@ -8,8 +8,8 @@ export default function BannersPage() {
   const qc = useQueryClient();
   const [showModal, setShowModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [formData, setFormData] = useState<any>({
-    title: '', subtitle: '', imageUrl: '', linkUrl: '', linkText: '', position: 0, isActive: true, startDate: '', endDate: ''
+  const [formData, setFormData] = useState<Partial<CmsBanner>>({
+    title: '', subtitle: '', imageUrl: '', linkUrl: '', linkText: '', position: 0, isActive: true, startDate: null, endDate: null
   });
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; name: string } | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
@@ -20,13 +20,13 @@ export default function BannersPage() {
   });
 
   const saveMutation = useMutation({
-    mutationFn: (body: any) => isEditing && formData.id ? cmsApi.banners.update(formData.id, body) : cmsApi.banners.create(body),
+    mutationFn: (body: Partial<CmsBanner>) => isEditing && formData.id ? cmsApi.banners.update(formData.id, body) : cmsApi.banners.create(body),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['sa-cms-banners'] });
       setShowModal(false);
       setErrorMsg('');
     },
-    onError: (err: any) => setErrorMsg(err.message || 'Failed to save banner')
+    onError: (err: Error) => setErrorMsg(err.message || 'Failed to save banner')
   });
 
   const deleteMutation = useMutation({
@@ -44,7 +44,7 @@ export default function BannersPage() {
     setErrorMsg('');
   };
 
-  const handleOpenEdit = (banner: any) => {
+  const handleOpenEdit = (banner: CmsBanner) => {
     setIsEditing(true);
     setFormData({ 
         ...banner,
@@ -89,7 +89,7 @@ export default function BannersPage() {
               ) : banners.length === 0 ? (
                 <tr><td colSpan={7} className="sa-text-center sa-text-muted">No banners found.</td></tr>
               ) : (
-                banners.map((b: any) => (
+                banners.map((b: CmsBanner) => (
                   <tr key={b.id}>
                     <td>
                       <img src={b.imageUrl} alt="banner" style={{ width: 100, height: 50, objectFit: 'cover', borderRadius: 4, border: '1px solid var(--border-color)' }} />
@@ -140,33 +140,33 @@ export default function BannersPage() {
               <div className="sa-form-row">
                 <div className="sa-form-group">
                   <label className="sa-label">Title</label>
-                  <input className="sa-input" value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} />
+                  <input className="sa-input" value={formData.title ?? ''} onChange={e => setFormData({ ...formData, title: e.target.value })} />
                 </div>
                 <div className="sa-form-group">
                   <label className="sa-label">Subtitle</label>
-                  <input className="sa-input" value={formData.subtitle} onChange={e => setFormData({ ...formData, subtitle: e.target.value })} />
+                  <input className="sa-input" value={formData.subtitle ?? ''} onChange={e => setFormData({ ...formData, subtitle: e.target.value })} />
                 </div>
               </div>
 
               <div className="sa-form-row">
                 <div className="sa-form-group">
                   <label className="sa-label">Link URL</label>
-                  <input className="sa-input" value={formData.linkUrl} onChange={e => setFormData({ ...formData, linkUrl: e.target.value })} />
+                  <input className="sa-input" value={formData.linkUrl ?? ''} onChange={e => setFormData({ ...formData, linkUrl: e.target.value })} />
                 </div>
                 <div className="sa-form-group">
                   <label className="sa-label">Link Text (Button label)</label>
-                  <input className="sa-input" value={formData.linkText} onChange={e => setFormData({ ...formData, linkText: e.target.value })} />
+                  <input className="sa-input" value={formData.linkText ?? ''} onChange={e => setFormData({ ...formData, linkText: e.target.value })} />
                 </div>
               </div>
 
               <div className="sa-form-row">
                 <div className="sa-form-group">
                   <label className="sa-label">Start Date</label>
-                  <input className="sa-input" type="date" value={formData.startDate} onChange={e => setFormData({ ...formData, startDate: e.target.value })} />
+                  <input className="sa-input" type="date" value={formData.startDate ?? ''} onChange={e => setFormData({ ...formData, startDate: e.target.value })} />
                 </div>
                 <div className="sa-form-group">
                   <label className="sa-label">End Date</label>
-                  <input className="sa-input" type="date" value={formData.endDate} onChange={e => setFormData({ ...formData, endDate: e.target.value })} />
+                  <input className="sa-input" type="date" value={formData.endDate ?? ''} onChange={e => setFormData({ ...formData, endDate: e.target.value })} />
                 </div>
               </div>
 

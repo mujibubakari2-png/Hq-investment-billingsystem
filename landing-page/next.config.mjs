@@ -63,6 +63,31 @@ const nextConfig = {
             key: 'Permissions-Policy',
             value: 'camera=(), microphone=(), geolocation=(self), payment=(self)',
           },
+          {
+            // HSTS is intentionally set here for the storefront (not handled solely by Nginx)
+            // to ensure all browsers enforce HTTPS for this origin after the first visit.
+            key: 'Strict-Transport-Security',
+            value: 'max-age=63072000; includeSubDomains; preload',
+          },
+          {
+            // Content-Security-Policy — prevents XSS by restricting resource origins.
+            // 'unsafe-inline' is required for Framer Motion inline styles and Next.js hydration.
+            // Adjust 'connect-src' when adding third-party analytics or payment SDKs.
+            key: 'Content-Security-Policy',
+            value: [
+              "default-src 'self'",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.paypal.com https://www.sandbox.paypal.com",
+              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+              "font-src 'self' https://fonts.gstatic.com",
+              "img-src 'self' data: blob: https: http://localhost",
+              "connect-src 'self' https://api.paypal.com https://api.sandbox.paypal.com",
+              "frame-src https://www.paypal.com https://www.sandbox.paypal.com",
+              "frame-ancestors 'none'",
+              "form-action 'self'",
+              "base-uri 'self'",
+              "object-src 'none'",
+            ].join('; '),
+          },
         ],
       },
     ];

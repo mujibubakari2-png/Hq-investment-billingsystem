@@ -58,7 +58,7 @@ function productToSaved(product: Product): SavedProduct {
     name: product.name,
     slug: product.slug,
     image: getFeaturedImage(product.images),
-    brand: product.brand,
+    brand: product.brand?.name ?? null,
     category: product.category?.name ?? null,
     price: Number(product.price),
     currency: product.currency,

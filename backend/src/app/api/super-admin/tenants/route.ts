@@ -5,6 +5,7 @@ import { requireRole } from "@/lib/rbac";
 import { hashPassword } from "@/lib/auth";
 import { sendAccountApprovedNotifications } from "@/lib/accountNotifications";
 import logger from "@/lib/logger";
+import type { Prisma } from "@/generated/prisma";
 import { writeAuditLog, getIpFromRequest } from "@/lib/auditLog";
 
 /**
@@ -42,8 +43,8 @@ export async function GET(req: NextRequest) {
         const skip = (page - 1) * limit;
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const where: any = {};
-        if (status) where.status = status;
+        const where: Prisma.TenantWhereInput = {};
+        if (status) where.status = status as Prisma.EnumTenantStatusFilter<"Tenant">;
         if (planId) where.planId = planId;
         if (search) {
             where.OR = [

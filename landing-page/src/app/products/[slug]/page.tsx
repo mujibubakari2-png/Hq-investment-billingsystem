@@ -78,7 +78,7 @@ export default async function ProductPage({ params }: PageProps) {
     image: imageUrl ? [imageUrl] : undefined,
     description: product.seoDescription ?? product.description ?? undefined,
     sku: product.sku ?? undefined,
-    brand: product.brand ? { "@type": "Brand", name: product.brand } : undefined,
+    brand: product.brand ? { "@type": "Brand", name: product.brand.name } : undefined,
     category: product.category?.name,
     aggregateRating: product.avgRating
       ? {

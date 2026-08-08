@@ -47,12 +47,21 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         }
 
         // P0 Validation layer: Validate required LAN/Subnet/DNS fields
+        // RC-2 FIX: hotspotPoolRange and pppoePoolRange are now conditional on
+        // serviceType so that hotspot-only routers don't need pppoePoolRange
+        // and pppoe-only routers don't need hotspotPoolRange.
+        const routerServiceType = (routerRaw as any).serviceType || 'both';
         const missingFields: string[] = [];
-        if (!routerRaw.lanIp) missingFields.push("lanIp");
+        if (!routerRaw.lanIp)      missingFields.push("lanIp");
         if (!routerRaw.lanGateway) missingFields.push("lanGateway");
-        if (!routerRaw.hotspotPoolRange) missingFields.push("hotspotPoolRange");
-        if (!routerRaw.pppoePoolRange) missingFields.push("pppoePoolRange");
-        if (!routerRaw.dns) missingFields.push("dns");
+        if (!routerRaw.dns)        missingFields.push("dns");
+        // Only require hotspot pool when serviceType is hotspot or both
+        if (routerServiceType !== 'pppoe' && !routerRaw.hotspotPoolRange)
+            missingFields.push("hotspotPoolRange");
+        // Only require PPPoE pool when serviceType is pppoe or both
+        if (routerServiceType !== 'hotspot' && !routerRaw.pppoePoolRange)
+            missingFields.push("pppoePoolRange");
+
 
         if (missingFields.length > 0) {
             return errorResponse(`Kupitisha script kumeshindwa kwa sababu router haina taarifa zifuatazo: ${missingFields.join(", ")}`, 400);
@@ -256,10 +265,15 @@ ${selectedLanInterfaces.length > 0
 # to allow plaintext credential capture on the LAN segment whenever the CHAP
 # challenge/JS path failed. Only https (TLS-encrypted) and http-chap
 # (challenge-hashed, password never transmitted) are accepted now.
+# RC-3 FIX: ssl-certificate=auto removed from hotspot profile — it fails to
+# import on any RouterOS device that has no certificate in its /certificate store,
+# stopping the entire RSC at this line. TLS on the hotspot portal (port 443)
+# requires a certificate to be imported first; configure it separately via
+# /certificate import or Let's Encrypt. The portal works correctly on HTTP.
 :if ([:len [/ip hotspot profile find name="${hotspotProfileName}"]] = 0) do={
-    /ip hotspot profile add name="${hotspotProfileName}" hotspot-address=${router.lanGateway} dns-name="${cleanName.toLowerCase()}.hotspot" html-directory=hotspot login-by=http-chap,https,cookie ssl-certificate=auto http-cookie-lifetime=3d use-radius=yes
+    /ip hotspot profile add name="${hotspotProfileName}" hotspot-address=${router.lanGateway} dns-name="${cleanName.toLowerCase()}.hotspot" html-directory=hotspot login-by=http-chap,https,cookie http-cookie-lifetime=3d use-radius=yes
 } else={
-    /ip hotspot profile set [find name="${hotspotProfileName}"] hotspot-address=${router.lanGateway} dns-name="${cleanName.toLowerCase()}.hotspot" login-by=http-chap,https,cookie ssl-certificate=auto use-radius=yes
+    /ip hotspot profile set [find name="${hotspotProfileName}"] hotspot-address=${router.lanGateway} dns-name="${cleanName.toLowerCase()}.hotspot" login-by=http-chap,https,cookie use-radius=yes
 }
 :if ([:len [/ip hotspot find name="${hotspotServerName}"]] = 0) do={
     /ip hotspot add name="${hotspotServerName}" interface=$lanBridge address-pool="${hotspotPoolName}" profile="${hotspotProfileName}" disabled=no

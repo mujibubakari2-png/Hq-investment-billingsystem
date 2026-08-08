@@ -31,7 +31,7 @@ export default function OrdersPage() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, body }: { id: string, body: any }) => ecommerceApi.orders.update(id, body),
+    mutationFn: ({ id, body }: { id: string, body: { status?: string; paymentStatus?: string } }) => ecommerceApi.orders.update(id, body),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['sa-ecommerce-orders'] });
       qc.invalidateQueries({ queryKey: ['sa-ecommerce-order', selectedOrder?.id] });

@@ -3,6 +3,7 @@ import { getTenantClient } from "@/lib/tenantPrisma";
 import { errorResponse, jsonResponse } from "@/lib/auth";
 import { requireRole } from "@/lib/rbac";
 import logger from "@/lib/logger";
+import type { Prisma } from "@/generated/prisma";
 import { writeAuditLog, getIpFromRequest } from "@/lib/auditLog";
 
 /**
@@ -30,7 +31,7 @@ export async function GET(req: NextRequest) {
         const skip = (page - 1) * limit;
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const where: any = {
+        const where: Prisma.AuditLogWhereInput = {
             // Only platform-level actions
             action: { startsWith: "PLATFORM_" },
         };

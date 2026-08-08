@@ -1,10 +1,13 @@
 "use client";
 import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
-import * as LucideIcons from "lucide-react";
+import type { ComponentType } from "react";
 import { Zap, Users, CreditCard, BarChart3, ShieldCheck, Router, HelpCircle } from "lucide-react";
+import type { FeatureItem } from "@/types";
 
-const ICON_MAP: Record<string, any> = {
+type IconComponent = ComponentType<{ size?: number; className?: string }>;
+
+const ICON_MAP: Record<string, IconComponent> = {
   Zap, Users, CreditCard, BarChart3, ShieldCheck, Router
 };
 
@@ -42,20 +45,19 @@ const defaultFeatures = [
 ];
 
 export default function Features() {
-  const [features, setFeatures] = useState<any[]>([]);
+  const [features, setFeatures] = useState<FeatureItem[]>([]);
 
   useEffect(() => {
     fetch("/api/public/storefront/settings")
       .then((res) => res.json())
-      .then((data) => {
+      .then((data: { data?: { STORE_FEATURES?: FeatureItem[] } }) => {
         if (data?.data?.STORE_FEATURES && data.data.STORE_FEATURES.length > 0) {
           setFeatures(data.data.STORE_FEATURES);
         } else {
           setFeatures(defaultFeatures);
         }
       })
-      .catch((err) => {
-        console.error(err);
+      .catch(() => {
         setFeatures(defaultFeatures);
       });
   }, []);
@@ -79,7 +81,7 @@ export default function Features() {
         </motion.div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12">
           {features.map((feature, index) => {
-            const IconComp = ICON_MAP[feature.icon] || (LucideIcons as any)[feature.icon] || HelpCircle;
+            const IconComp: IconComponent = ICON_MAP[feature.icon] ?? HelpCircle;
 
             return (
               <motion.div

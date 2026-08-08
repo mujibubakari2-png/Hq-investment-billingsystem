@@ -3,6 +3,7 @@ import { getTenantClient } from "@/lib/tenantPrisma";
 import { errorResponse, jsonResponse } from "@/lib/auth";
 import { requireRole } from "@/lib/rbac";
 import logger from "@/lib/logger";
+import type { Prisma } from "@/generated/prisma";
 
 /**
  * GET /api/super-admin/webhooks
@@ -30,7 +31,7 @@ export async function GET(req: NextRequest) {
         const skip = (page - 1) * limit;
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const where: any = {};
+        const where: Prisma.WebhookLogWhereInput = {};
         if (provider) where.provider = provider;
         if (verified === "true") where.verified = true;
         if (verified === "false") where.verified = false;

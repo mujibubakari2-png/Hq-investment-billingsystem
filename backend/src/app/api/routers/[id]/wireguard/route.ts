@@ -1118,6 +1118,40 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 // ──────────────────────────────────────────────────────────
                 logger.info("[PUSH-CONFIG] Phase 3: Applying firewall lockdown...");
 
+                // RC-4 FIX: Detect the actual WAN interface dynamically instead of
+                // hardcoding 'ether1'. On non-standard MikroTik models (RB4011, CCR, hEX)
+                // the WAN port can be sfp1, ether1, or even a bonded interface.
+                // Strategy: find the default route (0.0.0.0/0) and trace its gateway
+                // interface. Fall back to 'ether1' only if detection fails.
+                let wanInterface = "ether1"; // safe default
+                try {
+                    const routes = await service.apiRequestPublic("/ip/route");
+                    if (Array.isArray(routes)) {
+                        const defaultRoute = routes.find((r: any) =>
+                            (r["dst-address"] === "0.0.0.0/0") && !r.disabled && r.active !== "false"
+                        );
+                        if (defaultRoute?.interface && typeof defaultRoute.interface === "string") {
+                            wanInterface = defaultRoute.interface;
+                            logger.info(`[PUSH-CONFIG] Detected WAN interface: ${wanInterface} (from default route)`);
+                        } else if (defaultRoute?.gateway) {
+                            // Gateway set but no direct interface — find interface by gateway IP
+                            const addresses = await service.apiRequestPublic("/ip/address");
+                            if (Array.isArray(addresses)) {
+                                const gatewayPrefix = (defaultRoute.gateway as string).split(".").slice(0, 3).join(".");
+                                const match = addresses.find((a: any) =>
+                                    typeof a.address === "string" && a.address.startsWith(gatewayPrefix)
+                                );
+                                if (match?.interface) {
+                                    wanInterface = match.interface;
+                                    logger.info(`[PUSH-CONFIG] Detected WAN interface: ${wanInterface} (from gateway address match)`);
+                                }
+                            }
+                        }
+                    }
+                } catch (e) {
+                    logger.warn(`[PUSH-CONFIG] WAN interface detection failed (non-fatal) — using ${wanInterface}: ${e}`);
+                }
+
                 // Resolve the HQ server's public IP for restricted WAN management.
                 // Only this IP can manage the router via WAN — not the entire internet.
                 const hqServerIp = process.env.SERVER_PUBLIC_IP || serverEndpoint;
@@ -1160,16 +1194,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 // access if the WireGuard tunnel goes down — without opening attack surface.
                 if (isValidIp) {
                     firewallRules.push(
-                        { chain: "input", "in-interface": "ether1", protocol: "tcp", "dst-port": `${restPort},8728,8729,8291`, "src-address": hqServerIp, action: "accept", comment: "HQ Server Management - HQ INVESTMENT" },
+                        { chain: "input", "in-interface": wanInterface, protocol: "tcp", "dst-port": `${restPort},8728,8729,8291`, "src-address": hqServerIp, action: "accept", comment: "HQ Server Management - HQ INVESTMENT" },
                     );
-                    logger.info(`[PUSH-CONFIG] Added WAN management rule restricted to HQ server IP: ${hqServerIp}`);
+                    logger.info(`[PUSH-CONFIG] Added WAN management rule restricted to HQ server IP: ${hqServerIp} on ${wanInterface}`);
                 } else {
                     logger.warn(`[PUSH-CONFIG] SERVER_PUBLIC_IP not a valid IP (${hqServerIp}). Skipping WAN management rule — router may only be reachable via VPN.`);
                 }
 
                 // ── DROP RULES: must come LAST (lowest priority) ──
                 firewallRules.push(
-                    { chain: "input", "in-interface": "ether1", action: "drop", comment: "Drop WAN input - HQ INVESTMENT" },
+                    // RC-4 FIX: Use dynamically detected wanInterface, NOT hardcoded 'ether1'
+                    { chain: "input", "in-interface": wanInterface, action: "drop", comment: "Drop WAN input - HQ INVESTMENT" },
                     // SECURITY: Block unauthenticated LAN/bridge clients from reaching WAN.
                     // The Hotspot engine creates DYNAMIC accept rules for authenticated users, so
                     // authenticated clients are NOT affected by this drop rule.
@@ -1205,6 +1240,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 const updateData: Record<string, any> = {
                     wgEnabled: true,
                     wgConfiguredAt: new Date(),
+                    // RC-1 FIX: Persist the LAN/pool values that push-config used so the
+                    // script-download endpoint can serve them without "missing metadata" errors.
+                    // push-config always configures both hotspot AND pppoe (serviceType='both').
+                    lanIp:            `${lanGateway}/24`,
+                    lanGateway:       lanGateway,
+                    hotspotPoolRange: `${hsPoolStart}-${hsPoolEnd}`,
+                    pppoePoolRange:   `${ppoePoolStart}-${ppoePoolEnd}`,
+                    dns:              '8.8.8.8,1.1.1.1',
+                    serviceType:      'both',
                 };
                 // Only switch host to tunnel IP if the MikroTik actually connected back
                 if (tunnelVerified) {

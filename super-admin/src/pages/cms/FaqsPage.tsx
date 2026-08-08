@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { cmsApi } from '../../api';
+import { cmsApi, type CmsFaq } from '../../api';
 import { StatusBadge, ConfirmModal, Alert, Pagination } from '../../components/ui';
 import { Search, Plus, Edit, Trash2, XCircle, Save } from 'lucide-react';
 
@@ -10,9 +10,9 @@ export default function FaqsPage() {
   const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [formData, setFormData] = useState<any>({
-    question: '', answer: '', category: 'general', sortOrder: 0, isActive: true
-  });
+  const [formData, setFormData] = useState<Partial<CmsFaq>>(
+    { question: '', answer: '', category: 'general', sortOrder: 0, isActive: true }
+  );
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; name: string } | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -22,13 +22,13 @@ export default function FaqsPage() {
   });
 
   const saveMutation = useMutation({
-    mutationFn: (body: any) => isEditing && formData.id ? cmsApi.faqs.update(formData.id, body) : cmsApi.faqs.create(body),
+    mutationFn: (body: Partial<CmsFaq>) => isEditing && formData.id ? cmsApi.faqs.update(formData.id, body) : cmsApi.faqs.create(body),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['sa-cms-faqs'] });
       setShowModal(false);
       setErrorMsg('');
     },
-    onError: (err: any) => setErrorMsg(err.message || 'Failed to save FAQ')
+    onError: (err: Error) => setErrorMsg(err.message || 'Failed to save FAQ')
   });
 
   const deleteMutation = useMutation({
@@ -46,7 +46,7 @@ export default function FaqsPage() {
     setErrorMsg('');
   };
 
-  const handleOpenEdit = (faq: any) => {
+  const handleOpenEdit = (faq: CmsFaq) => {
     setIsEditing(true);
     setFormData(faq);
     setShowModal(true);
@@ -158,7 +158,7 @@ export default function FaqsPage() {
 
               <div className="sa-form-group">
                 <label className="sa-label">Category</label>
-                <input className="sa-input" value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })} placeholder="e.g. general, shipping, returns" />
+                <input className="sa-input" value={formData.category ?? ''} onChange={e => setFormData({ ...formData, category: e.target.value })} placeholder="e.g. general, shipping, returns" />
               </div>
 
               <div className="sa-form-row">

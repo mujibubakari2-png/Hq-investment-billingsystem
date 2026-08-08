@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { cmsApi } from '../../api';
+import { cmsApi, type CustomPage } from '../../api';
 import { StatusBadge, ConfirmModal, Alert, Pagination } from '../../components/ui';
 import { Search, Plus, Edit, Trash2, XCircle, Save, File } from 'lucide-react';
 
@@ -10,7 +10,7 @@ export default function PagesPage() {
   const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [formData, setFormData] = useState<any>({ title: '', slug: '', content: '', isPublished: false });
+  const [formData, setFormData] = useState<Partial<CustomPage>>({ title: '', slug: '', content: '', isPublished: false });
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; title: string } | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -20,13 +20,13 @@ export default function PagesPage() {
   });
 
   const saveMutation = useMutation({
-    mutationFn: (body: any) => isEditing && formData.id ? cmsApi.pages.update(formData.id, body) : cmsApi.pages.create(body),
+    mutationFn: (body: Partial<CustomPage>) => isEditing && formData.id ? cmsApi.pages.update(formData.id, body) : cmsApi.pages.create(body),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['sa-pages'] });
       setShowModal(false);
       setErrorMsg('');
     },
-    onError: (err: any) => setErrorMsg(err.message || 'Failed to save page')
+    onError: (err: Error) => setErrorMsg(err.message || 'Failed to save page')
   });
 
   const deleteMutation = useMutation({
@@ -44,7 +44,7 @@ export default function PagesPage() {
     setErrorMsg('');
   };
 
-  const handleOpenEdit = (p: any) => {
+  const handleOpenEdit = (p: CustomPage) => {
     setIsEditing(true);
     setFormData(p);
     setShowModal(true);

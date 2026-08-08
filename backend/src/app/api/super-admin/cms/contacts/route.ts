@@ -1,20 +1,25 @@
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { NextRequest } from "next/server";
+import { getTenantClient } from "@/lib/tenantPrisma";
 import { requireRole } from "@/lib/rbac";
+import { errorResponse, jsonResponse } from "@/lib/auth";
+import type { Prisma } from "@/generated/prisma";
+import logger from "@/lib/logger";
 
 // GET /api/super-admin/cms/contacts
 export async function GET(req: NextRequest) {
   try {
-    const auth = await requireRole(req, "SUPER_ADMIN");
-    if (auth.error) return auth.error;
+    const guard = requireRole(req, "SUPER_ADMIN");
+    if (guard.error) return guard.error;
+    if (guard.user.tenantId) return errorResponse("Access denied", 403, "NOT_PLATFORM_ADMIN");
 
+    const db = getTenantClient(null);
     const { searchParams } = new URL(req.url);
     const page = parseInt(searchParams.get("page") || "1", 10);
     const limit = parseInt(searchParams.get("limit") || "25", 10);
     const search = searchParams.get("search") || "";
     const status = searchParams.get("status") || "";
 
-    const where: any = {};
+    const where: Prisma.ContactMessageWhereInput = {};
     if (search) {
       where.OR = [
         { name: { contains: search, mode: "insensitive" } },
@@ -26,28 +31,15 @@ export async function GET(req: NextRequest) {
       where.status = status;
     }
 
+    const skip = (page - 1) * limit;
     const [total, data] = await Promise.all([
-      prisma.contactMessage.count({ where }),
-      prisma.contactMessage.findMany({
-        where,
-        orderBy: { createdAt: "desc" },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
+      db.contactMessage.count({ where }),
+      db.contactMessage.findMany({ where, orderBy: { createdAt: "desc" }, skip, take: limit }),
     ]);
 
-    return NextResponse.json({
-      success: true,
-      data,
-      total,
-      page,
-      pages: Math.ceil(total / limit),
-    });
-  } catch (error: unknown) {
-    console.error("[CONTACTS_GET]", error);
-    return NextResponse.json(
-      { success: false, error: (error as Error).message },
-      { status: 500 }
-    );
+    return jsonResponse({ success: true, data, meta: { total, page, totalPages: Math.ceil(total / limit) } });
+  } catch (e) {
+    logger.error("Super Admin GET Contacts Error:", { error: e instanceof Error ? e.message : String(e) });
+    return errorResponse("Internal server error", 500);
   }
 }

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { cmsApi } from '../../api';
+import { cmsApi, type CmsTestimonial } from '../../api';
 import { StatusBadge, ConfirmModal, Alert, Pagination } from '../../components/ui';
 import { Search, Plus, Edit, Trash2, XCircle, Save } from 'lucide-react';
 
@@ -28,7 +28,7 @@ export default function TestimonialsPage() {
       setShowModal(false);
       setErrorMsg('');
     },
-    onError: (err: any) => setErrorMsg(err.message || 'Failed to save testimonial')
+    onError: (err: Error) => setErrorMsg(err.message || 'Failed to save testimonial')
   });
 
   const deleteMutation = useMutation({
@@ -46,7 +46,7 @@ export default function TestimonialsPage() {
     setErrorMsg('');
   };
 
-  const handleOpenEdit = (testimonial: any) => {
+  const handleOpenEdit = (testimonial: CmsTestimonial) => {
     setIsEditing(true);
     setFormData(testimonial);
     setShowModal(true);
@@ -99,7 +99,7 @@ export default function TestimonialsPage() {
               ) : testimonials.length === 0 ? (
                 <tr><td colSpan={6} className="sa-text-center sa-text-muted">No testimonials found.</td></tr>
               ) : (
-                testimonials.map((t: any) => (
+                testimonials.map((t: CmsTestimonial) => (
                   <tr key={t.id}>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>

@@ -497,13 +497,236 @@ export interface Customer {
   createdAt: string;
 }
 
+export interface ProductReview {
+  id: string;
+  productId: string;
+  productName?: string;
+  authorName: string;
+  email: string | null;
+  rating: number;
+  title: string | null;
+  comment: string | null;
+  isApproved: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Brand {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  logoUrl: string | null;
+  websiteUrl: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Collection {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  imageUrl: string | null;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Warehouse {
+  id: string;
+  name: string;
+  location: string | null;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ShippingZone {
+  id: string;
+  name: string;
+  rate: number;
+  currency: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TaxClass {
+  id: string;
+  name: string;
+  rate: number;
+  isDefault: boolean;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Coupon {
+  id: string;
+  code: string;
+  discountType: 'PERCENTAGE' | 'FIXED';
+  discountValue: number;
+  minOrderAmount: number | null;
+  usageLimit: number | null;
+  usedCount: number;
+  isActive: boolean;
+  expiresAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FlashSale {
+  id: string;
+  title: string;
+  discountPercentage: number;
+  startDate: string;
+  endDate: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MenuItem {
+  id: string;
+  label: string;
+  url: string;
+  sortOrder: number;
+  isActive: boolean;
+  parentId: string | null;
+}
+
+export interface Menu {
+  id: string;
+  name: string;
+  location: string;
+  items: MenuItem[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface InventoryMovement {
+  id: string;
+  productId: string;
+  productName?: string;
+  type: 'IN' | 'OUT' | 'ADJUSTMENT';
+  quantity: number;
+  notes: string | null | undefined;
+  createdAt: string;
+}
+
+export interface EcomCustomer {
+  id: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  status: 'ACTIVE' | 'INACTIVE' | 'BLOCKED';
+  totalOrders: number;
+  totalSpent: number;
+  lastActive: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BlogPost {
+  id: string;
+  title: string;
+  slug: string;
+  content: string;
+  excerpt: string | null;
+  coverImageUrl: string | null;
+  author: string | null;
+  isPublished: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CustomPage {
+  id: string;
+  title: string;
+  slug: string;
+  content: string;
+  metaTitle: string | null;
+  metaDescription: string | null;
+  isPublished: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ContactMessage {
+  id: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  subject: string | null;
+  message: string;
+  status: string;
+  createdAt: string;
+}
+
+export interface Subscriber {
+  id: string;
+  email: string;
+  name: string | null;
+  isActive: boolean;
+  subscribedAt: string;
+}
+
+export interface StorefrontSettingRecord {
+  key: string;
+  value: unknown;
+  updatedAt: string;
+}
+
+export interface CmsBanner {
+  id: string;
+  title: string | null;
+  subtitle: string | null;
+  imageUrl: string;
+  linkUrl: string | null;
+  linkText: string | null;
+  position: number;
+  isActive: boolean;
+  startDate: string | null;
+  endDate: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CmsTestimonial {
+  id: string;
+  name: string;
+  role: string | null;
+  company: string | null;
+  content: string;
+  avatarUrl: string | null;
+  rating: number;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt: string;
+}
+
+export interface CmsFaq {
+  id: string;
+  question: string;
+  answer: string;
+  category: string | null;
+  sortOrder: number;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface StockMovement {
   id: string;
   productId: string;
-  product?: any; // Add Product interface if needed
+  product?: { id: string; name: string; sku?: string | null; quantity?: number };
   type: 'IN' | 'OUT' | 'ADJUSTMENT';
   quantity: number;
-  notes?: string;
+  notes?: string | null;
   createdAt: string;
 }
 
@@ -539,8 +762,8 @@ export const ecommerceApi = {
       return get<{ data: Product[]; total: number; page: number; pages: number }>(`/ecommerce/products${q}`);
     },
     get: (id: string) => get<{ data: Product }>(`/ecommerce/products/${id}`),
-    create: (body: any) => post<{ data: Product }>('/ecommerce/products', body),
-    update: (id: string, body: any) => put<{ data: Product }>(`/ecommerce/products/${id}`, body),
+    create: (body: Partial<Product> & Record<string, unknown>) => post<{ data: Product }>('/ecommerce/products', body),
+    update: (id: string, body: Partial<Product> & Record<string, unknown>) => put<{ data: Product }>(`/ecommerce/products/${id}`, body),
     delete: (id: string) => del<{ message: string }>(`/ecommerce/products/${id}`)
   },
   orders: {
@@ -554,114 +777,114 @@ export const ecommerceApi = {
   reviews: {
     list: (params?: Record<string, string>) => {
       const q = params ? '?' + new URLSearchParams(params).toString() : '';
-      return get<{ data: any[]; total: number; page: number; pages: number }>(`/ecommerce/reviews${q}`);
+      return get<{ data: ProductReview[]; total: number; page: number; pages: number }>(`/ecommerce/reviews${q}`);
     },
-    update: (id: string, body: { isApproved: boolean }) => put<{ data: any }>(`/ecommerce/reviews/${id}`, body),
+    update: (id: string, body: { isApproved: boolean }) => put<{ data: ProductReview }>(`/ecommerce/reviews/${id}`, body),
     delete: (id: string) => del<{ message: string }>(`/ecommerce/reviews/${id}`)
   },
   brands: {
     list: (params?: Record<string, string>) => {
       const q = params ? '?' + new URLSearchParams(params).toString() : '';
-      return get<{ data: any[]; total: number; page: number; pages: number }>(`/ecommerce/brands${q}`);
+      return get<{ data: Brand[]; total: number; page: number; pages: number }>(`/ecommerce/brands${q}`);
     },
-    create: (body: any) => post<{ data: any }>('/ecommerce/brands', body),
-    update: (id: string, body: any) => put<{ data: any }>(`/ecommerce/brands/${id}`, body),
+    create: (body: Partial<Brand>) => post<{ data: Brand }>('/ecommerce/brands', body),
+    update: (id: string, body: Partial<Brand>) => put<{ data: Brand }>(`/ecommerce/brands/${id}`, body),
     delete: (id: string) => del<{ message: string }>(`/ecommerce/brands/${id}`)
   },
   collections: {
     list: (params?: Record<string, string>) => {
       const q = params ? '?' + new URLSearchParams(params).toString() : '';
-      return get<{ data: any[]; total: number; page: number; pages: number }>(`/ecommerce/collections${q}`);
+      return get<{ data: Collection[]; total: number; page: number; pages: number }>(`/ecommerce/collections${q}`);
     },
-    create: (body: any) => post<{ data: any }>('/ecommerce/collections', body),
-    update: (id: string, body: any) => put<{ data: any }>(`/ecommerce/collections/${id}`, body),
+    create: (body: Partial<Collection>) => post<{ data: Collection }>('/ecommerce/collections', body),
+    update: (id: string, body: Partial<Collection>) => put<{ data: Collection }>(`/ecommerce/collections/${id}`, body),
     delete: (id: string) => del<{ message: string }>(`/ecommerce/collections/${id}`)
   },
   warehouses: {
     list: (params?: Record<string, string>) => {
       const q = params ? '?' + new URLSearchParams(params).toString() : '';
-      return get<{ data: any[]; total: number; page: number; pages: number }>(`/ecommerce/warehouses${q}`);
+      return get<{ data: Warehouse[]; total: number; page: number; pages: number }>(`/ecommerce/warehouses${q}`);
     },
-    create: (body: any) => post<{ data: any }>('/ecommerce/warehouses', body),
-    update: (id: string, body: any) => put<{ data: any }>(`/ecommerce/warehouses/${id}`, body),
+    create: (body: Partial<Warehouse>) => post<{ data: Warehouse }>('/ecommerce/warehouses', body),
+    update: (id: string, body: Partial<Warehouse>) => put<{ data: Warehouse }>(`/ecommerce/warehouses/${id}`, body),
     delete: (id: string) => del<{ message: string }>(`/ecommerce/warehouses/${id}`)
   },
   shipping: {
     list: (params?: Record<string, string>) => {
       const q = params ? '?' + new URLSearchParams(params).toString() : '';
-      return get<{ data: any[]; total: number; page: number; pages: number }>(`/ecommerce/shipping${q}`);
+      return get<{ data: ShippingZone[]; total: number; page: number; pages: number }>(`/ecommerce/shipping${q}`);
     },
-    create: (body: any) => post<{ data: any }>('/ecommerce/shipping', body),
-    update: (id: string, body: any) => put<{ data: any }>(`/ecommerce/shipping/${id}`, body),
+    create: (body: Partial<ShippingZone>) => post<{ data: ShippingZone }>('/ecommerce/shipping', body),
+    update: (id: string, body: Partial<ShippingZone>) => put<{ data: ShippingZone }>(`/ecommerce/shipping/${id}`, body),
     delete: (id: string) => del<{ message: string }>(`/ecommerce/shipping/${id}`)
   },
   taxes: {
     list: (params?: Record<string, string>) => {
       const q = params ? '?' + new URLSearchParams(params).toString() : '';
-      return get<{ data: any[]; total: number; page: number; pages: number }>(`/ecommerce/taxes${q}`);
+      return get<{ data: TaxClass[]; total: number; page: number; pages: number }>(`/ecommerce/taxes${q}`);
     },
-    create: (body: any) => post<{ data: any }>('/ecommerce/taxes', body),
-    update: (id: string, body: any) => put<{ data: any }>(`/ecommerce/taxes/${id}`, body),
+    create: (body: Partial<TaxClass>) => post<{ data: TaxClass }>('/ecommerce/taxes', body),
+    update: (id: string, body: Partial<TaxClass>) => put<{ data: TaxClass }>(`/ecommerce/taxes/${id}`, body),
     delete: (id: string) => del<{ message: string }>(`/ecommerce/taxes/${id}`)
   },
   coupons: {
     list: (params?: Record<string, string>) => {
       const q = params ? '?' + new URLSearchParams(params).toString() : '';
-      return get<{ data: any[]; total: number; page: number; pages: number }>(`/ecommerce/coupons${q}`);
+      return get<{ data: Coupon[]; total: number; page: number; pages: number }>(`/ecommerce/coupons${q}`);
     },
-    create: (body: any) => post<{ data: any }>('/ecommerce/coupons', body),
-    update: (id: string, body: any) => put<{ data: any }>(`/ecommerce/coupons/${id}`, body),
+    create: (body: Partial<Coupon>) => post<{ data: Coupon }>('/ecommerce/coupons', body),
+    update: (id: string, body: Partial<Coupon>) => put<{ data: Coupon }>(`/ecommerce/coupons/${id}`, body),
     delete: (id: string) => del<{ message: string }>(`/ecommerce/coupons/${id}`)
   },
   flashSales: {
     list: (params?: Record<string, string>) => {
       const q = params ? '?' + new URLSearchParams(params).toString() : '';
-      return get<{ data: any[]; total: number; page: number; pages: number }>(`/ecommerce/flash-sales${q}`);
+      return get<{ data: FlashSale[]; total: number; page: number; pages: number }>(`/ecommerce/flash-sales${q}`);
     },
-    create: (body: any) => post<{ data: any }>('/ecommerce/flash-sales', body),
-    update: (id: string, body: any) => put<{ data: any }>(`/ecommerce/flash-sales/${id}`, body),
+    create: (body: Partial<FlashSale>) => post<{ data: FlashSale }>('/ecommerce/flash-sales', body),
+    update: (id: string, body: Partial<FlashSale>) => put<{ data: FlashSale }>(`/ecommerce/flash-sales/${id}`, body),
     delete: (id: string) => del<{ message: string }>(`/ecommerce/flash-sales/${id}`)
   },
   inventory: {
     list: (params?: Record<string, string>) => {
       const q = params ? '?' + new URLSearchParams(params).toString() : '';
-      return get<{ data: any[]; meta: any }>(`/ecommerce/inventory${q}`);
+      return get<{ data: StockMovement[]; meta: { total: number; page: number; totalPages: number } }>(`/ecommerce/inventory${q}`);
     },
-    addMovement: (body: any) => post<{ data: any }>('/ecommerce/inventory', body)
+    addMovement: (body: Omit<InventoryMovement, 'id' | 'createdAt' | 'productName'>) => post<{ data: InventoryMovement }>('/ecommerce/inventory', body)
   },
   customers: {
     list: (params?: Record<string, string>) => {
       const q = params ? '?' + new URLSearchParams(params).toString() : '';
-      return get<{ data: any[]; meta: any }>(`/ecommerce/customers${q}`);
+      return get<{ data: Customer[]; meta: { total: number; page: number; totalPages: number } }>(`/ecommerce/customers${q}`);
     },
-    create: (body: any) => post<{ data: any }>('/ecommerce/customers', body),
-    update: (id: string, body: any) => put<{ data: any }>(`/ecommerce/customers/${id}`, body),
+    create: (body: Partial<Customer>) => post<{ data: Customer }>('/ecommerce/customers', body),
+    update: (id: string, body: Partial<Customer>) => put<{ data: Customer }>(`/ecommerce/customers/${id}`, body),
     delete: (id: string) => del<{ message: string }>(`/ecommerce/customers/${id}`)
   },
   menus: {
     list: (params?: Record<string, string>) => {
       const q = params ? '?' + new URLSearchParams(params).toString() : '';
-      return get<{ data: any[]; meta: any }>(`/ecommerce/menus${q}`);
+      return get<{ data: Menu[]; meta: { total: number; page: number; totalPages: number } }>(`/ecommerce/menus${q}`);
     },
-    create: (body: any) => post<{ data: any }>('/ecommerce/menus', body),
-    update: (id: string, body: any) => put<{ data: any }>(`/ecommerce/menus/${id}`, body),
+    create: (body: Partial<Menu>) => post<{ data: Menu }>('/ecommerce/menus', body),
+    update: (id: string, body: Partial<Menu>) => put<{ data: Menu }>(`/ecommerce/menus/${id}`, body),
     delete: (id: string) => del<{ message: string }>(`/ecommerce/menus/${id}`)
   },
   media: {
     list: (params?: Record<string, string>) => {
       const q = params ? '?' + new URLSearchParams(params).toString() : '';
-      return get<{ data: any[]; meta: any }>(`/ecommerce/media${q}`);
+      return get<{ data: MediaAsset[]; meta: { total: number; page: number; totalPages: number } }>(`/ecommerce/media${q}`);
     },
-    create: (body: any) => post<{ data: any }>('/ecommerce/media', body),
+    create: (body: Partial<MediaAsset>) => post<{ data: MediaAsset }>('/ecommerce/media', body),
     delete: (id: string) => del<{ message: string }>(`/ecommerce/media/${id}`)
   },
   promotions: {
     list: (params?: Record<string, string>) => {
       const q = params ? '?' + new URLSearchParams(params).toString() : '';
-      return get<{ data: any[]; meta: any }>(`/ecommerce/promotions${q}`);
+      return get<{ data: Promotion[]; meta: { total: number; page: number; totalPages: number } }>(`/ecommerce/promotions${q}`);
     },
-    create: (body: any) => post<{ data: any }>('/ecommerce/promotions', body),
-    update: (id: string, body: any) => put<{ data: any }>(`/ecommerce/promotions/${id}`, body),
+    create: (body: Partial<Promotion>) => post<{ data: Promotion }>('/ecommerce/promotions', body),
+    update: (id: string, body: Partial<Promotion>) => put<{ data: Promotion }>(`/ecommerce/promotions/${id}`, body),
     delete: (id: string) => del<{ message: string }>(`/ecommerce/promotions/${id}`)
   }
 };
@@ -670,9 +893,9 @@ export const developerApi = {
   apiKeys: {
     list: (params?: Record<string, string>) => {
       const q = params ? '?' + new URLSearchParams(params).toString() : '';
-      return get<{ data: any[]; meta: any }>(`/developer/api-keys${q}`);
+      return get<{ data: ApiKey[]; meta: { total: number; page: number; totalPages: number } }>(`/developer/api-keys${q}`);
     },
-    create: (body: any) => post<{ rawKey: string; message: string }>('/developer/api-keys', body),
+    create: (body: { name: string }) => post<{ rawKey: string; message: string }>('/developer/api-keys', body),
     revoke: (id: string) => del<{ message: string }>(`/developer/api-keys/${id}`)
   }
 };
@@ -680,66 +903,66 @@ export const developerApi = {
 // ── CMS ───────────────────────────────────────────────────────────────────────
 export const cmsApi = {
   settings: {
-    get: () => get<{ data: Record<string, any> }>('/cms/settings'),
-    update: (body: Record<string, any>) => put<{ message: string }>('/cms/settings', body),
+    get: () => get<{ data: Record<string, unknown> }>('/cms/settings'),
+    update: (body: Record<string, unknown>) => put<{ message: string }>('/cms/settings', body),
   },
   banners: {
     list: (params?: Record<string, string>) => {
       const q = params ? '?' + new URLSearchParams(params).toString() : '';
-      return get<{ data: any[]; total: number; page: number; pages: number }>(`/cms/banners${q}`);
+      return get<{ data: CmsBanner[]; total: number; page: number; pages: number }>(`/cms/banners${q}`);
     },
-    create: (body: any) => post<{ data: any }>('/cms/banners', body),
-    update: (id: string, body: any) => put<{ data: any }>(`/cms/banners/${id}`, body),
+    create: (body: Partial<CmsBanner>) => post<{ data: CmsBanner }>('/cms/banners', body),
+    update: (id: string, body: Partial<CmsBanner>) => put<{ data: CmsBanner }>(`/cms/banners/${id}`, body),
     delete: (id: string) => del<{ message: string }>(`/cms/banners/${id}`)
   },
   testimonials: {
     list: (params?: Record<string, string>) => {
       const q = params ? '?' + new URLSearchParams(params).toString() : '';
-      return get<{ data: any[]; total: number; page: number; pages: number }>(`/cms/testimonials${q}`);
+      return get<{ data: CmsTestimonial[]; total: number; page: number; pages: number }>(`/cms/testimonials${q}`);
     },
-    create: (body: any) => post<{ data: any }>('/cms/testimonials', body),
-    update: (id: string, body: any) => put<{ data: any }>(`/cms/testimonials/${id}`, body),
+    create: (body: Partial<CmsTestimonial>) => post<{ data: CmsTestimonial }>('/cms/testimonials', body),
+    update: (id: string, body: Partial<CmsTestimonial>) => put<{ data: CmsTestimonial }>(`/cms/testimonials/${id}`, body),
     delete: (id: string) => del<{ message: string }>(`/cms/testimonials/${id}`)
   },
   faqs: {
     list: (params?: Record<string, string>) => {
       const q = params ? '?' + new URLSearchParams(params).toString() : '';
-      return get<{ data: any[]; total: number; page: number; pages: number }>(`/cms/faqs${q}`);
+      return get<{ data: CmsFaq[]; total: number; page: number; pages: number }>(`/cms/faqs${q}`);
     },
-    create: (body: any) => post<{ data: any }>('/cms/faqs', body),
-    update: (id: string, body: any) => put<{ data: any }>(`/cms/faqs/${id}`, body),
+    create: (body: Partial<CmsFaq>) => post<{ data: CmsFaq }>('/cms/faqs', body),
+    update: (id: string, body: Partial<CmsFaq>) => put<{ data: CmsFaq }>(`/cms/faqs/${id}`, body),
     delete: (id: string) => del<{ message: string }>(`/cms/faqs/${id}`)
   },
   subscribers: {
     list: (params?: Record<string, string>) => {
       const q = params ? '?' + new URLSearchParams(params).toString() : '';
-      return get<{ data: any[]; total: number; page: number; pages: number }>(`/cms/subscribers${q}`);
+      return get<{ data: Subscriber[]; total: number; page: number; pages: number }>(`/cms/subscribers${q}`);
     }
   },
   blogs: {
     list: (params?: Record<string, string>) => {
       const q = params ? '?' + new URLSearchParams(params).toString() : '';
-      return get<{ data: any[]; total: number; page: number; pages: number }>(`/cms/blogs${q}`);
+      return get<{ data: BlogPost[]; total: number; page: number; pages: number }>(`/cms/blogs${q}`);
     },
-    create: (body: any) => post<{ data: any }>('/cms/blogs', body),
-    update: (id: string, body: any) => put<{ data: any }>(`/cms/blogs/${id}`, body),
+    create: (body: Partial<BlogPost>) => post<{ data: BlogPost }>('/cms/blogs', body),
+    update: (id: string, body: Partial<BlogPost>) => put<{ data: BlogPost }>(`/cms/blogs/${id}`, body),
     delete: (id: string) => del<{ message: string }>(`/cms/blogs/${id}`)
   },
   pages: {
     list: (params?: Record<string, string>) => {
       const q = params ? '?' + new URLSearchParams(params).toString() : '';
-      return get<{ data: any[]; total: number; page: number; pages: number }>(`/cms/pages${q}`);
+      return get<{ data: CustomPage[]; total: number; page: number; pages: number }>(`/cms/pages${q}`);
     },
-    create: (body: any) => post<{ data: any }>('/cms/pages', body),
-    update: (id: string, body: any) => put<{ data: any }>(`/cms/pages/${id}`, body),
+    create: (body: Partial<CustomPage>) => post<{ data: CustomPage }>('/cms/pages', body),
+    update: (id: string, body: Partial<CustomPage>) => put<{ data: CustomPage }>(`/cms/pages/${id}`, body),
     delete: (id: string) => del<{ message: string }>(`/cms/pages/${id}`)
   },
   contacts: {
     list: (params?: Record<string, string>) => {
       const q = params ? '?' + new URLSearchParams(params).toString() : '';
-      return get<{ data: any[]; total: number; page: number; pages: number }>(`/cms/contacts${q}`);
+      return get<{ data: ContactMessage[]; total: number; page: number; pages: number }>(`/cms/contacts${q}`);
     },
-    updateStatus: (id: string, status: string) => put<{ data: any }>(`/cms/contacts/${id}`, { status }),
+    updateStatus: (id: string, status: string) => put<{ data: ContactMessage }>(`/cms/contacts/${id}`, { status }),
     delete: (id: string) => del<{ message: string }>(`/cms/contacts/${id}`)
   }
 };

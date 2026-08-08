@@ -3,6 +3,7 @@
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { useState, useEffect } from "react";
+import type { ComponentType } from "react";
 import {
   ArrowRight,
   BadgeCheck,
@@ -19,8 +20,11 @@ import {
   Zap,
   HelpCircle,
 } from "lucide-react";
+import type { HeroConfig, FeatureItem, FloatingCard, TrustItem } from "@/types";
 
-const ICON_MAP: Record<string, any> = {
+type IconComponent = ComponentType<{ size?: number; className?: string }>;
+
+const ICON_MAP: Record<string, IconComponent> = {
   Smartphone, Laptop, Headphones, Shirt, Zap, Shield, Star, Truck, BadgeCheck, PackageCheck
 };
 
@@ -44,13 +48,13 @@ const defaultTrustItems = [
 ];
 
 export default function Hero() {
-  const [config, setConfig] = useState<any>(null);
-  const [features, setFeatures] = useState<any[]>([]);
+  const [config, setConfig] = useState<HeroConfig | null>(null);
+  const [features, setFeatures] = useState<FeatureItem[]>([]);
 
   useEffect(() => {
     fetch("/api/public/storefront/settings")
       .then((res) => res.json())
-      .then((data) => {
+      .then((data: { data?: { HERO_CONFIG?: HeroConfig; STORE_FEATURES?: FeatureItem[] } }) => {
         if (data?.data) {
           if (data.data.HERO_CONFIG) setConfig(data.data.HERO_CONFIG);
           if (data.data.STORE_FEATURES) setFeatures(data.data.STORE_FEATURES);
@@ -59,13 +63,13 @@ export default function Hero() {
       .catch(console.error);
   }, []);
 
-  const badgeText = config?.badgeText || "Premium Marketplace for East Africa";
-  const title = config?.title || "Premium shopping.";
-  const subtitle = config?.subtitle || "Real products.";
+  const badgeText = config?.badgeText ?? "Premium Marketplace for East Africa";
+  const title = config?.title ?? "Premium shopping.";
+  const subtitle = config?.subtitle ?? "Real products.";
 
-  const floatingCards = config?.floatingCards?.length ? config.floatingCards : defaultFloatingCards;
-  const trustItems = config?.trustItems?.length ? config.trustItems : defaultTrustItems;
-  const featureChips = features?.length ? features : defaultFeatureChips;
+  const floatingCards: FloatingCard[] = config?.floatingCards?.length ? config.floatingCards : defaultFloatingCards;
+  const trustItems: TrustItem[] = config?.trustItems?.length ? config.trustItems : defaultTrustItems;
+  const featureChips: FeatureItem[] = features.length > 0 ? features : defaultFeatureChips;
 
   return (
     <section className="relative min-h-screen flex items-center overflow-hidden pt-20">
@@ -169,7 +173,7 @@ export default function Hero() {
               transition={{ duration: 0.5, delay: 0.35 }}
               className="flex flex-wrap gap-3 justify-center lg:justify-start mb-10"
             >
-              {featureChips.slice(0, 4).map((chip: any) => {
+              {featureChips.slice(0, 4).map((chip) => {
                 const IconComp = ICON_MAP[chip.icon] || HelpCircle;
                 return (
                   <div
@@ -250,7 +254,7 @@ export default function Hero() {
               </div>
             </motion.div>
 
-            {floatingCards.map((card: any, i: number) => {
+            {floatingCards.map((card, i) => {
               const positions = [
                 { top: "5%", left: "-10%" },
                 { top: "10%", right: "-10%" },
@@ -274,9 +278,9 @@ export default function Hero() {
                 >
                   <div
                     className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0"
-                    style={{ background: `${card.color}20` }}
+                    style={{ background: `${card.color}20`, color: card.color }}
                   >
-                    <IconComp size={20} color={card.color} />
+                    <IconComp size={20} />
                   </div>
                   <div>
                     <p className="text-xs font-semibold text-slate-700">{card.label}</p>
@@ -294,7 +298,7 @@ export default function Hero() {
           transition={{ delay: 0.8, duration: 0.5 }}
           className="mt-14 grid grid-cols-1 md:grid-cols-3 gap-4"
         >
-          {trustItems.slice(0, 3).map((item: any) => {
+          {trustItems.slice(0, 3).map((item) => {
             const IconComp = ICON_MAP[item.icon] || HelpCircle;
             return (
               <div key={item.title} className="glass rounded-2xl px-5 py-4 flex items-center gap-3">

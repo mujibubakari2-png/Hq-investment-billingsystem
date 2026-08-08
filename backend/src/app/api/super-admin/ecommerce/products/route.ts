@@ -3,6 +3,7 @@ import { getTenantClient } from "@/lib/tenantPrisma";
 import { errorResponse, jsonResponse } from "@/lib/auth";
 import { requireRole } from "@/lib/rbac";
 import logger from "@/lib/logger";
+import type { Prisma } from "@/generated/prisma";
 
 /**
  * GET  /api/super-admin/ecommerce/products
@@ -24,14 +25,14 @@ export async function GET(req: NextRequest) {
         const limit = parseInt(searchParams.get("limit") || "10", 10);
         const skip = (page - 1) * limit;
 
-        const where: any = { deletedAt: null };
+        const where: Prisma.ProductWhereInput = { deletedAt: null };
         if (search) {
             where.OR = [
                 { name: { contains: search, mode: "insensitive" } },
                 { sku: { contains: search, mode: "insensitive" } },
             ];
         }
-        if (status) where.status = status;
+        if (status) where.status = status as Prisma.ProductWhereInput["status"];
         if (categoryId) where.categoryId = categoryId;
 
         const [total, products] = await Promise.all([
@@ -43,6 +44,7 @@ export async function GET(req: NextRequest) {
                 orderBy: { createdAt: "desc" },
                 include: {
                     category: { select: { id: true, name: true } },
+                    brand: { select: { id: true, name: true } },
                     images: { orderBy: { sortOrder: "asc" }, take: 1 }
                 }
             })
@@ -69,7 +71,7 @@ export async function POST(req: NextRequest) {
         const body = await req.json();
         
         const {
-            name, slug, sku, barcode, categoryId, brand, price, discountType,
+            name, slug, sku, barcode, categoryId, brandId, price, discountType,
             discountValue, currency, quantity, description, tags, status,
             featured, trending, bestSeller, isNew, images
         } = body;
@@ -103,7 +105,7 @@ export async function POST(req: NextRequest) {
                 sku: sku || null,
                 barcode: barcode || null,
                 categoryId: categoryId || null,
-                brand: brand || null,
+                brandId: brandId || null,
                 price,
                 discountType: discountType || "percent",
                 discountValue: discountValue || null,

@@ -3,6 +3,7 @@ import { getTenantClient } from "@/lib/tenantPrisma";
 import { errorResponse, jsonResponse } from "@/lib/auth";
 import { requireRole } from "@/lib/rbac";
 import logger from "@/lib/logger";
+import type { Prisma } from "@/generated/prisma";
 
 /**
  * GET  /api/super-admin/ecommerce/orders
@@ -23,7 +24,7 @@ export async function GET(req: NextRequest) {
         const limit = parseInt(searchParams.get("limit") || "10", 10);
         const skip = (page - 1) * limit;
 
-        const where: any = { deletedAt: null };
+        const where: Prisma.EcomOrderWhereInput = { deletedAt: null };
         if (search) {
             where.OR = [
                 { orderNumber: { contains: search, mode: "insensitive" } },
@@ -32,8 +33,8 @@ export async function GET(req: NextRequest) {
                 { customerPhone: { contains: search, mode: "insensitive" } },
             ];
         }
-        if (status) where.status = status;
-        if (paymentStatus) where.paymentStatus = paymentStatus;
+        if (status) where.status = status as Prisma.EnumOrderStatusFilter<"EcomOrder">;
+        if (paymentStatus) where.paymentStatus = paymentStatus as Prisma.EnumPaymentStatusFilter<"EcomOrder">;
 
         const [total, orders] = await Promise.all([
             db.ecomOrder.count({ where }),

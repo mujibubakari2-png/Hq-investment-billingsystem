@@ -26,6 +26,12 @@ export interface ProductCategory {
   _count?: { products: number };
 }
 
+/** The `brand` field is the DB relation — the public API always returns the object shape. */
+export interface ProductBrand {
+  id: string;
+  name: string;
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -33,7 +39,8 @@ export interface Product {
   sku: string | null;
   barcode: string | null;
   categoryId: string | null;
-  brand: string | null;
+  /** Relation to Brand model — returned as `{ id, name }` by the public API. */
+  brand: ProductBrand | null;
   price: string | number;
   discountType: string | null;
   discountValue: string | number | null;
@@ -184,4 +191,53 @@ export interface Toast {
   type: ToastType;
   message: string;
   duration?: number;
+}
+
+// ─── Storefront Settings Types ────────────────────────────────────────────────
+// These types represent the shape of data returned by /api/public/storefront/settings
+// and stored in the store_settings table. Used to eliminate `any` casts in Hero and Features.
+
+export interface FloatingCard {
+  icon: string;
+  label: string;
+  price: string;
+  color: string;
+  delay: number;
+}
+
+export interface TrustItem {
+  icon: string;
+  title: string;
+  text: string;
+}
+
+export interface FeatureItem {
+  icon: string;
+  title: string;
+  description?: string;
+}
+
+export interface HeroConfig {
+  badgeText?: string;
+  title?: string;
+  subtitle?: string;
+  floatingCards?: FloatingCard[];
+  trustItems?: TrustItem[];
+}
+
+export interface StoreStatistics {
+  products: number;
+  customers: number;
+  orders: number;
+  yearsInBusiness: number;
+  brands?: number;
+  countries?: number;
+  satisfactionRate?: number;
+  dailyVisitors?: number;
+}
+
+export interface StorefrontSettings {
+  HERO_CONFIG?: HeroConfig;
+  STORE_FEATURES?: FeatureItem[];
+  STATISTICS?: StoreStatistics;
 }

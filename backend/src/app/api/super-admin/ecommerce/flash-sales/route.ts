@@ -3,6 +3,7 @@ import { getTenantClient } from "@/lib/tenantPrisma";
 import { errorResponse, jsonResponse } from "@/lib/auth";
 import { requireRole } from "@/lib/rbac";
 import logger from "@/lib/logger";
+import type { Prisma } from "@/generated/prisma";
 
 /**
  * GET  /api/super-admin/ecommerce/flash-sales
@@ -22,7 +23,7 @@ export async function GET(req: NextRequest) {
         const limit = parseInt(searchParams.get("limit") || "25", 10);
         const skip = (page - 1) * limit;
 
-        const where: any = {};
+        const where: Prisma.FlashSaleWhereInput = {};
         if (search) {
             where.title = { contains: search, mode: "insensitive" };
         }

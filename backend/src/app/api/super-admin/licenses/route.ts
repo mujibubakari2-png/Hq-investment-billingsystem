@@ -3,6 +3,7 @@ import { getTenantClient } from "@/lib/tenantPrisma";
 import { errorResponse, jsonResponse } from "@/lib/auth";
 import { requireRole } from "@/lib/rbac";
 import logger from "@/lib/logger";
+import type { Prisma } from "@/generated/prisma";
 import { writeAuditLog, getIpFromRequest } from "@/lib/auditLog";
 
 /**
@@ -29,8 +30,8 @@ export async function GET(req: NextRequest) {
         const skip = (page - 1) * limit;
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const where: any = {};
-        if (status) where.status = status;
+        const where: Prisma.TenantLicenseWhereInput = {};
+        if (status) where.status = status as any;
         if (tenantId) where.tenantId = tenantId;
 
         const [licenses, total] = await Promise.all([

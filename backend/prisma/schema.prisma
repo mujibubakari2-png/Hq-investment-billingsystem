@@ -264,11 +264,16 @@ model Router {
   // These were present in route code but missing from the schema, causing TS errors.
   // All optional — existing routers without these values get null (script endpoint
   // validates them and returns a 400 with the specific missing field names).
-  lanIp            String? // e.g. "192.168.88.1"
+  lanIp            String? // e.g. "192.168.88.1/24"
   lanGateway       String? // e.g. "192.168.88.1"
   hotspotPoolRange String? // e.g. "192.168.88.10-192.168.88.254"
   pppoePoolRange   String? // e.g. "10.0.0.10-10.0.0.254"
   dns              String? // e.g. "8.8.8.8,8.8.4.4"
+  // RC-2 FIX: serviceType determines which pool ranges are required for script generation.
+  // "hotspot" — only hotspot pool required; pppoePoolRange skipped.
+  // "pppoe"   — only pppoe pool required; hotspotPoolRange skipped.
+  // "both"    — both pools required (default for backward compat with existing routers).
+  serviceType      String? @default("both") // "hotspot" | "pppoe" | "both"
   wgConfiguredAt   DateTime?
   wgEnabled        Boolean                 @default(false)
   wgListenPort     Int?                    @default(51820)
@@ -1187,9 +1192,11 @@ model Review {
 model StoreSetting {
   key       String   @id // e.g., 'HERO_CONFIG', 'STORE_FEATURES', 'STATISTICS'
   value     Json
-  
+
   updatedAt DateTime @updatedAt
   updatedBy String?
+
+  @@map("store_settings")
 }
 
 

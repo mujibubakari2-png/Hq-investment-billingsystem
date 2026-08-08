@@ -24,9 +24,9 @@ export default function StorefrontSettingsPage() {
 
   useEffect(() => {
     if (data?.data) {
-      if (data.data.HERO_CONFIG) setHeroConfig(data.data.HERO_CONFIG);
-      if (data.data.STORE_FEATURES) setFeatures(data.data.STORE_FEATURES);
-      if (data.data.STATISTICS) setStats(data.data.STATISTICS);
+      if (data.data.HERO_CONFIG) setHeroConfig(data.data.HERO_CONFIG as any);
+      if (data.data.STORE_FEATURES) setFeatures(data.data.STORE_FEATURES as any[]);
+      if (data.data.STATISTICS) setStats(data.data.STATISTICS as any);
     }
   }, [data]);
 

@@ -4,6 +4,7 @@ import { errorResponse, jsonResponse } from "@/lib/auth";
 import { requireRole } from "@/lib/rbac";
 import { writeAuditLog, getIpFromRequest } from "@/lib/auditLog";
 import logger from "@/lib/logger";
+import type { Prisma } from "@/generated/prisma";
 
 /**
  * GET  /api/super-admin/invoices    — list all platform (SaaS) invoices
@@ -30,8 +31,8 @@ export async function GET(req: NextRequest) {
         const skip = (page - 1) * limit;
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const where: any = {};
-        if (status) where.status = status;
+        const where: Prisma.TenantInvoiceWhereInput = {};
+        if (status) where.status = status as Prisma.EnumTenantInvoiceStatusFilter<"TenantInvoice">;
         if (tenantId) where.tenantId = tenantId;
 
         const [invoices, total] = await Promise.all([

@@ -217,14 +217,16 @@ ${isWireGuard ? `# VPN IP: ${routerTunnelIp}\n` : ''}# Generated: ${new Date().t
 # ── 7. Hotspot Server ────────────────────────────────────────────
 # IMPORTANT: hotspot is created AFTER IP address is assigned.
 # SECURITY FIX: http-pap removed — PAP transmits passwords in cleartext over the wire.
+# RC-3 FIX: ssl-certificate=auto removed — it crashes import on routers without
+# a certificate in /certificate store. TLS can be added separately after import.
 :if ([:len [/ip hotspot profile find name="hsprof-${safeRouterNameLower}"]] = 0) do={
-    /ip hotspot profile add name="hsprof-${safeRouterNameLower}" hotspot-address=${lanGateway} dns-name="${safeRouterNameLower}.hotspot" html-directory=hotspot login-by=http-chap,https,cookie ssl-certificate=auto http-cookie-lifetime=3d use-radius=yes
+    /ip hotspot profile add name="hsprof-${safeRouterNameLower}" hotspot-address=${lanGateway} dns-name="${safeRouterNameLower}.hotspot" html-directory=hotspot login-by=http-chap,https,cookie http-cookie-lifetime=3d use-radius=yes
 } else={
-    /ip hotspot profile set [find name="hsprof-${safeRouterNameLower}"] login-by=http-chap,https,cookie ssl-certificate=auto use-radius=yes
+    /ip hotspot profile set [find name="hsprof-${safeRouterNameLower}"] login-by=http-chap,https,cookie use-radius=yes
 }
-# Enforce use-radius=yes AND configure SSL on ALL hotspot profiles (in case old ones exist)
+# Enforce use-radius=yes on ALL hotspot profiles (in case old ones exist)
 :foreach prof in=[/ip hotspot profile find] do={
-    /ip hotspot profile set $prof use-radius=yes login-by=http-chap,https,cookie ssl-certificate=auto
+    /ip hotspot profile set $prof use-radius=yes login-by=http-chap,https,cookie
 }
 :if ([:len [/ip hotspot find name="hotspot-${safeRouterName}"]] = 0) do={
     :if ([:len [/ip hotspot find interface=$lanBridge]] = 0) do={

@@ -176,10 +176,26 @@ export async function verifyRefreshToken(token: string): Promise<JwtPayload | nu
 }
 
 export function getTokenFromRequest(req: NextRequest): string | null {
-    // 1. Try to get it from the HttpOnly cookie
+    // 1. Try to get it from the HttpOnly cookie (tenant app)
     const cookieToken = req.cookies.get("accessToken")?.value;
     if (cookieToken) {
         return cookieToken;
+    }
+
+    // AUTH-SA-001 FIX: the Super Admin login/refresh routes
+    // (src/app/api/super-admin/auth/{login,refresh}/route.ts) set an HttpOnly
+    // cookie named "sa_accessToken" — a DIFFERENT name from the tenant app's
+    // "accessToken". This function never checked for it, so the HttpOnly
+    // cookie set at Super Admin login was silently unused: every Super Admin
+    // request was actually authenticated via the Authorization Bearer header
+    // instead, whose value the frontend keeps in localStorage (JS-readable,
+    // i.e. exposed to any XSS) — the opposite of what an HttpOnly cookie is
+    // meant to protect against, and worse for the platform's highest-privilege
+    // role than for an ordinary tenant user. Checking this cookie first
+    // restores the intended protection without requiring any frontend change.
+    const saCookieToken = req.cookies.get("sa_accessToken")?.value;
+    if (saCookieToken) {
+        return saCookieToken;
     }
 
     // 2. Fallback to Authorization header

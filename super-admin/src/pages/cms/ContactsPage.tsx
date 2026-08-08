@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { cmsApi } from '../../api';
+import { cmsApi, type ContactMessage } from '../../api';
 import { ConfirmModal, Pagination } from '../../components/ui';
 import { Search, Trash2, Eye, Mail, MailOpen, XCircle, CheckCircle, MessageSquare } from 'lucide-react';
 
@@ -21,7 +21,7 @@ export default function ContactsPage() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  const [viewMsg, setViewMsg] = useState<any | null>(null);
+  const [viewMsg, setViewMsg] = useState<ContactMessage | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; name: string } | null>(null);
 
   const { data, isLoading } = useQuery({
@@ -49,7 +49,7 @@ export default function ContactsPage() {
     },
   });
 
-  const handleView = (msg: any) => {
+  const handleView = (msg: ContactMessage) => {
     setViewMsg(msg);
     if (msg.status === 'UNREAD') {
       statusMutation.mutate({ id: msg.id, status: 'READ' });
@@ -59,7 +59,7 @@ export default function ContactsPage() {
   const messages = data?.data ?? [];
   const total = data?.total ?? 0;
   const pages = data?.pages ?? 1;
-  const unreadCount = messages.filter((m: any) => m.status === 'UNREAD').length;
+  const unreadCount = messages.filter((m: ContactMessage) => m.status === 'UNREAD').length;
 
   return (
     <div>
@@ -129,7 +129,7 @@ export default function ContactsPage() {
               ) : messages.length === 0 ? (
                 <tr><td colSpan={7} className="sa-text-center sa-text-muted">No contact messages found.</td></tr>
               ) : (
-                messages.map((m: any) => (
+                messages.map((m: ContactMessage) => (
                   <tr key={m.id} style={{ fontWeight: m.status === 'UNREAD' ? 600 : 400 }}>
                     <td>
                       {m.status === 'UNREAD'

@@ -21,6 +21,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
             where: { id: params.id, deletedAt: null },
             include: {
                 category: { select: { id: true, name: true } },
+                brand: { select: { id: true, name: true } },
                 images: { orderBy: { sortOrder: "asc" } }
             }
         });

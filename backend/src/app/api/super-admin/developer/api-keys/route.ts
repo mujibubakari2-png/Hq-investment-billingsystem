@@ -3,6 +3,7 @@ import { getTenantClient } from "@/lib/tenantPrisma";
 import { errorResponse, jsonResponse } from "@/lib/auth";
 import { requireRole } from "@/lib/rbac";
 import logger from "@/lib/logger";
+import type { Prisma } from "@/generated/prisma";
 import { randomBytes, createHash } from "crypto";
 
 /**
@@ -27,7 +28,7 @@ export async function GET(req: NextRequest) {
         const limit = parseInt(searchParams.get("limit") || "25", 10);
         const skip = (page - 1) * limit;
 
-        const where: any = { deletedAt: null };
+        const where: Prisma.ApiKeyWhereInput = { deletedAt: null };
 
         const [total, keys] = await Promise.all([
             db.apiKey.count({ where }),

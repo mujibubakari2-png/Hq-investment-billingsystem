@@ -76,6 +76,12 @@ export function getTokenFromRequest(req: NextRequest): string | null {
     const cookieToken = req.cookies.get("accessToken")?.value;
     if (cookieToken) return cookieToken;
 
+    // AUTH-SA-001 FIX: see matching fix in src/lib/auth.ts — Super Admin sets
+    // a cookie named "sa_accessToken", not "accessToken". Must be checked here
+    // too since middleware (Edge Runtime) uses this exact function.
+    const saCookieToken = req.cookies.get("sa_accessToken")?.value;
+    if (saCookieToken) return saCookieToken;
+
     const authHeader = req.headers.get("authorization");
     if (authHeader?.startsWith("Bearer ")) return authHeader.slice(7);
 

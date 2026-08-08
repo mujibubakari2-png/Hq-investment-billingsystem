@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { cmsApi } from '../../api';
+import { cmsApi, type BlogPost } from '../../api';
 import { StatusBadge, ConfirmModal, Alert, Pagination } from '../../components/ui';
 import { Search, Plus, Edit, Trash2, XCircle, Save, FileText } from 'lucide-react';
 
@@ -10,7 +10,7 @@ export default function BlogsPage() {
   const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [formData, setFormData] = useState<any>({ title: '', slug: '', author: '', coverImageUrl: '', content: '', isPublished: false });
+  const [formData, setFormData] = useState<Partial<BlogPost>>({ title: '', slug: '', author: null, coverImageUrl: null, content: '', isPublished: false });
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; title: string } | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -20,13 +20,13 @@ export default function BlogsPage() {
   });
 
   const saveMutation = useMutation({
-    mutationFn: (body: any) => isEditing && formData.id ? cmsApi.blogs.update(formData.id, body) : cmsApi.blogs.create(body),
+    mutationFn: (body: Partial<BlogPost>) => isEditing && formData.id ? cmsApi.blogs.update(formData.id, body) : cmsApi.blogs.create(body),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['sa-blogs'] });
       setShowModal(false);
       setErrorMsg('');
     },
-    onError: (err: any) => setErrorMsg(err.message || 'Failed to save blog post')
+    onError: (err: Error) => setErrorMsg(err.message || 'Failed to save blog post')
   });
 
   const deleteMutation = useMutation({
@@ -44,7 +44,7 @@ export default function BlogsPage() {
     setErrorMsg('');
   };
 
-  const handleOpenEdit = (b: any) => {
+  const handleOpenEdit = (b: BlogPost) => {
     setIsEditing(true);
     setFormData(b);
     setShowModal(true);
@@ -150,13 +150,13 @@ export default function BlogsPage() {
                 </div>
                 <div className="sa-form-group">
                   <label className="sa-label">Author</label>
-                  <input className="sa-input" value={formData.author} onChange={e => setFormData({ ...formData, author: e.target.value })} />
+                  <input className="sa-input" value={formData.author ?? ''} onChange={e => setFormData({ ...formData, author: e.target.value })} />
                 </div>
               </div>
 
               <div className="sa-form-group">
                 <label className="sa-label">Cover Image URL</label>
-                <input className="sa-input" value={formData.coverImageUrl} onChange={e => setFormData({ ...formData, coverImageUrl: e.target.value })} />
+                <input className="sa-input" value={formData.coverImageUrl ?? ''} onChange={e => setFormData({ ...formData, coverImageUrl: e.target.value })} />
               </div>
 
               <div className="sa-form-group">

@@ -145,6 +145,17 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         if (update.provisioningStatus || body.provisioningStatus) data.provisioningStatus = update.provisioningStatus || body.provisioningStatus || "PENDING";
         if (update.featureFlags || body.featureFlags) data.featureFlags = update.featureFlags || body.featureFlags || null;
 
+        // RC-1/RC-2 FIX: Persist network configuration fields.
+        // These are set by the Setup Wizard (on download/push) and by auto-push.
+        // Using explicit undefined-check so callers can pass null to clear a field.
+        if (update.lanIp            !== undefined) data.lanIp            = update.lanIp            || null;
+        if (update.lanGateway       !== undefined) data.lanGateway       = update.lanGateway       || null;
+        if (update.hotspotPoolRange !== undefined) data.hotspotPoolRange = update.hotspotPoolRange || null;
+        if (update.pppoePoolRange   !== undefined) data.pppoePoolRange   = update.pppoePoolRange   || null;
+        if (update.dns              !== undefined) data.dns              = update.dns              || null;
+        // serviceType controls conditional script-download validation (RC-2 FIX)
+        if (update.serviceType      !== undefined) data.serviceType      = update.serviceType      || 'both';
+
         const encryptedData = encryptRouterFields(data);
         const router = await db.router.update({ where: { id }, data: encryptedData });
 

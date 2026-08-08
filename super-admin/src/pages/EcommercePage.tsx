@@ -101,11 +101,28 @@ export default function EcommercePage() {
             </span>
           </div>
           <div className="sa-ecom-action-row">
-            {activeModule.actions.map((action) => (
-              <button key={action} className="sa-ecom-action-chip" type="button">
-                {action} <ArrowRight size={13} />
-              </button>
-            ))}
+            {activeModule.actions.map((action) => {
+              // Determine the target route for this module
+              const specialRoutes: Record<string, string> = {
+                banners: '/cms/banners',
+                blog: '/cms/blogs',
+                pages: '/cms/pages',
+                cms: '/cms/storefront-settings',
+              };
+              const target = specialRoutes[activeModule.slug] ?? `/ecommerce/${activeModule.slug}`;
+
+              return (
+                <button
+                  key={action}
+                  className="sa-ecom-action-chip"
+                  type="button"
+                  onClick={() => navigate(target)}
+                  aria-label={`${action} — navigate to ${activeModule.label}`}
+                >
+                  {action} <ArrowRight size={13} />
+                </button>
+              );
+            })}
           </div>
         </div>
       )}

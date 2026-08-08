@@ -154,7 +154,7 @@ export default function ProductInfo({ product }: ProductInfoProps) {
       <div className="flex flex-wrap gap-4 text-sm text-slate-500">
         {product.brand && (
           <span>
-            <span className="font-semibold text-slate-700">Brand:</span> {product.brand}
+            <span className="font-semibold text-slate-700">Brand:</span> {product.brand.name}
           </span>
         )}
         {product.sku && (
