@@ -171,8 +171,8 @@ export async function executePushConfig(
     if (router.username && router.password) {
         try {
             const users = await service.apiRequestPublic("/user");
-            if (Array.isArray(users)) {
-                const ex = users.find((u: any) => u.name === router.username || u.name === "admin");
+            if (users && Array.isArray(users)) {
+                const ex = users.find((u: any) => u.name === router.username);
                 if (ex) {
                     await service.apiRequestPublic("/user", "PATCH", { ".id": ex[".id"], name: router.username, password: router.password });
                 } else {
@@ -412,11 +412,15 @@ export async function executePushConfig(
     // properly before we drop WAN access.
     async function testVpnConnectivity(): Promise<boolean> {
         try {
+            if (!router.username || !router.password) {
+                throw new Error("ROUTER_CREDENTIALS_MISSING");
+            }
+            
             const vpnService = new MikroTikService({
                 host: tunnelIp || "",
                 port: router.apiPort || router.port || 8728,
-                username: router.username || "admin",
-                password: router.password || ""
+                username: router.username,
+                password: router.password
             }, routerId, rawRouter?.tenantId || "");
             await vpnService.apiRequestPublic("/system/identity", "GET");
             return true;

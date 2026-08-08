@@ -545,16 +545,16 @@ describe('WireGuard route', () => {
     const { executePushConfig } = require('@/lib/pushConfigExecutor');
     await executePushConfig('router-withcreds', 'tenant-a', { lanPorts: [] });
 
-    // /user PATCH should have been called with the DB credentials (no fallback)
-    const userPatchCall = service.apiRequestPublic.mock.calls.find((call: any) =>
-      call[0] === '/user' && call[1] === 'PATCH'
+    // /user PUT should have been called with the DB credentials to create the user
+    const userPutCall = service.apiRequestPublic.mock.calls.find((call: any) =>
+      call[0] === '/user' && call[1] === 'PUT'
     );
-    expect(userPatchCall).toBeDefined();
-    expect(userPatchCall?.[2]?.name).toBe('hq_admin_abc123');
-    expect(userPatchCall?.[2]?.password).toBe('SecurePass!99');
+    expect(userPutCall).toBeDefined();
+    expect(userPutCall?.[2]?.name).toBe('hq_admin_abc123');
+    expect(userPutCall?.[2]?.password).toBe('SecurePass!99');
     // Must NOT fall back to "admin" for either field
-    expect(userPatchCall?.[2]?.name).not.toBe('admin');
-    expect(userPatchCall?.[2]?.password).not.toBe('admin');
+    expect(userPutCall?.[2]?.name).not.toBe('admin');
+    expect(userPutCall?.[2]?.password).not.toBe('admin');
   });
 });
 
