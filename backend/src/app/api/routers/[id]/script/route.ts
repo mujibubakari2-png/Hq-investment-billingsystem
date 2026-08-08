@@ -338,9 +338,53 @@ ${selectedLanInterfaces.length > 0
 `;
         }
 
+        // ── SECTION 7: WireGuard VPN — MUST run BEFORE firewall ─────────────
+        // ROOT CAUSE FIX: The original script placed WireGuard AFTER firewall.
+        // When the firewall's vpnSubnet-only management rule fires, WireGuard
+        // hasn't been configured yet — so the operator's WAN session is killed
+        // with no VPN alternative available, permanently locking out remote access.
+        // Fix: configure WireGuard FIRST so the tunnel can initiate a handshake
+        // before management traffic is restricted to the VPN subnet only.
+        if (router.wgPrivateKey && router.wgPeerPublicKey && router.wgTunnelIp) {
+            let resolvedEndpoint7 = router.wgServerEndpoint;
+            if (!resolvedEndpoint7 && serverUrl) {
+                try { resolvedEndpoint7 = new URL(serverUrl).hostname; } catch { }
+            }
+            const serverEndpoint7 = resolvedEndpoint7 || "YOUR_SERVER_IP";
+            const listenPort7 = router.wgListenPort || 51820;
+            script += `
+# 7. WireGuard VPN Interface (BEFORE FIREWALL — VPN must exist before management is restricted to VPN subnet)
+:if ([:len [/interface wireguard find name="wg-hq"]] = 0) do={
+    /interface wireguard add name=wg-hq listen-port=${listenPort7} private-key="${router.wgPrivateKey}" comment="HQ INVESTMENT VPN Interface"
+} else={
+    /interface wireguard set [find name="wg-hq"] private-key="${router.wgPrivateKey}"
+}
+:if ([:len [/interface list member find list="hq-mgmt" interface="wg-hq"]] = 0) do={
+    /interface list member add list="hq-mgmt" interface="wg-hq" comment="HQ INVESTMENT VPN management"
+}
+
+# 7a. WireGuard IP Address (/24 required — /32 breaks return routing through tunnel)
+:foreach addr in=[/ip address find interface="wg-hq"] do={ /ip address remove $addr }
+/ip address add address="${router.wgTunnelIp}/24" interface=wg-hq comment="HQ INVESTMENT VPN Address"
+
+# 7b. WireGuard Peer (Server)
+:if ([:len [/interface wireguard peers find interface="wg-hq" public-key="${router.wgPeerPublicKey}"]] = 0) do={
+    /interface wireguard peers add interface=wg-hq public-key="${router.wgPeerPublicKey}" allowed-address="${subnetPrefix}.0/24" endpoint-address="${serverEndpoint7}" endpoint-port=${listenPort7} persistent-keepalive=25s comment="HQ INVESTMENT ISP Server"
+} else={
+    /interface wireguard peers set [find interface="wg-hq" public-key="${router.wgPeerPublicKey}"] allowed-address="${subnetPrefix}.0/24" endpoint-address="${serverEndpoint7}" endpoint-port=${listenPort7} persistent-keepalive=25s
+}
+
+# 7c. VPN Route
+:if ([:len [/ip route find dst-address="${subnetPrefix}.0/24" gateway="wg-hq"]] = 0) do={
+    /ip route add dst-address="${subnetPrefix}.0/24" gateway=wg-hq comment="WireGuard route - HQ INVESTMENT"
+}
+/log info "WireGuard VPN configured — handshake will initiate via persistent-keepalive=25s"
+`;
+        }
+
         script += `
-# 7. Firewall Rules
-# 7-pre. IPv4 Connection Tracking (same as MikroTik default — REQUIRED for performance & security)
+# 8. Firewall Rules
+# 8-pre. IPv4 Connection Tracking (same as MikroTik default — REQUIRED for performance & security)
 :if ([:len [/ip firewall filter find where comment="HQ: accept established input"]] = 0) do={
     /ip firewall filter add chain=input action=accept connection-state=established,related,untracked comment="HQ: accept established input"
 }
@@ -369,7 +413,7 @@ ${selectedLanInterfaces.length > 0
     /ip firewall filter add chain=forward action=drop connection-nat-state=!dstnat in-interface-list=WAN comment="HQ: drop all from WAN not DSTNATed"
 }
 
-# 7-mgmt. Management access & VPN rules (TATIZO 2 fix: Enforce vpnSubnet src-address restriction)
+# 8-mgmt. Management access & VPN rules (vpnSubnet src-address restriction)
         :if ([:len [/ip firewall filter find where comment="Allow local loopback"]] = 0) do={
             :if ([:len [/ip firewall filter find where src-address="127.0.0.1" dst-address="127.0.0.1"]] = 0) do={
                 :local localhost "127.0.0.1"
@@ -402,7 +446,7 @@ ${selectedLanInterfaces.length > 0
     /ip firewall filter add chain=forward in-interface=$lanBridge action=drop comment="Drop unauthenticated LAN forward"
 }
 
-# 7b. Walled Garden — lets an unauthenticated client still reach the billing
+# 8b. Walled Garden — lets an unauthenticated client still reach the billing
 # portal (to buy a voucher or pay) BEFORE they've logged in to the hotspot.
 :if ([:len ["${walledGardenHost}"]] > 0) do={
     :if ([:len [/ip hotspot walled-garden find where comment="HQ INVESTMENT Billing Portal"]] = 0) do={
@@ -414,13 +458,13 @@ ${selectedLanInterfaces.length > 0
 }
 ${buildHotspotFlowEnforcementLines("$lanBridge").join("\n")}
 
-# 8. NAT — REQUIRED for any authenticated client (hotspot or PPPoE) to actually
+# 9. NAT — REQUIRED for any authenticated client (hotspot or PPPoE) to actually
 # reach the internet. Without this, login succeeds but browsing still fails.
 :if ([:len [/ip firewall nat find where comment="HQ INVESTMENT NAT"]] = 0) do={
     /ip firewall nat add chain=srcnat action=masquerade out-interface-list=WAN comment="HQ INVESTMENT NAT"
 }
 
-# 8b. IPv6 Firewall Rules — Comprehensive IPv6 protection
+# 9b. IPv6 Firewall Rules — Comprehensive IPv6 protection
 # Add bad IPv6 address list (same as default RouterOS config)
 :if ([:len [/ipv6 firewall address-list find name="bad_ipv6"]] = 0) do={
     /ipv6 firewall address-list add list=bad_ipv6 address=::/128 comment="HQ INVESTMENT: unspecified address"
@@ -510,46 +554,11 @@ ${buildHotspotFlowEnforcementLines("$lanBridge").join("\n")}
 /log info "IPv6 firewall rules configured"
 `;
 
-        if (router.wgPrivateKey && router.wgPeerPublicKey && router.wgTunnelIp) {
-            // Try to resolve server endpoint from APP_URL if not explicitly set
-            let resolvedEndpoint = router.wgServerEndpoint;
-            if (!resolvedEndpoint && serverUrl) {
-                try {
-                    const url = new URL(serverUrl);
-                    resolvedEndpoint = url.hostname;
-                } catch (e) { }
-            }
-            const serverEndpoint = resolvedEndpoint || "YOUR_SERVER_IP";
-            const listenPort = router.wgListenPort || 51820;
+        // WireGuard block has been moved to BEFORE the firewall section (section 7 above).
+        // This prevents the router lockout that occurred when firewall management restrictions
+        // fired before the WireGuard tunnel was configured.
 
-            script += `
-# 9. WireGuard VPN Interface
-:if ([:len [/interface wireguard find name="wg-hq"]] = 0) do={
-    /interface wireguard add name=wg-hq listen-port=${listenPort} private-key="${router.wgPrivateKey}" comment="HQ INVESTMENT VPN Interface"
-} else={
-    /interface wireguard set [find name="wg-hq"] private-key="${router.wgPrivateKey}"
-}
-
-# 10. WireGuard IP Address (/24 required for subnet routing — /32 breaks server→router replies)
-# Remove stale /32 if present, then add /24
-:foreach addr in=[/ip address find interface="wg-hq"] do={ /ip address remove $addr }
-/ip address add address="${router.wgTunnelIp}/24" interface=wg-hq comment="HQ INVESTMENT VPN Address"
-
-# 11. WireGuard Peer (Server)
-:if ([:len [/interface wireguard peers find interface="wg-hq" public-key="${router.wgPeerPublicKey}"]] = 0) do={
-    /interface wireguard peers add interface=wg-hq public-key="${router.wgPeerPublicKey}" allowed-address="${subnetPrefix}.0/24" endpoint-address="${serverEndpoint}" endpoint-port=${listenPort} persistent-keepalive=25s comment="HQ INVESTMENT ISP Server"
-} else={
-    /interface wireguard peers set [find interface="wg-hq" public-key="${router.wgPeerPublicKey}"] allowed-address="${subnetPrefix}.0/24" endpoint-address="${serverEndpoint}" endpoint-port=${listenPort} persistent-keepalive=25s
-}
-
-# 12. VPN Routing
-:if ([:len [/ip route find dst-address="${subnetPrefix}.0/24" gateway="wg-hq"]] = 0) do={
-    /ip route add dst-address="${subnetPrefix}.0/24" gateway=wg-hq comment="WireGuard route - HQ INVESTMENT"
-}
-`;
-        }
-
-        // 11. RADIUS Configuration (Managed via VPN or Public IP)
+        // 10. RADIUS Configuration (Managed via VPN or Public IP)
         let publicIp = "";
 
         try {
@@ -571,7 +580,7 @@ ${buildHotspotFlowEnforcementLines("$lanBridge").join("\n")}
         // Only SUPER_ADMIN should receive a script containing plaintext credentials.
         if (userPayload.role === "SUPER_ADMIN") {
             script += `
-# 11. RADIUS Configuration
+# 10. RADIUS Configuration
 :if ([:len [/radius find where comment="HQ INVESTMENT RADIUS"]] = 0) do={
     /radius add address=${radiusAddr} secret="${router.radiusSecret}" service=hotspot,ppp timeout=3000ms ${srcAddrPart} comment="HQ INVESTMENT RADIUS"
 } else={
@@ -581,27 +590,34 @@ ${buildHotspotFlowEnforcementLines("$lanBridge").join("\n")}
     /radius incoming set accept=yes port=3799
 }
 
-# 12. Enable RADIUS & SSL/TLS for Hotspot and PPP Services (TATIZO 3 Hotspot SSL fix)
+# 12. Enable RADIUS for Hotspot and PPP Services
 # SECURITY FIX: http-pap removed (plaintext password over the wire).
-/ip hotspot profile set [find default=yes] use-radius=yes ssl-certificate=auto login-by=http-chap,https,cookie
+# RC-3 FIX (RESTORED): ssl-certificate=auto removed again — it aborts RSC import
+# on any RouterOS device with no certificate in its /certificate store, stopping
+# the ENTIRE script at this line (including this default-profile RADIUS enable
+# and the /ppp profile default RADIUS enable right after it). TLS on the
+# hotspot portal requires a certificate to be imported first via
+# /certificate import, then: /ip hotspot profile set [find] ssl-certificate=<name>
+/ip hotspot profile set [find default=yes] use-radius=yes login-by=http-chap,https,cookie
 /ppp profile set [find name=default] use-radius=yes
-/log info "RADIUS & SSL services enabled for Hotspot and PPP"
+/log info "RADIUS services enabled for Hotspot and PPP"
 
-# 13. Success Notification
+# 11. Success Notification
 /log info "HQ INVESTMENT Configuration completed successfully!"
 /log info "Your router should now be reachable by the billing system."
 `;
         } else {
             script += `
-# 11. RADIUS Configuration (REDACTED)
+# 10. RADIUS Configuration (REDACTED)
 # Your account doesn't have permission to view router credentials. Contact a Super Admin to obtain a full setup script.
 # To manually configure RADIUS, add a NAS entry on the billing server with this router's IP and shared secret.
 
-# 12. Enable RADIUS & SSL/TLS for Hotspot and PPP Services (no secret embedded)
+# 10b. Enable RADIUS for Hotspot and PPP Services (no secret embedded)
 # SECURITY FIX: http-pap removed (plaintext password over the wire).
-/ip hotspot profile set [find default=yes] use-radius=yes ssl-certificate=auto login-by=http-chap,https,cookie
+# RC-3 FIX (RESTORED): ssl-certificate=auto removed — aborts RSC import when no certificate exists.
+/ip hotspot profile set [find default=yes] use-radius=yes login-by=http-chap,https,cookie
 /ppp profile set [find name=default] use-radius=yes
-# 13. Success Notification
+# 11. Success Notification
 /log info "HQ INVESTMENT Configuration completed (credentials redacted)."
 `;
         }

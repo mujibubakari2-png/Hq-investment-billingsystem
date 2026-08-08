@@ -64,6 +64,7 @@ describe('WireGuard route', () => {
     process.env.WG_SERVER_PORT = '';
     process.env.SERVER_PUBLIC_IP = '';
     mockCheckWireGuardReachability.mockResolvedValue({ ok: false, output: 'Request timed out', reason: 'failed' });
+    mockCheckPeerHandshake.mockResolvedValue(true);
   });
 
   it('uses routers:read guard for GET wireguard config', async () => {
@@ -232,12 +233,8 @@ describe('WireGuard route', () => {
     };
     mockGetTenantClient.mockReturnValue(db);
 
-    const req = new NextRequest('http://localhost/api/routers/router-3/wireguard', {
-      method: 'POST',
-      body: JSON.stringify({ action: 'push-config' }),
-    });
-
-    await route.POST(req, { params: Promise.resolve({ id: 'router-3' }) });
+    const { executePushConfig } = require('@/lib/pushConfigExecutor');
+    await executePushConfig('router-3', 'tenant-a', { lanPorts: [] });
 
     const peerCall = service.apiRequestPublic.mock.calls.find((call: any) =>
       call[0] === '/interface/wireguard/peers' && call[1] === 'PUT'
@@ -299,12 +296,8 @@ describe('WireGuard route', () => {
     };
     mockGetTenantClient.mockReturnValue(db);
 
-    const req = new NextRequest('http://localhost/api/routers/router-4/wireguard', {
-      method: 'POST',
-      body: JSON.stringify({ action: 'push-config' }),
-    });
-
-    await route.POST(req, { params: Promise.resolve({ id: 'router-4' }) });
+    const { executePushConfig } = require('@/lib/pushConfigExecutor');
+    await executePushConfig('router-4', 'tenant-a', { lanPorts: [] });
 
     const wgInputRule = service.apiRequestPublic.mock.calls.find((call: any) =>
       call[0] === '/ip/firewall/filter' && call[1] === 'PUT' && call[2]?.chain === 'input' && call[2]?.['in-interface'] === 'wg-hq' && call[2]?.action === 'accept'
@@ -359,12 +352,8 @@ describe('WireGuard route', () => {
     };
     mockGetTenantClient.mockReturnValue(db);
 
-    const req = new NextRequest('http://localhost/api/routers/router-3/wireguard', {
-      method: 'POST',
-      body: JSON.stringify({ action: 'push-config' }),
-    });
-
-    await route.POST(req, { params: Promise.resolve({ id: 'router-3' }) });
+    const { executePushConfig } = require('@/lib/pushConfigExecutor');
+    await executePushConfig('router-3', 'tenant-a', { lanPorts: [] });
 
     const wgAddressCall = service.apiRequestPublic.mock.calls.find((call: any) =>
       call[0] === '/ip/address' && call[1] === 'PUT' && call[2]?.address === '10.200.0.200/24'
@@ -484,12 +473,8 @@ describe('WireGuard route', () => {
     };
     mockGetTenantClient.mockReturnValue(db);
 
-    const req = new NextRequest('http://localhost/api/routers/router-nodrift/wireguard', {
-      method: 'POST',
-      body: JSON.stringify({ action: 'push-config' }),
-    });
-
-    await route.POST(req, { params: Promise.resolve({ id: 'router-nodrift' }) });
+    const { executePushConfig } = require('@/lib/pushConfigExecutor');
+    await executePushConfig('router-nodrift', 'tenant-a', { lanPorts: [] });
 
     // CRITICAL: /user PATCH or PUT must NOT be called when DB has no credentials
     // Calling it with "admin"/"admin" fallback would change RouterOS password
@@ -553,12 +538,8 @@ describe('WireGuard route', () => {
     };
     mockGetTenantClient.mockReturnValue(db);
 
-    const req = new NextRequest('http://localhost/api/routers/router-withcreds/wireguard', {
-      method: 'POST',
-      body: JSON.stringify({ action: 'push-config' }),
-    });
-
-    await route.POST(req, { params: Promise.resolve({ id: 'router-withcreds' }) });
+    const { executePushConfig } = require('@/lib/pushConfigExecutor');
+    await executePushConfig('router-withcreds', 'tenant-a', { lanPorts: [] });
 
     // /user PATCH should have been called with the DB credentials (no fallback)
     const userPatchCall = service.apiRequestPublic.mock.calls.find((call: any) =>

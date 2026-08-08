@@ -1,0 +1,483 @@
+/**
+ * Push-Config Executor — BullMQ-safe async provisioning
+ *
+ * Extracted from POST /api/routers/[id]/wireguard push-config handler.
+ *
+ * ROOT CAUSE FIXES:
+ * 1. PHASED FIREWALL: ACCEPT rules applied first, connectivity verified,
+ *    DROP rules applied last one-by-one with connectivity check after each.
+ *    Rollback all HQ INVESTMENT rules if router becomes unreachable.
+ *    Eliminates 504 (was: 16 × 8s timeouts after DROP WAN killed WAN session).
+ *
+ * 2. DB-FIRST LAN METADATA: lanGateway/lanIp/pools read from DB before
+ *    falling back to VPN-derived values. Fixes "missing metadata" on script download.
+ *
+ * 3. ASYNC EXECUTION: Runs in BullMQ worker, no HTTP timeout constraints.
+ */
+
+import { getTenantClient } from "@/lib/tenantPrisma";
+import { getMikroTikService, sanitizeMikroTikName } from "@/lib/mikrotik";
+import { wireguardManager } from "@/lib/wireguard";
+import { encryptRouterFields, decryptRouterFields } from "@/lib/encryption";
+import { generateRadiusSecret } from "@/lib/routerProvisioning";
+import logger from "@/lib/logger";
+
+interface StepResult { step: string; ok: boolean; error?: string; }
+
+export interface PushConfigPayload {
+    lanPorts?: string[];
+    serverEndpoint?: string;
+    serverPort?: number;
+}
+
+export interface PushConfigResult {
+    success: boolean;
+    partialSuccess: boolean;
+    tunnelVerified: boolean;
+    stepsWithIssues: number;
+    stepDetails?: StepResult[];
+    message: string;
+    routerUnreachableAfterFirewall?: boolean;
+    firewallRolledBack?: boolean;
+}
+
+async function updateRouterWgFields(
+    db: ReturnType<typeof getTenantClient>,
+    routerId: string,
+    data: Record<string, any>
+) {
+    const sanitized = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined));
+    if (!Object.keys(sanitized).length) return;
+    await db.router.update({ where: { id: routerId }, data: encryptRouterFields(sanitized) });
+}
+
+export async function executePushConfig(
+    routerId: string,
+    tenantId: string | null,
+    payload: PushConfigPayload
+): Promise<PushConfigResult> {
+    const db = getTenantClient(tenantId);
+
+    const rawRouter = await db.router.findFirst({
+        where: { id: routerId },
+        select: {
+            id: true, name: true, host: true, tenantId: true,
+            port: true, apiPort: true, password: true, username: true,
+            radiusSecret: true,
+            wgPrivateKey: true, wgPublicKey: true, wgPeerPublicKey: true,
+            wgPresharedKey: true, wgTunnelIp: true, wgServerEndpoint: true,
+            wgListenPort: true,
+            lanIp: true, lanGateway: true, hotspotPoolRange: true,
+            pppoePoolRange: true, dns: true, serviceType: true,
+        },
+    });
+    if (!rawRouter) throw new Error(`Router ${routerId} not found`);
+    const router = decryptRouterFields(rawRouter) as typeof rawRouter;
+
+    const stepResults: StepResult[] = [];
+    function trackStep(step: string, ok: boolean, err?: unknown): void {
+        const error = err instanceof Error ? err.message : err ? String(err) : undefined;
+        stepResults.push({ step, ok, error });
+        if (!ok) logger.warn(`[PUSH-CONFIG] Step failed: ${step}`, { error });
+    }
+
+    const wgServerIp = await wireguardManager.getServerIp();
+    const subnetPrefix = wgServerIp.split(".").slice(0, 3).join(".");
+    let tunnelIp = router.wgTunnelIp;
+    if (!tunnelIp || !tunnelIp.startsWith(`${subnetPrefix}.`)) tunnelIp = `${subnetPrefix}.200`;
+
+    // DB-first LAN metadata (canonical source set by Setup Wizard)
+    const tunnelParts = tunnelIp.split(".");
+    const vpnDerivedPrefix = `${tunnelParts[0]}.10.${tunnelParts[2] || "0"}`;
+    const dbLanGateway  = router.lanGateway  as string | null;
+    const dbLanIp       = router.lanIp       as string | null;
+    const dbHsPool      = router.hotspotPoolRange as string | null;
+    const dbPpoePool    = router.pppoePoolRange   as string | null;
+    const dbDns         = router.dns              as string | null;
+
+    const lanGateway = dbLanGateway || `${vpnDerivedPrefix}.1`;
+    const lanCidr    = dbLanIp      || `${lanGateway}/24`;
+    const lanPrefix  = lanGateway.split(".").slice(0, 3).join(".");
+    const lanNetwork = `${lanPrefix}.0/24`;
+    const listenPort = router.wgListenPort || 51820;
+
+    const hsPoolStart   = dbHsPool?.split("-")[0]   || `${lanPrefix}.10`;
+    const hsPoolEnd     = dbHsPool?.split("-")[1]   || `${lanPrefix}.149`;
+    const ppoePoolStart = dbPpoePool?.split("-")[0] || `${lanPrefix}.150`;
+    const ppoePoolEnd   = dbPpoePool?.split("-")[1] || `${lanPrefix}.250`;
+
+    // Server endpoint
+    const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL;
+    let serverEndpoint = payload.serverEndpoint || router.wgServerEndpoint || process.env.WG_SERVER_ENDPOINT || "";
+    if (!serverEndpoint && appUrl) {
+        try { serverEndpoint = new URL(appUrl).hostname; }
+        catch { serverEndpoint = appUrl.replace(/^https?:\/\//, "").split("/")[0]; }
+    }
+    if (!serverEndpoint) serverEndpoint = process.env.SERVER_PUBLIC_IP || "vpn.billing-system.local";
+    const serverPort = payload.serverPort || parseInt(process.env.WG_SERVER_PORT || "51820");
+    const lanPorts: string[] = Array.isArray(payload.lanPorts) ? payload.lanPorts : [];
+
+    const service = await getMikroTikService(routerId, tenantId);
+
+    // -- STEP 0: Cleanup -------------------------------------------------------
+    logger.info("[PUSH-CONFIG] Cleaning up old HQ INVESTMENT configs...");
+    for (const ep of ["/ip/firewall/filter", "/ip/firewall/nat", "/ip/route", "/ip/address"]) {
+        try {
+            const items = await service.apiRequestPublic(ep);
+            if (Array.isArray(items)) {
+                for (const item of items) {
+                    if (item.comment?.includes("HQ INVESTMENT")) {
+                        try { await service.apiRequestPublic(`${ep}/${item[".id"]}`, "DELETE"); } catch {}
+                    }
+                }
+            }
+        } catch {}
+    }
+
+    // -- STEP 1: Basic setup ---------------------------------------------------
+    if (router.username && router.password) {
+        try {
+            const users = await service.apiRequestPublic("/user");
+            if (Array.isArray(users)) {
+                const ex = users.find((u: any) => u.name === router.username || u.name === "admin");
+                if (ex) {
+                    await service.apiRequestPublic("/user", "PATCH", { ".id": ex[".id"], name: router.username, password: router.password });
+                } else {
+                    await service.apiRequestPublic("/user", "PUT", { name: router.username, password: router.password, group: "full", comment: "Management User - DO NOT DELETE" });
+                }
+            }
+        } catch {}
+    }
+    try { await service.apiRequestPublic("/system/identity", "PATCH", { name: router.name }); } catch {}
+    try { await service.apiRequestPublic("/ip/dns", "PATCH", { servers: "8.8.8.8,8.8.4.4", "allow-remote-requests": "yes" }); } catch {}
+    try { await service.apiRequestPublic("/system/ntp/client", "PATCH", { enabled: "yes", servers: "pool.ntp.org" }); } catch {}
+
+    // -- STEP 2: Bridge + Hotspot + PPPoE + DHCP ------------------------------
+    logger.info("[PUSH-CONFIG] Setting up Bridge, Hotspot & PPPoE...");
+    let lanBridgeName = "bridge-lan";
+    let bridgeExists = false;
+    try {
+        const bridges = await service.apiRequestPublic("/interface/bridge");
+        if (Array.isArray(bridges) && bridges.length > 0) {
+            const lb = bridges.find((b: any) => !b.name.toLowerCase().startsWith("wan") && b.name !== "wan-bridge");
+            if (lb) { lanBridgeName = lb.name; bridgeExists = true; }
+        }
+    } catch {}
+
+    if (!bridgeExists) {
+        try { await service.apiRequestPublic("/interface/bridge", "PUT", { name: lanBridgeName, "protocol-mode": "none", comment: "HQ INVESTMENT LAN Bridge - Hotspot & PPPoE" }); }
+        catch (e: any) { if (!e.message?.includes("already")) logger.warn("[PUSH-CONFIG] Bridge:", { error: e.message }); }
+    } else {
+        try {
+            const bl = await service.apiRequestPublic("/interface/bridge");
+            const ex = Array.isArray(bl) ? bl.find((b: any) => b.name === lanBridgeName) : null;
+            if (ex?.[".id"]) await service.apiRequestPublic(`/interface/bridge/${ex[".id"]}`, "PATCH", { "protocol-mode": "none" });
+        } catch {}
+    }
+
+    // Bridge ports
+    if (lanPorts.length > 0) {
+        try {
+            const ep = await service.apiRequestPublic("/interface/bridge/port");
+            for (const portName of lanPorts) {
+                if (!portName || portName === "ether1" || portName.includes("wan")) continue;
+                const ex = Array.isArray(ep) ? ep.find((p: any) => p.interface === portName) : null;
+                if (ex) {
+                    if (ex.bridge !== lanBridgeName) try { await service.apiRequestPublic(`/interface/bridge/port/${ex[".id"]}`, "PATCH", { bridge: lanBridgeName }); } catch {}
+                } else {
+                    try { await service.apiRequestPublic("/interface/bridge/port", "PUT", { bridge: lanBridgeName, interface: portName, comment: "HQ INVESTMENT Auto-Added" }); } catch {}
+                }
+            }
+        } catch {}
+    }
+
+    // Remove WAN interfaces from LAN bridge
+    try {
+        const allBP = await service.apiRequestPublic("/interface/bridge/port");
+        if (Array.isArray(allBP)) {
+            const wanPat = /^(ether1|sfp[\d-]|lte[\d-]|wan)/i;
+            for (const bp of allBP) {
+                if (bp.bridge === lanBridgeName && wanPat.test(bp.interface) && !lanPorts.includes(bp.interface)) {
+                    try { await service.apiRequestPublic(`/interface/bridge/port/${bp[".id"]}`, "DELETE"); } catch {}
+                }
+            }
+        }
+    } catch {}
+
+    // Clean stale HQ addresses, DHCP, pools, hotspot
+    for (const ep of ["/ip/address", "/ip/dhcp-server", "/ip/dhcp-server/network", "/ip/pool", "/ip/hotspot"]) {
+        try {
+            const items = await service.apiRequestPublic(ep);
+            if (Array.isArray(items)) {
+                for (const item of items) {
+                    const shouldDelete = item.comment?.includes("HQ INVESTMENT") ||
+                        (ep === "/ip/pool" && (item.name?.includes("hs-pool") || item.name?.includes("pppoe-pool"))) ||
+                        (ep === "/ip/dhcp-server" && (item.interface === lanBridgeName || item.name === "defconf")) ||
+                        (ep === "/ip/hotspot" && item.interface === lanBridgeName);
+                    if (shouldDelete) try { await service.apiRequestPublic(`${ep}/${item[".id"]}`, "DELETE"); } catch {}
+                }
+            }
+        } catch {}
+    }
+
+    const safeRouterName = sanitizeMikroTikName(router.name);
+    const safeRouterNameLower = sanitizeMikroTikName(router.name.toLowerCase());
+    const hotspotProfileName = `hsprof-${safeRouterNameLower}`;
+
+    try { await service.apiRequestPublic("/ip/hotspot/profile", "PUT", { name: hotspotProfileName, "hotspot-address": lanGateway, "dns-name": `${safeRouterNameLower}.hotspot`, "html-directory": "hotspot", "login-by": "http-chap,https,cookie", "http-cookie-lifetime": "3d", "use-radius": "yes" }); } catch {}
+    try { await service.apiRequestPublic("/ip/dns/static", "PUT", { name: `${safeRouterNameLower}.hotspot`, address: lanGateway, comment: "HQ INVESTMENT Hotspot DNS" }); } catch {}
+
+    // Secure all existing hotspot profiles
+    try {
+        const profiles = await service.apiRequestPublic("/ip/hotspot/profile");
+        if (Array.isArray(profiles)) {
+            for (const prof of profiles) {
+                if (prof["use-radius"] !== "yes" || (prof["login-by"] || "").includes("mac")) {
+                    await service.apiRequestPublic(`/ip/hotspot/profile/${prof[".id"]}`, "PATCH", { "use-radius": "yes", "login-by": "http-chap,https,cookie" });
+                }
+            }
+        }
+    } catch {}
+
+    try { await service.apiRequestPublic("/ip/pool", "PUT", { name: `hs-pool-${safeRouterName}`, ranges: `${hsPoolStart}-${hsPoolEnd}` }); } catch {}
+    try { await service.apiRequestPublic("/ip/pool", "PUT", { name: `pppoe-pool-${safeRouterName}`, ranges: `${ppoePoolStart}-${ppoePoolEnd}` }); } catch {}
+    try { await service.apiRequestPublic("/ip/address", "PUT", { address: lanCidr, interface: lanBridgeName, comment: "HQ INVESTMENT Hotspot LAN" }); } catch {}
+    try { await service.apiRequestPublic("/ip/dhcp-server/network", "PUT", { address: lanNetwork, gateway: lanGateway, "dns-server": dbDns || "8.8.8.8,1.1.1.1" }); } catch {}
+    try { await service.apiRequestPublic("/ip/dhcp-server", "PUT", { name: `dhcp-${safeRouterName}`, interface: lanBridgeName, "address-pool": `hs-pool-${safeRouterName}`, "lease-time": "1h", disabled: "no" }); } catch {}
+    try { await service.apiRequestPublic("/ip/hotspot", "PUT", { name: `hotspot-${safeRouterName}`, interface: lanBridgeName, "address-pool": `hs-pool-${safeRouterName}`, profile: hotspotProfileName, disabled: "no" }); } catch {}
+    try { await service.apiRequestPublic("/ppp/profile", "PUT", { name: `pppoe-profile-${safeRouterName}`, "local-address": lanGateway, "remote-address": `pppoe-pool-${safeRouterName}`, "dns-server": dbDns || "8.8.8.8,1.1.1.1", "use-encryption": "yes", "use-radius": "yes" }); } catch {}
+    try { await service.apiRequestPublic("/ppp/aaa", "PATCH", { "use-radius": "yes", "accounting": "yes" }); } catch {}
+    try { await service.apiRequestPublic("/interface/pppoe-server/server", "PUT", { "service-name": `pppoe-svc-${safeRouterName}`, interface: lanBridgeName, "default-profile": `pppoe-profile-${safeRouterName}`, "one-session-per-host": "yes", disabled: "no" }); } catch {}
+
+    // -- STEP 3: WireGuard VPN -------------------------------------------------
+    logger.info("[PUSH-CONFIG] Setting up WireGuard VPN...");
+    try { await wireguardManager.addPeer(router.wgPublicKey!, tunnelIp, router.wgPresharedKey || undefined); trackStep("WireGuard: add peer on server", true); }
+    catch (e: any) { trackStep("WireGuard: add peer on server", false, e); }
+
+    try {
+        await service.apiRequestPublic("/interface/wireguard", "PUT", { name: "wg-hq", "listen-port": String(listenPort), "private-key": router.wgPrivateKey, disabled: "no", comment: "HQ INVESTMENT VPN Interface" });
+        trackStep("WireGuard: create wg-hq interface", true);
+    } catch (e: any) {
+        if (e.message?.includes("already")) {
+            try {
+                const wi = await service.apiRequestPublic("/interface/wireguard");
+                if (Array.isArray(wi)) { const ex = wi.find((i: any) => i.name === "wg-hq"); if (ex?.[".id"]) await service.apiRequestPublic(`/interface/wireguard/${ex[".id"]}`, "PATCH", { "private-key": router.wgPrivateKey }); }
+                trackStep("WireGuard: create wg-hq interface", true);
+            } catch (pe) { trackStep("WireGuard: create wg-hq interface", false, pe); }
+        } else { trackStep("WireGuard: create wg-hq interface", false, e); }
+    }
+
+    try {
+        const addrs = await service.apiRequestPublic("/ip/address");
+        if (Array.isArray(addrs)) { for (const a of addrs) { if (a.interface === "wg-hq") try { await service.apiRequestPublic(`/ip/address/${a[".id"]}`, "DELETE"); } catch {} } }
+    } catch {}
+    try { await service.apiRequestPublic("/ip/address", "PUT", { address: `${tunnelIp}/24`, interface: "wg-hq", comment: "HQ INVESTMENT VPN Address" }); } catch {}
+
+    try {
+        const oldPeers = await service.apiRequestPublic("/interface/wireguard/peers");
+        if (Array.isArray(oldPeers)) {
+            for (const p of oldPeers) {
+                if (p.comment?.includes("HQ INVESTMENT") || p.interface === "wg-hq") try { await service.apiRequestPublic(`/interface/wireguard/peers/${p[".id"]}`, "DELETE"); } catch {}
+            }
+        }
+    } catch {}
+    try {
+        await service.apiRequestPublic("/interface/wireguard/peers", "PUT", { interface: "wg-hq", "public-key": router.wgPeerPublicKey, ...(router.wgPresharedKey ? { "preshared-key": router.wgPresharedKey } : {}), "allowed-address": `${subnetPrefix}.0/24`, "endpoint-address": serverEndpoint, "endpoint-port": String(serverPort), "persistent-keepalive": "25s", comment: "HQ INVESTMENT ISP Server" });
+        trackStep("WireGuard: add server peer", true);
+    } catch (e: any) {
+        if (!e.message?.includes("already")) trackStep("WireGuard: add server peer", false, e);
+        else trackStep("WireGuard: add server peer", true);
+    }
+
+    // -- STEP 4-6: NAT + Route -------------------------------------------------
+    const restPort = router.apiPort || (router.port === 8728 || router.port === 8729 ? 80 : router.port) || 80;
+    logger.info("[PUSH-CONFIG] Setting up NAT & Route...");
+    try { await service.apiRequestPublic("/ip/firewall/nat", "PUT", { chain: "srcnat", action: "masquerade", comment: "NAT for Internet - HQ INVESTMENT", "place-before": "0" }); } catch {}
+    try { await service.apiRequestPublic("/ip/route", "PUT", { "dst-address": `${subnetPrefix}.0/24`, gateway: "wg-hq", comment: "WireGuard route - HQ INVESTMENT" }); } catch {}
+
+    // -- STEP 7: RADIUS & CoA --------------------------------------------------
+    logger.info("[PUSH-CONFIG] Setting up RADIUS...");
+    try {
+        const oldR = await service.apiRequestPublic("/radius");
+        if (Array.isArray(oldR)) { for (const r of oldR) { if (r.comment?.includes("HQ INVESTMENT")) try { await service.apiRequestPublic(`/radius/${r[".id"]}`, "DELETE"); } catch {} } }
+    } catch {}
+
+    let currentRadiusSecret = router.radiusSecret as string | undefined;
+    if (!currentRadiusSecret) {
+        currentRadiusSecret = generateRadiusSecret();
+        await updateRouterWgFields(db, routerId, { radiusSecret: currentRadiusSecret });
+        const nasIp = tunnelIp || router.host;
+        try {
+            const existingNas = await db.radiusNas.findFirst({ where: { tenantId: rawRouter.tenantId, nasName: nasIp } });
+            if (existingNas) { await db.radiusNas.update({ where: { id: existingNas.id }, data: { secret: currentRadiusSecret } }); }
+            else { await db.radiusNas.create({ data: { nasName: nasIp, shortName: router.name, secret: currentRadiusSecret, type: "other", tenantId: rawRouter.tenantId, description: "Auto-synced from push-config" } }); }
+        } catch {}
+    }
+    try { await service.apiRequestPublic("/radius", "PUT", { address: wgServerIp, secret: currentRadiusSecret, service: "hotspot,ppp", "authentication-port": "1812", "accounting-port": "1813", timeout: "10000ms", "src-address": tunnelIp, comment: "HQ INVESTMENT RADIUS" }); trackStep("RADIUS: register server on router", true); }
+    catch (e: any) { trackStep("RADIUS: register server on router", false, e); }
+    try { await service.apiRequestPublic("/radius/incoming", "PATCH", { accept: "yes", port: "3799" }); trackStep("RADIUS: enable CoA (incoming)", true); }
+    catch (e: any) { trackStep("RADIUS: enable CoA (incoming)", false, e); }
+
+    // -- STEP 7b: Walled Garden ------------------------------------------------
+    logger.info("[PUSH-CONFIG] Setting up Walled Garden...");
+    const billingHost = (process.env.WG_SERVER_ENDPOINT || process.env.NEXT_PUBLIC_API_URL?.replace(/^https?:\/\//, "") || wgServerIp).split(":")[0];
+    for (const ep of ["/ip/hotspot/walled-garden", "/ip/hotspot/walled-garden/ip"]) {
+        try { const items = await service.apiRequestPublic(ep); if (Array.isArray(items)) { for (const e of items) { if (e.comment?.includes("HQ INVESTMENT")) try { await service.apiRequestPublic(`${ep}/${e[".id"]}`, "DELETE"); } catch {} } } } catch {}
+    }
+    try { await service.apiRequestPublic("/ip/hotspot/walled-garden", "PUT", { "dst-host": billingHost, action: "allow", comment: "Billing Portal - HQ INVESTMENT" }); } catch {}
+    try { await service.apiRequestPublic("/ip/hotspot/walled-garden/ip", "PUT", { "dst-address": wgServerIp, action: "accept", comment: "Billing Portal IP - HQ INVESTMENT" }); } catch {}
+    try { await service.apiRequestPublic("/ip/hotspot/walled-garden/ip", "PUT", { "dst-address": `${subnetPrefix}.0/24`, action: "accept", comment: "VPN Subnet - HQ INVESTMENT" }); } catch {}
+
+    // -- STEP 8: Phased Firewall -----------------------------------------------
+    logger.info("[PUSH-CONFIG] Phase 3: Applying phased firewall lockdown...");
+
+    let wanInterface = "ether1";
+    try {
+        const routes = await service.apiRequestPublic("/ip/route");
+        if (Array.isArray(routes)) {
+            const dflt = routes.find((r: any) => r["dst-address"] === "0.0.0.0/0" && !r.disabled && r.active !== "false");
+            if (dflt?.interface) { wanInterface = dflt.interface; logger.info(`[PUSH-CONFIG] Detected WAN: ${wanInterface}`); }
+        }
+    } catch {}
+
+    const hqServerIp = process.env.SERVER_PUBLIC_IP || serverEndpoint;
+    const isValidIp = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hqServerIp);
+
+    const acceptRules: Record<string, string>[] = [
+        { chain: "input", protocol: "udp", "dst-port": String(listenPort), action: "accept", comment: "Allow WireGuard - HQ INVESTMENT" },
+        { chain: "input", "in-interface": "wg-hq", action: "accept", comment: "Allow WireGuard interface input - HQ INVESTMENT" },
+        { chain: "input", protocol: "icmp", "src-address": `${subnetPrefix}.0/24`, action: "accept", comment: "Allow ICMP from VPN - HQ INVESTMENT" },
+        { chain: "input", protocol: "tcp", "dst-port": String(restPort), "src-address": `${subnetPrefix}.0/24`, action: "accept", comment: "Allow REST API from VPN - HQ INVESTMENT" },
+        { chain: "input", protocol: "tcp", "dst-port": "8291", "src-address": `${subnetPrefix}.0/24`, action: "accept", comment: "Allow Winbox from VPN - HQ INVESTMENT" },
+        { chain: "input", protocol: "udp", "dst-port": "3799", "src-address": `${subnetPrefix}.0/24`, action: "accept", comment: "Allow RADIUS CoA from VPN - HQ INVESTMENT" },
+        { chain: "input", protocol: "tcp", "dst-port": "80,443", "src-address": `${subnetPrefix}.0/24`, action: "accept", comment: "Allow Web from VPN - HQ INVESTMENT" },
+        { chain: "input", protocol: "tcp", "dst-port": "8728,8729", "src-address": `${subnetPrefix}.0/24`, action: "accept", comment: "Allow API from VPN - HQ INVESTMENT" },
+        { chain: "input", protocol: "udp", "dst-port": "53,67", "in-interface": lanBridgeName, action: "accept", comment: "Allow DNS & DHCP from LAN - HQ INVESTMENT" },
+        { chain: "input", protocol: "icmp", action: "accept", comment: "Allow Ping - HQ INVESTMENT" },
+        { chain: "input", "connection-state": "established,related", action: "accept", comment: "Allow Established Input - HQ INVESTMENT" },
+        { chain: "input", "in-interface": lanBridgeName, protocol: "tcp", "dst-port": "80,443", action: "accept", comment: "Allow Hotspot Captive Portal - HQ INVESTMENT" },
+        { chain: "input", "in-interface": lanBridgeName, protocol: "udp", "dst-port": "67", action: "accept", comment: "Allow Hotspot DHCP - HQ INVESTMENT" },
+        { chain: "input", "in-interface": lanBridgeName, protocol: "udp", "dst-port": "53", action: "accept", comment: "Allow Hotspot DNS - HQ INVESTMENT" },
+        { chain: "forward", "in-interface": "all-ppp", "out-interface": "ether1", action: "accept", comment: "Allow PPPoE to Internet - HQ INVESTMENT" },
+        { chain: "forward", "connection-state": "established,related", action: "accept", comment: "Allow Established Forward - HQ INVESTMENT" },
+        { chain: "forward", "in-interface": "wg-hq", action: "accept", comment: "Allow WG traffic - HQ INVESTMENT" },
+        { chain: "forward", "out-interface": "wg-hq", action: "accept", comment: "Allow WG return - HQ INVESTMENT" },
+    ];
+    if (isValidIp) { acceptRules.push({ chain: "input", "in-interface": wanInterface, protocol: "tcp", "dst-port": `${restPort},8728,8729,8291`, "src-address": hqServerIp, action: "accept", comment: "HQ Server Management - HQ INVESTMENT" }); }
+
+    const dropRules: Record<string, string>[] = [
+        { chain: "input", "in-interface": wanInterface, action: "drop", comment: "Drop WAN input - HQ INVESTMENT" },
+        { chain: "forward", "in-interface": lanBridgeName, action: "drop", comment: "Drop unauthenticated LAN forward - HQ INVESTMENT" },
+    ];
+
+    async function testConnectivity(): Promise<boolean> {
+        try { await service.apiRequestPublic("/system/identity", "GET"); return true; } catch { return false; }
+    }
+    async function rollbackFirewall(): Promise<void> {
+        try {
+            const rules = await service.apiRequestPublic("/ip/firewall/filter");
+            if (Array.isArray(rules)) {
+                for (const rule of rules) {
+                    if (rule.comment?.includes("HQ INVESTMENT")) try { await service.apiRequestPublic(`/ip/firewall/filter/${rule[".id"]}`, "DELETE"); } catch {}
+                }
+            }
+            logger.warn("[PUSH-CONFIG] Firewall rollback completed.");
+        } catch (e) { logger.error("[PUSH-CONFIG] Firewall rollback FAILED:", { error: String(e) }); }
+    }
+
+    // Phase A: ACCEPT rules
+    let fwAcceptFail = 0;
+    for (const rule of [...acceptRules].reverse()) {
+        try { await service.apiRequestPublic("/ip/firewall/filter", "PUT", { ...rule, "place-before": "0" }); }
+        catch (e: any) { if (!e.message?.includes("already")) fwAcceptFail++; }
+    }
+
+    // Phase B: connectivity before DROP
+    let routerUnreachableAfterFirewall = false;
+    let firewallRolledBack = false;
+    const preDropReachable = await testConnectivity();
+    if (!preDropReachable) {
+        logger.error("[PUSH-CONFIG] ROUTER_UNREACHABLE before DROP rules. Rolling back.");
+        await rollbackFirewall();
+        trackStep("Firewall: pre-DROP connectivity", false, "Router unreachable before DROP rules");
+        routerUnreachableAfterFirewall = true;
+        firewallRolledBack = true;
+    } else {
+        // Phase C: DROP rules one by one
+        let fwDropFail = 0;
+        for (const dropRule of [...dropRules].reverse()) {
+            try {
+                await service.apiRequestPublic("/ip/firewall/filter", "PUT", { ...dropRule, "place-before": "0" });
+                logger.info(`[PUSH-CONFIG] DROP rule applied: ${dropRule.comment}`);
+            } catch (e: any) { if (!e.message?.includes("already")) fwDropFail++; }
+
+            const stillReachable = await testConnectivity();
+            if (!stillReachable) {
+                routerUnreachableAfterFirewall = true;
+                logger.error(`[PUSH-CONFIG] ROUTER_UNREACHABLE_AFTER_FIREWALL — after: ${dropRule.comment}`);
+                await rollbackFirewall();
+                firewallRolledBack = true;
+                trackStep("Firewall: DROP rule connectivity", false, `ROUTER_UNREACHABLE_AFTER_FIREWALL after: ${dropRule.comment}. All rules rolled back.`);
+                break;
+            }
+        }
+        if (!routerUnreachableAfterFirewall) {
+            const fwFail = fwAcceptFail + fwDropFail;
+            trackStep("Firewall: push all rules", fwFail === 0, fwFail > 0 ? `${fwFail} rule(s) failed` : undefined);
+            logger.info(`[PUSH-CONFIG] Firewall lockdown applied. Accept failures: ${fwAcceptFail}, Drop failures: ${fwDropFail}`);
+        }
+    }
+
+    // -- Verify tunnel ---------------------------------------------------------
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    const tunnelVerified = router.wgPublicKey
+        ? await wireguardManager.checkPeerHandshake(router.wgPublicKey).catch(() => false)
+        : false;
+
+    // -- Persist to DB ---------------------------------------------------------
+    const updateData: Record<string, any> = {
+        wgEnabled: true, wgConfiguredAt: new Date(),
+        lanIp:            dbLanIp      || lanCidr,
+        lanGateway:       dbLanGateway || lanGateway,
+        hotspotPoolRange: dbHsPool     || `${hsPoolStart}-${hsPoolEnd}`,
+        pppoePoolRange:   dbPpoePool   || `${ppoePoolStart}-${ppoePoolEnd}`,
+        dns:              dbDns         || "8.8.8.8,1.1.1.1",
+        serviceType:      (rawRouter as any).serviceType || "both",
+    };
+    if (tunnelVerified) updateData.host = tunnelIp;
+    else logger.warn(`[PUSH-CONFIG] Peer ${tunnelIp} handshake not confirmed. Keeping original host IP.`);
+    await updateRouterWgFields(db, routerId, updateData);
+
+    // -- Audit log -------------------------------------------------------------
+    const failedSteps = stepResults.filter(s => !s.ok);
+    const criticalStepFailed = failedSteps.some(s => s.step.includes("WireGuard") || s.step.includes("Firewall") || s.step.includes("RADIUS"));
+    await db.routerLog.create({
+        data: {
+            routerId,
+            action: failedSteps.length === 0 ? "wireguard_pushed" : "wireguard_pushed_partial",
+            details: `WireGuard config pushed to ${router.name}. ${
+                failedSteps.length === 0 ? "All steps succeeded." : `${failedSteps.length} step(s) had issues: ${failedSteps.map(s => s.step).join(", ")}.`
+            }${tunnelVerified ? ` Tunnel IP: ${tunnelIp}.` : " Tunnel verification failed."}${firewallRolledBack ? " FIREWALL ROLLED BACK." : ""}`,
+            status: failedSteps.length === 0 ? "success" : "partial",
+        },
+    });
+
+    return {
+        success: !criticalStepFailed,
+        partialSuccess: failedSteps.length > 0 && !criticalStepFailed,
+        tunnelVerified,
+        stepsWithIssues: failedSteps.length,
+        stepDetails: failedSteps.length > 0 ? failedSteps : undefined,
+        routerUnreachableAfterFirewall,
+        firewallRolledBack,
+        message: criticalStepFailed
+            ? `Push-config completed with ${failedSteps.length} critical failure(s). Check step details and retry.`
+            : firewallRolledBack
+                ? `Services configured on ${router.name}, but firewall was rolled back (router unreachable after DROP WAN). WireGuard tunnel may need manual verification. Tunnel IP: ${tunnelIp}.`
+                : failedSteps.length > 0
+                    ? `WireGuard configured on ${router.name} with ${failedSteps.length} minor issue(s). Core functions operational.${tunnelVerified ? ` Tunnel IP: ${tunnelIp}.` : ""}`
+                    : tunnelVerified
+                        ? `WireGuard configured and tunnel established on ${router.name}. Tunnel IP: ${tunnelIp}.`
+                        : `WireGuard configured on ${router.name}, but tunnel handshake not yet confirmed. Keeping original host IP.`,
+    };
+}

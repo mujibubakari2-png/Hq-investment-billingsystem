@@ -115,12 +115,11 @@ server {
         add_header Cache-Control "no-cache, must-revalidate";
     }
 
-    # ── Long-running router provisioning routes ──────────────────────────────
-    # push-config sends many sequential MikroTik API calls (cleanup + WG +
-    # RADIUS + firewall). Script download can also take a few seconds.
-    # These need a much longer read timeout than the general /api/ block.
-    # NOTE: This block must come BEFORE the general /api/ block (nginx uses
-    # the most specific matching location, not first-match).
+    # ── Router provisioning routes ───────────────────────────────────────────
+    # push-config now enqueues a BullMQ job and returns immediately (~200ms),
+    # so the 120s timeout is no longer needed. 30s covers the enqueue round-trip
+    # plus all other wireguard actions (activate, deactivate, reset-host, etc.)
+    # which are all fast REST calls.
     location ~ ^/api/routers/[^/]+/wireguard {
         limit_req  zone=api burst=5 nodelay;
         limit_req_status 429;
@@ -131,9 +130,9 @@ server {
         proxy_set_header X-Real-IP         $remote_addr;
         proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_read_timeout                 120s;
+        proxy_read_timeout                 30s;
         proxy_connect_timeout              10s;
-        proxy_send_timeout                 120s;
+        proxy_send_timeout                 30s;
         proxy_buffering                    off;
     }
 

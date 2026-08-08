@@ -12,6 +12,7 @@ export type RouterJobName =
     | "backup-router"
     | "reboot-router"
     | "provision-router"
+    | "push-config"
     | "discover-router"
     | "discovery-sweep";   // BullMQ repeatable cron sweep job
 
@@ -257,6 +258,29 @@ export async function enqueueProvisionRouter(
         tenantId,
         {},
         { idempotencyKey: `provision:${routerId}`, priority: JOB_PRIORITY.PROVISION },
+        vendor
+    );
+}
+
+export async function enqueuePushConfig(
+    routerId: string,
+    tenantId: string | null,
+    payload: {
+        lanPorts?: string[];
+        serverEndpoint?: string;
+        serverPort?: number;
+    } = {},
+    vendor?: RouterVendor
+): Promise<string> {
+    // Use a timestamp-based key so re-pushes always create a new job
+    // (unlike idempotency keys that deduplicate rapid double-clicks).
+    const jobId = `push-config:${routerId}:${Date.now()}`;
+    return enqueueRouterOp(
+        "push-config",
+        routerId,
+        tenantId,
+        payload,
+        { idempotencyKey: jobId, priority: JOB_PRIORITY.PROVISION },
         vendor
     );
 }

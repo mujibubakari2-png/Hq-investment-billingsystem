@@ -26,6 +26,7 @@ import { Worker, Job } from "bullmq";
 import { getRedisConnection, type RouterJobData } from "@/lib/queue";
 import { getRouterAdapter } from "@/lib/routerAdapters";
 import { getTenantClient } from "@/lib/tenantPrisma";
+import { executePushConfig } from "@/lib/pushConfigExecutor";
 import logger from "@/lib/logger";
 
 void env;
@@ -224,6 +225,31 @@ const handlers: Record<string, (data: RouterJobData) => Promise<unknown>> = {
         await log(routerId, tenantId ?? null, "reboot-router", r.success ? "success" : "failed",
             r.success ? "rebooted" : r.message);
         return r;
+    },
+
+    // ── Push-Config: async MikroTik provisioning ─────────────────────────────
+    // Runs the full WireGuard + Hotspot + PPPoE + RADIUS + Firewall provisioning
+    // pipeline asynchronously. Eliminates 504 gateway timeouts that occurred
+    // when the synchronous HTTP handler exceeded nginx's proxy_read_timeout.
+    "push-config": async ({ routerId, tenantId, payload }) => {
+        logger.info(`[RouterWorker] Starting push-config for router ${routerId}`);
+        const result = await executePushConfig(
+            routerId,
+            tenantId ?? null,
+            {
+                lanPorts:       Array.isArray(payload.lanPorts) ? payload.lanPorts : [],
+                serverEndpoint: payload.serverEndpoint as string | undefined,
+                serverPort:     payload.serverPort as number | undefined,
+            }
+        );
+        await log(
+            routerId,
+            tenantId ?? null,
+            "push-config",
+            result.success ? "success" : "failed",
+            result.message.slice(0, 500)
+        );
+        return result;
     },
 };
 
