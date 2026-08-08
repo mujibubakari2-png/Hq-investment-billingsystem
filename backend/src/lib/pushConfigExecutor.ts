@@ -16,7 +16,7 @@
  */
 
 import { getTenantClient } from "@/lib/tenantPrisma";
-import { getMikroTikService, sanitizeMikroTikName } from "@/lib/mikrotik";
+import { getMikroTikService, sanitizeMikroTikName, MikroTikService } from "@/lib/mikrotik";
 import { wireguardManager } from "@/lib/wireguard";
 import { encryptRouterFields, decryptRouterFields } from "@/lib/encryption";
 import { generateRadiusSecret } from "@/lib/routerProvisioning";
@@ -198,12 +198,21 @@ export async function executePushConfig(
     // Bridge ports
     if (lanPorts.length > 0) {
         try {
+            const allInterfaces = await service.apiRequestPublic("/interface");
+            const existingInterfaces = Array.isArray(allInterfaces) ? new Set(allInterfaces.map((i: any) => i.name)) : new Set();
             const ep = await service.apiRequestPublic("/interface/bridge/port");
             for (const portName of lanPorts) {
                 if (!portName || portName === "ether1" || portName.includes("wan")) continue;
+                if (!existingInterfaces.has(portName)) {
+                    logger.warn(`[PUSH-CONFIG] Skipping port ${portName} as it does not exist on router ${router.name}`);
+                    continue;
+                }
                 const ex = Array.isArray(ep) ? ep.find((p: any) => p.interface === portName) : null;
                 if (ex) {
-                    if (ex.bridge !== lanBridgeName) await runApiSafe(`/interface/bridge/port/${ex[".id"]}`, "PATCH", { bridge: lanBridgeName });
+                    if (ex.bridge !== lanBridgeName) {
+                        // Only change ownership if explicitly requested
+                        await runApiSafe(`/interface/bridge/port/${ex[".id"]}`, "PATCH", { bridge: lanBridgeName, comment: "HQ INVESTMENT Auto-Added" });
+                    }
                 } else {
                     await runApiSafe("/interface/bridge/port", "PUT", { bridge: lanBridgeName, interface: portName, comment: "HQ INVESTMENT Auto-Added" });
                 }
@@ -224,17 +233,20 @@ export async function executePushConfig(
         }
     } catch {}
 
-    // Clean stale HQ addresses, DHCP, pools, hotspot
+    // Clean stale HQ addresses, DHCP, pools, hotspot (Strict Ownership)
     for (const ep of ["/ip/address", "/ip/dhcp-server", "/ip/dhcp-server/network", "/ip/pool", "/ip/hotspot"]) {
         try {
             const items = await service.apiRequestPublic(ep);
             if (Array.isArray(items)) {
                 for (const item of items) {
-                    const shouldDelete = item.comment?.includes("HQ INVESTMENT") ||
-                        (ep === "/ip/pool" && (item.name?.includes("hs-pool") || item.name?.includes("pppoe-pool"))) ||
-                        (ep === "/ip/dhcp-server" && (item.interface === lanBridgeName || item.name === "defconf")) ||
-                        (ep === "/ip/hotspot" && item.interface === lanBridgeName);
-                    if (shouldDelete) await runApiSafe(`${ep}/${item[".id"]}`, "DELETE");
+                    const isHqComment = item.comment?.includes("HQ INVESTMENT");
+                    const isHqName = (ep === "/ip/pool" && (item.name?.includes("hs-pool") || item.name?.includes("pppoe-pool"))) ||
+                                     (ep === "/ip/dhcp-server" && item.name?.startsWith("dhcp-")) ||
+                                     (ep === "/ip/hotspot" && item.name?.startsWith("hq-hotspot"));
+                    // Only delete if we are certain it belongs to us. We never delete "defconf" or UNKNOWN resources.
+                    if (isHqComment || isHqName) {
+                        await runApiSafe(`${ep}/${item[".id"]}`, "DELETE");
+                    }
                 }
             }
         } catch {}
@@ -324,14 +336,8 @@ export async function executePushConfig(
 
     let currentRadiusSecret = router.radiusSecret as string | undefined;
     if (!currentRadiusSecret) {
-        currentRadiusSecret = generateRadiusSecret();
-        await updateRouterWgFields(db, routerId, { radiusSecret: currentRadiusSecret });
-        const nasIp = tunnelIp || router.host;
-        try {
-            const existingNas = await db.radiusNas.findFirst({ where: { tenantId: rawRouter.tenantId, nasName: nasIp } });
-            if (existingNas) { await db.radiusNas.update({ where: { id: existingNas.id }, data: { secret: currentRadiusSecret } }); }
-            else { await db.radiusNas.create({ data: { nasName: nasIp, shortName: router.name, secret: currentRadiusSecret, type: "other", tenantId: rawRouter.tenantId, description: "Auto-synced from push-config" } }); }
-        } catch {}
+        logger.error(`[PUSH-CONFIG] RADIUS_SECRET_MISSING for router ${routerId}`);
+        throw new Error("RADIUS_SECRET_MISSING: Router does not have a RADIUS secret configured.");
     }
     try { await service.apiRequestPublic("/radius", "PUT", { address: wgServerIp, secret: currentRadiusSecret, service: "hotspot,ppp", "authentication-port": "1812", "accounting-port": "1813", timeout: "10000ms", "src-address": tunnelIp, comment: "HQ INVESTMENT RADIUS" }); trackStep("RADIUS: register server on router", true); }
     catch (e: any) { trackStep("RADIUS: register server on router", false, e); }
@@ -390,9 +396,24 @@ export async function executePushConfig(
         { chain: "forward", "in-interface": lanBridgeName, action: "drop", comment: "Drop unauthenticated LAN forward - HQ INVESTMENT" },
     ];
 
-    async function testConnectivity(): Promise<boolean> {
-        try { await service.apiRequestPublic("/system/identity", "GET"); return true; } catch { return false; }
+    // Test connectivity over the new WireGuard VPN tunnel IP to ensure it's routing
+    // properly before we drop WAN access.
+    async function testVpnConnectivity(): Promise<boolean> {
+        try {
+            const vpnService = new MikroTikService({
+                host: tunnelIp,
+                port: router.apiPort || router.port || 8728,
+                username: router.username || "admin",
+                password: router.password || ""
+            }, routerId, rawRouter.tenantId);
+            await vpnService.apiRequestPublic("/system/identity", "GET");
+            return true;
+        } catch (err: any) {
+            logger.warn(`[PUSH-CONFIG] VPN Connectivity test failed: ${err.message}`);
+            return false;
+        }
     }
+    
     async function rollbackFirewall(): Promise<void> {
         try {
             const rules = await service.apiRequestPublic("/ip/firewall/filter");
@@ -415,11 +436,14 @@ export async function executePushConfig(
     // Phase B: connectivity before DROP
     let routerUnreachableAfterFirewall = false;
     let firewallRolledBack = false;
-    const preDropReachable = await testConnectivity();
+    // Wait a few seconds to let WireGuard tunnel establish before testing
+    await new Promise(res => setTimeout(res, 3000));
+    
+    const preDropReachable = await testVpnConnectivity();
     if (!preDropReachable) {
-        logger.error("[PUSH-CONFIG] ROUTER_UNREACHABLE before DROP rules. Rolling back.");
+        logger.error("[PUSH-CONFIG] VPN ROUTER_UNREACHABLE before DROP rules. Rolling back.");
         await rollbackFirewall();
-        trackStep("Firewall: pre-DROP connectivity", false, "Router unreachable before DROP rules");
+        trackStep("Firewall: pre-DROP VPN connectivity", false, "Router unreachable over VPN before DROP rules");
         routerUnreachableAfterFirewall = true;
         firewallRolledBack = true;
     } else {
@@ -431,21 +455,25 @@ export async function executePushConfig(
                 logger.info(`[PUSH-CONFIG] DROP rule applied: ${dropRule.comment}`);
             } catch (e: any) { if (!e.message?.includes("already")) fwDropFail++; }
 
-            const stillReachable = await testConnectivity();
+            const stillReachable = await testVpnConnectivity();
             if (!stillReachable) {
                 routerUnreachableAfterFirewall = true;
-                logger.error(`[PUSH-CONFIG] ROUTER_UNREACHABLE_AFTER_FIREWALL � after: ${dropRule.comment}`);
+                logger.error(`[PUSH-CONFIG] ROUTER_UNREACHABLE_AFTER_FIREWALL (VPN) — after: ${dropRule.comment}`);
                 await rollbackFirewall();
                 firewallRolledBack = true;
-                trackStep("Firewall: DROP rule connectivity", false, `ROUTER_UNREACHABLE_AFTER_FIREWALL after: ${dropRule.comment}. All rules rolled back.`);
+                trackStep("Firewall: DROP rule VPN connectivity", false, `ROUTER_UNREACHABLE_AFTER_FIREWALL over VPN after: ${dropRule.comment}. All rules rolled back.`);
                 break;
             }
         }
         if (!routerUnreachableAfterFirewall) {
-            const fwFail = fwAcceptFail + fwDropFail;
-            trackStep("Firewall: push all rules", fwFail === 0, fwFail > 0 ? `${fwFail} rule(s) failed` : undefined);
-            logger.info(`[PUSH-CONFIG] Firewall lockdown applied. Accept failures: ${fwAcceptFail}, Drop failures: ${fwDropFail}`);
+            trackStep("Firewall: DROP rules", fwDropFail === 0);
         }
+    }
+    
+    if (!routerUnreachableAfterFirewall) {
+        const fwFail = fwAcceptFail + fwDropFail;
+        trackStep("Firewall: push all rules", fwFail === 0, fwFail > 0 ? `${fwFail} rule(s) failed` : undefined);
+        logger.info(`[PUSH-CONFIG] Firewall lockdown applied. Accept failures: ${fwAcceptFail}, Drop failures: ${fwDropFail}`);
     }
 
     // -- Verify tunnel ---------------------------------------------------------

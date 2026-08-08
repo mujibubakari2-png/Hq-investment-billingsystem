@@ -18,15 +18,13 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { routersApi } from '../api';
 import { getPublicApiBase } from '../utils/config';
-import { sanitizeMikroTikName } from '../utils/mikrotikUtils';
-import { buildRouterSetupWizardScript, validateRouterSetupWizardServiceInputs } from '../utils/routerSetupWizardScript';
 
 import {
     WIZARD_STEPS, NEXT_BUTTON_LABELS,
     type EthernetInterface, type ServiceType, type VpnMode, type VerifyStatus,
 } from '../components/wizard/WizardTypes';
 import { Step0Download, Step1Connection } from '../components/wizard/WizardSteps01';
-import { Step2Services, Step3Vpn }         from '../components/wizard/WizardSteps23';
+import { Step2Services, Step3Vpn } from '../components/wizard/WizardSteps23';
 import { Step4Interfaces, Step5Generate, Step6Verify } from '../components/wizard/WizardSteps456';
 
 // SEC-ROUTER-003 FIX: the wizard previously shipped with hardcoded, static
@@ -37,7 +35,6 @@ import { Step4Interfaces, Step5Generate, Step6Verify } from '../components/wizar
 // unique value out of the box.
 // Legacy static defaults that must never be trusted/kept if found in saved
 // state or a stale draft — these are known, guessable, cross-tenant values.
-const KNOWN_INSECURE_SECRETS = new Set(['hqinvestment_radius_secret', 'MyISPVpnKey2024!']);
 
 interface RouterSetupWizardProps {
     router?: any;
@@ -50,46 +47,46 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
     const routerId = routerProp?.id || paramId;
 
     // ── Core state ────────────────────────────────────────────────────────
-    const [currentStep, setCurrentStep]   = useState(0);
-    const [routerData, setRouterData]     = useState<any>(routerProp || null);
+    const [currentStep, setCurrentStep] = useState(0);
+    const [routerData, setRouterData] = useState<any>(routerProp || null);
 
     // Step 1: connection
     const [connectionStatus, setConnectionStatus] = useState<'checking' | 'online' | 'offline'>('checking');
-    const [connectionError, setConnectionError]   = useState<string | null>(null);
+    const [connectionError, setConnectionError] = useState<string | null>(null);
 
     // Step 2: services
-    const [serviceType, setServiceType]       = useState<ServiceType>('hotspot');
+    const [serviceType, setServiceType] = useState<ServiceType>('hotspot');
     const [pppoeLocalAddress, setPppoeLocalAddress] = useState('');
-    const [pppoePoolStart, setPppoePoolStart]       = useState('');
-    const [pppoePoolEnd, setPppoePoolEnd]           = useState('');
+    const [pppoePoolStart, setPppoePoolStart] = useState('');
+    const [pppoePoolEnd, setPppoePoolEnd] = useState('');
     const [hotspotLocalAddress, setHotspotLocalAddress] = useState('');
-    const [hotspotPoolStart, setHotspotPoolStart]       = useState('');
-    const [hotspotPoolEnd, setHotspotPoolEnd]           = useState('');
+    const [hotspotPoolStart, setHotspotPoolStart] = useState('');
+    const [hotspotPoolEnd, setHotspotPoolEnd] = useState('');
     const [radiusAddress, setRadiusAddress] = useState('');
     // SEC-ROUTER-003 FIX: no static default — generated below once (see
     // effect further down), or pulled from the router's real, already-
     // provisioned radiusSecret when available so it matches the RADIUS NAS
     // entry the backend already created for this router.
-    const [radiusSecret, setRadiusSecret]   = useState('');
+    const [radiusSecret, setRadiusSecret] = useState('');
 
     // Step 3: VPN
     const [vpnEnabled, setVpnEnabled] = useState(true);
-    const [vpnMode, setVpnMode]       = useState<VpnMode>('hybrid');
+    const [vpnMode, setVpnMode] = useState<VpnMode>('hybrid');
 
     // Step 4: interfaces
-    const [interfaces, setInterfaces]           = useState<EthernetInterface[]>([]);
+    const [interfaces, setInterfaces] = useState<EthernetInterface[]>([]);
     const [loadingInterfaces, setLoadingInterfaces] = useState(false);
     const [selectedInterfaces, setSelectedInterfaces] = useState<string[]>([]);
 
     // Step 5: generate
     const [configGenerated, setConfigGenerated] = useState(false);
-    const [showPreview, setShowPreview]         = useState(false);
-    const [wgConfig, setWgConfig]               = useState<any>(null);
-    const [actionLoading, setActionLoading]     = useState(false);
+    const [showPreview, setShowPreview] = useState(false);
+    const [wgConfig, setWgConfig] = useState<any>(null);
+    const [actionLoading, setActionLoading] = useState(false);
 
     // Step 6: verify
     const [serviceVerifyStatus, setServiceVerifyStatus] = useState<VerifyStatus>('checking');
-    const [vpnVerifyStatus, setVpnVerifyStatus]         = useState<VerifyStatus>('checking');
+    const [vpnVerifyStatus, setVpnVerifyStatus] = useState<VerifyStatus>('checking');
     const [verifyMessage, setVerifyMessage] = useState<string>('');
 
     // ── Derived ───────────────────────────────────────────────────────────
@@ -111,7 +108,7 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
     const radiusSecretFetched = useRef(false);
     useEffect(() => {
         if (!routerData || radiusSecretFetched.current) return;
-        
+
         if (routerData.radiusSecret) {
             setRadiusSecret(prev => {
                 // Only use the DB secret if the user hasn't typed anything yet
@@ -175,7 +172,7 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
             // RC-5 FIX: Use the new deep verification endpoint to query RouterOS state
             const verifyRes = await routersApi.verifyRouter(routerId);
             setVerifyMessage(verifyRes.statusMessage || '');
-            
+
             // If the API isn't reachable at all, everything fails
             if (!verifyRes.apiReachable) {
                 setServiceVerifyStatus('failed');
@@ -192,9 +189,9 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
             } else {
                 setVpnVerifyStatus('success');
             }
-        } catch { 
-            setServiceVerifyStatus('failed'); 
-            setVpnVerifyStatus('failed'); 
+        } catch {
+            setServiceVerifyStatus('failed');
+            setVpnVerifyStatus('failed');
         }
     };
 
@@ -204,10 +201,6 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
     // SEC-ROUTER-002 FIX (parity with backend /api/routers/[id]/script):
     // derive the VPN /24 management subnet from the WireGuard tunnel IP, so
     // Winbox/Web/API firewall rules can be scoped to it instead of the WAN.
-    const vpnManagementSubnet: string | null = wgConfig?.routerTunnelIp
-        ? `${(wgConfig.routerTunnelIp as string).split('.').slice(0, 3).join('.')}.0/24`
-        : null;
-    const certName = 'hq-hotspot-cert';
 
     // RC-1 FIX: Persist network config to DB so the script-download endpoint
     // (GET /api/routers/:id/script) can read the same values the wizard used
@@ -218,9 +211,9 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
         try {
             const lanGw = serviceType !== 'pppoe' ? hotspotLocalAddress : pppoeLocalAddress;
             const payload: Record<string, string | null> = {
-                lanIp:      lanGw ? `${lanGw}/24` : null,
+                lanIp: lanGw ? `${lanGw}/24` : null,
                 lanGateway: lanGw || null,
-                dns:        (routerData?.dns as string) || '8.8.8.8,8.8.4.4',
+                dns: (routerData?.dns as string) || '8.8.8.8,8.8.4.4',
                 serviceType,
                 // Only persist pool ranges that are relevant to the chosen serviceType
                 hotspotPoolRange: serviceType !== 'pppoe'
@@ -238,70 +231,38 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
         }
     };
 
-    const getGeneratedScript = (): string => {
-        const serviceValidation = validateRouterSetupWizardServiceInputs({
-            serviceType,
-            hotspotLocalAddress,
-            pppoeLocalAddress,
-            hotspotPoolStart,
-            hotspotPoolEnd,
-            pppoePoolStart,
-            pppoePoolEnd,
-        });
+    const handleDownloadConfig = async () => {
+        if (!routerId) return;
 
-        if (!serviceValidation.ok) {
-            alert(`Missing required PPPoE/Hotspot values: ${serviceValidation.missingFields.join(', ')}. Please fill them in before generating the script.`);
-            return '';
+        const missingFields = [];
+        if (serviceType === 'pppoe' || serviceType === 'both') {
+            if (!pppoeLocalAddress) missingFields.push('PPPoE gateway address');
+            if (!pppoePoolStart) missingFields.push('PPPoE pool start');
+            if (!pppoePoolEnd) missingFields.push('PPPoE pool end');
+        }
+        if (serviceType === 'hotspot' || serviceType === 'both') {
+            if (!hotspotLocalAddress) missingFields.push('Hotspot gateway address');
+            if (!hotspotPoolStart) missingFields.push('Hotspot pool start');
+            if (!hotspotPoolEnd) missingFields.push('Hotspot pool end');
+        }
+        if (missingFields.length > 0) {
+            alert(`Missing required PPPoE/Hotspot values: ${missingFields.join(', ')}. Please fill them in before generating the script.`);
+            return;
         }
 
-        // SEC-ROUTER-001/003: If radiusSecret is missing or insecure, we provide a placeholder
-        // for the preview. Auto-Push will generate the real one on the backend.
-        const safeRadiusSecret = (!radiusSecret || KNOWN_INSECURE_SECRETS.has(radiusSecret)) 
-            ? 'AUTOGENERATED_BY_AUTO_PUSH' 
-            : radiusSecret;
+        setActionLoading(true);
+        try {
+            // RC-1 FIX: Persist config to DB first so the backend script-download
+            // endpoint has the same values the wizard used to generate this file.
+            await persistNetworkConfig();
 
-        return buildRouterSetupWizardScript({
-            routerName,
-            routerId: routerId || '',
-            publicApiBase,
-            apiHost,
-            serviceType,
-            selectedInterfaces,
-            vpnEnabled,
-            vpnMode,
-            vpnProtocol: '',
-            vpnPoolStart: '',
-            vpnPoolEnd: '',
-            vpnSecrets: [],
-            hotspotLocalAddress,
-            hotspotPoolStart,
-            hotspotPoolEnd,
-            pppoeLocalAddress,
-            pppoePoolStart,
-            pppoePoolEnd,
-            radiusAddress,
-            radiusSecret: safeRadiusSecret,
-            wgConfig,
-            certName,
-            vpnManagementSubnet,
-            dnsServers: (routerData && (routerData.dns as string)) || '8.8.8.8,8.8.4.4',
-        });
-    };
-
-    const handleDownloadConfig = async () => {
-        const content = getGeneratedScript();
-        if (!content) return;
-        // RC-1 FIX: Persist config to DB first so the backend script-download
-        // endpoint has the same values the wizard used to generate this file.
-        await persistNetworkConfig();
-        const blob = new Blob([content], { type: 'application/octet-stream' });
-        const url  = URL.createObjectURL(blob);
-        const a    = document.createElement('a');
-        a.href     = url;
-        a.download = `${sanitizeMikroTikName(routerName)}_config.rsc`;
-        document.body.appendChild(a); a.click(); document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        setConfigGenerated(true);
+            await routersApi.downloadScript(routerId, routerName);
+            setConfigGenerated(true);
+        } catch (err: any) {
+            alert('Failed to download script: ' + (err.message || String(err)));
+        } finally {
+            setActionLoading(false);
+        }
     };
 
     const handleAutoPush = async () => {
@@ -318,19 +279,28 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
                 let attempt = 0;
                 while ((jobStatus === 'waiting' || jobStatus === 'active') && attempt < 60) {
                     await new Promise(r => setTimeout(r, 2000)); // poll every 2s
-                    const pollRes = await fetch(`${publicApiBase}/routers/${routerId}/wireguard/job/${res.jobId}`, {
-                        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-                    }).then(r => r.json());
-                    
-                    jobStatus = pollRes.status;
-                    if (jobStatus === 'completed') {
-                        setConfigGenerated(true);
-                        alert(pollRes.message || 'Configuration pushed successfully.');
-                        handleNext();
-                        return;
-                    } else if (jobStatus === 'failed') {
-                        alert('Auto-Push Failed: ' + (pollRes.error || 'Unknown error'));
-                        return;
+                    try {
+                        const pollRes = await routersApi.wireguard.getJobStatus(routerId, res.jobId as string);
+
+                        jobStatus = pollRes.status;
+                        if (jobStatus === 'completed') {
+                            setConfigGenerated(true);
+                            alert(pollRes.message || 'Configuration pushed successfully.');
+                            handleNext();
+                            return;
+                        } else if (jobStatus === 'failed') {
+                            alert('Auto-Push Failed: ' + (pollRes.error || 'Unknown error'));
+                            return;
+                        }
+                    } catch (pollErr: any) {
+                        const errMsg = pollErr.message || String(pollErr);
+                        // If httpClient.ts fell back to "Server error: 502" etc., it means JSON parsing failed
+                        if (errMsg.includes('Server error:')) {
+                            alert(`AUTO_PUSH_API_NON_JSON_RESPONSE\nThe backend returned an invalid (HTML or empty) response while checking job status. This usually means a gateway timeout or proxy error occurred.\nDetails: ${errMsg}\nJob ID: ${res.jobId}`);
+                            return;
+                        }
+                        // For other network/transient errors, keep retrying up to 60 attempts
+                        console.warn('Poll attempt failed:', errMsg);
                     }
                     attempt++;
                 }
@@ -356,10 +326,10 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
         if (currentStep < WIZARD_STEPS.length - 1) {
             setCurrentStep(currentStep + 1);
         } else {
-        if (onClose) onClose(); else navigate('/routers');
+            if (onClose) onClose(); else navigate('/routers');
         }
     };
-    const handlePrev   = () => { if (currentStep > 0) setCurrentStep(currentStep - 1); };
+    const handlePrev = () => { if (currentStep > 0) setCurrentStep(currentStep - 1); };
     const handleFinish = () => { if (onClose) onClose(); else navigate('/routers'); };
 
     // ── Step switcher ─────────────────────────────────────────────────────
@@ -370,7 +340,11 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
             case 2: return <Step2Services serviceType={serviceType} setServiceType={setServiceType} pppoeLocalAddress={pppoeLocalAddress} setPppoeLocalAddress={setPppoeLocalAddress} pppoePoolStart={pppoePoolStart} setPppoePoolStart={setPppoePoolStart} pppoePoolEnd={pppoePoolEnd} setPppoePoolEnd={setPppoePoolEnd} hotspotLocalAddress={hotspotLocalAddress} setHotspotLocalAddress={setHotspotLocalAddress} hotspotPoolStart={hotspotPoolStart} setHotspotPoolStart={setHotspotPoolStart} hotspotPoolEnd={hotspotPoolEnd} setHotspotPoolEnd={setHotspotPoolEnd} radiusAddress={radiusAddress} setRadiusAddress={setRadiusAddress} radiusSecret={radiusSecret} setRadiusSecret={setRadiusSecret} />;
             case 3: return <Step3Vpn vpnEnabled={vpnEnabled} setVpnEnabled={setVpnEnabled} vpnMode={vpnMode} setVpnMode={setVpnMode} />;
             case 4: return <Step4Interfaces routerName={routerName} interfaces={interfaces} loadingInterfaces={loadingInterfaces} selectedInterfaces={selectedInterfaces} onToggleInterface={toggleInterface} onRefresh={fetchInterfaces} />;
-            case 5: return <Step5Generate routerName={routerName} serviceType={serviceType} selectedInterfaces={selectedInterfaces} vpnEnabled={vpnEnabled} hotspotLocalAddress={hotspotLocalAddress} pppoeLocalAddress={pppoeLocalAddress} configGenerated={configGenerated} showPreview={showPreview} setShowPreview={setShowPreview} getGeneratedScript={getGeneratedScript} onDownload={handleDownloadConfig} onAutoPush={handleAutoPush} actionLoading={actionLoading} />;
+            case 5: function getGeneratedScript(): string {
+                throw new Error('Function not implemented.');
+            }
+
+                return <Step5Generate routerName={routerName} serviceType={serviceType} selectedInterfaces={selectedInterfaces} vpnEnabled={vpnEnabled} hotspotLocalAddress={hotspotLocalAddress} pppoeLocalAddress={pppoeLocalAddress} configGenerated={configGenerated} showPreview={showPreview} setShowPreview={setShowPreview} getGeneratedScript={getGeneratedScript} onDownload={handleDownloadConfig} onAutoPush={handleAutoPush} actionLoading={actionLoading} />;
             case 6: return <Step6Verify routerName={routerName} serviceType={serviceType} vpnEnabled={vpnEnabled} vpnMode={vpnMode} serviceVerifyStatus={serviceVerifyStatus} vpnVerifyStatus={vpnVerifyStatus} verifyMessage={verifyMessage} onGoBack={() => setCurrentStep(0)} onFinish={handleFinish} />;
             default: return null;
         }

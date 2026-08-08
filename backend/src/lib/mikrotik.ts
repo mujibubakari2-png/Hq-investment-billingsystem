@@ -568,14 +568,34 @@ export class MikroTikService {
                 }
             }
 
-            // 5. LAN
-            result.lanInterface = result.hotspotInterface || "bridge-lan";
-            result.lanIp = result.hotspotIp; 
+            // 5. LAN (Semantic discovery: bridge -> IP -> Subnet)
+            const bridges = await this.apiRequest("/interface/bridge", "GET");
+            if (Array.isArray(bridges) && bridges.length > 0) {
+                // Determine the primary LAN bridge. Prefer the one associated with hotspot/pppoe, or "bridge-lan", or the first one.
+                const targetBridge = bridges.find(b => b.name === result.hotspotInterface) 
+                                  || bridges.find(b => b.name?.toLowerCase().includes("lan")) 
+                                  || bridges[0];
+                
+                if (targetBridge) {
+                    result.lanInterface = targetBridge.name;
+                    const addresses = await this.apiRequest("/ip/address", "GET");
+                    const lanAddr = Array.isArray(addresses) ? addresses.find(a => a.interface === targetBridge.name) : null;
+                    if (lanAddr) {
+                        result.lanIp = lanAddr.address.split('/')[0];
+                    } else if (result.hotspotIp) {
+                        result.lanIp = result.hotspotIp;
+                    }
+                }
+            } else {
+                result.lanInterface = result.hotspotInterface;
+                result.lanIp = result.hotspotIp;
+            }
 
-            // 6. VPN
+            // 6. VPN (Semantic discovery: wireguard -> IP -> peer)
             const wgs = await this.apiRequest("/interface/wireguard", "GET");
             if (Array.isArray(wgs) && wgs.length > 0) {
-                const wg = wgs[0]; 
+                // Look for HQ INVESTMENT wireguard or the first one
+                const wg = wgs.find(w => w.comment?.includes("HQ INVESTMENT") || w.name === "wg-hq") || wgs[0]; 
                 result.vpnInterface = wg.name;
                 const addresses = await this.apiRequest("/ip/address", "GET");
                 const wgAddr = Array.isArray(addresses) ? addresses.find(a => a.interface === wg.name) : null;

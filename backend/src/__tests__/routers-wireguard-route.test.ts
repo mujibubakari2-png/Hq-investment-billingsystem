@@ -331,6 +331,7 @@ describe('WireGuard route', () => {
       wgConfiguredAt: null,
       username: 'admin',
       password: 'admin',
+      radiusSecret: 'mock-radius-secret',
       port: 8728,
       apiPort: 8728,
     });
@@ -391,6 +392,7 @@ describe('WireGuard route', () => {
       wgConfiguredAt: null,
       username: 'admin',
       password: 'admin',
+      radiusSecret: 'mock-radius-secret',
       port: 8728,
       apiPort: 8728,
     });
@@ -454,6 +456,7 @@ describe('WireGuard route', () => {
       wgConfiguredAt: null,
       username: null,    // ← no username in DB
       password: null,    // ← no password in DB — the bug scenario
+      radiusSecret: 'mock-radius-secret',
       port: 8728,
       apiPort: 8728,
     });
@@ -513,6 +516,7 @@ describe('WireGuard route', () => {
       wgConfiguredAt: null,
       username: 'hq_admin_abc123',   // ← valid username
       password: 'SecurePass!99',     // ← valid password
+      radiusSecret: 'mock-radius-secret',
       port: 8728,
       apiPort: 8728,
     });

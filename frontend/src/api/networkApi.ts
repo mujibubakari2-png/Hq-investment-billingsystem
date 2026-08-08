@@ -58,6 +58,7 @@ export const routersApi = {
         activate: (id: string) => post<Record<string, unknown>>(`/routers/${id}/wireguard`, { action: 'activate' }),
         deactivate: (id: string) => post<Record<string, unknown>>(`/routers/${id}/wireguard`, { action: 'deactivate' }),
         pushConfig: (id: string, lanPorts?: string[]) => post<Record<string, unknown>>(`/routers/${id}/wireguard`, { action: 'push-config', lanPorts }),
+        getJobStatus: (id: string, jobId: string) => get<{ status: string; message?: string; error?: string }>(`/routers/${id}/wireguard/job/${jobId}`),
     },
 
     // Hotspot portal customization
