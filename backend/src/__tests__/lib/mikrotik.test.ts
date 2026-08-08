@@ -62,10 +62,15 @@ describe('MikroTikService', () => {
             .mockResolvedValueOnce({
                 ok: true,
                 text: async () => JSON.stringify([{ version: '7.12' }])
-            });
+            })
+            .mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify([]) }) 
+            .mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify({ servers: '8.8.8.8' }) }) 
+            .mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify([]) }) 
+            .mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify([]) }) 
+            .mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify([]) });
 
         const result = await service.testConnection();
-        expect(global.fetch).toHaveBeenCalledTimes(3);
+        expect(global.fetch).toHaveBeenCalledTimes(8);
         
         // Ensure the second call was HTTP (for system/identity)
         expect((global.fetch as jest.Mock).mock.calls[1][0]).toContain('http://router.example.com/rest/system/identity');
@@ -106,7 +111,12 @@ describe('MikroTikService', () => {
             .mockResolvedValueOnce({
                 ok: true,
                 text: async () => JSON.stringify([{ version: '7.12' }])
-            });
+            })
+            .mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify([]) }) 
+            .mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify({ servers: '8.8.8.8' }) }) 
+            .mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify([]) }) 
+            .mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify([]) }) 
+            .mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify([]) });
 
         const result = await service.testConnection();
 

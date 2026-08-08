@@ -119,5 +119,55 @@ export const PackageUpdateSchema = updatePackageSchema;
 export const PaymentChannelUpdateSchema = z.object({}).passthrough();
 export const SubscriptionCreateSchema = z.object({}).passthrough();
 export const SubscriptionUpdateSchema = z.object({}).passthrough();
-export const RouterUpdateSchema = z.object({}).passthrough();
+export const RouterUpdateSchema = z.object({
+  name: z.string().optional(),
+  host: z.string().optional(),
+  username: z.string().optional(),
+  password: z.string().optional(),
+  port: z.union([z.number(), z.string().transform(Number), z.null()]).optional(),
+  apiPort: z.union([z.number(), z.string().transform(Number), z.null()]).optional(),
+  type: z.string().optional(),
+  vendor: z.string().optional(),
+  model: z.string().optional(),
+  architecture: z.string().optional(),
+  firmwareVersion: z.string().optional(),
+  apiType: z.string().optional(),
+  vpnMode: z.string().optional(),
+  description: z.string().optional(),
+  status: z.string().optional(),
+  accountingEnabled: z.boolean().optional(),
+  licenseLevel: z.string().optional(),
+  healthStatus: z.string().optional(),
+  provisioningStatus: z.string().optional(),
+  featureFlags: z.string().optional(),
+  lanIp: z.string().nullable().optional(),
+  lanGateway: z.string().nullable().optional(),
+  hotspotPoolRange: z.string().nullable().optional(),
+  pppoePoolRange: z.string().nullable().optional(),
+  dns: z.string().nullable().optional(),
+  serviceType: z.enum(['hotspot', 'pppoe', 'both']).nullable().optional(),
+})
+.passthrough()
+.superRefine((data, ctx) => {
+    // Only enforce conditional requirement if the user is explicitly setting network fields.
+    const hasNetworkFields = data.lanIp !== undefined || data.lanGateway !== undefined || data.hotspotPoolRange !== undefined || data.pppoePoolRange !== undefined || data.serviceType !== undefined;
+    
+    if (hasNetworkFields) {
+        const sType = data.serviceType || 'both';
+        if ((sType === 'hotspot' || sType === 'both') && data.hotspotPoolRange === null) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "hotspotPoolRange is required when serviceType includes hotspot",
+                path: ['hotspotPoolRange'],
+            });
+        }
+        if ((sType === 'pppoe' || sType === 'both') && data.pppoePoolRange === null) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "pppoePoolRange is required when serviceType includes pppoe",
+                path: ['pppoePoolRange'],
+            });
+        }
+    }
+});
 export const VpnUserCreateSchema = z.object({}).passthrough();

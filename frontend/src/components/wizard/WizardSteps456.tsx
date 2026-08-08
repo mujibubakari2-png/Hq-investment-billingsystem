@@ -231,6 +231,7 @@ interface Step6Props {
     vpnMode: VpnMode;
     serviceVerifyStatus: VerifyStatus;
     vpnVerifyStatus: VerifyStatus;
+    verifyMessage?: string;
     onGoBack: () => void;
     onFinish: () => void;
 }
@@ -327,6 +328,11 @@ export function Step6Verify(p: Step6Props) {
                                 'Configuration failed. Please check your setup and try again.'
                             )}
                         </div>
+                        {p.verifyMessage && (
+                            <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 'var(--radius-sm)', padding: '12px 16px', fontSize: '0.85rem', color: '#b91c1c', marginBottom: 20 }}>
+                                <strong>Detailed Error:</strong> {p.verifyMessage}
+                            </div>
+                        )}
                         <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
                             <button className="btn btn-secondary" onClick={p.onGoBack}><ArrowBackIcon fontSize="small" /> Go Back and Try Again</button>
                             <button className="btn btn-secondary" onClick={p.onFinish}><ListIcon fontSize="small" /> Back to Router List</button>
@@ -340,6 +346,11 @@ export function Step6Verify(p: Step6Props) {
                             Router <strong>{p.routerName}</strong> is fully configured and connected.
                             {p.vpnEnabled && ` VPN tunnel (${p.vpnMode}) is active.`}
                         </p>
+                        {p.verifyMessage && (
+                            <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 'var(--radius-sm)', padding: '12px 16px', fontSize: '0.85rem', color: '#15803d', marginBottom: 20 }}>
+                                <strong>Status:</strong> {p.verifyMessage}
+                            </div>
+                        )}
                         <button className="btn" style={{ background: '#16a34a', color: '#fff', fontWeight: 600, padding: '10px 24px' }} onClick={p.onFinish}>
                             Go to Routers Dashboard
                         </button>

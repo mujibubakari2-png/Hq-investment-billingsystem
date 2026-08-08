@@ -5,7 +5,7 @@ import { requirePermission } from "@/lib/rbac";
 import { canAccessTenant } from "@/lib/tenant";
 import { decryptRouterFields, encrypt } from "@/lib/encryption";
 import { deriveLanNetworkCidr, generateRouterAdminPassword, generateRadiusSecret } from "@/lib/routerProvisioning";
-import { buildHotspotFlowEnforcementLines, normalizeWizardScriptInputs } from "@/lib/routerWizardScriptBuilder";
+import { buildRouterWizardScript, buildHotspotFlowEnforcementLines, normalizeWizardScriptInputs } from "@/lib/routerWizardScriptBuilder";
 
 // Simple sanitizer for wireless passphrases embedded into RouterOS scripts.
 function sanitizePassphrase(p: unknown): string {
@@ -52,9 +52,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         // and pppoe-only routers don't need hotspotPoolRange.
         const routerServiceType = (routerRaw as any).serviceType || 'both';
         const missingFields: string[] = [];
-        if (!routerRaw.lanIp)      missingFields.push("lanIp");
+        if (!routerRaw.lanIp) missingFields.push("lanIp");
         if (!routerRaw.lanGateway) missingFields.push("lanGateway");
-        if (!routerRaw.dns)        missingFields.push("dns");
+        if (!routerRaw.dns) missingFields.push("dns");
         // Only require hotspot pool when serviceType is hotspot or both
         if (routerServiceType !== 'pppoe' && !routerRaw.hotspotPoolRange)
             missingFields.push("hotspotPoolRange");
@@ -133,6 +133,50 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         } catch (e) {
             logger.warn('[Script] Failed to parse APP_URL for walled garden host', {
                 error: e instanceof Error ? e.message : String(e),
+            });
+        }
+
+        // Phase 1: Canonical configuration generator consolidation
+        const useLegacy = req.nextUrl.searchParams.get('legacy') === '1';
+
+        const unifiedScript = buildRouterWizardScript({
+            routerName: router.name,
+            routerId: router.id,
+            publicApiBase: "",
+            apiHost: walledGardenHost || serverUrl,
+            serviceType: (router.serviceType as 'hotspot' | 'pppoe' | 'both') || 'both',
+            selectedInterfaces: selectedLanInterfaces,
+            vpnEnabled: !!(router.wgTunnelIp),
+            vpnProtocol: "wireguard",
+            vpnPoolStart: "",
+            vpnPoolEnd: "",
+            vpnSecrets: [],
+            hotspotLocalAddress: router.lanGateway || "",
+            hotspotPoolStart: router.hotspotPoolRange ? router.hotspotPoolRange.split("-")[0] : "",
+            hotspotPoolEnd: router.hotspotPoolRange ? router.hotspotPoolRange.split("-")[1] : "",
+            pppoeLocalAddress: router.lanGateway || "",
+            pppoePoolStart: router.pppoePoolRange ? router.pppoePoolRange.split("-")[0] : "",
+            pppoePoolEnd: router.pppoePoolRange ? router.pppoePoolRange.split("-")[1] : "",
+            radiusAddress: vpnIp,
+            radiusSecret: router.radiusSecret || "",
+            wgConfig: { routerTunnelIp: router.wgTunnelIp },
+            certName: "hq-hotspot-cert",
+            vpnManagementSubnet: vpnSubnet,
+            dnsServers: router.dns || "",
+            vpnMode: router.vpnMode || "hybrid",
+        });
+
+        if (!useLegacy) {
+            const safeFilename = router.name
+                .trim()
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/^-+|-+$/g, '');
+            return new Response(unifiedScript, {
+                headers: {
+                    "Content-Type": "text/plain",
+                    "Content-Disposition": `attachment; filename="setup-${safeFilename}.rsc"`,
+                },
             });
         }
 
@@ -228,10 +272,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 # 6b. Bridge Port Membership — Add explicitly selected LAN interfaces as bridge members (for L2 switching)
 # If no interfaces are supplied, fall back to the standard physical-port scan.
 ${selectedLanInterfaces.length > 0
-    ? selectedLanInterfaces.map((iface) => `:if ([:len [/interface bridge port find where interface="${iface}"]] = 0) do={
+                ? selectedLanInterfaces.map((iface) => `:if ([:len [/interface bridge port find where interface="${iface}"]] = 0) do={
     /interface bridge port add bridge=$lanBridge interface=${iface} comment="HQ INVESTMENT LAN port"
 }`).join('\n')
-    : `:foreach intf in=[/interface find where !(name=ether1 || name~"bridge" || name~"ppp" || name~"wlan" || name~"wg" || passthrough=yes || type=loopback)] do={
+                : `:foreach intf in=[/interface find where !(name=ether1 || name~"bridge" || name~"ppp" || name~"wlan" || name~"wg" || passthrough=yes || type=loopback)] do={
     :local intfName [/interface get $intf name]
     :if ([:len [/interface bridge port find bridge=$lanBridge interface=$intfName]] = 0) do={
         /interface bridge port add bridge=$lanBridge interface=$intfName comment="HQ INVESTMENT LAN port"
@@ -290,7 +334,7 @@ ${selectedLanInterfaces.length > 0
 }
 `;
 
-    // 6c. Wireless AP Configuration (optional — only if wlanEnabled=true)
+        // 6c. Wireless AP Configuration (optional — only if wlanEnabled=true)
         const _r: any = router as any;
         if (_r.wlanEnabled) {
             const wlan1Ssid = _r.wlan1Ssid || "HQ-Hotspot-2.4GHz";

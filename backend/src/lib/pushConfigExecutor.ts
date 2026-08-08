@@ -1,5 +1,5 @@
 /**
- * Push-Config Executor — BullMQ-safe async provisioning
+ * Push-Config Executor ï¿½ BullMQ-safe async provisioning
  *
  * Extracted from POST /api/routers/[id]/wireguard push-config handler.
  *
@@ -7,7 +7,7 @@
  * 1. PHASED FIREWALL: ACCEPT rules applied first, connectivity verified,
  *    DROP rules applied last one-by-one with connectivity check after each.
  *    Rollback all HQ INVESTMENT rules if router becomes unreachable.
- *    Eliminates 504 (was: 16 × 8s timeouts after DROP WAN killed WAN session).
+ *    Eliminates 504 (was: 16 ï¿½ 8s timeouts after DROP WAN killed WAN session).
  *
  * 2. DB-FIRST LAN METADATA: lanGateway/lanIp/pools read from DB before
  *    falling back to VPN-derived values. Fixes "missing metadata" on script download.
@@ -119,6 +119,27 @@ export async function executePushConfig(
 
     const service = await getMikroTikService(routerId, tenantId);
 
+    let criticalStepFailed = false;
+    const runApi = async (category: string, ep: string, method: string = "GET", data?: any, critical = false) => {
+        if (criticalStepFailed) return null;
+        try {
+            return await service.apiRequestPublic(ep, method as any, data);
+        } catch (e: any) {
+            const msg = e.message || String(e);
+            if (msg.includes("already") || msg.includes("no such")) return null;
+            trackStep(category + ": " + ep, false, msg);
+            if (critical) {
+                criticalStepFailed = true;
+                throw new Error(`Critical phase failed [${category}]: ${msg}`);
+            }
+            return null;
+        }
+    };
+    const runApiSafe = async (ep: string, method: string = "GET", data?: any) => {
+        try { return await service.apiRequestPublic(ep, method as any, data); } catch {}
+    };
+
+
     // -- STEP 0: Cleanup -------------------------------------------------------
     logger.info("[PUSH-CONFIG] Cleaning up old HQ INVESTMENT configs...");
     for (const ep of ["/ip/firewall/filter", "/ip/firewall/nat", "/ip/route", "/ip/address"]) {
@@ -127,7 +148,7 @@ export async function executePushConfig(
             if (Array.isArray(items)) {
                 for (const item of items) {
                     if (item.comment?.includes("HQ INVESTMENT")) {
-                        try { await service.apiRequestPublic(`${ep}/${item[".id"]}`, "DELETE"); } catch {}
+                        await runApiSafe(`${ep}/${item[".id"]}`, "DELETE");
                     }
                 }
             }
@@ -148,9 +169,9 @@ export async function executePushConfig(
             }
         } catch {}
     }
-    try { await service.apiRequestPublic("/system/identity", "PATCH", { name: router.name }); } catch {}
-    try { await service.apiRequestPublic("/ip/dns", "PATCH", { servers: "8.8.8.8,8.8.4.4", "allow-remote-requests": "yes" }); } catch {}
-    try { await service.apiRequestPublic("/system/ntp/client", "PATCH", { enabled: "yes", servers: "pool.ntp.org" }); } catch {}
+    await runApi("MANAGEMENT", "/system/identity", "PATCH", { name: router.name });
+    await runApi("MANAGEMENT", "/ip/dns", "PATCH", { servers: "8.8.8.8,8.8.4.4", "allow-remote-requests": "yes" });
+    await runApi("MANAGEMENT", "/system/ntp/client", "PATCH", { enabled: "yes", servers: "pool.ntp.org" });
 
     // -- STEP 2: Bridge + Hotspot + PPPoE + DHCP ------------------------------
     logger.info("[PUSH-CONFIG] Setting up Bridge, Hotspot & PPPoE...");
@@ -165,13 +186,12 @@ export async function executePushConfig(
     } catch {}
 
     if (!bridgeExists) {
-        try { await service.apiRequestPublic("/interface/bridge", "PUT", { name: lanBridgeName, "protocol-mode": "none", comment: "HQ INVESTMENT LAN Bridge - Hotspot & PPPoE" }); }
-        catch (e: any) { if (!e.message?.includes("already")) logger.warn("[PUSH-CONFIG] Bridge:", { error: e.message }); }
+        await runApi("BRIDGE", "/interface/bridge", "PUT", { name: lanBridgeName, "protocol-mode": "none", comment: "HQ INVESTMENT LAN Bridge - Hotspot & PPPoE" }, true);
     } else {
         try {
             const bl = await service.apiRequestPublic("/interface/bridge");
             const ex = Array.isArray(bl) ? bl.find((b: any) => b.name === lanBridgeName) : null;
-            if (ex?.[".id"]) await service.apiRequestPublic(`/interface/bridge/${ex[".id"]}`, "PATCH", { "protocol-mode": "none" });
+            if (ex?.["\.id"]) await runApi("BRIDGE", `/interface/bridge/${ex["\.id"]}`, "PATCH", { "protocol-mode": "none" });
         } catch {}
     }
 
@@ -183,9 +203,9 @@ export async function executePushConfig(
                 if (!portName || portName === "ether1" || portName.includes("wan")) continue;
                 const ex = Array.isArray(ep) ? ep.find((p: any) => p.interface === portName) : null;
                 if (ex) {
-                    if (ex.bridge !== lanBridgeName) try { await service.apiRequestPublic(`/interface/bridge/port/${ex[".id"]}`, "PATCH", { bridge: lanBridgeName }); } catch {}
+                    if (ex.bridge !== lanBridgeName) await runApiSafe(`/interface/bridge/port/${ex[".id"]}`, "PATCH", { bridge: lanBridgeName });
                 } else {
-                    try { await service.apiRequestPublic("/interface/bridge/port", "PUT", { bridge: lanBridgeName, interface: portName, comment: "HQ INVESTMENT Auto-Added" }); } catch {}
+                    await runApiSafe("/interface/bridge/port", "PUT", { bridge: lanBridgeName, interface: portName, comment: "HQ INVESTMENT Auto-Added" });
                 }
             }
         } catch {}
@@ -198,7 +218,7 @@ export async function executePushConfig(
             const wanPat = /^(ether1|sfp[\d-]|lte[\d-]|wan)/i;
             for (const bp of allBP) {
                 if (bp.bridge === lanBridgeName && wanPat.test(bp.interface) && !lanPorts.includes(bp.interface)) {
-                    try { await service.apiRequestPublic(`/interface/bridge/port/${bp[".id"]}`, "DELETE"); } catch {}
+                    await runApiSafe(`/interface/bridge/port/${bp[".id"]}`, "DELETE");
                 }
             }
         }
@@ -214,7 +234,7 @@ export async function executePushConfig(
                         (ep === "/ip/pool" && (item.name?.includes("hs-pool") || item.name?.includes("pppoe-pool"))) ||
                         (ep === "/ip/dhcp-server" && (item.interface === lanBridgeName || item.name === "defconf")) ||
                         (ep === "/ip/hotspot" && item.interface === lanBridgeName);
-                    if (shouldDelete) try { await service.apiRequestPublic(`${ep}/${item[".id"]}`, "DELETE"); } catch {}
+                    if (shouldDelete) await runApiSafe(`${ep}/${item[".id"]}`, "DELETE");
                 }
             }
         } catch {}
@@ -224,8 +244,8 @@ export async function executePushConfig(
     const safeRouterNameLower = sanitizeMikroTikName(router.name.toLowerCase());
     const hotspotProfileName = `hsprof-${safeRouterNameLower}`;
 
-    try { await service.apiRequestPublic("/ip/hotspot/profile", "PUT", { name: hotspotProfileName, "hotspot-address": lanGateway, "dns-name": `${safeRouterNameLower}.hotspot`, "html-directory": "hotspot", "login-by": "http-chap,https,cookie", "http-cookie-lifetime": "3d", "use-radius": "yes" }); } catch {}
-    try { await service.apiRequestPublic("/ip/dns/static", "PUT", { name: `${safeRouterNameLower}.hotspot`, address: lanGateway, comment: "HQ INVESTMENT Hotspot DNS" }); } catch {}
+    await runApi("LAN/POOL/HOTSPOT", "/ip/hotspot/profile", "PUT", { name: hotspotProfileName, "hotspot-address": lanGateway, "dns-name": `${safeRouterNameLower}.hotspot`, "html-directory": "hotspot", "login-by": "http-chap,https,cookie", "http-cookie-lifetime": "3d", "use-radius": "yes" }, true);
+    await runApi("LAN/POOL/HOTSPOT", "/ip/dns/static", "PUT", { name: `${safeRouterNameLower}.hotspot`, address: lanGateway, comment: "HQ INVESTMENT Hotspot DNS" }, true);
 
     // Secure all existing hotspot profiles
     try {
@@ -239,15 +259,15 @@ export async function executePushConfig(
         }
     } catch {}
 
-    try { await service.apiRequestPublic("/ip/pool", "PUT", { name: `hs-pool-${safeRouterName}`, ranges: `${hsPoolStart}-${hsPoolEnd}` }); } catch {}
-    try { await service.apiRequestPublic("/ip/pool", "PUT", { name: `pppoe-pool-${safeRouterName}`, ranges: `${ppoePoolStart}-${ppoePoolEnd}` }); } catch {}
-    try { await service.apiRequestPublic("/ip/address", "PUT", { address: lanCidr, interface: lanBridgeName, comment: "HQ INVESTMENT Hotspot LAN" }); } catch {}
-    try { await service.apiRequestPublic("/ip/dhcp-server/network", "PUT", { address: lanNetwork, gateway: lanGateway, "dns-server": dbDns || "8.8.8.8,1.1.1.1" }); } catch {}
-    try { await service.apiRequestPublic("/ip/dhcp-server", "PUT", { name: `dhcp-${safeRouterName}`, interface: lanBridgeName, "address-pool": `hs-pool-${safeRouterName}`, "lease-time": "1h", disabled: "no" }); } catch {}
-    try { await service.apiRequestPublic("/ip/hotspot", "PUT", { name: `hotspot-${safeRouterName}`, interface: lanBridgeName, "address-pool": `hs-pool-${safeRouterName}`, profile: hotspotProfileName, disabled: "no" }); } catch {}
-    try { await service.apiRequestPublic("/ppp/profile", "PUT", { name: `pppoe-profile-${safeRouterName}`, "local-address": lanGateway, "remote-address": `pppoe-pool-${safeRouterName}`, "dns-server": dbDns || "8.8.8.8,1.1.1.1", "use-encryption": "yes", "use-radius": "yes" }); } catch {}
-    try { await service.apiRequestPublic("/ppp/aaa", "PATCH", { "use-radius": "yes", "accounting": "yes" }); } catch {}
-    try { await service.apiRequestPublic("/interface/pppoe-server/server", "PUT", { "service-name": `pppoe-svc-${safeRouterName}`, interface: lanBridgeName, "default-profile": `pppoe-profile-${safeRouterName}`, "one-session-per-host": "yes", disabled: "no" }); } catch {}
+    await runApi("LAN/POOL/HOTSPOT", "/ip/pool", "PUT", { name: `hs-pool-${safeRouterName}`, ranges: `${hsPoolStart}-${hsPoolEnd}` }, true);
+    await runApi("LAN/POOL/HOTSPOT", "/ip/pool", "PUT", { name: `pppoe-pool-${safeRouterName}`, ranges: `${ppoePoolStart}-${ppoePoolEnd}` }, true);
+    await runApi("LAN/POOL/HOTSPOT", "/ip/address", "PUT", { address: lanCidr, interface: lanBridgeName, comment: "HQ INVESTMENT Hotspot LAN" }, true);
+    await runApi("LAN/POOL/HOTSPOT", "/ip/dhcp-server/network", "PUT", { address: lanNetwork, gateway: lanGateway, "dns-server": dbDns || "8.8.8.8,1.1.1.1" }, true);
+    await runApi("LAN/POOL/HOTSPOT", "/ip/dhcp-server", "PUT", { name: `dhcp-${safeRouterName}`, interface: lanBridgeName, "address-pool": `hs-pool-${safeRouterName}`, "lease-time": "1h", disabled: "no" }, true);
+    await runApi("LAN/POOL/HOTSPOT", "/ip/hotspot", "PUT", { name: `hotspot-${safeRouterName}`, interface: lanBridgeName, "address-pool": `hs-pool-${safeRouterName}`, profile: hotspotProfileName, disabled: "no" }, true);
+    await runApi("PPPOE", "/ppp/profile", "PUT", { name: `pppoe-profile-${safeRouterName}`, "local-address": lanGateway, "remote-address": `pppoe-pool-${safeRouterName}`, "dns-server": dbDns || "8.8.8.8,1.1.1.1", "use-encryption": "yes", "use-radius": "yes" }, true);
+    await runApi("PPPOE", "/ppp/aaa", "PATCH", { "use-radius": "yes", "accounting": "yes" });
+    await runApi("PPPOE", "/interface/pppoe-server/server", "PUT", { "service-name": `pppoe-svc-${safeRouterName}`, interface: lanBridgeName, "default-profile": `pppoe-profile-${safeRouterName}`, "one-session-per-host": "yes", disabled: "no" }, true);
 
     // -- STEP 3: WireGuard VPN -------------------------------------------------
     logger.info("[PUSH-CONFIG] Setting up WireGuard VPN...");
@@ -269,15 +289,15 @@ export async function executePushConfig(
 
     try {
         const addrs = await service.apiRequestPublic("/ip/address");
-        if (Array.isArray(addrs)) { for (const a of addrs) { if (a.interface === "wg-hq") try { await service.apiRequestPublic(`/ip/address/${a[".id"]}`, "DELETE"); } catch {} } }
+        if (Array.isArray(addrs)) { for (const a of addrs) { if (a.interface === "wg-hq") await runApiSafe(`/ip/address/${a[".id"]}`, "DELETE"); } }
     } catch {}
-    try { await service.apiRequestPublic("/ip/address", "PUT", { address: `${tunnelIp}/24`, interface: "wg-hq", comment: "HQ INVESTMENT VPN Address" }); } catch {}
+    await runApi("LAN/POOL/HOTSPOT", "/ip/address", "PUT", { address: `${tunnelIp}/24`, interface: "wg-hq", comment: "HQ INVESTMENT VPN Address" }, true);
 
     try {
         const oldPeers = await service.apiRequestPublic("/interface/wireguard/peers");
         if (Array.isArray(oldPeers)) {
             for (const p of oldPeers) {
-                if (p.comment?.includes("HQ INVESTMENT") || p.interface === "wg-hq") try { await service.apiRequestPublic(`/interface/wireguard/peers/${p[".id"]}`, "DELETE"); } catch {}
+                if (p.comment?.includes("HQ INVESTMENT") || p.interface === "wg-hq") await runApiSafe(`/interface/wireguard/peers/${p[".id"]}`, "DELETE");
             }
         }
     } catch {}
@@ -292,14 +312,14 @@ export async function executePushConfig(
     // -- STEP 4-6: NAT + Route -------------------------------------------------
     const restPort = router.apiPort || (router.port === 8728 || router.port === 8729 ? 80 : router.port) || 80;
     logger.info("[PUSH-CONFIG] Setting up NAT & Route...");
-    try { await service.apiRequestPublic("/ip/firewall/nat", "PUT", { chain: "srcnat", action: "masquerade", comment: "NAT for Internet - HQ INVESTMENT", "place-before": "0" }); } catch {}
-    try { await service.apiRequestPublic("/ip/route", "PUT", { "dst-address": `${subnetPrefix}.0/24`, gateway: "wg-hq", comment: "WireGuard route - HQ INVESTMENT" }); } catch {}
+    await runApi("LAN/POOL/HOTSPOT", "/ip/firewall/nat", "PUT", { chain: "srcnat", action: "masquerade", comment: "NAT for Internet - HQ INVESTMENT", "place-before": "0" }, true);
+    await runApi("LAN/POOL/HOTSPOT", "/ip/route", "PUT", { "dst-address": `${subnetPrefix}.0/24`, gateway: "wg-hq", comment: "WireGuard route - HQ INVESTMENT" }, true);
 
     // -- STEP 7: RADIUS & CoA --------------------------------------------------
     logger.info("[PUSH-CONFIG] Setting up RADIUS...");
     try {
         const oldR = await service.apiRequestPublic("/radius");
-        if (Array.isArray(oldR)) { for (const r of oldR) { if (r.comment?.includes("HQ INVESTMENT")) try { await service.apiRequestPublic(`/radius/${r[".id"]}`, "DELETE"); } catch {} } }
+        if (Array.isArray(oldR)) { for (const r of oldR) { if (r.comment?.includes("HQ INVESTMENT")) await runApiSafe(`/radius/${r[".id"]}`, "DELETE"); } }
     } catch {}
 
     let currentRadiusSecret = router.radiusSecret as string | undefined;
@@ -322,11 +342,11 @@ export async function executePushConfig(
     logger.info("[PUSH-CONFIG] Setting up Walled Garden...");
     const billingHost = (process.env.WG_SERVER_ENDPOINT || process.env.NEXT_PUBLIC_API_URL?.replace(/^https?:\/\//, "") || wgServerIp).split(":")[0];
     for (const ep of ["/ip/hotspot/walled-garden", "/ip/hotspot/walled-garden/ip"]) {
-        try { const items = await service.apiRequestPublic(ep); if (Array.isArray(items)) { for (const e of items) { if (e.comment?.includes("HQ INVESTMENT")) try { await service.apiRequestPublic(`${ep}/${e[".id"]}`, "DELETE"); } catch {} } } } catch {}
+        try { const items = await service.apiRequestPublic(ep); if (Array.isArray(items)) { for (const e of items) { if (e.comment?.includes("HQ INVESTMENT")) await runApiSafe(`${ep}/${e[".id"]}`, "DELETE"); } } } catch {}
     }
-    try { await service.apiRequestPublic("/ip/hotspot/walled-garden", "PUT", { "dst-host": billingHost, action: "allow", comment: "Billing Portal - HQ INVESTMENT" }); } catch {}
-    try { await service.apiRequestPublic("/ip/hotspot/walled-garden/ip", "PUT", { "dst-address": wgServerIp, action: "accept", comment: "Billing Portal IP - HQ INVESTMENT" }); } catch {}
-    try { await service.apiRequestPublic("/ip/hotspot/walled-garden/ip", "PUT", { "dst-address": `${subnetPrefix}.0/24`, action: "accept", comment: "VPN Subnet - HQ INVESTMENT" }); } catch {}
+    await runApi("LAN/POOL/HOTSPOT", "/ip/hotspot/walled-garden", "PUT", { "dst-host": billingHost, action: "allow", comment: "Billing Portal - HQ INVESTMENT" }, true);
+    await runApi("LAN/POOL/HOTSPOT", "/ip/hotspot/walled-garden/ip", "PUT", { "dst-address": wgServerIp, action: "accept", comment: "Billing Portal IP - HQ INVESTMENT" }, true);
+    await runApi("LAN/POOL/HOTSPOT", "/ip/hotspot/walled-garden/ip", "PUT", { "dst-address": `${subnetPrefix}.0/24`, action: "accept", comment: "VPN Subnet - HQ INVESTMENT" }, true);
 
     // -- STEP 8: Phased Firewall -----------------------------------------------
     logger.info("[PUSH-CONFIG] Phase 3: Applying phased firewall lockdown...");
@@ -378,7 +398,7 @@ export async function executePushConfig(
             const rules = await service.apiRequestPublic("/ip/firewall/filter");
             if (Array.isArray(rules)) {
                 for (const rule of rules) {
-                    if (rule.comment?.includes("HQ INVESTMENT")) try { await service.apiRequestPublic(`/ip/firewall/filter/${rule[".id"]}`, "DELETE"); } catch {}
+                    if (rule.comment?.includes("HQ INVESTMENT")) await runApiSafe(`/ip/firewall/filter/${rule[".id"]}`, "DELETE");
                 }
             }
             logger.warn("[PUSH-CONFIG] Firewall rollback completed.");
@@ -414,7 +434,7 @@ export async function executePushConfig(
             const stillReachable = await testConnectivity();
             if (!stillReachable) {
                 routerUnreachableAfterFirewall = true;
-                logger.error(`[PUSH-CONFIG] ROUTER_UNREACHABLE_AFTER_FIREWALL — after: ${dropRule.comment}`);
+                logger.error(`[PUSH-CONFIG] ROUTER_UNREACHABLE_AFTER_FIREWALL ï¿½ after: ${dropRule.comment}`);
                 await rollbackFirewall();
                 firewallRolledBack = true;
                 trackStep("Firewall: DROP rule connectivity", false, `ROUTER_UNREACHABLE_AFTER_FIREWALL after: ${dropRule.comment}. All rules rolled back.`);
@@ -450,7 +470,7 @@ export async function executePushConfig(
 
     // -- Audit log -------------------------------------------------------------
     const failedSteps = stepResults.filter(s => !s.ok);
-    const criticalStepFailed = failedSteps.some(s => s.step.includes("WireGuard") || s.step.includes("Firewall") || s.step.includes("RADIUS"));
+    const hasCriticalFailure = criticalStepFailed || failedSteps.some(s => s.step.includes("WireGuard") || s.step.includes("Firewall") || s.step.includes("RADIUS"));
     await db.routerLog.create({
         data: {
             routerId,
@@ -463,14 +483,14 @@ export async function executePushConfig(
     });
 
     return {
-        success: !criticalStepFailed,
-        partialSuccess: failedSteps.length > 0 && !criticalStepFailed,
+        success: !hasCriticalFailure,
+        partialSuccess: failedSteps.length > 0 && !hasCriticalFailure,
         tunnelVerified,
         stepsWithIssues: failedSteps.length,
         stepDetails: failedSteps.length > 0 ? failedSteps : undefined,
         routerUnreachableAfterFirewall,
         firewallRolledBack,
-        message: criticalStepFailed
+        message: hasCriticalFailure
             ? `Push-config completed with ${failedSteps.length} critical failure(s). Check step details and retry.`
             : firewallRolledBack
                 ? `Services configured on ${router.name}, but firewall was rolled back (router unreachable after DROP WAN). WireGuard tunnel may need manual verification. Tunnel IP: ${tunnelIp}.`

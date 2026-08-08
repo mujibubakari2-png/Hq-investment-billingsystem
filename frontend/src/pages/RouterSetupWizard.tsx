@@ -90,6 +90,7 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
     // Step 6: verify
     const [serviceVerifyStatus, setServiceVerifyStatus] = useState<VerifyStatus>('checking');
     const [vpnVerifyStatus, setVpnVerifyStatus]         = useState<VerifyStatus>('checking');
+    const [verifyMessage, setVerifyMessage] = useState<string>('');
 
     // ── Derived ───────────────────────────────────────────────────────────
     const publicApiBase = getPublicApiBase();
@@ -171,46 +172,30 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
         setServiceVerifyStatus('checking'); setVpnVerifyStatus('checking');
         if (!routerId) { setServiceVerifyStatus('failed'); setVpnVerifyStatus('failed'); return; }
         try {
-            // RC-5 FIX: Use real RouterOS state checks instead of getPPPoEUsers/getHotspotUsers
-            // which only verify API connectivity (they return empty arrays even when services
-            // are absent). We call system-info to confirm the router is reachable, then
-            // use getSystemInfo to determine service status from actual RouterOS objects.
-            const connRes = await routersApi.testConnection(routerId);
-            if (!connRes.success) {
+            // RC-5 FIX: Use the new deep verification endpoint to query RouterOS state
+            const verifyRes = await routersApi.verifyRouter(routerId);
+            setVerifyMessage(verifyRes.statusMessage || '');
+            
+            // If the API isn't reachable at all, everything fails
+            if (!verifyRes.apiReachable) {
                 setServiceVerifyStatus('failed');
                 setVpnVerifyStatus('failed');
                 return;
             }
 
-            // Verify services via system-info (confirms router is responding to API)
-            let serviceVerified = false;
-            try {
-                const sysInfo = await routersApi.getSystemInfo(routerId);
-                // If getSystemInfo returns data, the router is accessible and configured.
-                // A router that had a failed import would still be reachable but might
-                // have no hotspot — we treat API reachability as "configured" here
-                // since full hotspot-object-level verification requires a dedicated endpoint.
-                serviceVerified = !!(sysInfo && (sysInfo.routerboard !== undefined || sysInfo.version || sysInfo.uptime));
-                setServiceVerifyStatus(serviceVerified ? 'success' : 'failed');
-            } catch {
-                setServiceVerifyStatus('failed');
-            }
+            // A router is considered successfully provisioned if at least one service is active
+            const serviceVerified = verifyRes.hotspotConfigured || verifyRes.pppoeConfigured;
+            setServiceVerifyStatus(serviceVerified ? 'success' : 'failed');
 
-            // VPN verification: check actual WireGuard tunnel handshake
             if (vpnEnabled) {
-                try {
-                    const wgStatus = await routersApi.wireguard.getConfig(routerId);
-                    // tunnelActive = true means WG reported a handshake within the last 180s
-                    const isTunnelUp = wgStatus.tunnelActive === true &&
-                        (wgStatus.lastHandshakeSeconds === null || wgStatus.lastHandshakeSeconds < 180);
-                    setVpnVerifyStatus(isTunnelUp ? 'success' : 'failed');
-                } catch {
-                    setVpnVerifyStatus(connRes.success ? 'success' : 'failed');
-                }
+                setVpnVerifyStatus(verifyRes.vpnActive ? 'success' : 'failed');
             } else {
                 setVpnVerifyStatus('success');
             }
-        } catch { setServiceVerifyStatus('failed'); setVpnVerifyStatus('failed'); }
+        } catch { 
+            setServiceVerifyStatus('failed'); 
+            setVpnVerifyStatus('failed'); 
+        }
     };
 
 
@@ -324,29 +309,33 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
 
         setActionLoading(true);
         try {
-            // RC-1 FIX: Persist network config before push so the DB is consistent
-            // with what the backend will configure on the router. Even if persist
-            // fails (non-fatal), push-config still proceeds — the backend derives
-            // LAN/pool values independently from the WireGuard tunnel IP.
             await persistNetworkConfig();
 
-            // FIX-504: Use AbortController to handle 504 gateway timeouts gracefully.
-            // The actual push-config operation may take 30-60s on the MikroTik side;
-            // the backend now returns faster (reduced sleeps), but long network latency
-            // could still cause a proxy timeout. We catch that and show a useful message.
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 90000); // 90s client timeout
-
-            let res: any;
-            try {
-                res = await routersApi.wireguard.pushConfig(routerId, selectedInterfaces);
-                clearTimeout(timeoutId);
-            } catch (err: any) {
-                clearTimeout(timeoutId);
-                throw err;
-            }
-
-            if (res.success || res.partialSuccess) {
+            const res = await routersApi.wireguard.pushConfig(routerId, selectedInterfaces);
+            if (res.jobId) {
+                // Poll for job completion
+                let jobStatus = 'waiting';
+                let attempt = 0;
+                while ((jobStatus === 'waiting' || jobStatus === 'active') && attempt < 60) {
+                    await new Promise(r => setTimeout(r, 2000)); // poll every 2s
+                    const pollRes = await fetch(`${publicApiBase}/routers/${routerId}/wireguard/job/${res.jobId}`, {
+                        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                    }).then(r => r.json());
+                    
+                    jobStatus = pollRes.status;
+                    if (jobStatus === 'completed') {
+                        setConfigGenerated(true);
+                        alert(pollRes.message || 'Configuration pushed successfully.');
+                        handleNext();
+                        return;
+                    } else if (jobStatus === 'failed') {
+                        alert('Auto-Push Failed: ' + (pollRes.error || 'Unknown error'));
+                        return;
+                    }
+                    attempt++;
+                }
+                if (attempt >= 60) alert('Auto-Push is taking too long. Please check status later.');
+            } else if (res.success || res.partialSuccess) {
                 setConfigGenerated(true);
                 alert(res.message || 'Configuration pushed successfully.');
                 handleNext();
@@ -382,7 +371,7 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
             case 3: return <Step3Vpn vpnEnabled={vpnEnabled} setVpnEnabled={setVpnEnabled} vpnMode={vpnMode} setVpnMode={setVpnMode} />;
             case 4: return <Step4Interfaces routerName={routerName} interfaces={interfaces} loadingInterfaces={loadingInterfaces} selectedInterfaces={selectedInterfaces} onToggleInterface={toggleInterface} onRefresh={fetchInterfaces} />;
             case 5: return <Step5Generate routerName={routerName} serviceType={serviceType} selectedInterfaces={selectedInterfaces} vpnEnabled={vpnEnabled} hotspotLocalAddress={hotspotLocalAddress} pppoeLocalAddress={pppoeLocalAddress} configGenerated={configGenerated} showPreview={showPreview} setShowPreview={setShowPreview} getGeneratedScript={getGeneratedScript} onDownload={handleDownloadConfig} onAutoPush={handleAutoPush} actionLoading={actionLoading} />;
-            case 6: return <Step6Verify routerName={routerName} serviceType={serviceType} vpnEnabled={vpnEnabled} vpnMode={vpnMode} serviceVerifyStatus={serviceVerifyStatus} vpnVerifyStatus={vpnVerifyStatus} onGoBack={() => setCurrentStep(0)} onFinish={handleFinish} />;
+            case 6: return <Step6Verify routerName={routerName} serviceType={serviceType} vpnEnabled={vpnEnabled} vpnMode={vpnMode} serviceVerifyStatus={serviceVerifyStatus} vpnVerifyStatus={vpnVerifyStatus} verifyMessage={verifyMessage} onGoBack={() => setCurrentStep(0)} onFinish={handleFinish} />;
             default: return null;
         }
     };

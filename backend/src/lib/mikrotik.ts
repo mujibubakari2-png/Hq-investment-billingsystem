@@ -393,7 +393,7 @@ export class MikroTikService {
 
     // ── Connection Test ─────────────────────────────────────────────────────
 
-    async testConnection(): Promise<{ success: boolean; message: string; info?: RouterSystemInfo }> {
+    async testConnection(): Promise<{ success: boolean; message: string; info?: RouterSystemInfo; discovery?: any }> {
         try {
             // Check for simulation mode (e.g., if host is "simulation")
             if (this.conn.host.toLowerCase() === "simulation") {
@@ -418,6 +418,55 @@ export class MikroTikService {
                 architecture: res?.["architecture-name"] || "Unknown",
             };
 
+            // READ-ONLY DISCOVERY & COMPARE DATABASE
+            const discovery = await this.syncNetworkMetadata();
+            
+            // Compare with Database
+            const routerRecord = await this.db.router.findUnique({ where: { id: this.routerId } });
+            
+            let syncState = "UNKNOWN";
+            let dbUpdates: any = {};
+            
+            if (routerRecord) {
+                const dbLan = routerRecord.lanIp;
+                const dbHsPool = routerRecord.hotspotPoolRange;
+                const dbPppoePool = routerRecord.pppoePoolRange;
+                const dbDns = routerRecord.dns;
+                
+                const rosLan = discovery.lanIp;
+                const rosHsPool = discovery.hotspotPoolRange;
+                const rosPppoePool = discovery.pppoePoolRange;
+                const rosDns = discovery.dnsServers;
+                
+                if (discovery.status === "CONFLICT") {
+                    syncState = "CONFLICT";
+                } else if (!rosLan && !rosHsPool && !rosPppoePool) {
+                    syncState = "UNKNOWN"; // RouterOS has no config
+                } else {
+                    const isLanConflict = dbLan && rosLan && dbLan !== rosLan;
+                    const isHsPoolConflict = dbHsPool && rosHsPool && dbHsPool !== rosHsPool;
+                    const isPppoePoolConflict = dbPppoePool && rosPppoePool && dbPppoePool !== rosPppoePool;
+                    
+                    if (isLanConflict || isHsPoolConflict || isPppoePoolConflict) {
+                        syncState = "CONFLICT";
+                    } else if (
+                        dbLan === rosLan && 
+                        (dbHsPool === rosHsPool || (!dbHsPool && !rosHsPool)) && 
+                        (dbPppoePool === rosPppoePool || (!dbPppoePool && !rosPppoePool))
+                    ) {
+                        syncState = "CONFIRMED";
+                    } else {
+                        syncState = "DISCOVERED";
+                        // Safe to populate missing values
+                        if (!dbLan && rosLan) dbUpdates.lanIp = rosLan;
+                        if (!dbLan && rosLan && !routerRecord.lanGateway) dbUpdates.lanGateway = rosLan;
+                        if (!dbHsPool && rosHsPool) dbUpdates.hotspotPoolRange = rosHsPool;
+                        if (!dbPppoePool && rosPppoePool) dbUpdates.pppoePoolRange = rosPppoePool;
+                        if (!dbDns && rosDns) dbUpdates.dns = rosDns;
+                    }
+                }
+            }
+
             // Update router status in DB
             await this.db.router.update({
                 where: { id: this.routerId },
@@ -429,11 +478,12 @@ export class MikroTikService {
                         : 0,
                     uptime: info.uptime,
                     lastSeen: new Date(),
+                    ...dbUpdates
                 },
             });
 
-            await this.log("connection_test", `Connected successfully. RouterOS ${info.version}`, "success");
-            return { success: true, message: "Connected successfully", info };
+            await this.log("connection_test", `Connected successfully. RouterOS ${info.version}. Discovery: ${syncState}`, "success");
+            return { success: true, message: "Connected successfully", info, discovery: { ...discovery, syncState } };
         } catch (err: any) {
             await this.db.router.update({
                 where: { id: this.routerId },
@@ -441,6 +491,103 @@ export class MikroTikService {
             });
             await this.log("connection_test", err.message, "error");
             return { success: false, message: err.message };
+        }
+    }
+
+    async syncNetworkMetadata(): Promise<{
+        wanGateway?: string;
+        lanInterface?: string;
+        lanIp?: string;
+        vpnInterface?: string;
+        vpnIp?: string;
+        hotspotServer?: string;
+        hotspotInterface?: string;
+        hotspotIp?: string;
+        hotspotPool?: string;
+        hotspotPoolRange?: string;
+        pppoeServer?: string;
+        pppoeProfile?: string;
+        pppoePool?: string;
+        pppoePoolRange?: string;
+        dnsServers?: string;
+        status: 'DISCOVERED' | 'CONFIRMED' | 'CONFLICT' | 'UNKNOWN';
+    }> {
+        if (this.conn.host.toLowerCase() === "simulation") {
+            return { status: "UNKNOWN" };
+        }
+
+        const result: any = { status: "DISCOVERED" };
+        let hasConflict = false;
+
+        try {
+            // 1. WAN
+            const routes = await this.apiRequest("/ip/route", "GET");
+            const defaultRoute = Array.isArray(routes) ? routes.find(r => r["dst-address"] === "0.0.0.0/0" && r.active === "true") : null;
+            if (defaultRoute) result.wanGateway = defaultRoute.gateway;
+
+            // 2. DNS
+            const dns = await this.apiRequest("/ip/dns", "GET");
+            if (dns && (dns as any).servers) result.dnsServers = (dns as any).servers;
+
+            // 3. Hotspot
+            const hotspots = await this.apiRequest("/ip/hotspot", "GET");
+            if (Array.isArray(hotspots) && hotspots.length > 0) {
+                if (hotspots.length > 1) hasConflict = true;
+                const hs = hotspots[0];
+                result.hotspotServer = hs.name;
+                result.hotspotInterface = hs.interface;
+                if (hs["address-pool"] && hs["address-pool"] !== "none") {
+                    result.hotspotPool = hs["address-pool"];
+                    const pools = await this.apiRequest("/ip/pool", "GET");
+                    const hsPool = Array.isArray(pools) ? pools.find(p => p.name === hs["address-pool"]) : null;
+                    if (hsPool) result.hotspotPoolRange = hsPool.ranges;
+                }
+                const addresses = await this.apiRequest("/ip/address", "GET");
+                const hsAddr = Array.isArray(addresses) ? addresses.find(a => a.interface === hs.interface) : null;
+                if (hsAddr) result.hotspotIp = hsAddr.address.split('/')[0];
+            }
+
+            // 4. PPPoE
+            const pppoes = await this.apiRequest("/interface/pppoe-server/server", "GET");
+            if (Array.isArray(pppoes) && pppoes.length > 0) {
+                if (pppoes.length > 1) hasConflict = true;
+                const pppoe = pppoes[0];
+                result.pppoeServer = pppoe.service;
+                if (pppoe["default-profile"]) {
+                    const profiles = await this.apiRequest("/ppp/profile", "GET");
+                    const profile = Array.isArray(profiles) ? profiles.find(p => p.name === pppoe["default-profile"]) : null;
+                    if (profile) {
+                        result.pppoeProfile = profile.name;
+                        if (profile["remote-address"]) {
+                            result.pppoePool = profile["remote-address"];
+                            const pools = await this.apiRequest("/ip/pool", "GET");
+                            const pppoePool = Array.isArray(pools) ? pools.find(p => p.name === profile["remote-address"]) : null;
+                            if (pppoePool) result.pppoePoolRange = pppoePool.ranges;
+                        }
+                    }
+                }
+            }
+
+            // 5. LAN
+            result.lanInterface = result.hotspotInterface || "bridge-lan";
+            result.lanIp = result.hotspotIp; 
+
+            // 6. VPN
+            const wgs = await this.apiRequest("/interface/wireguard", "GET");
+            if (Array.isArray(wgs) && wgs.length > 0) {
+                const wg = wgs[0]; 
+                result.vpnInterface = wg.name;
+                const addresses = await this.apiRequest("/ip/address", "GET");
+                const wgAddr = Array.isArray(addresses) ? addresses.find(a => a.interface === wg.name) : null;
+                if (wgAddr) result.vpnIp = wgAddr.address.split('/')[0];
+            }
+
+            if (hasConflict) result.status = "CONFLICT";
+            return result;
+        } catch (err: any) {
+            logger.warn(`[MikroTik] Discovery failed: ${err.message}`);
+            result.status = "UNKNOWN";
+            return result;
         }
     }
 
