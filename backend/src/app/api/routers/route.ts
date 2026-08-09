@@ -227,7 +227,7 @@ export async function POST(req: NextRequest) {
         const routerData: any = {
             name,
             host,
-            username: body.username || body.user || "",
+            username: body.username || body.user || "admin",
             password: password,
             port: port,
             apiPort: apiPort,

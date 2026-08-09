@@ -352,7 +352,8 @@ describe('MikroTikService', () => {
         );
     });
 
-    it('[BUG-FIX] getMikroTikService throws ROUTER_CREDENTIALS_MISSING when router has no password in DB', async () => {
+    it('[BUG-FIX] getMikroTikService warns when router has no password in DB', async () => {
+        const loggerWarnSpy = jest.spyOn(require('@/lib/logger').default, 'warn').mockImplementation(() => {});
         const unscopedFindUnique = jest.fn().mockResolvedValue({
             id: 'router-nopass',
             tenantId: 'tenant-1',
@@ -372,7 +373,13 @@ describe('MikroTikService', () => {
             },
         }));
 
-        await expect(getMikroTikService('router-nopass', 'tenant-1')).rejects.toThrow('ROUTER_CREDENTIALS_MISSING');
+        await getMikroTikService('router-nopass', 'tenant-1');
+
+        // Should warn about missing password that will cause 401
+        expect(loggerWarnSpy).toHaveBeenCalledWith(
+            expect.stringContaining('no password set in the database')
+        );
+        loggerWarnSpy.mockRestore();
     });
 });
 

@@ -1356,9 +1356,15 @@ export async function getMikroTikService(routerId: string, tenantId?: string | n
 
     validateOutboundHost(decryptedRouter.host, { allowPrivate: allowPrivateForWireGuardRouter });
 
-    // BUG-FIX: Require explicit username and password without fallbacks.
-    if (!decryptedRouter.username || !decryptedRouter.password) {
-        throw new Error("ROUTER_CREDENTIALS_MISSING");
+    // BUG-FIX: Use decryptedRouter for ALL credential fields (username, password, host) to be
+    // consistent. username is not encrypted but using decryptedRouter (which spreads all fields
+    // from router) ensures both come from the same decrypted record.
+    if (!decryptedRouter.password) {
+        logger.warn(
+            `[MikroTik] Router ${routerId} has no password set in the database. ` +
+            `An empty password will be sent — this will cause a 401 if the RouterOS admin ` +
+            `account has a password. Set the password in Settings → Routers → Edit.`
+        );
     }
 
     return new MikroTikService(
@@ -1366,8 +1372,8 @@ export async function getMikroTikService(routerId: string, tenantId?: string | n
             host: decryptedRouter.host,
             port: router.apiPort || router.port || 8728,
             restPort: (router as any).restPort ?? undefined,
-            username: decryptedRouter.username,
-            password: decryptedRouter.password,
+            username: decryptedRouter.username || "admin",   // BUG-FIX: use decryptedRouter consistently
+            password: decryptedRouter.password || "",
         },
         routerId,
         router.tenantId,
