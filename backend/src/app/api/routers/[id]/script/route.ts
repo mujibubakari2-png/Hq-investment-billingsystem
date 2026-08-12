@@ -91,8 +91,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
             updatedRadiusSecret = encrypt(generateRadiusSecret());
             needsUpdate = true;
         }
-        if (!routerRaw.username || routerRaw.username === "admin") {
-            updatedUsername = `hq_admin_${routerRaw.id.substring(0, 8).toLowerCase()}`;
+        if (!routerRaw.username) {
+            updatedUsername = "admin";
             needsUpdate = true;
         }
 
@@ -238,10 +238,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 # lets anyone on the same broadcast segment as the WAN uplink discover and attempt
 # to log into the router bypassing the IP-layer firewall entirely.
 :if ([:len [/interface list find name="hq-mgmt"]] = 0) do={
-    /interface list add name="hq-mgmt" comment="HQ INVESTMENT management interfaces (LAN+VPN only)"
-}
-:if ([:len [/interface list member find list="hq-mgmt" interface="${lanBridgeName}"]] = 0) do={
-    /interface list member add list="hq-mgmt" interface="${lanBridgeName}"
+    /interface list add name="hq-mgmt" comment="HQ INVESTMENT management interfaces (VPN only)"
 }
 :if ([:len [/interface wireguard find name="wg-hq"]] > 0) do={
     :if ([:len [/interface list member find list="hq-mgmt" interface="wg-hq"]] = 0) do={

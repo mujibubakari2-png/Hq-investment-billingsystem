@@ -149,7 +149,7 @@ export function buildRouterWizardScript(params: RouterSetupWizardScriptParams): 
     '',
     '# ===== Management Safety =====',
     ':if ([:len [/interface list find name="hq-mgmt"]] = 0) do={',
-    '    /interface list add name="hq-mgmt" comment="HQ INVESTMENT management interfaces (LAN+VPN only)"',
+    '    /interface list add name="hq-mgmt" comment="HQ INVESTMENT management interfaces (VPN only)"',
     '}',
     ':if ([:len [/interface wireguard find name="wg-hq"]] > 0) do={',
     '    :if ([:len [/interface list member find list="hq-mgmt" interface="wg-hq"]] = 0) do={ /interface list member add list="hq-mgmt" interface="wg-hq" }',
@@ -202,7 +202,6 @@ export function buildRouterWizardScript(params: RouterSetupWizardScriptParams): 
           `:local targetBridge "${targetBridge}"`,
           `:if ([:len [/interface bridge find where name=$targetBridge]] = 0) do={ /interface bridge add name=$targetBridge protocol-mode=none arp=enabled vlan-filtering=no comment="HQ Investment Bridge" }`,
           `:if ([:len [/interface bridge find where name=$targetBridge]] > 0) do={ /interface bridge set [find name=$targetBridge] protocol-mode=none arp=enabled vlan-filtering=no }`,
-          `:if ([:len [/interface list member find list="hq-mgmt" interface=$targetBridge]] = 0) do={ /interface list member add list="hq-mgmt" interface=$targetBridge }`,
           ...normalized.selectedInterfaces.map((iface) => `:if ([:len [/interface bridge port find where interface="${iface}"]] = 0) do={ /interface bridge port add bridge=$targetBridge interface=${iface} comment="HQ LAN port" }`),
         ]
       : [

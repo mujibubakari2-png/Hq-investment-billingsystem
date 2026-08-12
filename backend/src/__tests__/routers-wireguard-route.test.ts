@@ -212,7 +212,15 @@ describe('WireGuard route', () => {
     });
 
     const service = {
-      apiRequestPublic: jest.fn().mockResolvedValue([]),
+      apiRequestPublic: jest.fn().mockImplementation(async (ep: string, method?: string) => {
+        if (ep === '/interface/wireguard/peers' && (!method || method === 'GET')) {
+          return [{ "public-key": "server-public-key", interface: "wg-hq", "allowed-address": "10.200.0.0/24" }];
+        }
+        if (ep === '/ip/route' && (!method || method === 'GET')) {
+            return [{ "dst-address": "0.0.0.0/0", interface: "ether1", active: "true" }];
+        }
+        return [];
+      }),
     };
     mockGetMikroTikService.mockResolvedValue(service);
 
@@ -275,7 +283,15 @@ describe('WireGuard route', () => {
     });
 
     const service = {
-      apiRequestPublic: jest.fn().mockResolvedValue([]),
+      apiRequestPublic: jest.fn().mockImplementation(async (ep: string, method?: string) => {
+        if (ep === '/interface/wireguard/peers' && (!method || method === 'GET')) {
+          return [{ "public-key": "server-public-key", interface: "wg-hq", "allowed-address": "10.200.0.0/24" }];
+        }
+        if (ep === '/ip/route' && (!method || method === 'GET')) {
+            return [{ "dst-address": "0.0.0.0/0", interface: "ether1", active: "true" }];
+        }
+        return [];
+      }),
     };
     mockGetMikroTikService.mockResolvedValue(service);
 
@@ -337,7 +353,15 @@ describe('WireGuard route', () => {
     });
 
     const service = {
-      apiRequestPublic: jest.fn().mockResolvedValue([]),
+      apiRequestPublic: jest.fn().mockImplementation(async (ep: string, method?: string) => {
+        if (ep === '/interface/wireguard/peers' && (!method || method === 'GET')) {
+          return [{ "public-key": "server-public-key", interface: "wg-hq", "allowed-address": "10.200.0.0/24" }];
+        }
+        if (ep === '/ip/route' && (!method || method === 'GET')) {
+            return [{ "dst-address": "0.0.0.0/0", interface: "ether1", active: "true" }];
+        }
+        return [];
+      }),
     };
     mockGetMikroTikService.mockResolvedValue(service);
 
@@ -462,7 +486,15 @@ describe('WireGuard route', () => {
     });
 
     const service = {
-      apiRequestPublic: jest.fn().mockResolvedValue([]),
+      apiRequestPublic: jest.fn().mockImplementation(async (ep: string, method?: string) => {
+        if (ep === '/interface/wireguard/peers' && (!method || method === 'GET')) {
+          return [{ "public-key": "server-public-key", interface: "wg-hq", "allowed-address": "10.200.0.0/24" }];
+        }
+        if (ep === '/ip/route' && (!method || method === 'GET')) {
+            return [{ "dst-address": "0.0.0.0/0", interface: "ether1", active: "true" }];
+        }
+        return [];
+      }),
     };
     mockGetMikroTikService.mockResolvedValue(service);
 
@@ -524,6 +556,12 @@ describe('WireGuard route', () => {
     // Mock /user GET to return an existing "admin" user
     const service = {
       apiRequestPublic: jest.fn().mockImplementation((path: string, method: string) => {
+        if (path === '/interface/wireguard/peers' && (!method || method === 'GET')) {
+          return Promise.resolve([{ "public-key": "server-public-key", interface: "wg-hq", "allowed-address": "10.200.0.0/24" }]);
+        }
+        if (path === '/ip/route' && (!method || method === 'GET')) {
+          return Promise.resolve([{ "dst-address": "0.0.0.0/0", interface: "ether1", active: "true" }]);
+        }
         if (path === '/user' && (!method || method === 'GET')) {
           return Promise.resolve([{ '.id': '*1', name: 'admin' }]);
         }

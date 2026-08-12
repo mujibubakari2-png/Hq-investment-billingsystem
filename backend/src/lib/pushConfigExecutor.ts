@@ -325,18 +325,55 @@ export async function executePushConfig(
             }
         }
     } catch {}
+    
+    const serverWgPublicKey = router.wgPeerPublicKey ?? await wireguardManager.getServerPublicKey() ?? process.env.WG_SERVER_PUBLIC_KEY;
+    if (!serverWgPublicKey) {
+        throw new Error("Server WireGuard public key is unavailable; refusing configuration push");
+    }
+
     try {
-        await service.apiRequestPublic("/interface/wireguard/peers", "PUT", { interface: "wg-hq", "public-key": router.wgPeerPublicKey, ...(router.wgPresharedKey ? { "preshared-key": router.wgPresharedKey } : {}), "allowed-address": `${subnetPrefix}.0/24`, "endpoint-address": serverEndpoint, "endpoint-port": String(serverPort), "persistent-keepalive": "25s", comment: "HQ INVESTMENT ISP Server" });
+        await service.apiRequestPublic("/interface/wireguard/peers", "PUT", { interface: "wg-hq", "public-key": serverWgPublicKey, ...(router.wgPresharedKey ? { "preshared-key": router.wgPresharedKey } : {}), "allowed-address": `${subnetPrefix}.0/24`, "endpoint-address": serverEndpoint, "endpoint-port": String(serverPort), "persistent-keepalive": "25s", comment: "HQ INVESTMENT ISP Server" });
+        
+        // Post-write verification
+        const peerCheck = await service.apiRequestPublic("/interface/wireguard/peers");
+        const peer = Array.isArray(peerCheck) ? peerCheck.find((p: any) => p["public-key"] === serverWgPublicKey && p.interface === "wg-hq") : null;
+        if (!peer) throw new Error("WireGuard peer was not created on the router.");
+        if (!peer["allowed-address"]?.includes(`${subnetPrefix}.0/24`)) throw new Error("WireGuard peer allowed-address mismatch.");
+        
         trackStep("WireGuard: add server peer", true);
     } catch (e: any) {
-        if (!e.message?.includes("already")) trackStep("WireGuard: add server peer", false, e);
+        if (!e.message?.includes("already")) {
+            trackStep("WireGuard: add server peer", false, e);
+            criticalStepFailed = true;
+            throw new Error(`Critical phase failed [WireGuard Peer]: ${e.message}`);
+        }
         else trackStep("WireGuard: add server peer", true);
     }
 
     // -- STEP 4-6: NAT + Route -------------------------------------------------
     const restPort = router.apiPort || (router.port === 8728 || router.port === 8729 ? 80 : router.port) || 80;
+    
+    let wanInterface = "ether1";
+    try {
+        const routes = await service.apiRequestPublic("/ip/route");
+        if (Array.isArray(routes)) {
+            const dflt = routes.find((r: any) => r["dst-address"] === "0.0.0.0/0" && !r.disabled && r.active !== "false");
+            if (dflt?.interface) { wanInterface = dflt.interface; logger.info(`[PUSH-CONFIG] Detected WAN: ${wanInterface}`); }
+        }
+    } catch {}
+
     logger.info("[PUSH-CONFIG] Setting up NAT & Route...");
-    await runApi("LAN/POOL/HOTSPOT", "/ip/firewall/nat", "PUT", { chain: "srcnat", action: "masquerade", comment: "NAT for Internet - HQ INVESTMENT", "place-before": "0" }, true);
+    // Ensure WAN interface list exists and wanInterface is added
+    await runApiSafe("/interface/list", "PUT", { name: "WAN", comment: "HQ INVESTMENT WAN" });
+    try {
+        const listMembers = await service.apiRequestPublic("/interface/list/member");
+        const wanMember = Array.isArray(listMembers) ? listMembers.find((m: any) => m.list === "WAN" && m.interface === wanInterface) : null;
+        if (!wanMember) {
+            await runApiSafe("/interface/list/member", "PUT", { list: "WAN", interface: wanInterface, comment: "HQ INVESTMENT WAN port" });
+        }
+    } catch {}
+
+    await runApi("LAN/POOL/HOTSPOT", "/ip/firewall/nat", "PUT", { chain: "srcnat", action: "masquerade", "out-interface-list": "WAN", comment: "NAT for Internet - HQ INVESTMENT", "place-before": "0" }, true);
     await runApi("LAN/POOL/HOTSPOT", "/ip/route", "PUT", { "dst-address": `${subnetPrefix}.0/24`, gateway: "wg-hq", comment: "WireGuard route - HQ INVESTMENT" }, true);
 
     // -- STEP 7: RADIUS & CoA --------------------------------------------------
@@ -368,15 +405,6 @@ export async function executePushConfig(
 
     // -- STEP 8: Phased Firewall -----------------------------------------------
     logger.info("[PUSH-CONFIG] Phase 3: Applying phased firewall lockdown...");
-
-    let wanInterface = "ether1";
-    try {
-        const routes = await service.apiRequestPublic("/ip/route");
-        if (Array.isArray(routes)) {
-            const dflt = routes.find((r: any) => r["dst-address"] === "0.0.0.0/0" && !r.disabled && r.active !== "false");
-            if (dflt?.interface) { wanInterface = dflt.interface; logger.info(`[PUSH-CONFIG] Detected WAN: ${wanInterface}`); }
-        }
-    } catch {}
 
     const hqServerIp = process.env.SERVER_PUBLIC_IP || serverEndpoint;
     const isValidIp = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hqServerIp);
