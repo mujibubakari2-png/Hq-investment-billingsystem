@@ -20,6 +20,7 @@ describe('pushConfigExecutor', () => {
                     id: '1', name: 'Test', host: '10.0.0.2', tenantId: 't1',
                     wgPrivateKey: 'priv', wgPublicKey: 'pub', wgPresharedKey: 'psk',
                     radiusSecret: 'test-secret',
+                    username: 'admin', password: 'secret',
                     lanIp: '192.168.1.1/24', lanGateway: '192.168.1.1',
                     wgTunnelIp: '10.0.0.201'
                 }),

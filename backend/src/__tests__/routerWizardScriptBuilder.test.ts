@@ -282,8 +282,8 @@ describe('DEFECT-6: RADIUS IP distinct from VPN IP', () => {
 describe('Idempotency: repeated generation', () => {
     it('17. Building the same script twice produces identical output', () => {
         const params = minimalParams();
-        const script1 = buildRouterWizardScript(params);
-        const script2 = buildRouterWizardScript(params);
+        const script1 = buildRouterWizardScript(params).replace(/Generated: .*/, 'Generated: MOCKED');
+        const script2 = buildRouterWizardScript(params).replace(/Generated: .*/, 'Generated: MOCKED');
         expect(script1).toBe(script2);
     });
 
@@ -303,7 +303,11 @@ describe('DEFECT canonical: Preview = Download Script = canonical wizard RSC', (
     it('19. buildRouterWizardScript is deterministic (same inputs → same output)', () => {
         const params1 = minimalParams({ selectedInterfaces: ['ether2'] });
         const params2 = minimalParams({ selectedInterfaces: ['ether2'] });
-        expect(buildRouterWizardScript(params1)).toBe(buildRouterWizardScript(params2));
+        expect(
+            buildRouterWizardScript(params1).replace(/Generated: .*/, 'Generated: MOCKED')
+        ).toBe(
+            buildRouterWizardScript(params2).replace(/Generated: .*/, 'Generated: MOCKED')
+        );
     });
 
     it('Interface deduplication preserves order', () => {
