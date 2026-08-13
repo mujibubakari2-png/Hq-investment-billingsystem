@@ -200,10 +200,10 @@ model Router {
   name               String
   host               String
   // SEC-ROUTER-004 FIX: New routers now get a unique, randomly-generated
-  // username at creation time (see generateAdminUsername() in
-  // routerProvisioning.ts) instead of always defaulting to the literal
-  // "admin" — the @default("admin") below only applies to rows/paths that
-  // bypass the application layer (e.g. raw SQL, legacy rows).
+  // username: API login username for this router (e.g. "admin").
+  // This value is ALWAYS provided by the user when adding/editing a router.
+  // The system never auto-generates it. The @default("admin") below only
+  // applies to legacy rows inserted via raw SQL that bypassed the API.
   username           String?      @default("admin")
   password           String?
   // SEC-ROUTER-003 FIX: RADIUS shared secret is now a field SEPARATE from the
