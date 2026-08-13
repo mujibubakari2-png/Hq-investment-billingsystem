@@ -450,10 +450,14 @@ describe('WireGuard route', () => {
 
   // ── BUG FIX REGRESSION TESTS ────────────────────────────────────────────────
 
-  it('[BUG-FIX] push-config must NOT call /user PATCH when DB has no password (prevents credential drift → 401)', async () => {
+  it('[BUG-FIX] push-config throws ROUTER_CREDENTIALS_MISSING when DB has no credentials (prevents silent fallback drift → 401)', async () => {
     // ROOT CAUSE: old code used `password: router.password || "admin"`.
     // When DB password is null, this changed RouterOS admin password to "admin"
     // WITHOUT updating the DB, so next connection used "" → 401 forever.
+    //
+    // NEW BEHAVIOR (stronger): executePushConfig now THROWS ROUTER_CREDENTIALS_MISSING
+    // immediately when username or password is missing, so /user is never called at all.
+    // This is strictly safer than the previous "skip silently" behavior.
     const route = require('@/app/api/routers/[id]/wireguard/route');
     mockRequirePermission.mockReturnValue({
       error: null,
@@ -486,15 +490,7 @@ describe('WireGuard route', () => {
     });
 
     const service = {
-      apiRequestPublic: jest.fn().mockImplementation(async (ep: string, method?: string) => {
-        if (ep === '/interface/wireguard/peers' && (!method || method === 'GET')) {
-          return [{ "public-key": "server-public-key", interface: "wg-hq", "allowed-address": "10.200.0.0/24" }];
-        }
-        if (ep === '/ip/route' && (!method || method === 'GET')) {
-            return [{ "dst-address": "0.0.0.0/0", interface: "ether1", active: "true" }];
-        }
-        return [];
-      }),
+      apiRequestPublic: jest.fn().mockResolvedValue([]),
     };
     mockGetMikroTikService.mockResolvedValue(service);
 
@@ -509,15 +505,19 @@ describe('WireGuard route', () => {
     mockGetTenantClient.mockReturnValue(db);
 
     const { executePushConfig } = require('@/lib/pushConfigExecutor');
-    await executePushConfig('router-nodrift', 'tenant-a', { lanPorts: [] });
 
-    // CRITICAL: /user PATCH or PUT must NOT be called when DB has no credentials
-    // Calling it with "admin"/"admin" fallback would change RouterOS password
-    // without updating DB → permanent 401 on next connection
-    const userPatchCall = service.apiRequestPublic.mock.calls.find((call: any) =>
+    // CRITICAL: function must throw ROUTER_CREDENTIALS_MISSING, not silently complete.
+    // This hard stop is strictly safer than the old "skip /user call" behavior because
+    // it prevents any RouterOS config from being pushed with unknown auth context.
+    await expect(
+      executePushConfig('router-nodrift', 'tenant-a', { lanPorts: [] })
+    ).rejects.toThrow('ROUTER_CREDENTIALS_MISSING');
+
+    // /user PATCH or PUT must never be reached (thrown before it)
+    const userMutationCall = service.apiRequestPublic.mock.calls.find((call: any) =>
       call[0] === '/user' && (call[1] === 'PATCH' || call[1] === 'PUT')
     );
-    expect(userPatchCall).toBeUndefined();
+    expect(userMutationCall).toBeUndefined();
   });
 
   it('[BUG-FIX] push-config DOES update /user when DB has valid username AND password', async () => {

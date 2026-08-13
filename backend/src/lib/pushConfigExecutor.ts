@@ -31,7 +31,7 @@ function isForbiddenRadiusSecret(value: unknown): boolean {
     return typeof value === "string" && FORBIDDEN_RADIUS_SECRETS.has(value.trim());
 }
 
-interface StepResult { step: string; ok: boolean; error?: string; }
+interface StepResult { step: string; ok: boolean; error?: string; routerCommand?: string; }
 
 export interface PushConfigPayload {
     lanPorts?: string[];
@@ -48,6 +48,19 @@ export interface PushConfigResult {
     message: string;
     routerUnreachableAfterFirewall?: boolean;
     firewallRolledBack?: boolean;
+    /** The first RouterOS REST API call that failed, for precise error diagnosis. */
+    firstFailedCommand?: string;
+    /** Per-phase result matrix for structured status reporting. */
+    phaseMatrix?: {
+        identity: 'CONFIGURED' | 'FAILED';
+        vpn: 'HEALTHY' | 'PENDING' | 'UNREACHABLE' | 'FAILED';
+        bridge: 'CONFIGURED' | 'NOT_CONFIGURED' | 'FAILED';
+        dhcp: 'CONFIGURED' | 'NOT_CONFIGURED' | 'FAILED';
+        radius: 'CONFIGURED' | 'NOT_CONFIGURED' | 'FAILED';
+        hotspot: 'CONFIGURED' | 'NOT_CONFIGURED' | 'FAILED' | 'BLOCKED_BY_DEPENDENCY';
+        firewall: 'CONFIGURED' | 'NOT_CONFIGURED' | 'FAILED' | 'ROLLED_BACK';
+        overall: 'HEALTHY' | 'FAILED' | 'BLOCKED_BY_DEPENDENCY' | 'PARTIAL';
+    };
 }
 
 async function updateRouterWgFields(
@@ -82,6 +95,17 @@ export async function executePushConfig(
     });
     if (!rawRouter) throw new Error(`Router ${routerId} not found`);
     const router = decryptRouterFields(rawRouter) as typeof rawRouter;
+
+    // DEFECT-10 FIX: Never silently fall back to "admin" or empty password.
+    // Missing credentials are a hard stop — provisioning without known credentials
+    // risks configuring the router with no working management account.
+    if (!router.username || !router.username.trim()) {
+        throw new Error(`ROUTER_CREDENTIALS_MISSING: Router ${routerId} (${rawRouter.name ?? 'unknown'}) has no username configured. Set the username before running Auto-Push.`);
+    }
+    if (!router.password || !router.password.trim()) {
+        throw new Error(`ROUTER_CREDENTIALS_MISSING: Router ${routerId} (${rawRouter.name ?? 'unknown'}) has no password configured. Set the password before running Auto-Push.`);
+    }
+
     if (isForbiddenRadiusSecret(router.radiusSecret)) {
         throw new Error("RADIUS_SECRET_MISSING: Router has a placeholder or insecure RADIUS secret configured.");
     }
@@ -168,18 +192,19 @@ export async function executePushConfig(
     }
 
     // -- STEP 1: Basic setup ---------------------------------------------------
-    if (router.username && router.password) {
-        try {
-            const users = await service.apiRequestPublic("/user");
-            if (Array.isArray(users)) {
-                const ex = users.find((u: any) => u.name === router.username || u.name === "admin");
-                if (ex) {
-                    await service.apiRequestPublic("/user", "PATCH", { ".id": ex[".id"], name: router.username, password: router.password });
-                } else {
-                    await service.apiRequestPublic("/user", "PUT", { name: router.username, password: router.password, group: "full", comment: "Management User - DO NOT DELETE" });
-                }
+    // Credentials are guaranteed non-null/non-empty at this point (validated above).
+    try {
+        const users = await service.apiRequestPublic("/user");
+        if (Array.isArray(users)) {
+            const ex = users.find((u: any) => u.name === router.username || u.name === "admin");
+            if (ex) {
+                await service.apiRequestPublic("/user", "PATCH", { ".id": ex[".id"], name: router.username, password: router.password });
+            } else {
+                await service.apiRequestPublic("/user", "PUT", { name: router.username, password: router.password, group: "full", comment: "HQ INVESTMENT Management User - DO NOT DELETE" });
             }
-        } catch {}
+        }
+    } catch (e: any) {
+        logger.warn(`[PUSH-CONFIG] User account setup warning (non-fatal): ${e.message}`);
     }
     await runApi("MANAGEMENT", "/system/identity", "PATCH", { name: router.name });
     await runApi("MANAGEMENT", "/ip/dns", "PATCH", { servers: "8.8.8.8,8.8.4.4", "allow-remote-requests": "yes" });
@@ -424,7 +449,9 @@ export async function executePushConfig(
         { chain: "input", "in-interface": lanBridgeName, protocol: "tcp", "dst-port": "80,443", action: "accept", comment: "Allow Hotspot Captive Portal - HQ INVESTMENT" },
         { chain: "input", "in-interface": lanBridgeName, protocol: "udp", "dst-port": "67", action: "accept", comment: "Allow Hotspot DHCP - HQ INVESTMENT" },
         { chain: "input", "in-interface": lanBridgeName, protocol: "udp", "dst-port": "53", action: "accept", comment: "Allow Hotspot DNS - HQ INVESTMENT" },
-        { chain: "forward", "in-interface": "all-ppp", "out-interface": "ether1", action: "accept", comment: "Allow PPPoE to Internet - HQ INVESTMENT" },
+        // DEFECT-3 FIX: Use dynamically discovered wanInterface — never hardcode "ether1".
+        // wanInterface is resolved from the RouterOS default route earlier in this function.
+        { chain: "forward", "in-interface": "all-ppp", "out-interface": wanInterface, action: "accept", comment: "Allow PPPoE to Internet - HQ INVESTMENT" },
         { chain: "forward", "connection-state": "established,related", action: "accept", comment: "Allow Established Forward - HQ INVESTMENT" },
         { chain: "forward", "in-interface": "wg-hq", action: "accept", comment: "Allow WG traffic - HQ INVESTMENT" },
         { chain: "forward", "out-interface": "wg-hq", action: "accept", comment: "Allow WG return - HQ INVESTMENT" },
@@ -443,8 +470,8 @@ export async function executePushConfig(
             const vpnService = new MikroTikService({
                 host: tunnelIp || "",
                 port: router.apiPort || router.port || 8728,
-                username: router.username || "admin",
-                password: router.password || ""
+                username: router.username!,   // guaranteed non-null: validated at top of function
+                password: router.password!,   // guaranteed non-null: validated at top of function
             }, routerId, rawRouter?.tenantId || "");
             await vpnService.apiRequestPublic("/system/identity", "GET");
             return true;
@@ -539,6 +566,26 @@ export async function executePushConfig(
     // -- Audit log -------------------------------------------------------------
     const failedSteps = stepResults.filter(s => !s.ok);
     const hasCriticalFailure = criticalStepFailed || failedSteps.some(s => s.step.includes("WireGuard") || s.step.includes("Firewall") || s.step.includes("RADIUS"));
+    const firstFailedCommand = failedSteps.length > 0 ? (failedSteps[0].routerCommand || failedSteps[0].step) : undefined;
+
+    // Build per-phase result matrix for structured status reporting
+    const vpnStepOk = stepResults.find(s => s.step.startsWith("WireGuard"))?.ok ?? false;
+    const bridgeStepOk = stepResults.find(s => s.step.startsWith("BRIDGE"))?.ok ?? false;
+    const dhcpStepOk = !failedSteps.some(s => s.step.includes("dhcp-server"));
+    const radiusStepOk = !failedSteps.some(s => s.step.startsWith("RADIUS"));
+    const hotspotStepOk = !failedSteps.some(s => s.step.includes("hotspot"));
+    const firewallOk = !routerUnreachableAfterFirewall && !failedSteps.some(s => s.step.startsWith("Firewall"));
+    const phaseMatrix: PushConfigResult['phaseMatrix'] = {
+        identity: failedSteps.some(s => s.step.includes('identity')) ? 'FAILED' : 'CONFIGURED',
+        vpn: criticalStepFailed && !vpnStepOk ? 'FAILED' : vpnStepOk ? (tunnelVerified ? 'HEALTHY' : 'PENDING') : 'FAILED',
+        bridge: bridgeStepOk ? 'CONFIGURED' : criticalStepFailed ? 'FAILED' : 'NOT_CONFIGURED',
+        dhcp: dhcpStepOk ? 'CONFIGURED' : 'FAILED',
+        radius: radiusStepOk ? 'CONFIGURED' : 'FAILED',
+        hotspot: !bridgeStepOk ? 'BLOCKED_BY_DEPENDENCY' : hotspotStepOk ? 'CONFIGURED' : 'FAILED',
+        firewall: firewallRolledBack ? 'ROLLED_BACK' : firewallOk ? 'CONFIGURED' : 'FAILED',
+        overall: hasCriticalFailure ? 'FAILED' : failedSteps.length > 0 ? 'PARTIAL' : 'HEALTHY',
+    };
+
     await db.routerLog.create({
         data: {
             routerId,
@@ -558,6 +605,8 @@ export async function executePushConfig(
         stepDetails: failedSteps.length > 0 ? failedSteps : undefined,
         routerUnreachableAfterFirewall,
         firewallRolledBack,
+        firstFailedCommand,
+        phaseMatrix,
         message: hasCriticalFailure
             ? `Push-config completed with ${failedSteps.length} critical failure(s). Check step details and retry.`
             : firewallRolledBack
