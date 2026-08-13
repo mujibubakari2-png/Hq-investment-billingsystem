@@ -48,7 +48,13 @@ export interface RouterSetupWizardScriptParams {
   vpnMode?: string;
   vpnDns?: string;
   ipsecSecret?: string;
-  wgConfig?: { routerTunnelIp?: string | null } | null;
+  wgConfig?: {
+    routerTunnelIp?: string | null;
+    privateKey?: string | null;
+    peerPublicKey?: string | null;
+    serverEndpoint?: string | null;
+    listenPort?: number | null;
+  } | null;
   certName?: string;
   vpnManagementSubnet?: string | null;
   dnsServers?: string;
@@ -216,20 +222,20 @@ export function buildRouterWizardScript(params: RouterSetupWizardScriptParams): 
   const safeRouterName = sanitizeMikroTikName(normalized.routerName);
   const escapedRouterName = escapeMikroTikString(normalized.routerName);
 
-  const hsPoolName      = `hs-pool-${safeRouterName}`;
-  const pppoePoolName   = `pppoe-pool-${safeRouterName}`;
-  const pppoeProfile    = `pppoe-profile-${safeRouterName}`;
-  const hotspotProfile  = `hq-hotspot-${safeRouterName}`;
-  const vpnPoolName     = `vpn-pool-${safeRouterName}`;
-  const vpnProfile      = `vpn-profile-${safeRouterName}`;
-  const targetBridge    = `bridge-${safeRouterName}`;
-  const dnsServers      = normalized.dnsServers || '8.8.8.8,8.8.4.4';
+  const hsPoolName = `hs-pool-${safeRouterName}`;
+  const pppoePoolName = `pppoe-pool-${safeRouterName}`;
+  const pppoeProfile = `pppoe-profile-${safeRouterName}`;
+  const hotspotProfile = `hq-hotspot-${safeRouterName}`;
+  const vpnPoolName = `vpn-pool-${safeRouterName}`;
+  const vpnProfile = `vpn-profile-${safeRouterName}`;
+  const targetBridge = `bridge-${safeRouterName}`;
+  const dnsServers = normalized.dnsServers || '8.8.8.8,8.8.4.4';
 
-  const hotspotPrefix  = normalized.hotspotLocalAddress
+  const hotspotPrefix = normalized.hotspotLocalAddress
     ? normalized.hotspotLocalAddress.split('.').slice(0, 3).join('.')
     : '';
   const hotspotNetwork = hotspotPrefix ? `${hotspotPrefix}.0/24` : '';
-  const hotspotCidr    = normalized.hotspotLocalAddress
+  const hotspotCidr = normalized.hotspotLocalAddress
     ? `${normalized.hotspotLocalAddress}/24`
     : '';
 
@@ -315,38 +321,57 @@ export function buildRouterWizardScript(params: RouterSetupWizardScriptParams): 
     '# ===== PHASE 1c: Firewall ACCEPT Rules =====',
     '# DEFECT-4 FIX: DROP WAN is NOT applied here.',
     '# It is deferred to PHASE 9 and is conditional on wg-hq existing and verified.',
+    '# ===== Basic Stateful Firewall Rules =====',
+    ':if ([:len [/ip firewall filter find where comment="HQ: accept established input"]] = 0) do={',
+    '    /ip firewall filter add chain=input action=accept connection-state=established,related,untracked comment="HQ: accept established input"',
+    '}',
+    ':if ([:len [/ip firewall filter find where comment="HQ: drop invalid input"]] = 0) do={',
+    '    /ip firewall filter add chain=input action=drop connection-state=invalid comment="HQ: drop invalid input"',
+    '}',
+    ':if ([:len [/ip firewall filter find where comment="HQ: accept ICMP"]] = 0) do={',
+    '    /ip firewall filter add chain=input action=accept protocol=icmp comment="HQ: accept ICMP"',
+    '}',
+    ':if ([:len [/ip firewall filter find where comment="HQ: fasttrack forward"]] = 0) do={',
+    '    /ip firewall filter add chain=forward action=fasttrack-connection connection-state=established,related comment="HQ: fasttrack forward"',
+    '}',
+    ':if ([:len [/ip firewall filter find where comment="HQ: accept established forward"]] = 0) do={',
+    '    /ip firewall filter add chain=forward action=accept connection-state=established,related,untracked comment="HQ: accept established forward"',
+    '}',
+    ':if ([:len [/ip firewall filter find where comment="HQ: drop invalid forward"]] = 0) do={',
+    '    /ip firewall filter add chain=forward action=drop connection-state=invalid comment="HQ: drop invalid forward"',
+    '}',
     ...(normalized.vpnManagementSubnet
       ? [
-          ':if ([:len [/ip firewall filter find where comment="Allow HQ INVESTMENT API Access (VPN only)"]] = 0) do={',
-          `    /ip firewall filter add chain=input action=accept protocol=tcp dst-port=80,443,8291 src-address=${normalized.vpnManagementSubnet} comment="Allow HQ INVESTMENT API Access (VPN only)"`,
-          '}',
-        ]
+        ':if ([:len [/ip firewall filter find where comment="Allow HQ INVESTMENT API Access (VPN only)"]] = 0) do={',
+        `    /ip firewall filter add chain=input action=accept protocol=tcp dst-port=80,443,8291 src-address=${normalized.vpnManagementSubnet} comment="Allow HQ INVESTMENT API Access (VPN only)"`,
+        '}',
+      ]
       : [
-          '# vpnManagementSubnet not set — skipping VPN-source accept rule.',
-          '# Configure WireGuard and re-generate to add the VPN-only management accept.',
-        ]),
+        '# vpnManagementSubnet not set — skipping VPN-source accept rule.',
+        '# Configure WireGuard and re-generate to add the VPN-only management accept.',
+      ]),
     '',
 
     // ── PHASE 4: Bridge Setup ─────────────────────────────────────────────────
     '# ===== PHASE 4: LAN Bridge =====',
     ...(hasBridgeInterfaces
       ? [
-          // DEFECT-1 FIX: :local targetBridge declared ONLY in this branch.
-          `:local targetBridge "${targetBridge}"`,
-          `:if ([:len [/interface bridge find where name=$targetBridge]] = 0) do={ /interface bridge add name=$targetBridge protocol-mode=none arp=enabled vlan-filtering=no comment="HQ Investment Bridge" }`,
-          `:if ([:len [/interface bridge find where name=$targetBridge]] > 0) do={ /interface bridge set [find name=$targetBridge] protocol-mode=none arp=enabled vlan-filtering=no }`,
-          ...normalized.selectedInterfaces.map(
-            (iface) =>
-              `:if ([:len [/interface bridge port find where interface="${iface}"]] = 0) do={ /interface bridge port add bridge=$targetBridge interface=${iface} comment="HQ LAN port" }`,
-          ),
-        ]
+        // DEFECT-1 FIX: :local targetBridge declared ONLY in this branch.
+        `:local targetBridge "${targetBridge}"`,
+        `:if ([:len [/interface bridge find where name=$targetBridge]] = 0) do={ /interface bridge add name=$targetBridge protocol-mode=none arp=enabled vlan-filtering=no comment="HQ Investment Bridge" }`,
+        `:if ([:len [/interface bridge find where name=$targetBridge]] > 0) do={ /interface bridge set [find name=$targetBridge] protocol-mode=none arp=enabled vlan-filtering=no }`,
+        ...normalized.selectedInterfaces.map(
+          (iface) =>
+            `:if ([:len [/interface bridge port find where interface="${iface}"]] = 0) do={ /interface bridge port add bridge=$targetBridge interface=${iface} comment="HQ LAN port" }`,
+        ),
+      ]
       : [
-          // DEFECT-1 FIX: No targetBridge variable is declared — no variable will be referenced.
-          '# BLOCKED_BY_DEPENDENCY: No LAN interfaces were selected.',
-          '# Bridge creation is skipped. The targetBridge variable is NOT declared in this script.',
-          '# Hotspot, PPPoE, DHCP, RADIUS, and Walled Garden sections are omitted below.',
-          '# Select at least one LAN interface in the Router Setup Wizard and re-generate.',
-        ]),
+        // DEFECT-1 FIX: No targetBridge variable is declared — no variable will be referenced.
+        '# BLOCKED_BY_DEPENDENCY: No LAN interfaces were selected.',
+        '# Bridge creation is skipped. The targetBridge variable is NOT declared in this script.',
+        '# Hotspot, PPPoE, DHCP, RADIUS, and Walled Garden sections are omitted below.',
+        '# Select at least one LAN interface in the Router Setup Wizard and re-generate.',
+      ]),
     '',
 
     // ── PHASE 5+7: Hotspot / PPPoE / DHCP — gated on hasBridgeInterfaces ─────
@@ -355,103 +380,134 @@ export function buildRouterWizardScript(params: RouterSetupWizardScriptParams): 
     '',
     ...(hasBridgeInterfaces
       ? [
-          // PPPoE server
-          ...(normalized.serviceType === 'pppoe' || normalized.serviceType === 'both'
-            ? [
-                '# ===== PPPoE Server =====',
-                `:if ([:len [/ip pool find where name="${pppoePoolName}"]] = 0) do={ /ip pool add name="${pppoePoolName}" ranges=${normalized.pppoePoolStart}-${normalized.pppoePoolEnd} }`,
-                `/ppp profile add name="${pppoeProfile}" local-address=${normalized.pppoeLocalAddress} dns-server=${dnsServers} use-compression=no use-encryption=yes use-radius=yes`,
-                `/interface pppoe-server server add service-name="hq-pppoe-${safeRouterName}" interface=$targetBridge default-profile="${pppoeProfile}" authentication=mschapv2 one-session-per-host=yes disabled=no`,
-                ':if ([:len [/ip firewall filter find where comment="Allow PPPoE to Internet"]] = 0) do={',
-                '    /ip firewall filter add chain=forward in-interface=all-ppp out-interface-list=WAN action=accept comment="Allow PPPoE to Internet"',
-                '}',
+        // PPPoE server
+        ...(normalized.serviceType === 'pppoe' || normalized.serviceType === 'both'
+          ? [
+            '# ===== PPPoE Server =====',
+            `:if ([:len [/ip pool find where name="${pppoePoolName}"]] = 0) do={ /ip pool add name="${pppoePoolName}" ranges=${normalized.pppoePoolStart}-${normalized.pppoePoolEnd} }`,
+            `/ppp profile add name="${pppoeProfile}" local-address=${normalized.pppoeLocalAddress} dns-server=${dnsServers} use-compression=no use-encryption=yes use-radius=yes`,
+            `/interface pppoe-server server add service-name="hq-pppoe-${safeRouterName}" interface=$targetBridge default-profile="${pppoeProfile}" authentication=mschapv2 one-session-per-host=yes disabled=no`,
+            ':if ([:len [/ip firewall filter find where comment="Allow PPPoE to Internet"]] = 0) do={',
+            '    /ip firewall filter add chain=forward in-interface=all-ppp out-interface-list=WAN action=accept comment="Allow PPPoE to Internet"',
+            '}',
+          ]
+          : []),
+        // Hotspot server
+        ...(normalized.serviceType === 'hotspot' || normalized.serviceType === 'both'
+          ? [
+            '',
+            '# ===== Hotspot Server =====',
+            `:if ([:len [/ip pool find where name="${hsPoolName}"]] = 0) do={ /ip pool add name="${hsPoolName}" ranges=${normalized.hotspotPoolStart}-${normalized.hotspotPoolEnd} }`,
+            `:if ([:len [/ip hotspot profile find where name="${hotspotProfile}"]] = 0) do={ /ip hotspot profile add name="${hotspotProfile}" hotspot-address=${normalized.hotspotLocalAddress} html-directory=hotspot login-by=http-chap,https,cookie use-radius=yes }`,
+            `:if ([:len [/ip address find where interface=$targetBridge]] = 0) do={ /ip address add address=${hotspotCidr} interface=$targetBridge }`,
+            `:if ([:len [/ip hotspot find where name="hq-hotspot-${safeRouterName}"]] = 0) do={ /ip hotspot add name="hq-hotspot-${safeRouterName}" interface=$targetBridge address-pool="${hsPoolName}" profile="${hotspotProfile}" disabled=no } else={ /ip hotspot set [find name="hq-hotspot-${safeRouterName}"] interface=$targetBridge address-pool="${hsPoolName}" profile="${hotspotProfile}" disabled=no }`,
+            ...(hotspotNetwork
+              ? [
+                `:if ([:len [/ip dhcp-server network find where address="${hotspotNetwork}"]] = 0) do={ /ip dhcp-server network add address=${hotspotNetwork} gateway=${normalized.hotspotLocalAddress} dns-server=${dnsServers} } else={ /ip dhcp-server network set [find where address="${hotspotNetwork}"] gateway=${normalized.hotspotLocalAddress} dns-server=${dnsServers} }`,
               ]
-            : []),
-          // Hotspot server
-          ...(normalized.serviceType === 'hotspot' || normalized.serviceType === 'both'
-            ? [
-                '',
-                '# ===== Hotspot Server =====',
-                `:if ([:len [/ip pool find where name="${hsPoolName}"]] = 0) do={ /ip pool add name="${hsPoolName}" ranges=${normalized.hotspotPoolStart}-${normalized.hotspotPoolEnd} }`,
-                `:if ([:len [/ip hotspot profile find where name="${hotspotProfile}"]] = 0) do={ /ip hotspot profile add name="${hotspotProfile}" hotspot-address=${normalized.hotspotLocalAddress} html-directory=hotspot login-by=http-chap,https,cookie use-radius=yes }`,
-                `:if ([:len [/ip address find where interface=$targetBridge]] = 0) do={ /ip address add address=${hotspotCidr} interface=$targetBridge }`,
-                `:if ([:len [/ip hotspot find where name="hq-hotspot-${safeRouterName}"]] = 0) do={ /ip hotspot add name="hq-hotspot-${safeRouterName}" interface=$targetBridge address-pool="${hsPoolName}" profile="${hotspotProfile}" disabled=no } else={ /ip hotspot set [find name="hq-hotspot-${safeRouterName}"] interface=$targetBridge address-pool="${hsPoolName}" profile="${hotspotProfile}" disabled=no }`,
-                ...(hotspotNetwork
-                  ? [
-                      `:if ([:len [/ip dhcp-server network find where address="${hotspotNetwork}"]] = 0) do={ /ip dhcp-server network add address=${hotspotNetwork} gateway=${normalized.hotspotLocalAddress} dns-server=${dnsServers} } else={ /ip dhcp-server network set [find where address="${hotspotNetwork}"] gateway=${normalized.hotspotLocalAddress} dns-server=${dnsServers} }`,
-                    ]
-                  : []),
-                `:if ([:len [/ip dhcp-server find where name="dhcp-${safeRouterName}"]] = 0) do={ /ip dhcp-server add name="dhcp-${safeRouterName}" interface=$targetBridge address-pool="${hsPoolName}" lease-time=1h disabled=no } else={ /ip dhcp-server set [find where name="dhcp-${safeRouterName}"] interface=$targetBridge address-pool="${hsPoolName}" lease-time=1h disabled=no }`,
-              ]
-            : []),
-        ]
+              : []),
+            `:if ([:len [/ip dhcp-server find where name="dhcp-${safeRouterName}"]] = 0) do={ /ip dhcp-server add name="dhcp-${safeRouterName}" interface=$targetBridge address-pool="${hsPoolName}" lease-time=1h disabled=no } else={ /ip dhcp-server set [find where name="dhcp-${safeRouterName}"] interface=$targetBridge address-pool="${hsPoolName}" lease-time=1h disabled=no }`,
+          ]
+          : []),
+      ]
       : [
-          // DEFECT-2 FIX: No $targetBridge reference emitted here.
-          '# BLOCKED_BY_DEPENDENCY: Hotspot/PPPoE/DHCP skipped — no bridge configured.',
-        ]),
+        // DEFECT-2 FIX: No $targetBridge reference emitted here.
+        '# BLOCKED_BY_DEPENDENCY: Hotspot/PPPoE/DHCP skipped — no bridge configured.',
+      ]),
+    '',
+    '# ===== NAT Masquerade =====',
+    ':if ([:len [/ip firewall nat find where comment="HQ INVESTMENT NAT"]] = 0) do={',
+    '    /ip firewall nat add chain=srcnat action=masquerade out-interface-list=WAN comment="HQ INVESTMENT NAT"',
+    '}',
+    '',
+    // ── WireGuard VPN (HQ INVESTMENT) ─────────────────────────────────────────
+    ...(normalized.wgConfig?.privateKey && normalized.wgConfig?.peerPublicKey && normalized.wgConfig?.routerTunnelIp
+      ? [
+        '# ===== WireGuard VPN =====',
+        `:if ([:len [/interface wireguard find name="wg-hq"]] = 0) do={`,
+        `    /interface wireguard add name=wg-hq listen-port=${normalized.wgConfig.listenPort || 51820} private-key="${normalized.wgConfig.privateKey}" comment="HQ INVESTMENT VPN Interface"`,
+        `} else={`,
+        `    /interface wireguard set [find name="wg-hq"] private-key="${normalized.wgConfig.privateKey}"`,
+        `}`,
+        `:if ([:len [/interface list member find list="hq-mgmt" interface="wg-hq"]] = 0) do={`,
+        `    /interface list member add list="hq-mgmt" interface="wg-hq" comment="HQ INVESTMENT VPN management"`,
+        `}`,
+        `:foreach addr in=[/ip address find interface="wg-hq"] do={ /ip address remove $addr }`,
+        `/ip address add address="${normalized.wgConfig.routerTunnelIp}/24" interface=wg-hq comment="HQ INVESTMENT VPN Address"`,
+        `:if ([:len [/interface wireguard peers find interface="wg-hq" public-key="${normalized.wgConfig.peerPublicKey}"]] = 0) do={`,
+        `    /interface wireguard peers add interface=wg-hq public-key="${normalized.wgConfig.peerPublicKey}" allowed-address="${normalized.wgConfig.routerTunnelIp.split('.').slice(0, 3).join('.')}.0/24" endpoint-address="${normalized.wgConfig.serverEndpoint || 'YOUR_SERVER_IP'}" endpoint-port=${normalized.wgConfig.listenPort || 51820} persistent-keepalive=25s comment="HQ INVESTMENT ISP Server"`,
+        `} else={`,
+        `    /interface wireguard peers set [find interface="wg-hq" public-key="${normalized.wgConfig.peerPublicKey}"] allowed-address="${normalized.wgConfig.routerTunnelIp.split('.').slice(0, 3).join('.')}.0/24" endpoint-address="${normalized.wgConfig.serverEndpoint || 'YOUR_SERVER_IP'}" endpoint-port=${normalized.wgConfig.listenPort || 51820} persistent-keepalive=25s`,
+        `}`,
+        `:if ([:len [/ip route find dst-address="${normalized.wgConfig.routerTunnelIp.split('.').slice(0, 3).join('.')}.0/24" gateway="wg-hq"]] = 0) do={`,
+        `    /ip route add dst-address="${normalized.wgConfig.routerTunnelIp.split('.').slice(0, 3).join('.')}.0/24" gateway=wg-hq comment="WireGuard route - HQ INVESTMENT"`,
+        `}`,
+        '/log info "WireGuard VPN configured — handshake will initiate via persistent-keepalive=25s"',
+      ]
+      : []),
     '',
 
     // ── L2TP/PPP VPN server (optional user VPN — distinct from WireGuard) ─────
     ...(normalized.vpnEnabled &&
-    normalized.vpnProtocol &&
-    normalized.vpnPoolStart &&
-    normalized.vpnPoolEnd
+      normalized.vpnProtocol &&
+      normalized.vpnPoolStart &&
+      normalized.vpnPoolEnd
       ? [
-          '# ===== VPN Server (L2TP/PPP) =====',
-          ...(normalized.vpnProtocol === 'L2TP' || normalized.vpnMode === 'hybrid'
-            ? [
-                `/ip pool add name="${vpnPoolName}" ranges=${normalized.vpnPoolStart}-${normalized.vpnPoolEnd}`,
-                `/ppp profile add name="${vpnProfile}" local-address=${normalized.pppoeLocalAddress || normalized.hotspotLocalAddress} remote-address="${vpnPoolName}" dns-server=${normalized.vpnDns ?? '8.8.8.8'}`,
-                `/interface l2tp-server server set enabled=yes use-ipsec=yes ipsec-secret="${normalized.ipsecSecret ?? ''}" default-profile="${vpnProfile}"`,
-              ]
-            : []),
-          ...((normalized.vpnSecrets ?? []).length > 0
-            ? (normalized.vpnSecrets ?? []).map(
-                (s) =>
-                  `/ppp secret add name="${s.username}" password="${s.password}" service=${(s.protocol ?? normalized.vpnProtocol ?? 'l2tp').toLowerCase()} profile="${vpnProfile}"${s.localAddress ? ` local-address=${s.localAddress}` : ''}${s.remoteAddress ? ` remote-address=${s.remoteAddress}` : ''}`,
-              )
-            : []),
-        ]
+        '# ===== VPN Server (L2TP/PPP) =====',
+        ...(normalized.vpnProtocol === 'L2TP' || normalized.vpnMode === 'hybrid'
+          ? [
+            `/ip pool add name="${vpnPoolName}" ranges=${normalized.vpnPoolStart}-${normalized.vpnPoolEnd}`,
+            `/ppp profile add name="${vpnProfile}" local-address=${normalized.pppoeLocalAddress || normalized.hotspotLocalAddress} remote-address="${vpnPoolName}" dns-server=${normalized.vpnDns ?? '8.8.8.8'}`,
+            `/interface l2tp-server server set enabled=yes use-ipsec=yes ipsec-secret="${normalized.ipsecSecret ?? ''}" default-profile="${vpnProfile}"`,
+          ]
+          : []),
+        ...((normalized.vpnSecrets ?? []).length > 0
+          ? (normalized.vpnSecrets ?? []).map(
+            (s) =>
+              `/ppp secret add name="${s.username}" password="${s.password}" service=${(s.protocol ?? normalized.vpnProtocol ?? 'l2tp').toLowerCase()} profile="${vpnProfile}"${s.localAddress ? ` local-address=${s.localAddress}` : ''}${s.remoteAddress ? ` remote-address=${s.remoteAddress}` : ''}`,
+          )
+          : []),
+      ]
       : []),
     '',
 
     // ── PHASE 6: RADIUS Client ────────────────────────────────────────────────
     ...(hasBridgeInterfaces
       ? [
-          '# ===== PHASE 6: RADIUS Client =====',
-          `:if ([:len [/radius find where address="${normalized.radiusAddress}"]] = 0) do={`,
-          `  /radius add service=hotspot,ppp address=${normalized.radiusAddress} secret="${normalized.radiusSecret}" authentication-port=1812 accounting-port=1813 timeout=3s`,
-          '}',
-          '/radius incoming set accept=yes port=3799',
-          '/ppp aaa set use-radius=yes accounting=yes',
-          '',
-        ]
+        '# ===== PHASE 6: RADIUS Client =====',
+        `:if ([:len [/radius find where address="${normalized.radiusAddress}"]] = 0) do={`,
+        `  /radius add service=hotspot,ppp address=${normalized.radiusAddress} secret="${normalized.radiusSecret}" authentication-port=1812 accounting-port=1813 timeout=3s`,
+        '}',
+        '/radius incoming set accept=yes port=3799',
+        '/ppp aaa set use-radius=yes accounting=yes',
+        '',
+      ]
       : [
-          '# BLOCKED_BY_DEPENDENCY: RADIUS skipped — no bridge configured.',
-          '',
-        ]),
+        '# BLOCKED_BY_DEPENDENCY: RADIUS skipped — no bridge configured.',
+        '',
+      ]),
 
     // ── PHASE 8: Walled Garden ────────────────────────────────────────────────
     ...(hasBridgeInterfaces
       ? [
-          '# ===== PHASE 8: Walled Garden =====',
-          `:if ([:len [/ip hotspot walled-garden find where dst-host="${normalized.apiHost}"]] = 0) do={ /ip hotspot walled-garden add dst-host="${normalized.apiHost}" action=allow comment="Billing Portal" }`,
-          `:if ([:len [/ip hotspot walled-garden ip find where dst-address="${normalized.hotspotLocalAddress}"]] = 0) do={ /ip hotspot walled-garden ip add dst-address="${normalized.hotspotLocalAddress}" action=accept comment="Hotspot Gateway" }`,
-          `:if ([:len [/ip hotspot walled-garden ip find where dst-address="${normalized.radiusAddress}"]] = 0) do={ /ip hotspot walled-garden ip add dst-address="${normalized.radiusAddress}" action=accept comment="Billing Portal IP" }`,
-          ...(normalized.wgConfig?.routerTunnelIp
-            ? [
-                `:if ([:len [/ip hotspot walled-garden ip find where dst-address="${normalized.wgConfig.routerTunnelIp.split('.').slice(0, 3).join('.')}.0/24"]] = 0) do={ /ip hotspot walled-garden ip add dst-address="${normalized.wgConfig.routerTunnelIp.split('.').slice(0, 3).join('.')}.0/24" action=accept comment="VPN Subnet" }`,
-              ]
-            : []),
-          // DEFECT-5 FIX: buildHotspotFlowEnforcementLines called ONLY here,
-          // inside the hasBridgeInterfaces guard. $targetBridge is in scope.
-          ...buildHotspotFlowEnforcementLines('$targetBridge'),
-          '',
-        ]
+        '# ===== PHASE 8: Walled Garden =====',
+        `:if ([:len [/ip hotspot walled-garden find where dst-host="${normalized.apiHost}"]] = 0) do={ /ip hotspot walled-garden add dst-host="${normalized.apiHost}" action=allow comment="Billing Portal" }`,
+        `:if ([:len [/ip hotspot walled-garden ip find where dst-address="${normalized.hotspotLocalAddress}"]] = 0) do={ /ip hotspot walled-garden ip add dst-address="${normalized.hotspotLocalAddress}" action=accept comment="Hotspot Gateway" }`,
+        `:if ([:len [/ip hotspot walled-garden ip find where dst-address="${normalized.radiusAddress}"]] = 0) do={ /ip hotspot walled-garden ip add dst-address="${normalized.radiusAddress}" action=accept comment="Billing Portal IP" }`,
+        ...(normalized.wgConfig?.routerTunnelIp
+          ? [
+            `:if ([:len [/ip hotspot walled-garden ip find where dst-address="${normalized.wgConfig.routerTunnelIp.split('.').slice(0, 3).join('.')}.0/24"]] = 0) do={ /ip hotspot walled-garden ip add dst-address="${normalized.wgConfig.routerTunnelIp.split('.').slice(0, 3).join('.')}.0/24" action=accept comment="VPN Subnet" }`,
+          ]
+          : []),
+        // DEFECT-5 FIX: buildHotspotFlowEnforcementLines called ONLY here,
+        // inside the hasBridgeInterfaces guard. $targetBridge is in scope.
+        ...buildHotspotFlowEnforcementLines('$targetBridge'),
+        '',
+      ]
       : [
-          '# BLOCKED_BY_DEPENDENCY: Walled Garden skipped — no bridge configured.',
-          '',
-        ]),
+        '# BLOCKED_BY_DEPENDENCY: Walled Garden skipped — no bridge configured.',
+        '',
+      ]),
 
     // ── PHASE 9: DROP WAN — FINAL, only when WireGuard is confirmed ───────────
     '# ===== PHASE 9: Restrictive WAN Firewall (conditional on wg-hq) =====',
@@ -481,8 +537,8 @@ export function buildRouterWizardScript(params: RouterSetupWizardScriptParams): 
     ...(hasBridgeInterfaces
       ? []
       : [
-          '/log warning "HQ INVESTMENT: Hotspot/PPPoE services were NOT configured (BLOCKED_BY_DEPENDENCY: no LAN interfaces selected)."',
-        ]),
+        '/log warning "HQ INVESTMENT: Hotspot/PPPoE services were NOT configured (BLOCKED_BY_DEPENDENCY: no LAN interfaces selected)."',
+      ]),
   ];
 
   return lines.filter((line) => line !== '').join('\n');

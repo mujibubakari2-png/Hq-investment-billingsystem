@@ -188,7 +188,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
             pppoePoolEnd: router.pppoePoolRange ? router.pppoePoolRange.split("-")[1] : "",
             radiusAddress: radiusServerIp,
             radiusSecret: router.radiusSecret || "",
-            wgConfig: { routerTunnelIp: router.wgTunnelIp },
+            wgConfig: { 
+                routerTunnelIp: router.wgTunnelIp,
+                privateKey: router.wgPrivateKey,
+                peerPublicKey: router.wgPeerPublicKey,
+                serverEndpoint: router.wgServerEndpoint ? router.wgServerEndpoint : (serverUrl ? (function() { try { return new URL(serverUrl).hostname; } catch(e) { return null; } })() : null),
+                listenPort: router.wgListenPort || 51820
+            },
             certName: "hq-hotspot-cert",
             vpnManagementSubnet: vpnSubnet,
             dnsServers: router.dns || "",
