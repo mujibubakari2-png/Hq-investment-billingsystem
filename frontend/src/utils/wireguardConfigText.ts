@@ -78,7 +78,7 @@ export function buildWireGuardConfigText(params: WireGuardConfigTextParams): str
     //
     const serverPeerHostRoute = `${routerTunnelIp}/32`;
 
-    if (params.mode === 'server') {
+    if (params.mode === 'client') {
         return `# ═══════════════════════════════════════════════════════════════
 # MikroTik RouterOS WireGuard config (ROUTER side)
 # For Router: ${params.routerName} (${params.routerId})
