@@ -71,6 +71,7 @@ describe('router creation route', () => {
       body: JSON.stringify({
         name: 'Router A',
         host: '10.0.0.1',
+        username: 'mikrotik-admin-a',
         password: 'supersecret',
       }),
     });
@@ -89,6 +90,64 @@ describe('router creation route', () => {
       data: expect.objectContaining({
         tenantId: 'tenant-a',
         action: 'router_created',
+      }),
+    }));
+  });
+
+  it('uses the exact UI-provided username instead of auto-generating one', async () => {
+    const route = require('@/app/api/routers/route');
+    mockRequirePermission.mockReturnValue({
+      error: null,
+      user: { id: 'admin-2', userId: 'admin-2', role: 'ADMIN', tenantId: 'tenant-c' },
+    });
+
+    const db = {
+      router: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockResolvedValue({
+          id: 'router-3',
+          name: 'Router C',
+          host: '10.0.0.3',
+          tenantId: 'tenant-c',
+          username: 'mikrotik-admin',
+          radiusSecret: 'encrypted-secret',
+          status: 'OFFLINE',
+          apiPort: 8728,
+        }),
+      },
+      tenant: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'tenant-c',
+          plan: { maxRouters: 5 },
+          routers: [],
+        }),
+      },
+      radiusNas: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockResolvedValue({}),
+      },
+      routerLog: {
+        create: jest.fn().mockResolvedValue({}),
+      },
+    };
+    mockGetTenantClient.mockReturnValue(db);
+
+    const req = new NextRequest('http://localhost/api/routers', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: 'Router C',
+        host: '10.0.0.3',
+        username: 'mikrotik-admin',
+        password: 'supersecret',
+      }),
+    });
+
+    const res = await route.POST(req);
+
+    expect(res.status).toBe(201);
+    expect(db.router.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        username: 'mikrotik-admin',
       }),
     }));
   });
@@ -136,6 +195,7 @@ describe('router creation route', () => {
         tenantId: 'tenant-b',
         name: 'Router B',
         host: '10.0.0.2',
+        username: 'mikrotik-admin-b',
         password: 'supersecret',
       }),
     });
@@ -303,6 +363,7 @@ describe('router creation route', () => {
         tenantId: 'tenant-d',
         name: 'Router C',
         host: '10.0.0.3',
+        username: 'mikrotik-admin-c',
         password: 'supersecret',
       }),
     });
