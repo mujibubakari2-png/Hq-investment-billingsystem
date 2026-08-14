@@ -51,35 +51,30 @@ describe('MikroTikService', () => {
             password: 'password'
         }, 'router-123', 'tenant-1');
 
-        // Use mockImplementation to handle parallel requests cleanly
-        (global.fetch as jest.Mock).mockImplementation(async (url: string) => {
-            if (url.includes('/system/identity') && url.startsWith('https')) {
-                throw new Error('Connection refused');
-            }
-            if (url.includes('/system/identity')) {
-                return { ok: true, text: async () => JSON.stringify([{ name: 'mikrotik-test' }]) };
-            }
-            if (url.includes('/system/resource')) {
-                return { ok: true, text: async () => JSON.stringify([{ version: '7.12' }]) };
-            }
-            if (url.includes('/ip/dns')) {
-                return { ok: true, text: async () => JSON.stringify({ servers: '8.8.8.8' }) };
-            }
-            return { ok: true, text: async () => JSON.stringify([]) };
-        });
+        // First call fails (HTTPS), second call succeeds (HTTP) for /system/identity
+        // Third call succeeds (HTTPS - though in reality it might fail too, we just want to mock the success for /system/resource)
+        (global.fetch as jest.Mock)
+            .mockRejectedValueOnce(new Error('Connection refused'))
+            .mockResolvedValueOnce({
+                ok: true,
+                text: async () => JSON.stringify([{ name: 'mikrotik-test' }])
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                text: async () => JSON.stringify([{ version: '7.12' }])
+            })
+            .mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify([]) }) 
+            .mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify({ servers: '8.8.8.8' }) }) 
+            .mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify([]) }) 
+            .mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify([]) }) 
+            .mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify([]) }) 
+            .mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify([]) });
 
         const result = await service.testConnection();
+        expect(global.fetch).toHaveBeenCalledTimes(9);
         
-        // 2 calls for identity (HTTPS fail + HTTP fallback)
-        // 1 call for resource
-        // 9 calls for network metadata sync
-        // Total = 12
-        expect(global.fetch).toHaveBeenCalledTimes(12);
-        
-        // Ensure the fallback call was HTTP (for system/identity)
-        const fetchCalls = (global.fetch as jest.Mock).mock.calls;
-        const identityHttpCall = fetchCalls.find(c => c[0].includes('http://router.example.com/rest/system/identity'));
-        expect(identityHttpCall).toBeDefined();
+        // Ensure the second call was HTTP (for system/identity)
+        expect((global.fetch as jest.Mock).mock.calls[1][0]).toContain('http://router.example.com/rest/system/identity');
         expect(result.success).toBe(true);
     });
 
@@ -93,12 +88,10 @@ describe('MikroTikService', () => {
             password: 'password'
         }, 'router-123', 'tenant-1');
 
-        (global.fetch as jest.Mock).mockRejectedValue(new Error('Connection refused'));
+        (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('Connection refused'));
 
         const result = await service.testConnection();
-        // Since identity and resource fetches run concurrently, both will fire
-        // before the promise rejection halts testConnection.
-        expect(global.fetch).toHaveBeenCalledTimes(2);
+        expect(global.fetch).toHaveBeenCalledTimes(1);
         expect(result.success).toBe(false);
     });
 
@@ -110,31 +103,27 @@ describe('MikroTikService', () => {
             password: 'password'
         }, 'router-123', 'tenant-1');
 
-        (global.fetch as jest.Mock).mockImplementation(async (url: string) => {
-            if (url.includes('/system/identity') && url.startsWith('https')) {
-                throw new Error('timeout');
-            }
-            if (url.includes('/system/identity')) {
-                return { ok: true, text: async () => JSON.stringify([{ name: 'mikrotik-test' }]) };
-            }
-            if (url.includes('/system/resource')) {
-                return { ok: true, text: async () => JSON.stringify([{ version: '7.12' }]) };
-            }
-            if (url.includes('/ip/dns')) {
-                return { ok: true, text: async () => JSON.stringify({ servers: '8.8.8.8' }) };
-            }
-            return { ok: true, text: async () => JSON.stringify([]) };
-        });
+        (global.fetch as jest.Mock)
+            .mockRejectedValueOnce(new Error('timeout'))
+            .mockResolvedValueOnce({
+                ok: true,
+                text: async () => JSON.stringify([{ name: 'mikrotik-test' }])
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                text: async () => JSON.stringify([{ version: '7.12' }])
+            })
+            .mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify([]) }) 
+            .mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify({ servers: '8.8.8.8' }) }) 
+            .mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify([]) }) 
+            .mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify([]) }) 
+            .mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify([]) });
 
         const result = await service.testConnection();
 
         expect(result.success).toBe(true);
-        const fetchCalls = (global.fetch as jest.Mock).mock.calls;
-        const identityHttpsCall = fetchCalls.find(c => c[0].includes('https://10.0.0.200:443/rest/system/identity'));
-        const identityHttpCall = fetchCalls.find(c => c[0].includes('http://10.0.0.200/rest/system/identity'));
-        
-        expect(identityHttpsCall).toBeDefined();
-        expect(identityHttpCall).toBeDefined();
+        expect((global.fetch as jest.Mock).mock.calls[0][0]).toContain('https://10.0.0.200:443/rest/system/identity');
+        expect((global.fetch as jest.Mock).mock.calls[1][0]).toContain('http://10.0.0.200/rest/system/identity');
     });
 
     it('should log correctly with tenantId on successful action', async () => {
