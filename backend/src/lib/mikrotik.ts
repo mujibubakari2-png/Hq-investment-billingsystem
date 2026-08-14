@@ -401,10 +401,8 @@ export class MikroTikService {
                 return { success: true, message: "Simulation mode active" };
             }
 
-            const [identity, resources] = await Promise.all([
-                this.apiRequest("/system/identity"),
-                this.apiRequest("/system/resource")
-            ]);
+            const identity = await this.apiRequest("/system/identity");
+            const resources = await this.apiRequest("/system/resource");
 
             const res = Array.isArray(resources) ? resources[0] : resources;
             const ident = Array.isArray(identity) ? identity[0] : identity;
@@ -522,26 +520,17 @@ export class MikroTikService {
         let hasConflict = false;
 
         try {
-            const [routes, dns, hotspots, pppoes, bridges, wgs, pools, addresses, profiles] = await Promise.all([
-                this.apiRequest("/ip/route", "GET").catch(() => []),
-                this.apiRequest("/ip/dns", "GET").catch(() => null),
-                this.apiRequest("/ip/hotspot", "GET").catch(() => []),
-                this.apiRequest("/interface/pppoe-server/server", "GET").catch(() => []),
-                this.apiRequest("/interface/bridge", "GET").catch(() => []),
-                this.apiRequest("/interface/wireguard", "GET").catch(() => []),
-                this.apiRequest("/ip/pool", "GET").catch(() => []),
-                this.apiRequest("/ip/address", "GET").catch(() => []),
-                this.apiRequest("/ppp/profile", "GET").catch(() => [])
-            ]);
-
             // 1. WAN
-            const defaultRoute = Array.isArray(routes) ? routes.find((r: any) => r["dst-address"] === "0.0.0.0/0" && r.active === "true") : null;
+            const routes = await this.apiRequest("/ip/route", "GET");
+            const defaultRoute = Array.isArray(routes) ? routes.find(r => r["dst-address"] === "0.0.0.0/0" && r.active === "true") : null;
             if (defaultRoute) result.wanGateway = defaultRoute.gateway;
 
             // 2. DNS
+            const dns = await this.apiRequest("/ip/dns", "GET");
             if (dns && (dns as any).servers) result.dnsServers = (dns as any).servers;
 
             // 3. Hotspot
+            const hotspots = await this.apiRequest("/ip/hotspot", "GET");
             if (Array.isArray(hotspots) && hotspots.length > 0) {
                 if (hotspots.length > 1) hasConflict = true;
                 const hs = hotspots[0];
@@ -549,25 +538,30 @@ export class MikroTikService {
                 result.hotspotInterface = hs.interface;
                 if (hs["address-pool"] && hs["address-pool"] !== "none") {
                     result.hotspotPool = hs["address-pool"];
-                    const hsPool = Array.isArray(pools) ? pools.find((p: any) => p.name === hs["address-pool"]) : null;
+                    const pools = await this.apiRequest("/ip/pool", "GET");
+                    const hsPool = Array.isArray(pools) ? pools.find(p => p.name === hs["address-pool"]) : null;
                     if (hsPool) result.hotspotPoolRange = hsPool.ranges;
                 }
-                const hsAddr = Array.isArray(addresses) ? addresses.find((a: any) => a.interface === hs.interface) : null;
+                const addresses = await this.apiRequest("/ip/address", "GET");
+                const hsAddr = Array.isArray(addresses) ? addresses.find(a => a.interface === hs.interface) : null;
                 if (hsAddr) result.hotspotIp = hsAddr.address.split('/')[0];
             }
 
             // 4. PPPoE
+            const pppoes = await this.apiRequest("/interface/pppoe-server/server", "GET");
             if (Array.isArray(pppoes) && pppoes.length > 0) {
                 if (pppoes.length > 1) hasConflict = true;
                 const pppoe = pppoes[0];
                 result.pppoeServer = pppoe.service;
                 if (pppoe["default-profile"]) {
-                    const profile = Array.isArray(profiles) ? profiles.find((p: any) => p.name === pppoe["default-profile"]) : null;
+                    const profiles = await this.apiRequest("/ppp/profile", "GET");
+                    const profile = Array.isArray(profiles) ? profiles.find(p => p.name === pppoe["default-profile"]) : null;
                     if (profile) {
                         result.pppoeProfile = profile.name;
                         if (profile["remote-address"]) {
                             result.pppoePool = profile["remote-address"];
-                            const pppoePool = Array.isArray(pools) ? pools.find((p: any) => p.name === profile["remote-address"]) : null;
+                            const pools = await this.apiRequest("/ip/pool", "GET");
+                            const pppoePool = Array.isArray(pools) ? pools.find(p => p.name === profile["remote-address"]) : null;
                             if (pppoePool) result.pppoePoolRange = pppoePool.ranges;
                         }
                     }
@@ -575,15 +569,17 @@ export class MikroTikService {
             }
 
             // 5. LAN (Semantic discovery: bridge -> IP -> Subnet)
+            const bridges = await this.apiRequest("/interface/bridge", "GET");
             if (Array.isArray(bridges) && bridges.length > 0) {
                 // Determine the primary LAN bridge. Prefer the one associated with hotspot/pppoe, or "bridge-lan", or the first one.
-                const targetBridge = bridges.find((b: any) => b.name === result.hotspotInterface) 
-                                  || bridges.find((b: any) => b.name?.toLowerCase().includes("lan")) 
+                const targetBridge = bridges.find(b => b.name === result.hotspotInterface) 
+                                  || bridges.find(b => b.name?.toLowerCase().includes("lan")) 
                                   || bridges[0];
                 
                 if (targetBridge) {
                     result.lanInterface = targetBridge.name;
-                    const lanAddr = Array.isArray(addresses) ? addresses.find((a: any) => a.interface === targetBridge.name) : null;
+                    const addresses = await this.apiRequest("/ip/address", "GET");
+                    const lanAddr = Array.isArray(addresses) ? addresses.find(a => a.interface === targetBridge.name) : null;
                     if (lanAddr) {
                         result.lanIp = lanAddr.address.split('/')[0];
                     } else if (result.hotspotIp) {
@@ -596,11 +592,13 @@ export class MikroTikService {
             }
 
             // 6. VPN (Semantic discovery: wireguard -> IP -> peer)
+            const wgs = await this.apiRequest("/interface/wireguard", "GET");
             if (Array.isArray(wgs) && wgs.length > 0) {
                 // Look for HQ INVESTMENT wireguard or the first one
-                const wg = wgs.find((w: any) => w.comment?.includes("HQ INVESTMENT") || w.name === "wg-hq") || wgs[0]; 
+                const wg = wgs.find(w => w.comment?.includes("HQ INVESTMENT") || w.name === "wg-hq") || wgs[0]; 
                 result.vpnInterface = wg.name;
-                const wgAddr = Array.isArray(addresses) ? addresses.find((a: any) => a.interface === wg.name) : null;
+                const addresses = await this.apiRequest("/ip/address", "GET");
+                const wgAddr = Array.isArray(addresses) ? addresses.find(a => a.interface === wg.name) : null;
                 if (wgAddr) result.vpnIp = wgAddr.address.split('/')[0];
             }
 
