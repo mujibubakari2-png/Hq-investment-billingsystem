@@ -42,7 +42,14 @@ describe('Router adapter architecture', () => {
       text: async () => JSON.stringify([{ name: 'test' }]),
     });
     
-    const adapter = createRouterAdapter({ vendor: 'MikroTik', id: 'router-1', tenantId: 'tenant-a', host: '8.8.8.8' } as any);
+    const adapter = createRouterAdapter({
+      vendor: 'MikroTik',
+      id: 'router-1',
+      tenantId: 'tenant-a',
+      host: '8.8.8.8',
+      username: 'mikrotik-admin',
+      password: 'secret',
+    } as any);
 
     const result = await adapter.apiRequestPublic('/ip/address');
 
