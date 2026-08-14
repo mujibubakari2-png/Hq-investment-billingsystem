@@ -57,21 +57,23 @@ describe('generateSecureSecret / generateRouterAdminPassword / generateRadiusSec
 });
 
 describe('generateAdminUsername', () => {
-    it('never returns the literal "admin"', () => {
+    it('never returns the literal "admin" and never creates hq_admin_ forms', () => {
         expect(generateAdminUsername('admin')).not.toBe('admin');
+        expect(generateAdminUsername('admin')).not.toMatch(/^hq_admin_/i);
         expect(generateAdminUsername('')).not.toBe('admin');
     });
 
-    it('is unique per call for the same router name (TATIZO 4 dead-code fix)', () => {
+    it('is deterministic for the same router name and does not add a random suffix', () => {
         const a = generateAdminUsername('Mikoroshoni-Router');
         const b = generateAdminUsername('Mikoroshoni-Router');
-        expect(a).not.toEqual(b);
-        expect(a).toMatch(/^adm_mikoroshoni-rout_[0-9a-f]{6}$/);
+        expect(a).toEqual(b);
+        expect(a).toMatch(/^hq_mikoroshoni-router$/);
+        expect(a).not.toMatch(/_[0-9a-f]{6}$/i);
     });
 
-    it('falls back to "router" when the name is empty or fully invalid', () => {
-        expect(generateAdminUsername('')).toMatch(/^adm_router_[0-9a-f]{6}$/);
-        expect(generateAdminUsername('!!!')).toMatch(/^adm_router_[0-9a-f]{6}$/);
+    it('falls back to a stable router username when the name is empty or invalid', () => {
+        expect(generateAdminUsername('')).toBe('hq_router');
+        expect(generateAdminUsername('!!!')).toBe('hq_router');
     });
 });
 

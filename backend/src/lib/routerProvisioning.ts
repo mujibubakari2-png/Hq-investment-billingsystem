@@ -47,11 +47,23 @@ export function generateRadiusSecret(): string {
     return generateSecureSecret(32);
 }
 
-/** Unique admin username per router — never the literal "admin". */
+/**
+ * Deterministic admin username per router.
+ *
+ * We intentionally avoid random suffixes like hq_admin_d0ec650c or adm_<name>_<hex>
+ * because they are noisy, unnecessary, and can be treated as suspicious or
+ * malformed identities by downstream RouterOS configuration logic.
+ */
 export function generateAdminUsername(routerName: string): string {
-    const suffix = crypto.randomBytes(3).toString("hex");
-    const clean = (routerName || "router").replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 16).toLowerCase();
-    return `adm_${clean || "router"}_${suffix}`;
+    const clean = (routerName || "router")
+        .replace(/[^a-zA-Z0-9_-]/g, "")
+        .replace(/_+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 24)
+        .toLowerCase();
+
+    const base = clean || "router";
+    return `hq_${base === "admin" ? "router" : base}`.slice(0, 32);
 }
 
 // ── Validation (TATIZO 1) ────────────────────────────────────────────────────

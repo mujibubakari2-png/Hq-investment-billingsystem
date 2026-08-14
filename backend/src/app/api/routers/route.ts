@@ -151,8 +151,10 @@ export async function POST(req: NextRequest) {
         const name = body.name || body.routerName || body.hostname || body.router_name || body.name;
         const host = body.host || body.hostIP || body.ipAddress || body.address || body.ip || "0.0.0.0";
         const password = body.password || body.accessCode || body.secret || body.sharedSecret || "";
+        const requestedUsername = (body.username || body.user || "").toString().trim();
 
         if (!name) return errorResponse("Router name is required");
+        if (!requestedUsername) return errorResponse("Router username is required");
         // if (!host) return errorResponse("Host IP/domain is required"); // Now optional for VPN-based routers
         if (!password) return errorResponse("Router access code / password is required");
 
@@ -227,7 +229,7 @@ export async function POST(req: NextRequest) {
         const routerData: any = {
             name,
             host,
-            username: body.username || body.user || "admin",
+            username: requestedUsername,
             password: password,
             port: port,
             apiPort: apiPort,

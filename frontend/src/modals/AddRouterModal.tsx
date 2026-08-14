@@ -75,18 +75,18 @@ export default function AddRouterModal({ onClose, onSave, initialData }: AddRout
     const [status, setStatus] = useState<'Online' | 'Offline'>(initialData?.status === 'Online' ? 'Online' : 'Offline');
     const [showAdvanced, setShowAdvanced] = useState(false);
     const [host, setHost] = useState(initialData?.host || '0.0.0.0');
-    const [username, setUsername] = useState(initialData?.username || 'admin');
+    const [username, setUsername] = useState(initialData?.username || '');
     const [port, setPort] = useState<number | undefined>(initialData?.port || undefined);
     const [apiPort, setApiPort] = useState<number | undefined>(initialData?.apiPort || undefined);
 
     const isEdit = !!initialData?.id;
 
     const handleSave = () => {
-        if (!routerName || (!accessCode && !isEdit)) {
-            alert('Router name and access code are required');
+        if (!routerName || !username.trim() || (!accessCode && !isEdit)) {
+            alert('Router name, username, and access code are required');
             return;
         }
-        if (onSave) onSave({ name: routerName, password: accessCode, vpnMode, description, status, host, username, port, apiPort });
+        if (onSave) onSave({ name: routerName, password: accessCode, vpnMode, description, status, host, username: username.trim(), port, apiPort });
     };
 
     const selectedVpn = VPN_OPTIONS.find(v => v.value === vpnMode)!;

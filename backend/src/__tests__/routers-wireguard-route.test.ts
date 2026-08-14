@@ -546,7 +546,7 @@ describe('WireGuard route', () => {
       wgListenPort: 51820,
       wgEnabled: false,
       wgConfiguredAt: null,
-      username: 'hq_admin_abc123',   // ← valid username
+      username: 'hq_router_admin',   // valid deterministic username
       password: 'SecurePass!99',     // ← valid password
       radiusSecret: 'mock-radius-secret',
       port: 8728,
@@ -588,7 +588,7 @@ describe('WireGuard route', () => {
       call[0] === '/user' && call[1] === 'PATCH'
     );
     expect(userPatchCall).toBeDefined();
-    expect(userPatchCall?.[2]?.name).toBe('hq_admin_abc123');
+    expect(userPatchCall?.[2]?.name).toBe('hq_router_admin');
     expect(userPatchCall?.[2]?.password).toBe('SecurePass!99');
     // Must NOT fall back to "admin" for either field
     expect(userPatchCall?.[2]?.name).not.toBe('admin');

@@ -91,9 +91,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
             updatedRadiusSecret = encrypt(generateRadiusSecret());
             needsUpdate = true;
         }
-        if (!routerRaw.username) {
-            updatedUsername = "admin";
-            needsUpdate = true;
+        if (!routerRaw.username || !routerRaw.username.trim()) {
+            return errorResponse("Router username missing. Please set the username in the UI before generating the script.", 400);
         }
 
         if (needsUpdate) {
