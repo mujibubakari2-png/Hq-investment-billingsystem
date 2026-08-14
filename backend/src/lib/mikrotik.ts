@@ -1367,12 +1367,19 @@ export async function getMikroTikService(routerId: string, tenantId?: string | n
         );
     }
 
+    if (!decryptedRouter.username || !decryptedRouter.username.trim()) {
+        throw new Error(
+            `Router ${routerId} has no username set in the database. ` +
+            `Use the exact username entered in the UI before connecting to the router.`
+        );
+    }
+
     return new MikroTikService(
         {
             host: decryptedRouter.host,
             port: router.apiPort || router.port || 8728,
             restPort: (router as any).restPort ?? undefined,
-            username: decryptedRouter.username || "admin",   // BUG-FIX: use decryptedRouter consistently
+            username: decryptedRouter.username.trim(),
             password: decryptedRouter.password || "",
         },
         routerId,

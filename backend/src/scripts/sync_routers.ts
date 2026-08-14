@@ -12,12 +12,18 @@ async function syncAllRouters() {
 
   for (const router of routers) {
     try {
+      const username = router.username?.trim();
+      if (!username) {
+        console.warn(`Skipping router ${router.name} (${router.host}): username is missing. Set the exact UI username before syncing.`);
+        continue;
+      }
+
       console.log(`\nSyncing router: ${router.name} (${router.host})`);
       
       const conn = {
         host: router.host,
         port: router.port || 8728,
-        username: router.username || "admin",
+        username,
         password: router.password || ""
       };
 
