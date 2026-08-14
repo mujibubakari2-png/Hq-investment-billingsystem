@@ -48,11 +48,11 @@ export function generateRadiusSecret(): string {
 }
 
 /**
- * Deterministic admin username per router.
+ * Deterministic fallback username for historical compatibility.
  *
- * We intentionally avoid random suffixes like hq_admin_d0ec650c or adm_<name>_<hex>
- * because they are noisy, unnecessary, and can be treated as suspicious or
- * malformed identities by downstream RouterOS configuration logic.
+ * We intentionally avoid random admin-style suffixes because they are noisy,
+ * unnecessary, and can be treated as suspicious or malformed identities by
+ * downstream RouterOS configuration logic.
  */
 export function generateAdminUsername(routerName: string): string {
     const clean = (routerName || "router")
