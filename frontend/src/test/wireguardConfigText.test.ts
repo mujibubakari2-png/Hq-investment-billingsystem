@@ -16,7 +16,6 @@ describe('buildWireGuardConfigText', () => {
             listenPort: 51820,
             serverEndpoint: 'vpn.example.com',
             serverPort: 51820,
-            serverPrivateKey: 'server-private',
         });
 
         expect(config).toContain('/interface wireguard');
@@ -28,7 +27,7 @@ describe('buildWireGuardConfigText', () => {
         expect(config).not.toContain('PrivateKey =');
     });
 
-    it('uses RouterOS-native commands for the client-side config', () => {
+    it('uses standard WireGuard commands for the client peer (server configuration)', () => {
         const config = buildWireGuardConfigText({
             mode: 'client',
             routerName: 'HQ Router',
@@ -40,13 +39,12 @@ describe('buildWireGuardConfigText', () => {
             listenPort: 51820,
             serverEndpoint: 'vpn.example.com',
             serverPort: 51820,
-            serverPrivateKey: 'server-private',
         });
 
-        expect(config).toContain('/interface wireguard');
-        expect(config).toContain('private-key="server-private"');
-        expect(config).toContain('allowed-address=10.0.0.200/24');
-        expect(config).toContain('add address=10.0.0.1/24 interface="wg-hq"');
-        expect(config).not.toContain('[Peer]');
+        expect(config).toContain('[Peer]');
+        expect(config).toContain('PublicKey = router-public');
+        expect(config).toContain('PresharedKey = preshared');
+        expect(config).toContain('AllowedIPs = 10.0.0.200/32');
+        expect(config).not.toContain('/interface wireguard');
     });
 });
