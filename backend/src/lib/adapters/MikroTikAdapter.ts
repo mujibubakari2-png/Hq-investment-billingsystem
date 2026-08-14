@@ -122,6 +122,11 @@ export class MikroTikAdapter implements RouterAdapter {
 
     private context: RouterAdapterContext;
     private baseUrl: string;
+    // HTTP-FALLBACK-001: only set when the primary connection uses HTTPS.
+    // Lets us recover routers whose www-ssl service has no certificate
+    // assigned (e.g. right after RC-3's ssl-certificate=auto removal) without
+    // silently downgrading routers whose HTTPS actually works.
+    private httpFallbackUrl: string | null = null;
 
     constructor(context: RouterAdapterContext) {
         this.context = context;
@@ -135,6 +140,15 @@ export class MikroTikAdapter implements RouterAdapter {
         }
         const protocol = useHttps ? "https" : "http";
         this.baseUrl = `${protocol}://${context.host}:${restPort}`;
+
+        if (useHttps) {
+            // Fallback candidate port: explicit apiPort if it isn't the https port
+            // itself, otherwise RouterOS's plain-HTTP default of 80.
+            const httpPort = (context.apiPort != null && context.apiPort !== restPort)
+                ? context.apiPort
+                : 80;
+            this.httpFallbackUrl = `http://${context.host}:${httpPort}`;
+        }
     }
 
     // ── Internal helpers ──────────────────────────────────────────────────────
@@ -153,7 +167,36 @@ export class MikroTikAdapter implements RouterAdapter {
 
     private async request(path: string, method = "GET", body?: unknown): Promise<any> {
         validateOutboundHost(this.conn.host);
-        return mikrotikRequest(this.baseUrl, this.conn, path, method, body);
+        try {
+            return await mikrotikRequest(this.baseUrl, this.conn, path, method, body);
+        } catch (err: any) {
+            // HTTP-FALLBACK-001: only fall back when (a) we have a fallback URL
+            // (i.e. we were using HTTPS) and (b) the failure looks like a
+            // transport/TLS problem rather than an authenticated application
+            // error. A 401 or a well-formed RouterOS API error means the HTTPS
+            // connection itself worked fine — retrying over HTTP would just
+            // reproduce the same result (or worse, silently downgrade a
+            // perfectly good HTTPS session), so those are re-thrown as-is.
+            if (!this.httpFallbackUrl) throw err;
+            const msg = String(err?.message ?? "");
+            const isAppLevelError = msg.startsWith("Authentication failed") || msg.startsWith("RouterOS API error");
+            if (isAppLevelError) throw err;
+
+            warnOnce(
+                `http-fallback:${this.conn.host}`,
+                `[MikroTikAdapter] HTTPS request to ${this.conn.host} failed (${msg.slice(0, 120)}); ` +
+                `retrying over plain HTTP at ${this.httpFallbackUrl}. This usually means www-ssl has no ` +
+                `certificate assigned — import one and set it on www-ssl to stop relying on this fallback.`
+            );
+            try {
+                return await mikrotikRequest(this.httpFallbackUrl, this.conn, path, method, body);
+            } catch {
+                // Both failed — surface the ORIGINAL https error, since it
+                // describes the actually configured (and intended) connection
+                // mode rather than the fallback we only tried opportunistically.
+                throw err;
+            }
+        }
     }
 
     private async log(

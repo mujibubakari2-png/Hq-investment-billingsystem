@@ -375,11 +375,18 @@ export function buildRouterWizardScript(params: RouterSetupWizardScriptParams): 
     '',
 
     // ── PHASE 5+7: Hotspot / PPPoE / DHCP — gated on hasBridgeInterfaces ─────
-    '# ===== PHASE 5+7: Hotspot / PPPoE / DHCP Services =====',
+    '# ===== PHASE 5+7: LAN IP, Hotspot / PPPoE / DHCP Services =====',
     `# Service type: ${normalized.serviceType}`,
     '',
     ...(hasBridgeInterfaces
       ? [
+        ...((normalized.hotspotLocalAddress || normalized.pppoeLocalAddress)
+          ? [
+              '# ===== LAN IP Address =====',
+              `:local lanCidr "${normalized.hotspotLocalAddress || normalized.pppoeLocalAddress}/24"`,
+              `:if ([:len [/ip address find where address=$lanCidr interface=$targetBridge]] = 0) do={ /ip address add address=$lanCidr interface=$targetBridge comment="HQ INVESTMENT LAN" }`,
+            ]
+          : []),
         // PPPoE server
         ...(normalized.serviceType === 'pppoe' || normalized.serviceType === 'both'
           ? [
@@ -399,7 +406,6 @@ export function buildRouterWizardScript(params: RouterSetupWizardScriptParams): 
             '# ===== Hotspot Server =====',
             `:if ([:len [/ip pool find where name="${hsPoolName}"]] = 0) do={ /ip pool add name="${hsPoolName}" ranges=${normalized.hotspotPoolStart}-${normalized.hotspotPoolEnd} }`,
             `:if ([:len [/ip hotspot profile find where name="${hotspotProfile}"]] = 0) do={ /ip hotspot profile add name="${hotspotProfile}" hotspot-address=${normalized.hotspotLocalAddress} html-directory=hotspot login-by=http-chap,https,cookie use-radius=yes }`,
-            `:if ([:len [/ip address find where interface=$targetBridge]] = 0) do={ /ip address add address=${hotspotCidr} interface=$targetBridge }`,
             `:if ([:len [/ip hotspot find where name="hq-hotspot-${safeRouterName}"]] = 0) do={ /ip hotspot add name="hq-hotspot-${safeRouterName}" interface=$targetBridge address-pool="${hsPoolName}" profile="${hotspotProfile}" disabled=no } else={ /ip hotspot set [find name="hq-hotspot-${safeRouterName}"] interface=$targetBridge address-pool="${hsPoolName}" profile="${hotspotProfile}" disabled=no }`,
             ...(hotspotNetwork
               ? [
