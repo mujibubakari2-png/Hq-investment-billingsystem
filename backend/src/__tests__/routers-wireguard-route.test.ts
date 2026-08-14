@@ -41,10 +41,19 @@ jest.mock('@/lib/wireguard', () => ({
   },
 }));
 
-jest.mock('@/lib/mikrotik', () => ({
-  getMikroTikService: jest.fn((...args: any[]) => mockGetMikroTikService.apply(null, args as any[])),
-  sanitizeMikroTikName: jest.fn((name: string) => name),
-}));
+jest.mock('@/lib/mikrotik', () => {
+  const MikroTikService = jest.fn().mockImplementation(() => ({
+    apiRequestPublic: jest.fn(),
+    testConnection: jest.fn(),
+    listAllActiveSessions: jest.fn(),
+  }));
+
+  return {
+    MikroTikService,
+    getMikroTikService: jest.fn((...args: any[]) => mockGetMikroTikService.apply(null, args as any[])),
+    sanitizeMikroTikName: jest.fn((name: string) => name),
+  };
+});
 
 jest.mock('@/lib/encryption', () => ({
   decryptRouterFields: jest.fn((...args: any[]) => mockDecryptRouterFields.apply(null, args as any[])),
@@ -583,16 +592,17 @@ describe('WireGuard route', () => {
     const { executePushConfig } = require('@/lib/pushConfigExecutor');
     await executePushConfig('router-withcreds', 'tenant-a', { lanPorts: [] });
 
-    // /user PATCH should have been called with the DB credentials (no fallback)
-    const userPatchCall = service.apiRequestPublic.mock.calls.find((call: any) =>
-      call[0] === '/user' && call[1] === 'PATCH'
+    // /user should be created or updated using the exact DB username only.
+    // It must not mutate or fallback to the generic "admin" account.
+    const userMutationCall = service.apiRequestPublic.mock.calls.find((call: any) =>
+      call[0] === '/user' && (call[1] === 'PATCH' || call[1] === 'PUT')
     );
-    expect(userPatchCall).toBeDefined();
-    expect(userPatchCall?.[2]?.name).toBe('hq_router_admin');
-    expect(userPatchCall?.[2]?.password).toBe('SecurePass!99');
-    // Must NOT fall back to "admin" for either field
-    expect(userPatchCall?.[2]?.name).not.toBe('admin');
-    expect(userPatchCall?.[2]?.password).not.toBe('admin');
+    expect(userMutationCall).toBeDefined();
+    expect(userMutationCall?.[2]?.name).toBe('hq_router_admin');
+    expect(userMutationCall?.[2]?.password).toBe('SecurePass!99');
+    expect(userMutationCall?.[2]?.name).not.toBe('admin');
+    expect(userMutationCall?.[2]?.password).not.toBe('admin');
+    expect(userMutationCall?.[1]).toBe('PUT');
   });
 });
 
