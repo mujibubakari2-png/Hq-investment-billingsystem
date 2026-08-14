@@ -154,9 +154,13 @@ export class MikroTikAdapter implements RouterAdapter {
     // ── Internal helpers ──────────────────────────────────────────────────────
 
     private get conn() {
+        if (!this.context.username || !this.context.username.trim()) {
+            throw new Error("MikroTik adapter requires an explicit username; no admin fallback is allowed.");
+        }
+
         return {
             host: this.context.host ?? "",
-            username: this.context.username ?? "admin",
+            username: this.context.username.trim(),
             password: this.context.password ?? "",
         };
     }

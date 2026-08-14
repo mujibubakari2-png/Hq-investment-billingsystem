@@ -74,6 +74,10 @@ export class TPLinkAdapter implements RouterAdapter {
 
     private async authenticate(): Promise<void> {
         validateOutboundHost(this.context.host ?? "");
+        if (!this.context.username || !this.context.username.trim()) {
+            throw new Error("TP-Link adapter requires an explicit username; no admin fallback is allowed.");
+        }
+
         const url = `${this.baseUrl}/cgi-bin/luci/;stok=/rpc/xqsystem/login`;
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 10_000);
@@ -85,7 +89,7 @@ export class TPLinkAdapter implements RouterAdapter {
                 body: JSON.stringify({
                     method: "do",
                     login: {
-                        username: this.context.username ?? "admin",
+                        username: this.context.username.trim(),
                         password: this.context.password ?? "",
                     },
                 }),

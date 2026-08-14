@@ -196,7 +196,7 @@ export async function executePushConfig(
     try {
         const users = await service.apiRequestPublic("/user");
         if (Array.isArray(users)) {
-            const ex = users.find((u: any) => u.name === router.username || u.name === "admin");
+            const ex = users.find((u: any) => u.name === router.username);
             if (ex) {
                 await service.apiRequestPublic("/user", "PATCH", { ".id": ex[".id"], name: router.username, password: router.password });
             } else {
