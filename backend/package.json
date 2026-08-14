@@ -6,7 +6,7 @@
     "dev": "next dev --hostname 0.0.0.0 --port 3000",
     "build": "prisma generate && next build && pnpm run build:workers",
     "build:full": "prisma generate && next build && pnpm run build:workers",
-    "build:workers": "prisma generate && tsc -p tsconfig.workers.json && tsc-alias -p tsconfig.workers.json",
+    "build:workers": "prisma generate && tsc -p ./tsconfig.workers.json && tsc-alias -p ./tsconfig.workers.json",
     "start": "next start --hostname 127.0.0.1 --port ${PORT:-3000}",
     "start:droplet": "bash scripts/droplet-start.sh",
     "next:start": "next start --hostname 127.0.0.1 --port ${PORT:-3000}",
