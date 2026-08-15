@@ -56,8 +56,22 @@ export default function RouterDetailModal({ router, onClose, onDelete }: RouterD
     const [loadingWg, setLoadingWg] = useState(true);
     const [downloadingScript, setDownloadingScript] = useState(false);
     const [showWebFig, setShowWebFig] = useState(false);
+    const [webfigInfo, setWebfigInfo] = useState<{
+        webfigUrl: string;
+        browserReachable: boolean;
+        accessNote: string;
+        host: string;
+    } | null>(null);
+    const [loadingWebfig, setLoadingWebfig] = useState(false);
     const [openingWinbox, setOpeningWinbox] = useState(false);
-    const [winboxSession, setWinboxSession] = useState<{ host: string; port: number; expiresInSeconds: number } | null>(null);
+    const [winboxSession, setWinboxSession] = useState<{
+        host: string;
+        port: number;
+        expiresInSeconds: number;
+        browserReachable?: boolean;
+        hostIsVpnIp?: boolean;
+        instructions: string;
+    } | null>(null);
 
     useEffect(() => {
         let cancelled = false;
@@ -84,11 +98,25 @@ export default function RouterDetailModal({ router, onClose, onDelete }: RouterD
         }
     };
 
+    const openWebFig = async () => {
+        setLoadingWebfig(true);
+        setShowWebFig(true);
+        try {
+            const info = await routersApi.remoteAccess.webfigUrl(router.id);
+            setWebfigInfo(info as any);
+        } catch (err: any) {
+            alert(`Failed to load WebFig info: ${err.message || err}`);
+            setShowWebFig(false);
+        } finally {
+            setLoadingWebfig(false);
+        }
+    };
+
     const openWinbox = async () => {
         setOpeningWinbox(true);
         try {
             const session = await routersApi.remoteAccess.openWinboxSession(router.id);
-            setWinboxSession(session);
+            setWinboxSession(session as any);
         } catch (err: any) {
             alert(`Imeshindwa kufungua kikao cha Winbox: ${err.message || err}`);
         } finally {
@@ -103,7 +131,7 @@ export default function RouterDetailModal({ router, onClose, onDelete }: RouterD
     if (showWebFig) {
         return (
             <div className="modal-overlay" onClick={() => setShowWebFig(false)}>
-                <div className="modal" style={{ maxWidth: 1100, width: '95vw', height: '90vh', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
+                <div className="modal" style={{ maxWidth: 640, width: '95vw' }} onClick={e => e.stopPropagation()}>
                     <div className="modal-header" style={{ background: 'linear-gradient(135deg, #0891b2, #0e7490)', color: '#fff' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                             <OpenInBrowserIcon />
@@ -113,11 +141,47 @@ export default function RouterDetailModal({ router, onClose, onDelete }: RouterD
                             <CloseIcon fontSize="small" />
                         </button>
                     </div>
-                    <iframe
-                        title={`webfig-${router.id}`}
-                        src={routersApi.remoteAccess.webfigUrl(router.id)}
-                        style={{ flex: 1, border: 'none', width: '100%' }}
-                    />
+                    <div style={{ padding: '20px 24px' }}>
+                        {loadingWebfig ? (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#9ca3af', fontSize: '0.82rem' }}>
+                                <SyncIcon style={{ fontSize: 18, animation: 'spin 1s linear infinite' }} /> Loading router access info…
+                            </div>
+                        ) : webfigInfo ? (
+                            <>
+                                {webfigInfo.browserReachable ? (
+                                    <div style={{ marginBottom: 16 }}>
+                                        <div style={{ fontWeight: 600, marginBottom: 8, color: '#0e7490' }}>Router WebFig Interface</div>
+                                        <p style={{ fontSize: '0.85rem', color: '#475569', marginBottom: 12 }}>
+                                            {webfigInfo.accessNote}
+                                        </p>
+                                        <a
+                                            href={webfigInfo.webfigUrl}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            style={{ display: 'inline-block', padding: '10px 20px', background: '#0891b2', color: '#fff', borderRadius: 8, fontWeight: 600, textDecoration: 'none', fontSize: '0.85rem' }}
+                                        >
+                                            <OpenInBrowserIcon style={{ fontSize: 16, verticalAlign: 'middle', marginRight: 6 }} />
+                                            Open WebFig ({webfigInfo.host})
+                                        </a>
+                                    </div>
+                                ) : (
+                                    <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, padding: '14px 16px' }}>
+                                        <div style={{ fontWeight: 700, color: '#92400e', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                            <WarningAmberIcon style={{ fontSize: 18 }} /> VPN-Only Router — Browser Cannot Reach WebFig Directly
+                                        </div>
+                                        <p style={{ fontSize: '0.82rem', color: '#78350f', margin: '0 0 10px', lineHeight: 1.6 }}>
+                                            {webfigInfo.accessNote}
+                                        </p>
+                                        <div style={{ background: '#fef3c7', borderRadius: 6, padding: '8px 12px', fontFamily: 'monospace', fontSize: '0.8rem', color: '#451a03', wordBreak: 'break-all' }}>
+                                            {webfigInfo.webfigUrl}
+                                        </div>
+                                    </div>
+                                )}
+                            </>
+                        ) : (
+                            <div style={{ color: '#ef4444', fontSize: '0.82rem' }}>Failed to load WebFig access info.</div>
+                        )}
+                    </div>
                 </div>
             </div>
         );
@@ -311,7 +375,7 @@ export default function RouterDetailModal({ router, onClose, onDelete }: RouterD
                                         color="#0e7490"
                                         bg="#ecfeff"
                                         border="#a5f3fc"
-                                        onClick={() => setShowWebFig(true)}
+                                        onClick={openWebFig}
                                     />
                                     <ActionBtn
                                         icon={<TerminalIcon fontSize="small" />}
@@ -329,13 +393,20 @@ export default function RouterDetailModal({ router, onClose, onDelete }: RouterD
                         {winboxSession && (
                             <div style={{
                                 marginTop: 10, padding: '12px 14px', borderRadius: 'var(--radius-md)',
-                                background: '#f5f3ff', border: '1px solid #ddd6fe', fontSize: '0.82rem',
+                                background: winboxSession.hostIsVpnIp ? '#fffbeb' : '#f5f3ff',
+                                border: `1px solid ${winboxSession.hostIsVpnIp ? '#fde68a' : '#ddd6fe'}`,
+                                fontSize: '0.82rem',
                             }}>
-                                <div style={{ fontWeight: 700, color: '#5b21b6', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                {winboxSession.hostIsVpnIp && (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#92400e', fontWeight: 600, marginBottom: 8, fontSize: '0.78rem' }}>
+                                        <WarningAmberIcon style={{ fontSize: 14 }} /> VPN Router — See instructions below
+                                    </div>
+                                )}
+                                <div style={{ fontWeight: 700, color: winboxSession.hostIsVpnIp ? '#78350f' : '#5b21b6', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
                                     <TerminalIcon style={{ fontSize: 16 }} /> Winbox Connect To:
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                    <code style={{ background: '#ede9fe', padding: '4px 10px', borderRadius: 6, fontSize: '0.9rem', fontWeight: 600, color: '#4c1d95' }}>
+                                    <code style={{ background: winboxSession.hostIsVpnIp ? '#fef3c7' : '#ede9fe', padding: '4px 10px', borderRadius: 6, fontSize: '0.9rem', fontWeight: 600, color: winboxSession.hostIsVpnIp ? '#451a03' : '#4c1d95' }}>
                                         {winboxSession.host}:{winboxSession.port}
                                     </code>
                                     <button
@@ -346,8 +417,8 @@ export default function RouterDetailModal({ router, onClose, onDelete }: RouterD
                                         <ContentCopyIcon style={{ fontSize: 15 }} />
                                     </button>
                                 </div>
-                                <div style={{ color: '#6d28d9', marginTop: 6, fontSize: '0.75rem' }}>
-                                    Fungua Winbox kwenye kompyuta yako, weka anwani hii kwenye "Connect To", tumia username/password ya router. Kiungo kitafunga ndani ya dakika {Math.floor(winboxSession.expiresInSeconds / 60)} kama hakijatumika.
+                                <div style={{ color: winboxSession.hostIsVpnIp ? '#78350f' : '#6d28d9', marginTop: 8, fontSize: '0.75rem', lineHeight: 1.6 }}>
+                                    {winboxSession.instructions}
                                 </div>
                             </div>
                         )}

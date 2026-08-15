@@ -13,6 +13,11 @@ describe('pushConfigExecutor', () => {
 
     beforeEach(() => {
         jest.clearAllMocks();
+        // Skip the VPN handshake polling loop — tests mock apiRequestPublic and
+        // have no real WireGuard tunnel. Setting both to 0 makes the loop exit
+        // on first iteration rather than waiting 30s.
+        process.env.PUSH_VPN_WAIT_MS = '0';
+        process.env.PUSH_VPN_POLL_MS = '0';
 
         mockDb = {
             router: {

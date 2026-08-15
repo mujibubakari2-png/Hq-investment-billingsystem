@@ -27,6 +27,13 @@ process.env.FIELD_ENCRYPTION_KEY ||= 'cafecafecafecafecafecafecafecafecafecafeca
 // Cron — test-only secret
 process.env.CRON_SECRET ||= 'ci_test_cron_secret_32chars_ok!!';
 
+// Auto-Push VPN wait — set to 0 in tests so the polling loop exits immediately.
+// In production, pushConfigExecutor defaults these to 30000ms / 5000ms.
+// Tests mock the MikroTik API and have no real WireGuard tunnel, so waiting
+// 30s per test would make the suite take 5+ minutes for no reason.
+process.env.PUSH_VPN_WAIT_MS ||= '0';
+process.env.PUSH_VPN_POLL_MS ||= '0';
+
 // Fix Float -> Decimal mock issues across 69 failing tests:
 // API routes expect Prisma.Decimal (.toNumber()), but tests mock primitive numbers.
 // This allows primitive numbers in mocks to seamlessly satisfy .toNumber() calls.

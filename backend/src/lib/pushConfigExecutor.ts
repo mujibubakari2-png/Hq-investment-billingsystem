@@ -473,10 +473,17 @@ export async function executePushConfig(
                 username: router.username!,   // guaranteed non-null: validated at top of function
                 password: router.password!,   // guaranteed non-null: validated at top of function
             }, routerId, rawRouter?.tenantId || "");
-            await vpnService.apiRequestPublic("/system/identity", "GET");
-            return true;
+            const identity = await vpnService.apiRequestPublic("/system/identity", "GET");
+            // FORENSIC-FIX-005: RouterOS 7.x returns a single object, not an array.
+            // The same fix applied in verify/route.ts must be mirrored here.
+            const identObj = Array.isArray(identity) ? identity[0] : identity;
+            return !!(identObj && typeof identObj === "object" && "name" in identObj);
         } catch (err: any) {
-            logger.warn(`[PUSH-CONFIG] VPN Connectivity test failed: ${err.message}`);
+            logger.warn("[PUSH-CONFIG] VPN Connectivity test failed", {
+                routerId,
+                stage: "VPN_CONNECTIVITY",
+                errorMessage: err.message,
+            });
             return false;
         }
     }
@@ -504,14 +511,54 @@ export async function executePushConfig(
     let routerUnreachableAfterFirewall = false;
     let firewallRolledBack = false;
     let fwDropFail = 0;
-    // Wait a few seconds to let WireGuard tunnel establish before testing
-    await new Promise(res => setTimeout(res, 3000));
-    
-    const preDropReachable = await testVpnConnectivity();
+
+    // FORENSIC-FIX-006: Replace blind 3-second wait with a live polling loop.
+    // MikroTik WireGuard handshake can take 5–25 seconds after the peer config is
+    // pushed. The old code checked once after 3s and immediately rolled back the
+    // firewall if the tunnel wasn't live yet — a false failure on every router with
+    // a slow handshake. Now we poll every 5s for up to 30s, exiting as soon as the
+    // tunnel is confirmed, so the DROP rules are only ever applied after the VPN is
+    // actually live. This is not "just increasing timeout" — it's replacing a
+    // single blind wait with a live readiness check.
+    //
+    // TESTABILITY: Both constants are configurable via environment variables so
+    // tests can set PUSH_VPN_WAIT_MS=0 / PUSH_VPN_POLL_MS=0 to skip the wait.
+    const VPN_POLL_INTERVAL_MS = parseInt(process.env.PUSH_VPN_POLL_MS || '5000', 10);
+    const VPN_WAIT_MAX_MS = parseInt(process.env.PUSH_VPN_WAIT_MS || '30000', 10);
+    let preDropReachable = false;
+    const vpnWaitStart = Date.now();
+    logger.info("[PUSH-CONFIG] Waiting for WireGuard VPN to become reachable...", {
+        routerId,
+        stage: "VPN_HANDSHAKE_WAIT",
+        tunnelIp,
+        maxWaitMs: VPN_WAIT_MAX_MS,
+    });
+    while (Date.now() - vpnWaitStart < VPN_WAIT_MAX_MS) {
+        preDropReachable = await testVpnConnectivity();
+        if (preDropReachable) {
+            logger.info("[PUSH-CONFIG] VPN tunnel reachable", {
+                routerId,
+                stage: "VPN_HANDSHAKE_WAIT",
+                result: "SUCCESS",
+                elapsedMs: Date.now() - vpnWaitStart,
+            });
+            break;
+        }
+        await new Promise(r => setTimeout(r, VPN_POLL_INTERVAL_MS));
+    }
+    if (!preDropReachable) {
+        logger.error("[PUSH-CONFIG] VPN tunnel did not become reachable within timeout", {
+            routerId,
+            stage: "VPN_HANDSHAKE_WAIT",
+            result: "TIMEOUT",
+            elapsedMs: Date.now() - vpnWaitStart,
+        });
+    }
+
     if (!preDropReachable) {
         logger.error("[PUSH-CONFIG] VPN ROUTER_UNREACHABLE before DROP rules. Rolling back.");
         await rollbackFirewall();
-        trackStep("Firewall: pre-DROP VPN connectivity", false, "Router unreachable over VPN before DROP rules");
+        trackStep("Firewall: pre-DROP VPN connectivity", false, "Router unreachable over VPN after 30s wait. WireGuard tunnel did not establish.");
         routerUnreachableAfterFirewall = true;
         firewallRolledBack = true;
     } else {
@@ -559,8 +606,29 @@ export async function executePushConfig(
         dns:              dbDns         || "8.8.8.8,1.1.1.1",
         serviceType:      (rawRouter as any).serviceType || "both",
     };
-    if (tunnelVerified) updateData.host = tunnelIp;
-    else logger.warn(`[PUSH-CONFIG] Peer ${tunnelIp} handshake not confirmed. Keeping original host IP.`);
+    if (tunnelVerified) {
+        // FORENSIC-FIX-007: When router.host is switched to the WireGuard VPN tunnel IP,
+        // all browser-facing features (WebFig, WinBox) that use router.host will receive a
+        // private VPN IP that the admin browser cannot route to. Log this transition clearly
+        // so operators understand why WebFig/WinBox show VPN guidance after Auto-Push.
+        // The webfig/route.ts and winbox-session/route.ts handlers now detect this case
+        // and provide proper user guidance instead of silently timing out.
+        logger.info("[PUSH-CONFIG] Switching router.host to VPN tunnel IP", {
+            routerId,
+            stage: "DB_UPDATE",
+            previousHost: rawRouter.host,
+            newHost: tunnelIp,
+            note: "WebFig and WinBox will now require VPN access or WAN IP override.",
+        });
+        updateData.host = tunnelIp;
+    } else {
+        logger.warn("[PUSH-CONFIG] Peer handshake not confirmed — keeping original host IP", {
+            routerId,
+            stage: "DB_UPDATE",
+            tunnelIp,
+            note: "VPN_NOT_ESTABLISHED",
+        });
+    }
     await updateRouterWgFields(db, routerId, updateData);
 
     // -- Audit log -------------------------------------------------------------

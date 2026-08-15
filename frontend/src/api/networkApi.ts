@@ -1,5 +1,5 @@
 // ── Network (Routers, VPN, Equipments) API ───────────────────────────────────
-import { get, post, put, del, downloadFile, getTextFile, CLEAN_API_URL } from './httpClient';
+import { get, post, put, del, downloadFile, getTextFile } from './httpClient';
 import type { Router } from '../types';
 
 export interface WireGuardConfig {
@@ -87,14 +87,44 @@ export const routersApi = {
         downloadFile(scriptPath(id, lanPorts), routerName ? `setup-${routerName}.rsc` : undefined),
 
     // Direct remote access — WebFig (browser) and Winbox (desktop) via the
-    // backend's credential-safe relay. See lib/winboxRelay.ts + webfig proxy.
+    // backend's credential-safe relay.
     remoteAccess: {
-        webfigUrl: (id: string) => `${CLEAN_API_URL}/api/routers/${id}/webfig/`,
+        // FORENSIC-FIX-008: Previously returned a static URL string pointing to a backend
+        // HTML page that linked to http://{router.host}. After Auto-Push, router.host
+        // becomes a WireGuard VPN IP (e.g. 10.0.0.200) that the admin browser cannot
+        // route to — the iframe was silently blank with no user-facing explanation.
+        //
+        // Now calls the backend JSON endpoint which returns:
+        //   { webfigUrl, browserReachable, accessNote, host, wgEnabled, wgTunnelIp }
+        // RouterDetailModal.tsx renders an appropriate panel based on this metadata.
+        webfigUrl: (id: string) =>
+            get<{
+                routerId: string;
+                routerName: string;
+                host: string;
+                wgEnabled: boolean;
+                wgTunnelIp: string | null;
+                browserReachable: boolean;
+                webfigUrl: string;
+                protocol: string;
+                accessNote: string;
+            }>(`/routers/${id}/webfig`),
+
         openWinboxSession: (id: string, winboxPort?: number) =>
-            post<{ host: string; port: number; expiresInSeconds: number; instructions: string }>(
+            post<{
+                host: string;
+                vpnHost: string | null;
+                wanHost: string | null;
+                port: number;
+                browserReachable: boolean;
+                hostIsVpnIp: boolean;
+                expiresInSeconds: number;
+                instructions: string;
+            }>(
                 `/routers/${id}/winbox-session`,
                 winboxPort ? { winboxPort } : {}
             ),
+
         closeWinboxSession: (id: string, port: number) =>
             del<{ success: boolean }>(`/routers/${id}/winbox-session?port=${port}`),
     },
