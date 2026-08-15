@@ -94,7 +94,7 @@ describe('DEFECT-3: Dynamic WAN interface discovery', () => {
         // Must contain the semantic discovery loop
         expect(script).toContain(':local wanIface ""');
         expect(script).toContain('dst-address="0.0.0.0/0"');
-        expect(script).toContain(':set wanIface [/ip route get $r gateway-interface]');
+        expect(script).toContain(':set wanIface [/ip route get $r vrf-interface]');
         // WAN member add must use $wanIface, not literal ether1
         expect(script).toContain('interface=$wanIface');
     });
