@@ -59,11 +59,14 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
             });
         }
 
+        const normalize = (res: any) => Array.isArray(res) ? res : (res ? [res] : []);
+
         // 2. Hotspot profile presence
         if (apiReachable && (router.serviceType === "hotspot" || router.serviceType === "both" || !router.serviceType)) {
             try {
-                const profiles = await service.apiRequestPublic("/ip/hotspot/profile");
-                if (Array.isArray(profiles)) {
+                const profilesRaw = await service.apiRequestPublic("/ip/hotspot/profile");
+                const profiles = normalize(profilesRaw);
+                if (profiles.length > 0) {
                     // FORENSIC-FIX-002: use-radius can be "yes" (string, ROS 7.x) or true
                     // (boolean, some firmware versions). The old strict "=== 'yes'" check
                     // failed when RouterOS returned a boolean true, making hotspot always
@@ -90,8 +93,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         // 3. PPPoE server presence
         if (apiReachable && (router.serviceType === "pppoe" || router.serviceType === "both" || !router.serviceType)) {
             try {
-                const servers = await service.apiRequestPublic("/interface/pppoe-server/server");
-                if (Array.isArray(servers)) {
+                const serversRaw = await service.apiRequestPublic("/interface/pppoe-server/server");
+                const servers = normalize(serversRaw);
+                if (servers.length > 0) {
                     // disabled can be "false" (string) or false (boolean)
                     const pppoeSrv = servers.find((s: any) =>
                         s.disabled === "false" || s.disabled === false
