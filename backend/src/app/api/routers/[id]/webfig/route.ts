@@ -4,6 +4,7 @@ import { requirePermission } from "@/lib/rbac";
 import { getTenantClient } from "@/lib/tenantPrisma";
 import { canAccessTenant } from "@/lib/tenant";
 import logger from "@/lib/logger";
+import { resolveRouterManagementTarget } from "@/lib/routerAddressResolver";
 
 // GET /api/routers/[id]/webfig
 //
@@ -33,49 +34,18 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
             return errorResponse("Unauthorized to access this router", 403);
         }
 
-        // Determine the correct address and protocol for WebFig.
-        // The REST API port is separate from the WebFig port.
-        // WebFig always runs on 80 (http) or 443 (https) on RouterOS.
-        const useHttps = process.env.MIKROTIK_USE_HTTPS === "true";
-        const protocol = useHttps ? "https" : "http";
+        const target = resolveRouterManagementTarget(router as any, 'WEBFIG_CLIENT');
 
-        // Determine whether the stored host is a WireGuard VPN IP.
-        // A VPN IP is any RFC-1918 private address — 10.x.x.x / 172.16-31.x.x / 192.168.x.x.
-        // When router.wgEnabled is true and the host matches a private pattern, the admin
-        // browser cannot reach it (only the VPS can route to the wg0 subnet).
-        const hostIsVpnIp =
-            router.wgEnabled === true &&
-            /^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/.test(router.host);
-
-        const webfigUrl = `${protocol}://${router.host}`;
-
-        logger.info("[WEBFIG] Access request", {
-            routerId: id,
-            host: router.host,
-            wgEnabled: router.wgEnabled,
-            hostIsVpnIp,
-        });
-
-        // Return JSON — the frontend (RouterDetailModal) is responsible for rendering.
         return jsonResponse({
-            routerId: id,
+            routerId: router.id,
             routerName: router.name,
-            host: router.host,
-            wgEnabled: router.wgEnabled,
-            wgTunnelIp: router.wgTunnelIp ?? null,
-            // Whether the browser can reach this IP directly
-            browserReachable: !hostIsVpnIp,
-            webfigUrl,
-            protocol,
-            // Guidance to display to the admin
-            accessNote: hostIsVpnIp
-                ? `This router is managed over WireGuard VPN (tunnel IP: ${router.host}). ` +
-                  `WebFig is accessible at ${webfigUrl} only from a machine connected to ` +
-                  `the WireGuard VPN subnet. Your browser cannot reach this address directly. ` +
-                  `Options: (1) Connect your admin PC to the WireGuard VPN, then open ${webfigUrl}. ` +
-                  `(2) SSH into the VPS and use port-forwarding: ` +
-                  `ssh -L 8080:${router.host}:80 user@vps-ip then open http://localhost:8080.`
-                : `WebFig is accessible directly at ${webfigUrl}. Sign in with the router admin credentials.`,
+            host: target.host,
+            wgTunnelIp: router.wgTunnelIp,
+            browserReachable: !target.requiresVpn,
+            hostIsVpnIp: target.requiresVpn,
+            webfigUrl: `${target.protocol}://${target.host}:${target.port}`,
+            protocol: target.protocol,
+            accessNote: target.instructions,
         });
     } catch (err: any) {
         logger.error("[WEBFIG] Error building access info", {

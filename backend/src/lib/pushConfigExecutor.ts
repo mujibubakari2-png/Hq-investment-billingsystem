@@ -453,6 +453,7 @@ export async function executePushConfig(
         // wanInterface is resolved from the RouterOS default route earlier in this function.
         { chain: "forward", "in-interface": "all-ppp", "out-interface": wanInterface, action: "accept", comment: "Allow PPPoE to Internet - HQ INVESTMENT" },
         { chain: "forward", "connection-state": "established,related", action: "accept", comment: "Allow Established Forward - HQ INVESTMENT" },
+        { chain: "input", "in-interface": "wg-hq", action: "accept", comment: "Allow WG input - HQ INVESTMENT" },
         { chain: "forward", "in-interface": "wg-hq", action: "accept", comment: "Allow WG traffic - HQ INVESTMENT" },
         { chain: "forward", "out-interface": "wg-hq", action: "accept", comment: "Allow WG return - HQ INVESTMENT" },
     ];
@@ -463,82 +464,53 @@ export async function executePushConfig(
         { chain: "forward", "in-interface": lanBridgeName, action: "drop", comment: "Drop unauthenticated LAN forward - HQ INVESTMENT" },
     ];
 
-    // Test connectivity over the new WireGuard VPN tunnel IP to ensure it's routing
-    // properly before we drop WAN access.
-    async function testVpnConnectivity(): Promise<boolean> {
-        try {
-            const vpnService = new MikroTikService({
-                host: tunnelIp || "",
-                port: router.apiPort || router.port || 8728,
-                username: router.username!,   // guaranteed non-null: validated at top of function
-                password: router.password!,   // guaranteed non-null: validated at top of function
-            }, routerId, rawRouter?.tenantId || "");
-            const identity = await vpnService.apiRequestPublic("/system/identity", "GET");
-            // FORENSIC-FIX-005: RouterOS 7.x returns a single object, not an array.
-            // The same fix applied in verify/route.ts must be mirrored here.
-            const identObj = Array.isArray(identity) ? identity[0] : identity;
-            return !!(identObj && typeof identObj === "object" && "name" in identObj);
-        } catch (err: any) {
-            logger.warn("[PUSH-CONFIG] VPN Connectivity test failed", {
-                routerId,
-                stage: "VPN_CONNECTIVITY",
-                errorMessage: err.message,
-            });
-            return false;
-        }
-    }
-    
-    async function rollbackFirewall(): Promise<void> {
-        try {
-            const rules = await service.apiRequestPublic("/ip/firewall/filter");
-            if (Array.isArray(rules)) {
-                for (const rule of rules) {
-                    if (rule.comment?.includes("HQ INVESTMENT")) await runApiSafe(`/ip/firewall/filter/${rule[".id"]}`, "DELETE");
-                }
-            }
-            logger.warn("[PUSH-CONFIG] Firewall rollback completed.");
-        } catch (e) { logger.error("[PUSH-CONFIG] Firewall rollback FAILED:", { error: String(e) }); }
-    }
-
-    // Phase A: ACCEPT rules
+    // -- Phase A: ACCEPT rules -----------------------------------------------
     let fwAcceptFail = 0;
     for (const rule of [...acceptRules].reverse()) {
         try { await service.apiRequestPublic("/ip/firewall/filter", "PUT", { ...rule, "place-before": "0" }); }
         catch (e: any) { if (!e.message?.includes("already")) fwAcceptFail++; }
     }
 
-    // Phase B: connectivity before DROP
+    // -- Phase B: Wait for VPN Handshake & IP Reachability -------------------
     let routerUnreachableAfterFirewall = false;
     let firewallRolledBack = false;
     let fwDropFail = 0;
 
-    // FORENSIC-FIX-006: Replace blind 3-second wait with a live polling loop.
-    // MikroTik WireGuard handshake can take 5–25 seconds after the peer config is
-    // pushed. The old code checked once after 3s and immediately rolled back the
-    // firewall if the tunnel wasn't live yet — a false failure on every router with
-    // a slow handshake. Now we poll every 5s for up to 30s, exiting as soon as the
-    // tunnel is confirmed, so the DROP rules are only ever applied after the VPN is
-    // actually live. This is not "just increasing timeout" — it's replacing a
-    // single blind wait with a live readiness check.
-    //
-    // TESTABILITY: Both constants are configurable via environment variables so
-    // tests can set PUSH_VPN_WAIT_MS=0 / PUSH_VPN_POLL_MS=0 to skip the wait.
     const VPN_POLL_INTERVAL_MS = parseInt(process.env.PUSH_VPN_POLL_MS || '5000', 10);
     const VPN_WAIT_MAX_MS = parseInt(process.env.PUSH_VPN_WAIT_MS || '30000', 10);
-    let preDropReachable = false;
+    let vpnApiReachable = false;
     const vpnWaitStart = Date.now();
+    
     logger.info("[PUSH-CONFIG] Waiting for WireGuard VPN to become reachable...", {
         routerId,
         stage: "VPN_HANDSHAKE_WAIT",
         tunnelIp,
         maxWaitMs: VPN_WAIT_MAX_MS,
     });
+
+    // We must verify the API *through the VPN tunnel* before dropping WAN.
+    async function verifyApiOverVpn(): Promise<boolean> {
+        try {
+            const vpnService = new MikroTikService({
+                host: tunnelIp || "",
+                port: router.apiPort || router.port || 8728,
+                username: router.username!,
+                password: router.password!,
+            }, routerId, rawRouter?.tenantId || "");
+            const identity = await vpnService.apiRequestPublic("/system/identity", "GET");
+            const identObj = Array.isArray(identity) ? identity[0] : identity;
+            return !!(identObj && typeof identObj === "object" && "name" in identObj);
+        } catch (err: any) {
+            return false;
+        }
+    }
+
     while (Date.now() - vpnWaitStart < VPN_WAIT_MAX_MS) {
-        preDropReachable = await testVpnConnectivity();
-        if (preDropReachable) {
-            logger.info("[PUSH-CONFIG] VPN tunnel reachable", {
+        vpnApiReachable = await verifyApiOverVpn();
+        if (vpnApiReachable) {
+            logger.info("[PUSH-CONFIG] VPN tunnel and API verified", {
                 routerId,
-                stage: "VPN_HANDSHAKE_WAIT",
+                stage: "VPN_API_VERIFICATION",
                 result: "SUCCESS",
                 elapsedMs: Date.now() - vpnWaitStart,
             });
@@ -546,50 +518,61 @@ export async function executePushConfig(
         }
         await new Promise(r => setTimeout(r, VPN_POLL_INTERVAL_MS));
     }
-    if (!preDropReachable) {
-        logger.error("[PUSH-CONFIG] VPN tunnel did not become reachable within timeout", {
+
+    if (!vpnApiReachable) {
+        logger.error("[PUSH-CONFIG] VPN API did not become reachable within timeout. Aborting WAN DROP.", {
             routerId,
-            stage: "VPN_HANDSHAKE_WAIT",
+            stage: "VPN_API_VERIFICATION",
             result: "TIMEOUT",
             elapsedMs: Date.now() - vpnWaitStart,
         });
+        trackStep("VPN: Connectivity Verification", false, "Router API unreachable over VPN. Tunnel may have failed to establish.");
+        criticalStepFailed = true; // Block DROP rules
     }
 
-    if (!preDropReachable) {
-        logger.error("[PUSH-CONFIG] VPN ROUTER_UNREACHABLE before DROP rules. Rolling back.");
-        await rollbackFirewall();
-        trackStep("Firewall: pre-DROP VPN connectivity", false, "Router unreachable over VPN after 30s wait. WireGuard tunnel did not establish.");
-        routerUnreachableAfterFirewall = true;
-        firewallRolledBack = true;
-    } else {
-        // Phase C: DROP rules one by one
-        for (const dropRule of [...dropRules].reverse()) {
-            try {
-                await service.apiRequestPublic("/ip/firewall/filter", "PUT", { ...dropRule, "place-before": "0" });
-                logger.info(`[PUSH-CONFIG] DROP rule applied: ${dropRule.comment}`);
-            } catch (e: any) { if (!e.message?.includes("already")) fwDropFail++; }
+    // -- Phase C: Dead-Man's Switch & WAN Drop -------------------------------
+    // Only proceed to Drop if we proved the VPN works.
+    if (vpnApiReachable) {
+        const recoveryId = `hq-recovery-${Date.now()}`;
+        try {
+            logger.info("[PUSH-CONFIG] Activating Firewall Dead-Man's Switch...");
+            await service.apiRequestPublic("/system/scheduler", "PUT", {
+                name: recoveryId,
+                interval: "00:03:00", // 3 minutes
+                "on-event": `/ip firewall filter remove [find comment~"HQ INVESTMENT" and action="drop"]; /system scheduler remove ${recoveryId}`
+            });
 
-            const stillReachable = await testVpnConnectivity();
-            if (!stillReachable) {
-                routerUnreachableAfterFirewall = true;
-                logger.error(`[PUSH-CONFIG] ROUTER_UNREACHABLE_AFTER_FIREWALL (VPN) — after: ${dropRule.comment}`);
-                await rollbackFirewall();
-                firewallRolledBack = true;
-                trackStep("Firewall: DROP rule VPN connectivity", false, `ROUTER_UNREACHABLE_AFTER_FIREWALL over VPN after: ${dropRule.comment}. All rules rolled back.`);
-                break;
+            logger.info("[PUSH-CONFIG] Applying WAN Drop Rules...");
+            for (const dropRule of [...dropRules].reverse()) {
+                try {
+                    await service.apiRequestPublic("/ip/firewall/filter", "PUT", { ...dropRule, "place-before": "0" });
+                } catch (e: any) { 
+                    if (!e.message?.includes("already")) fwDropFail++; 
+                }
             }
-        }
-        if (!routerUnreachableAfterFirewall) {
-            trackStep("Firewall: DROP rules", fwDropFail === 0);
+
+            // Phase D: Final Verification & Commit
+            const stillReachable = await verifyApiOverVpn();
+            if (stillReachable) {
+                logger.info("[PUSH-CONFIG] Final VPN API Verification SUCCESS. Canceling Dead-Man's Switch.");
+                await service.apiRequestPublic(`/system/scheduler/${recoveryId}`, "DELETE").catch(() => {});
+                trackStep("Firewall: DROP rules", fwDropFail === 0);
+            } else {
+                logger.error("[PUSH-CONFIG] ROUTER_UNREACHABLE_AFTER_FIREWALL. Waiting for Dead-Man's Switch to restore access.");
+                routerUnreachableAfterFirewall = true;
+                firewallRolledBack = true;
+                trackStep("Firewall: DROP rule VPN connectivity", false, "ROUTER_UNREACHABLE_AFTER_FIREWALL. Router will auto-recover in 3 minutes.");
+            }
+        } catch (e: any) {
+            logger.error("[PUSH-CONFIG] Critical error during firewall provisioning", { error: e.message });
+            trackStep("Firewall: Provisioning", false, e.message);
         }
     }
-    
-    if (!routerUnreachableAfterFirewall) {
+
+    if (!routerUnreachableAfterFirewall && vpnApiReachable) {
         const fwFail = fwAcceptFail + fwDropFail;
         trackStep("Firewall: push all rules", fwFail === 0, fwFail > 0 ? `${fwFail} rule(s) failed` : undefined);
-        logger.info(`[PUSH-CONFIG] Firewall lockdown applied. Accept failures: ${fwAcceptFail}, Drop failures: ${fwDropFail}`);
     }
-
     // -- Verify tunnel ---------------------------------------------------------
     await new Promise(resolve => setTimeout(resolve, 1000));
     const tunnelVerified = router.wgPublicKey

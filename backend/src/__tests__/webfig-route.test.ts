@@ -113,7 +113,7 @@ describe('webfig route', () => {
     // New route returns browserReachable=false with VPN guidance.
     expect(json.browserReachable).toBe(false);
     expect(json.webfigUrl).toContain('10.200.0.200');
-    expect(json.accessNote).toContain('WireGuard');
+    expect(json.accessNote).toContain('Management VPN');
   });
 
   it('returns 404 when the router does not exist', async () => {
