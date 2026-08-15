@@ -65,17 +65,13 @@ jest.mock('@/lib/wireguardConnectivity', () => ({
 }));
 
 describe('WireGuard route', () => {
-  jest.setTimeout(30000);
+  jest.setTimeout(20000);
   beforeEach(() => {
     jest.clearAllMocks();
     process.env.WG_SERVER_PUBLIC_KEY = '';
     process.env.WG_SERVER_ENDPOINT = '';
     process.env.WG_SERVER_PORT = '';
     process.env.SERVER_PUBLIC_IP = '';
-    // Skip VPN handshake polling loop — no real WireGuard tunnel in tests.
-    // pushConfigExecutor reads PUSH_VPN_WAIT_MS / PUSH_VPN_POLL_MS to control the loop.
-    process.env.PUSH_VPN_WAIT_MS = '0';
-    process.env.PUSH_VPN_POLL_MS = '0';
     mockCheckWireGuardReachability.mockResolvedValue({ ok: false, output: 'Request timed out', reason: 'failed' });
     mockCheckPeerHandshake.mockResolvedValue(true);
   });

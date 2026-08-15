@@ -453,7 +453,6 @@ export async function executePushConfig(
         // wanInterface is resolved from the RouterOS default route earlier in this function.
         { chain: "forward", "in-interface": "all-ppp", "out-interface": wanInterface, action: "accept", comment: "Allow PPPoE to Internet - HQ INVESTMENT" },
         { chain: "forward", "connection-state": "established,related", action: "accept", comment: "Allow Established Forward - HQ INVESTMENT" },
-        { chain: "input", "in-interface": "wg-hq", action: "accept", comment: "Allow WG input - HQ INVESTMENT" },
         { chain: "forward", "in-interface": "wg-hq", action: "accept", comment: "Allow WG traffic - HQ INVESTMENT" },
         { chain: "forward", "out-interface": "wg-hq", action: "accept", comment: "Allow WG return - HQ INVESTMENT" },
     ];
@@ -464,115 +463,86 @@ export async function executePushConfig(
         { chain: "forward", "in-interface": lanBridgeName, action: "drop", comment: "Drop unauthenticated LAN forward - HQ INVESTMENT" },
     ];
 
-    // -- Phase A: ACCEPT rules -----------------------------------------------
+    // Test connectivity over the new WireGuard VPN tunnel IP to ensure it's routing
+    // properly before we drop WAN access.
+    async function testVpnConnectivity(): Promise<boolean> {
+        try {
+            const vpnService = new MikroTikService({
+                host: tunnelIp || "",
+                port: router.apiPort || router.port || 8728,
+                username: router.username!,   // guaranteed non-null: validated at top of function
+                password: router.password!,   // guaranteed non-null: validated at top of function
+            }, routerId, rawRouter?.tenantId || "");
+            await vpnService.apiRequestPublic("/system/identity", "GET");
+            return true;
+        } catch (err: any) {
+            logger.warn(`[PUSH-CONFIG] VPN Connectivity test failed: ${err.message}`);
+            return false;
+        }
+    }
+    
+    async function rollbackFirewall(): Promise<void> {
+        try {
+            const rules = await service.apiRequestPublic("/ip/firewall/filter");
+            if (Array.isArray(rules)) {
+                for (const rule of rules) {
+                    if (rule.comment?.includes("HQ INVESTMENT")) await runApiSafe(`/ip/firewall/filter/${rule[".id"]}`, "DELETE");
+                }
+            }
+            logger.warn("[PUSH-CONFIG] Firewall rollback completed.");
+        } catch (e) { logger.error("[PUSH-CONFIG] Firewall rollback FAILED:", { error: String(e) }); }
+    }
+
+    // Phase A: ACCEPT rules
     let fwAcceptFail = 0;
     for (const rule of [...acceptRules].reverse()) {
         try { await service.apiRequestPublic("/ip/firewall/filter", "PUT", { ...rule, "place-before": "0" }); }
         catch (e: any) { if (!e.message?.includes("already")) fwAcceptFail++; }
     }
 
-    // -- Phase B: Wait for VPN Handshake & IP Reachability -------------------
+    // Phase B: connectivity before DROP
     let routerUnreachableAfterFirewall = false;
     let firewallRolledBack = false;
     let fwDropFail = 0;
-
-    const VPN_POLL_INTERVAL_MS = parseInt(process.env.PUSH_VPN_POLL_MS || '5000', 10);
-    const VPN_WAIT_MAX_MS = parseInt(process.env.PUSH_VPN_WAIT_MS || '30000', 10);
-    let vpnApiReachable = false;
-    const vpnWaitStart = Date.now();
+    // Wait a few seconds to let WireGuard tunnel establish before testing
+    await new Promise(res => setTimeout(res, 3000));
     
-    logger.info("[PUSH-CONFIG] Waiting for WireGuard VPN to become reachable...", {
-        routerId,
-        stage: "VPN_HANDSHAKE_WAIT",
-        tunnelIp,
-        maxWaitMs: VPN_WAIT_MAX_MS,
-    });
+    const preDropReachable = await testVpnConnectivity();
+    if (!preDropReachable) {
+        logger.error("[PUSH-CONFIG] VPN ROUTER_UNREACHABLE before DROP rules. Rolling back.");
+        await rollbackFirewall();
+        trackStep("Firewall: pre-DROP VPN connectivity", false, "Router unreachable over VPN before DROP rules");
+        routerUnreachableAfterFirewall = true;
+        firewallRolledBack = true;
+    } else {
+        // Phase C: DROP rules one by one
+        for (const dropRule of [...dropRules].reverse()) {
+            try {
+                await service.apiRequestPublic("/ip/firewall/filter", "PUT", { ...dropRule, "place-before": "0" });
+                logger.info(`[PUSH-CONFIG] DROP rule applied: ${dropRule.comment}`);
+            } catch (e: any) { if (!e.message?.includes("already")) fwDropFail++; }
 
-    // We must verify the API *through the VPN tunnel* before dropping WAN.
-    async function verifyApiOverVpn(): Promise<boolean> {
-        try {
-            const vpnService = new MikroTikService({
-                host: tunnelIp || "",
-                port: router.apiPort || router.port || 8728,
-                username: router.username!,
-                password: router.password!,
-            }, routerId, rawRouter?.tenantId || "");
-            const identity = await vpnService.apiRequestPublic("/system/identity", "GET");
-            const identObj = Array.isArray(identity) ? identity[0] : identity;
-            return !!(identObj && typeof identObj === "object" && "name" in identObj);
-        } catch (err: any) {
-            return false;
-        }
-    }
-
-    while (Date.now() - vpnWaitStart < VPN_WAIT_MAX_MS) {
-        vpnApiReachable = await verifyApiOverVpn();
-        if (vpnApiReachable) {
-            logger.info("[PUSH-CONFIG] VPN tunnel and API verified", {
-                routerId,
-                stage: "VPN_API_VERIFICATION",
-                result: "SUCCESS",
-                elapsedMs: Date.now() - vpnWaitStart,
-            });
-            break;
-        }
-        await new Promise(r => setTimeout(r, VPN_POLL_INTERVAL_MS));
-    }
-
-    if (!vpnApiReachable) {
-        logger.error("[PUSH-CONFIG] VPN API did not become reachable within timeout. Aborting WAN DROP.", {
-            routerId,
-            stage: "VPN_API_VERIFICATION",
-            result: "TIMEOUT",
-            elapsedMs: Date.now() - vpnWaitStart,
-        });
-        trackStep("VPN: Connectivity Verification", false, "Router API unreachable over VPN. Tunnel may have failed to establish.");
-        criticalStepFailed = true; // Block DROP rules
-    }
-
-    // -- Phase C: Dead-Man's Switch & WAN Drop -------------------------------
-    // Only proceed to Drop if we proved the VPN works.
-    if (vpnApiReachable) {
-        const recoveryId = `hq-recovery-${Date.now()}`;
-        try {
-            logger.info("[PUSH-CONFIG] Activating Firewall Dead-Man's Switch...");
-            await service.apiRequestPublic("/system/scheduler", "PUT", {
-                name: recoveryId,
-                interval: "00:03:00", // 3 minutes
-                "on-event": `/ip firewall filter remove [find comment~"HQ INVESTMENT" and action="drop"]; /system scheduler remove ${recoveryId}`
-            });
-
-            logger.info("[PUSH-CONFIG] Applying WAN Drop Rules...");
-            for (const dropRule of [...dropRules].reverse()) {
-                try {
-                    await service.apiRequestPublic("/ip/firewall/filter", "PUT", { ...dropRule, "place-before": "0" });
-                } catch (e: any) { 
-                    if (!e.message?.includes("already")) fwDropFail++; 
-                }
-            }
-
-            // Phase D: Final Verification & Commit
-            const stillReachable = await verifyApiOverVpn();
-            if (stillReachable) {
-                logger.info("[PUSH-CONFIG] Final VPN API Verification SUCCESS. Canceling Dead-Man's Switch.");
-                await service.apiRequestPublic(`/system/scheduler/${recoveryId}`, "DELETE").catch(() => {});
-                trackStep("Firewall: DROP rules", fwDropFail === 0);
-            } else {
-                logger.error("[PUSH-CONFIG] ROUTER_UNREACHABLE_AFTER_FIREWALL. Waiting for Dead-Man's Switch to restore access.");
+            const stillReachable = await testVpnConnectivity();
+            if (!stillReachable) {
                 routerUnreachableAfterFirewall = true;
+                logger.error(`[PUSH-CONFIG] ROUTER_UNREACHABLE_AFTER_FIREWALL (VPN) — after: ${dropRule.comment}`);
+                await rollbackFirewall();
                 firewallRolledBack = true;
-                trackStep("Firewall: DROP rule VPN connectivity", false, "ROUTER_UNREACHABLE_AFTER_FIREWALL. Router will auto-recover in 3 minutes.");
+                trackStep("Firewall: DROP rule VPN connectivity", false, `ROUTER_UNREACHABLE_AFTER_FIREWALL over VPN after: ${dropRule.comment}. All rules rolled back.`);
+                break;
             }
-        } catch (e: any) {
-            logger.error("[PUSH-CONFIG] Critical error during firewall provisioning", { error: e.message });
-            trackStep("Firewall: Provisioning", false, e.message);
+        }
+        if (!routerUnreachableAfterFirewall) {
+            trackStep("Firewall: DROP rules", fwDropFail === 0);
         }
     }
-
-    if (!routerUnreachableAfterFirewall && vpnApiReachable) {
+    
+    if (!routerUnreachableAfterFirewall) {
         const fwFail = fwAcceptFail + fwDropFail;
         trackStep("Firewall: push all rules", fwFail === 0, fwFail > 0 ? `${fwFail} rule(s) failed` : undefined);
+        logger.info(`[PUSH-CONFIG] Firewall lockdown applied. Accept failures: ${fwAcceptFail}, Drop failures: ${fwDropFail}`);
     }
+
     // -- Verify tunnel ---------------------------------------------------------
     await new Promise(resolve => setTimeout(resolve, 1000));
     const tunnelVerified = router.wgPublicKey
@@ -589,29 +559,8 @@ export async function executePushConfig(
         dns:              dbDns         || "8.8.8.8,1.1.1.1",
         serviceType:      (rawRouter as any).serviceType || "both",
     };
-    if (tunnelVerified) {
-        // FORENSIC-FIX-007: When router.host is switched to the WireGuard VPN tunnel IP,
-        // all browser-facing features (WebFig, WinBox) that use router.host will receive a
-        // private VPN IP that the admin browser cannot route to. Log this transition clearly
-        // so operators understand why WebFig/WinBox show VPN guidance after Auto-Push.
-        // The webfig/route.ts and winbox-session/route.ts handlers now detect this case
-        // and provide proper user guidance instead of silently timing out.
-        logger.info("[PUSH-CONFIG] Switching router.host to VPN tunnel IP", {
-            routerId,
-            stage: "DB_UPDATE",
-            previousHost: rawRouter.host,
-            newHost: tunnelIp,
-            note: "WebFig and WinBox will now require VPN access or WAN IP override.",
-        });
-        updateData.host = tunnelIp;
-    } else {
-        logger.warn("[PUSH-CONFIG] Peer handshake not confirmed — keeping original host IP", {
-            routerId,
-            stage: "DB_UPDATE",
-            tunnelIp,
-            note: "VPN_NOT_ESTABLISHED",
-        });
-    }
+    if (tunnelVerified) updateData.host = tunnelIp;
+    else logger.warn(`[PUSH-CONFIG] Peer ${tunnelIp} handshake not confirmed. Keeping original host IP.`);
     await updateRouterWgFields(db, routerId, updateData);
 
     // -- Audit log -------------------------------------------------------------
