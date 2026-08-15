@@ -164,5 +164,6 @@ export function startLockHeartbeat(lock: RouterLock, intervalMs = HEARTBEAT_INTE
             logger.error(`[LockHeartbeat] Failed to renew lock for router ${lock.routerId} — operation may be interrupted`);
         }
     }, intervalMs);
+    timer.unref();
     return () => clearInterval(timer);
 }

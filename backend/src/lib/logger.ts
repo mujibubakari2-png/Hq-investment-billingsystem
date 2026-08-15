@@ -110,6 +110,7 @@ function scheduleFlush(): void {
     _flushTimer = null;
     flushBatch().catch(() => {});
   }, FLUSH_INTERVAL_MS);
+  _flushTimer.unref();
 }
 
 function sendToLogtail(entry: LogEntry): void {

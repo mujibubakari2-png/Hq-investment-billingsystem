@@ -52,20 +52,19 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
                 webfigPort
             );
             sessionId = proxy.sessionId;
-            webfigUrl = `http://${proxyHost}:${proxy.port}/webfig/`;
+            webfigUrl = `https://${proxyHost}/webfig/`;
             instructions = `A secure WebFig gateway has been opened. Connect to ${webfigUrl}. This session expires in 1 hour.`;
             
             logger.info("[WEBFIG] Secure proxy session created", {
                 routerId: id,
                 proxyHost,
-                proxyPort: proxy.port,
                 targetHost: target.host,
                 targetPort: webfigPort,
                 userId: userPayload.userId
             });
         }
 
-        return jsonResponse({
+        const response = jsonResponse({
             routerId: router.id,
             routerName: router.name,
             host: proxyHost,
@@ -77,6 +76,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
             sessionId,
             accessNote: instructions,
         });
+
+        if (sessionId) {
+            response.headers.set('Set-Cookie', `__Host-webfig_session_id=${sessionId}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${4 * 60 * 60}`);
+        }
+
+        return response;
     } catch (err: any) {
         logger.error("[WEBFIG] Error building access info", {
             error: err instanceof Error ? err.message : String(err),

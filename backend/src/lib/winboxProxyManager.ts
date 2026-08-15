@@ -54,7 +54,19 @@ function cleanupExpired() {
         }
     }
 }
-setInterval(cleanupExpired, 60_000);
+let cleanupInterval: ReturnType<typeof setInterval> | null = setInterval(cleanupExpired, 60_000);
+if (cleanupInterval) cleanupInterval.unref();
+
+export function shutdownWinboxProxy(callback?: () => void) {
+    if (cleanupInterval) {
+        clearInterval(cleanupInterval);
+        cleanupInterval = null;
+    }
+    for (const sessionId of sessions.keys()) {
+        destroySession(sessionId);
+    }
+    if (callback) callback();
+}
 
 export async function createWinboxSession(
     routerId: string,

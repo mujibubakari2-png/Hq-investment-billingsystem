@@ -58,11 +58,22 @@ const DISCOVERY_QUEUE_NAME = `router-discovery${workerRegion}`;
 
 let _queue: Queue<RouterJobData> | null = null;
 let _discoveryQueue: Queue<any> | null = null;
+const _regionQueues = new Map<string, Queue<RouterJobData>>();
 
 /** Get a region-specific queue instance based on the target router's region */
 export function getRegionQueue(region?: string | null): Queue<RouterJobData> {
     const r = region ? `:${region.toLowerCase()}` : '';
-    return new Queue(`router-ops${r}`, { connection: getRedisConnection() });
+    const name = `router-ops${r}`;
+    
+    if (!_regionQueues.has(name)) {
+        const queue = new Queue<RouterJobData>(name, { connection: getRedisConnection() });
+        queue.on("error", (err) => {
+            logger.error(`[Region Queue ${name}] error`, { error: err.message });
+        });
+        _regionQueues.set(name, queue);
+    }
+    
+    return _regionQueues.get(name)!;
 }
 
 export function getRouterQueue(): Queue<RouterJobData> {
@@ -108,6 +119,10 @@ export async function closeRouterQueue(): Promise<void> {
     if (_discoveryQueue) {
         try { await _discoveryQueue.close(); } catch { /* ignore */ } finally { _discoveryQueue = null; }
     }
+    for (const [name, q] of _regionQueues.entries()) {
+        try { await q.close(); } catch { /* ignore */ }
+    }
+    _regionQueues.clear();
 }
 
 export type EnqueueOptions = {

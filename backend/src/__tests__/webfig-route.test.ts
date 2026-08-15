@@ -7,7 +7,7 @@ import { NextRequest } from 'next/server';
 
 const mockRequirePermission = jest.fn();
 const mockGetTenantClient = jest.fn();
-const mockCanAccessTenant = jest.fn(() => true);
+const mockCanAccessTenant = jest.fn((...args: any[]) => true);
 
 jest.mock('@/lib/rbac', () => ({
   requirePermission: (...args: any[]) => mockRequirePermission(...args),
@@ -78,9 +78,13 @@ describe('webfig route', () => {
 
     expect(res.status).toBe(200);
     expect(json.browserReachable).toBe(true);
-    expect(json.webfigUrl).toMatch(/^http:\/\/localhost:\d+\/webfig\/$/);
+    expect(json.webfigUrl).toBe('https://localhost/webfig/');
     expect(json.sessionId).toBeDefined();
     expect(json.accessNote).toContain('secure WebFig gateway');
+
+    const setCookie = res.headers.get('set-cookie');
+    expect(setCookie).toBeDefined();
+    expect(setCookie).toContain('__Host-webfig_session_id=');
   });
 
   it('returns JSON with a secure proxy URL for a WireGuard router with private VPN IP', async () => {
@@ -108,11 +112,19 @@ describe('webfig route', () => {
     const json = await res.json();
 
     expect(res.status).toBe(200);
-    // New route securely proxies ALL connections, so browser is always reachable via proxy.
+    // New route securely proxies ALL connections via single internal server
     expect(json.browserReachable).toBe(true);
-    expect(json.webfigUrl).toMatch(/^http:\/\/localhost:\d+\/webfig\/$/);
+    expect(json.webfigUrl).toBe('https://localhost/webfig/');
     expect(json.sessionId).toBeDefined();
     expect(json.accessNote).toContain('secure WebFig gateway');
+
+    // Check cookie
+    const setCookie = res.headers.get('set-cookie');
+    expect(setCookie).toBeDefined();
+    expect(setCookie).toContain('__Host-webfig_session_id=');
+    expect(setCookie).toContain('Path=/');
+    expect(setCookie).toContain('Secure');
+    expect(setCookie).toContain('HttpOnly');
   });
 
   it('returns 404 when the router does not exist', async () => {
