@@ -117,7 +117,7 @@ server {
 
     # ── WebFig Central Proxy ───────────────────────────────────────────────────
     # Routes to the singleton Node proxy on 127.0.0.1:8092.
-    location ~ ^/(webfig|jsproxy)/ {
+    location ~ ^/(webfig|jsproxy|favicon\.ico) {
         proxy_pass http://127.0.0.1:8092;
         proxy_http_version 1.1;
         proxy_set_header Upgrade           $http_upgrade;
