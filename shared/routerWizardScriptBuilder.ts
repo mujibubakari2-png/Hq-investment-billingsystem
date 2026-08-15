@@ -287,7 +287,7 @@ export function buildRouterWizardScript(params: RouterSetupWizardScriptParams): 
     ':local wanIface ""',
     ':foreach r in=[/ip route find dst-address="0.0.0.0/0" active=yes] do={',
     '    :if ($wanIface = "") do={',
-    '        :set wanIface [/ip route get $r gateway-interface]',
+    '        :set wanIface [/ip route get $r vrf-interface]',
     '    }',
     '}',
     ':if ($wanIface = "") do={',
