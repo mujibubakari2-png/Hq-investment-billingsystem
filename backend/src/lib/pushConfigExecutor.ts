@@ -110,17 +110,44 @@ export async function executePushConfig(
         throw new Error("RADIUS_SECRET_MISSING: Router has a placeholder or insecure RADIUS secret configured.");
     }
 
+    // -- PHASE 1: Validate Configuration & Key Lifecycle -----------------------
+    logger.info(`[PUSH-CONFIG] Phase 1: Validating configuration for router ${routerId}...`);
+    
+    const serverWgPublicKey = router.wgPeerPublicKey ?? await wireguardManager.getServerPublicKey() ?? process.env.WG_SERVER_PUBLIC_KEY;
+    if (!serverWgPublicKey) {
+        throw new Error("WIREGUARD_KEY_CONFIGURATION_INCOMPLETE: Server WireGuard public key is unavailable.");
+    }
+
+    if (!router.wgPublicKey || !router.wgPrivateKey) {
+        throw new Error("WIREGUARD_KEY_CONFIGURATION_INCOMPLETE: Router WireGuard key material is missing. Please generate keys before running Auto-Push.");
+    }
+
+    const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL;
+    let serverEndpoint = payload.serverEndpoint || router.wgServerEndpoint || process.env.WG_SERVER_ENDPOINT || "";
+    if (!serverEndpoint && appUrl) {
+        try { serverEndpoint = new URL(appUrl).hostname; }
+        catch { serverEndpoint = appUrl.replace(/^https?:\/\//, "").split("/")[0]; }
+    }
+    if (!serverEndpoint) serverEndpoint = process.env.SERVER_PUBLIC_IP || "vpn.billing-system.local";
+    const serverPort = payload.serverPort || parseInt(process.env.WG_SERVER_PORT || "51820");
+
+    if (!serverEndpoint || serverEndpoint === "vpn.billing-system.local" || serverEndpoint === "localhost") {
+        throw new Error("WIREGUARD_KEY_CONFIGURATION_INCOMPLETE: Server WireGuard endpoint is invalid or unreachable. Configure WG_SERVER_ENDPOINT or SERVER_PUBLIC_IP.");
+    }
+
+    const wgServerIp = await wireguardManager.getServerIp();
+    const subnetPrefix = wgServerIp.split(".").slice(0, 3).join(".");
+    let tunnelIp = router.wgTunnelIp;
+    if (!tunnelIp || !tunnelIp.startsWith(`${subnetPrefix}.`)) {
+        throw new Error("WIREGUARD_KEY_CONFIGURATION_INCOMPLETE: Router Tunnel IP is not properly allocated in the DB. Please complete the WireGuard setup first.");
+    }
+
     const stepResults: StepResult[] = [];
     function trackStep(step: string, ok: boolean, err?: unknown): void {
         const error = err instanceof Error ? err.message : err ? String(err) : undefined;
         stepResults.push({ step, ok, error });
         if (!ok) logger.warn(`[PUSH-CONFIG] Step failed: ${step}`, { error });
     }
-
-    const wgServerIp = await wireguardManager.getServerIp();
-    const subnetPrefix = wgServerIp.split(".").slice(0, 3).join(".");
-    let tunnelIp = router.wgTunnelIp;
-    if (!tunnelIp || !tunnelIp.startsWith(`${subnetPrefix}.`)) tunnelIp = `${subnetPrefix}.200`;
 
     // DB-first LAN metadata (canonical source set by Setup Wizard)
     const tunnelParts = tunnelIp.split(".");
@@ -141,16 +168,7 @@ export async function executePushConfig(
     const hsPoolEnd     = dbHsPool?.split("-")[1]   || `${lanPrefix}.149`;
     const ppoePoolStart = dbPpoePool?.split("-")[0] || `${lanPrefix}.150`;
     const ppoePoolEnd   = dbPpoePool?.split("-")[1] || `${lanPrefix}.250`;
-
-    // Server endpoint
-    const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL;
-    let serverEndpoint = payload.serverEndpoint || router.wgServerEndpoint || process.env.WG_SERVER_ENDPOINT || "";
-    if (!serverEndpoint && appUrl) {
-        try { serverEndpoint = new URL(appUrl).hostname; }
-        catch { serverEndpoint = appUrl.replace(/^https?:\/\//, "").split("/")[0]; }
-    }
-    if (!serverEndpoint) serverEndpoint = process.env.SERVER_PUBLIC_IP || "vpn.billing-system.local";
-    const serverPort = payload.serverPort || parseInt(process.env.WG_SERVER_PORT || "51820");
+    
     const lanPorts: string[] = Array.isArray(payload.lanPorts) ? payload.lanPorts : [];
 
     const service = await getMikroTikService(routerId, tenantId);
@@ -351,10 +369,7 @@ export async function executePushConfig(
         }
     } catch {}
     
-    const serverWgPublicKey = router.wgPeerPublicKey ?? await wireguardManager.getServerPublicKey() ?? process.env.WG_SERVER_PUBLIC_KEY;
-    if (!serverWgPublicKey) {
-        throw new Error("Server WireGuard public key is unavailable; refusing configuration push");
-    }
+    // serverWgPublicKey was resolved during Phase 1 validation
 
     try {
         await service.apiRequestPublic("/interface/wireguard/peers", "PUT", { interface: "wg-hq", "public-key": serverWgPublicKey, ...(router.wgPresharedKey ? { "preshared-key": router.wgPresharedKey } : {}), "allowed-address": `${subnetPrefix}.0/24`, "endpoint-address": serverEndpoint, "endpoint-port": String(serverPort), "persistent-keepalive": "25s", comment: "HQ INVESTMENT ISP Server" });
@@ -658,10 +673,10 @@ export async function executePushConfig(
         firewallRolledBack,
         firstFailedCommand,
         phaseMatrix,
-        message: hasCriticalFailure
-            ? `Push-config completed with ${failedSteps.length} critical failure(s). Check step details and retry.`
-            : firewallRolledBack
-                ? `Services configured on ${router.name}, but firewall was rolled back (router unreachable after DROP WAN). WireGuard tunnel may need manual verification. Tunnel IP: ${tunnelIp}.`
+        message: firewallRolledBack
+            ? `Services configured on ${router.name}, but firewall was rolled back (router unreachable after DROP WAN). WireGuard tunnel may need manual verification. Tunnel IP: ${tunnelIp}.`
+            : hasCriticalFailure
+                ? `Push-config completed with ${failedSteps.length} critical failure(s). Check step details and retry.`
                 : failedSteps.length > 0
                     ? `WireGuard configured on ${router.name} with ${failedSteps.length} minor issue(s). Core functions operational.${tunnelVerified ? ` Tunnel IP: ${tunnelIp}.` : ""}`
                     : tunnelVerified

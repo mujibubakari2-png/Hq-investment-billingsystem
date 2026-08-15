@@ -10,7 +10,7 @@
  *   WizardSteps456.tsx   — Step 4 (interfaces) + Step 5 (generate) + Step 6 (verify)
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
@@ -107,31 +107,15 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
     const apiHost = publicApiBase.startsWith('http') ? new URL(publicApiBase).hostname : window.location.hostname;
     const routerName = routerData?.name || 'Loading...';
 
-    // ── Initialise ────────────────────────────────────────────────────────
+    // -- Initialise
     useEffect(() => {
         if (!routerData && routerId) {
             routersApi.get(routerId).then(setRouterData).catch(console.error);
         }
     }, [routerId]);
 
-    // BUG-004 FIX: Use a ref to ensure we only apply the DB secret ONCE.
-    // Without this, if routerData refetches or delays and the user has
-    // started typing a new secret manually, the effect could run again
-    // and clobber their input if `prev` was somehow falsy.
-    const radiusSecretFetched = useRef(false);
-    useEffect(() => {
-        if (!routerData || radiusSecretFetched.current) return;
 
-        if (routerData.radiusSecret) {
-            setRadiusSecret(prev => {
-                // Only use the DB secret if the user hasn't typed anything yet
-                return prev ? prev : (routerData.radiusSecret as string);
-            });
-            radiusSecretFetched.current = true;
-        }
-    }, [routerData]);
-
-    // Fetch WireGuard config → derive LAN IPs
+    // Fetch WireGuard config to derive suggested LAN IPs
     useEffect(() => {
         if (!routerId) return;
         routersApi.wireguard?.getConfig?.(routerId)

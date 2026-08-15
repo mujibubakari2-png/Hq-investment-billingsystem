@@ -9,6 +9,9 @@ export interface VerificationResult {
     port: number | null;
     statusText?: string;
     details?: any;
+    available?: boolean;
+    www?: { enabled: boolean; port: number | null };
+    wwwSsl?: { enabled: boolean; port: number | null };
 }
 
 export interface FullServiceVerification {
@@ -65,42 +68,64 @@ export async function verifyRouterServices(service: MikroTikService): Promise<Fu
     try {
         // 1. IP Services (WebFig, WinBox, API)
         const services = normalizeRosResponse(await service.apiRequestPublic("/ip/service", "GET"));
+        const webfigData = {
+            www: { enabled: false, port: 80 as number | null },
+            wwwSsl: { enabled: false, port: 443 as number | null }
+        };
         for (const svc of services) {
             const enabled = svc.disabled !== "true" && svc.disabled !== true;
             const port = parseInt(svc.port || "0", 10);
-            if (svc.name === "www" || svc.name === "www-ssl") {
-                result.webfig = { reachable: true, authenticated: true, configured: true, enabled, port };
+            if (svc.name === "www") {
+                webfigData.www = { enabled, port: isNaN(port) ? null : port };
+            }
+            if (svc.name === "www-ssl") {
+                webfigData.wwwSsl = { enabled, port: isNaN(port) ? null : port };
             }
             if (svc.name === "winbox") {
-                result.winbox = { reachable: true, authenticated: true, configured: true, enabled, port };
+                result.winbox = { reachable: true, authenticated: true, configured: true, enabled, port: isNaN(port) ? null : port };
             }
         }
+        const webfigAvailable = webfigData.www.enabled || webfigData.wwwSsl.enabled;
+        result.webfig = {
+            reachable: true,
+            authenticated: true,
+            configured: true,
+            enabled: webfigAvailable,
+            available: webfigAvailable,
+            www: webfigData.www,
+            wwwSsl: webfigData.wwwSsl,
+            port: webfigData.wwwSsl.enabled ? webfigData.wwwSsl.port : webfigData.www.port
+        };
 
         // 2. WireGuard
         const wgIfaces = normalizeRosResponse(await service.apiRequestPublic("/interface/wireguard", "GET"));
         if (wgIfaces.length > 0) {
-            const enabled = wgIfaces[0].disabled !== "true" && wgIfaces[0].disabled !== true;
-            result.wireguard = { reachable: true, authenticated: true, configured: true, enabled, port: parseInt(wgIfaces[0]["listen-port"] || "0", 10) };
+            const hqWg = wgIfaces.find((i: any) => i.name === "wg-hq") || wgIfaces[0];
+            const enabled = hqWg.disabled !== "true" && hqWg.disabled !== true;
+            result.wireguard = { reachable: true, authenticated: true, configured: true, enabled, port: parseInt(hqWg["listen-port"] || "0", 10) };
         }
 
         // 3. RADIUS
         const radiusClients = normalizeRosResponse(await service.apiRequestPublic("/radius", "GET"));
         if (radiusClients.length > 0) {
-            const enabled = radiusClients[0].disabled !== "true" && radiusClients[0].disabled !== true;
-            result.radius = { reachable: true, authenticated: true, configured: true, enabled, port: null, details: radiusClients[0].address };
+            const hqRad = radiusClients.find((r: any) => r.comment?.includes("HQ INVESTMENT") || (r.service && (r.service.includes("hotspot") || r.service.includes("ppp")))) || radiusClients[0];
+            const enabled = hqRad.disabled !== "true" && hqRad.disabled !== true;
+            result.radius = { reachable: true, authenticated: true, configured: true, enabled, port: null, details: hqRad.address };
         }
 
         // 4. Hotspot
         const hotspots = normalizeRosResponse(await service.apiRequestPublic("/ip/hotspot", "GET"));
         if (hotspots.length > 0) {
-            const enabled = hotspots[0].disabled !== "true" && hotspots[0].disabled !== true;
+            const hqHs = hotspots.find((h: any) => h.name?.startsWith("hq-hotspot") || h.name?.startsWith("hotspot-")) || hotspots[0];
+            const enabled = hqHs.disabled !== "true" && hqHs.disabled !== true;
             result.hotspot = { reachable: true, authenticated: true, configured: true, enabled, port: null };
         }
 
         // 5. PPPoE
         const pppoeServers = normalizeRosResponse(await service.apiRequestPublic("/interface/pppoe-server/server", "GET"));
         if (pppoeServers.length > 0) {
-            const enabled = pppoeServers[0].disabled !== "true" && pppoeServers[0].disabled !== true;
+            const hqPpp = pppoeServers.find((p: any) => p["service-name"]?.startsWith("pppoe-svc-")) || pppoeServers[0];
+            const enabled = hqPpp.disabled !== "true" && hqPpp.disabled !== true;
             result.pppoe = { reachable: true, authenticated: true, configured: true, enabled, port: null };
         }
 

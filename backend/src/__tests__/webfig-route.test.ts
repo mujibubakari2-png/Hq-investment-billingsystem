@@ -52,7 +52,7 @@ describe('webfig route', () => {
     mockCanAccessTenant.mockReturnValue(true);
   });
 
-  it('returns JSON with browserReachable=true for a direct-IP (WAN) router', async () => {
+  it('returns JSON with a secure proxy URL for a direct-IP (WAN) router', async () => {
     const { GET } = require('@/app/api/routers/[id]/webfig/route');
 
     mockRequirePermission.mockReturnValue({
@@ -78,12 +78,12 @@ describe('webfig route', () => {
 
     expect(res.status).toBe(200);
     expect(json.browserReachable).toBe(true);
-    expect(json.webfigUrl).toContain('203.0.113.1');
-    expect(json.host).toBe('203.0.113.1');
-    expect(json.accessNote).not.toContain('WireGuard');
+    expect(json.webfigUrl).toMatch(/^http:\/\/localhost:\d+\/webfig\/$/);
+    expect(json.sessionId).toBeDefined();
+    expect(json.accessNote).toContain('secure WebFig gateway');
   });
 
-  it('returns browserReachable=false for a WireGuard router with private VPN IP', async () => {
+  it('returns JSON with a secure proxy URL for a WireGuard router with private VPN IP', async () => {
     const { GET } = require('@/app/api/routers/[id]/webfig/route');
 
     mockRequirePermission.mockReturnValue({
@@ -108,12 +108,11 @@ describe('webfig route', () => {
     const json = await res.json();
 
     expect(res.status).toBe(200);
-    // FORENSIC-FIX-003: After Auto-Push, router.host is a private VPN IP.
-    // Old route returned HTML iframe pointing at this IP — silently blank.
-    // New route returns browserReachable=false with VPN guidance.
-    expect(json.browserReachable).toBe(false);
-    expect(json.webfigUrl).toContain('10.200.0.200');
-    expect(json.accessNote).toContain('Management VPN');
+    // New route securely proxies ALL connections, so browser is always reachable via proxy.
+    expect(json.browserReachable).toBe(true);
+    expect(json.webfigUrl).toMatch(/^http:\/\/localhost:\d+\/webfig\/$/);
+    expect(json.sessionId).toBeDefined();
+    expect(json.accessNote).toContain('secure WebFig gateway');
   });
 
   it('returns 404 when the router does not exist', async () => {

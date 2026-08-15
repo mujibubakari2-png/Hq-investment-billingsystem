@@ -41,13 +41,15 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
         const decryptedRouter = decryptRouterFields(router);
 
+        const isSuperAdmin = userPayload.role === "SUPER_ADMIN";
         const safeRouter = {
             ...decryptedRouter,
-            password: userPayload.role === "SUPER_ADMIN" ? decryptedRouter.password : mask(decryptedRouter.password),
-            wgPrivateKey: decryptedRouter.wgPrivateKey,
-            wgPresharedKey: decryptedRouter.wgPresharedKey,
-            // SEC-ROUTER-003 FIX: Unmask radiusSecret to align with frontend setup script generation requirements
-            radiusSecret: decryptedRouter.radiusSecret,
+            password:       isSuperAdmin ? decryptedRouter.password       : mask(decryptedRouter.password),
+            // These secrets are only needed server-side (script generation,
+            // WireGuard setup, RADIUS auth). Never send plaintext to the browser.
+            wgPrivateKey:   isSuperAdmin ? decryptedRouter.wgPrivateKey   : null,
+            wgPresharedKey: isSuperAdmin ? decryptedRouter.wgPresharedKey : null,
+            radiusSecret:   isSuperAdmin ? decryptedRouter.radiusSecret   : null,
         };
 
         return jsonResponse(safeRouter);
@@ -226,17 +228,20 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         // (enc:v1:...) for password/wgPrivateKey/wgPresharedKey/radiusSecret to the
         // browser network tab on every PUT call.
         const decryptedForResponse = decryptRouterFields(router as any);
+        const isSuperAdminPut = userPayload.role === 'SUPER_ADMIN';
         const safeResponse = {
             ...decryptedForResponse,
-            password:       userPayload.role === 'SUPER_ADMIN' ? decryptedForResponse.password : '****',
-            wgPrivateKey:   decryptedForResponse.wgPrivateKey,
-            wgPresharedKey: decryptedForResponse.wgPresharedKey,
-            radiusSecret:   decryptedForResponse.radiusSecret,
+            password:       isSuperAdminPut ? decryptedForResponse.password       : '****',
+            // Secrets are server-side only — never return plaintext to browser
+            wgPrivateKey:   isSuperAdminPut ? decryptedForResponse.wgPrivateKey   : null,
+            wgPresharedKey: isSuperAdminPut ? decryptedForResponse.wgPresharedKey : null,
+            radiusSecret:   isSuperAdminPut ? decryptedForResponse.radiusSecret   : null,
             status:         (router as any).status === 'ONLINE' ? 'Online' : 'Offline',
             router_id:      router.id,
             ip:             (router as any).host,
         };
         return jsonResponse(safeResponse);
+
     } catch {
         return errorResponse("Internal server error", 500);
     }

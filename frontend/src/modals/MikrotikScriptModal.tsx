@@ -1,13 +1,13 @@
-import { useState } from 'react';
-import { generateMikrotikScript } from '../utils/mikrotikScriptGenerator';
+import { useState, useEffect } from 'react';
 import { sanitizeMikroTikName } from '../utils/mikrotikUtils';
 import CloseIcon from '@mui/icons-material/Close';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import DownloadIcon from '@mui/icons-material/Download';
 import DescriptionIcon from '@mui/icons-material/Description';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import { getPublicApiBase } from '../utils/config';
+import SyncIcon from '@mui/icons-material/Sync';
 import type { Router } from '../types';
+import { routersApi } from '../api/networkApi';
 
 interface MikrotikScriptModalProps {
     router: Router;
@@ -16,64 +16,36 @@ interface MikrotikScriptModalProps {
 
 export default function MikrotikScriptModal({ router, onClose }: MikrotikScriptModalProps) {
     const [copied, setCopied] = useState(false);
+    const [script, setScript] = useState<string | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
-    // Generate router ID code - handle both numeric IDs and UUIDs
-    const generateRouterIdCode = (id: string): string => {
-        // If it's a numeric ID, pad it; if it's a UUID, use first 8 chars
-        const numericId = parseInt(id, 10);
-        if (!isNaN(numericId)) {
-            return `MYR-${String(numericId).padStart(3, '0')}VBHBC`;
-        }
-        // For UUIDs or other formats, extract alphanumeric prefix
-        const prefix = id.replace(/[^a-zA-Z0-9]/g, '').substring(0, 8).toUpperCase();
-        return `MYR-${prefix}VBHBC`;
-    };
+    // Fetch script from the server-side endpoint — secrets never leave the server.
+    // This replaces the legacy client-side generateMikrotikScript() which required
+    // router.radiusSecret (and router.password) to be present in browser state.
+    useEffect(() => {
+        setLoading(true);
+        setError(null);
+        routersApi.getScript(router.id)
+            .then((text: string) => { setScript(text); })
+            .catch((err: any) => {
+                setError(err?.message || String(err) || 'Failed to generate script. Ensure LAN IP, Gateway, Pool ranges, and DNS are configured on this router first.');
+                setScript(null);
+            })
+            .finally(() => setLoading(false));
+    }, [router.id]);
 
-    const routerIdCode = generateRouterIdCode(router.id);
-
-    const publicApiBase = getPublicApiBase();
-
-    // Extract hostname from the resolved base URL for RADIUS / walled-garden
-    const apiHost = publicApiBase.startsWith('http')
-        ? new URL(publicApiBase).hostname
-        : window.location.hostname;
-
-    // Safely generate the MikroTik script. The generator throws when
-    // required LAN/pool/DNS fields are missing; catch and surface a
-    // friendly message instead of letting the modal crash.
-    let mikrotikScript = '';
-    let generationError: string | null = null;
-    try {
-        mikrotikScript = generateMikrotikScript({
-            routerName: router.name,
-            routerUsername: router.username,
-            routerPassword: router.password,
-            routerId: routerIdCode,
-            apiHost,
-            publicApiBase,
-            isWireGuard: false,
-            lanIp: router.lanIp,
-            lanGateway: router.lanGateway,
-            hotspotPoolRange: router.hotspotPoolRange,
-            pppoePoolRange: router.pppoePoolRange,
-            dns: router.dns,
-            radiusSecret: router.radiusSecret,
-        });
-    } catch (err: any) {
-        generationError = err?.message || String(err);
-        mikrotikScript = `/* ${generationError} */`;
-    }
 
     const handleCopy = () => {
-        if (generationError) { alert(generationError); return; }
-        navigator.clipboard.writeText(mikrotikScript);
+        if (!script) return;
+        navigator.clipboard.writeText(script);
         setCopied(true);
         setTimeout(() => setCopied(false), 2500);
     };
 
     const handleDownload = () => {
-        if (generationError) { alert(generationError); return; }
-        const blob = new Blob([mikrotikScript], { type: 'text/plain' });
+        if (!script) return;
+        const blob = new Blob([script], { type: 'text/plain' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -93,7 +65,7 @@ export default function MikrotikScriptModal({ router, onClose }: MikrotikScriptM
                         <DescriptionIcon style={{ flexShrink: 0 }} />
                         <div style={{ minWidth: 0 }}>
                             <div style={{ fontWeight: 700, fontSize: '1.05rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>MikroTik Configuration Script</div>
-                            <div style={{ fontSize: '0.8rem', opacity: 0.85, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{router.name} — {routerIdCode}</div>
+                            <div style={{ fontSize: '0.8rem', opacity: 0.85, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{router.name}</div>
                         </div>
                     </div>
                     <button onClick={onClose} className="modal-close" style={{ color: '#fff', background: 'rgba(255,255,255,0.15)', flexShrink: 0 }}>
@@ -112,15 +84,25 @@ export default function MikrotikScriptModal({ router, onClose }: MikrotikScriptM
 
                 {/* Script Content */}
                 <div style={{ flex: 1, overflow: 'auto', padding: '0 24px 16px' }}>
-                    <pre style={{
-                        background: '#1e1e2e', color: '#cdd6f4',
-                        padding: 20, borderRadius: 10, fontSize: '0.78rem',
-                        lineHeight: 1.6, fontFamily: "'Fira Code', 'Consolas', monospace",
-                        overflow: 'auto', marginTop: 16, whiteSpace: 'pre-wrap',
-                        border: '1px solid #313244',
-                    }}>
-                        {mikrotikScript}
-                    </pre>
+                    {loading ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#9ca3af', fontSize: '0.82rem', marginTop: 24 }}>
+                            <SyncIcon style={{ fontSize: 18, animation: 'spin 1s linear infinite' }} /> Generating script on server…
+                        </div>
+                    ) : error ? (
+                        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '14px 16px', marginTop: 16, fontSize: '0.82rem', color: '#dc2626' }}>
+                            {error}
+                        </div>
+                    ) : (
+                        <pre style={{
+                            background: '#1e1e2e', color: '#cdd6f4',
+                            padding: 20, borderRadius: 10, fontSize: '0.78rem',
+                            lineHeight: 1.6, fontFamily: "'Fira Code', 'Consolas', monospace",
+                            overflow: 'auto', marginTop: 16, whiteSpace: 'pre-wrap',
+                            border: '1px solid #313244',
+                        }}>
+                            {script}
+                        </pre>
+                    )}
                 </div>
 
                 {/* Footer */}
@@ -129,16 +111,17 @@ export default function MikrotikScriptModal({ router, onClose }: MikrotikScriptM
                         💡 Run in MikroTik → System → Terminal
                     </div>
                     <div className="modal-footer-right">
-                        <button className="btn btn-secondary" onClick={handleCopy} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <button className="btn btn-secondary" onClick={handleCopy} disabled={!script || loading} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                             {copied ? <CheckCircleIcon style={{ fontSize: 16, color: '#16a34a' }} /> : <ContentCopyIcon style={{ fontSize: 16 }} />}
                             {copied ? 'Copied!' : 'Copy Script'}
                         </button>
-                        <button className="btn" style={{ background: '#4338ca', color: '#fff', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }} onClick={handleDownload}>
+                        <button className="btn" style={{ background: '#4338ca', color: '#fff', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }} onClick={handleDownload} disabled={!script || loading}>
                             <DownloadIcon style={{ fontSize: 16 }} /> Download .rsc
                         </button>
                     </div>
                 </div>
             </div>
+            <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
         </div>
     );
 }

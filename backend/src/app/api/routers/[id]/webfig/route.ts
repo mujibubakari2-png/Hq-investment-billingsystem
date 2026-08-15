@@ -5,18 +5,9 @@ import { getTenantClient } from "@/lib/tenantPrisma";
 import { canAccessTenant } from "@/lib/tenant";
 import logger from "@/lib/logger";
 import { resolveRouterManagementTarget } from "@/lib/routerAddressResolver";
-
-// GET /api/routers/[id]/webfig
-//
-// FORENSIC-FIX-003: The previous implementation returned a static HTML page that
-// redirected to http://{router.host}. After a successful Auto-Push, router.host is
-// switched to the WireGuard VPN tunnel IP (e.g. 10.0.0.200), which is only reachable
-// from the VPS — NOT from the admin's browser. The iframe in RouterDetailModal.tsx
-// loaded this page, which then tried to embed an unreachable IP, resulting in a blank
-// iframe (timeout/blank) with no user-facing explanation.
-//
-// Fix: Return JSON with VPN-aware metadata so the frontend can show the correct URL
-// and explain network requirements to the admin. Never proxy WebFig here (security).
+import { createWebfigSession } from "@/lib/webfigProxyManager";
+import { verifyRouterServices } from "@/lib/routerVerification";
+import { getMikroTikService } from "@/lib/mikrotik";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
@@ -34,18 +25,57 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
             return errorResponse("Unauthorized to access this router", 403);
         }
 
-        const target = resolveRouterManagementTarget(router as any, 'WEBFIG_CLIENT');
+        const target = resolveRouterManagementTarget(router as any, 'BACKEND_API');
+        const proxyHost = process.env.SERVER_PUBLIC_IP || new URL(req.url).hostname || "localhost";
+        
+        let webfigUrl = `${target.protocol}://${target.host}:${target.port}`;
+        let sessionId = null;
+        let instructions = target.instructions;
+        
+        // Find which port WebFig is actually listening on
+        let webfigPort = 80;
+        try {
+            const service = await getMikroTikService(router.id, router.tenantId);
+            const verification = await verifyRouterServices(service);
+            if (verification.webfig.port) {
+                webfigPort = verification.webfig.port;
+            }
+        } catch (e) {
+            logger.warn("[WEBFIG] Could not verify exact webfig port, defaulting to 80");
+        }
+
+        if (target.requiresVpn || target.reachableFrom === 'INTERNAL_BACKEND') {
+            const proxy = await createWebfigSession(
+                router.id,
+                userPayload.userId,
+                target.host, // The internal VPN IP
+                webfigPort
+            );
+            sessionId = proxy.sessionId;
+            webfigUrl = `http://${proxyHost}:${proxy.port}/webfig/`;
+            instructions = `A secure WebFig gateway has been opened. Connect to ${webfigUrl}. This session expires in 1 hour.`;
+            
+            logger.info("[WEBFIG] Secure proxy session created", {
+                routerId: id,
+                proxyHost,
+                proxyPort: proxy.port,
+                targetHost: target.host,
+                targetPort: webfigPort,
+                userId: userPayload.userId
+            });
+        }
 
         return jsonResponse({
             routerId: router.id,
             routerName: router.name,
-            host: target.host,
-            wgTunnelIp: router.wgTunnelIp,
-            browserReachable: !target.requiresVpn,
-            hostIsVpnIp: target.requiresVpn,
-            webfigUrl: `${target.protocol}://${target.host}:${target.port}`,
-            protocol: target.protocol,
-            accessNote: target.instructions,
+            host: proxyHost,
+            // wgTunnelIp intentionally excluded — internal VPN IP must not reach browser
+            browserReachable: true,
+            hostIsVpnIp: false,
+            webfigUrl,
+            protocol: target.requiresVpn ? "https" : "http",
+            sessionId,
+            accessNote: instructions,
         });
     } catch (err: any) {
         logger.error("[WEBFIG] Error building access info", {
