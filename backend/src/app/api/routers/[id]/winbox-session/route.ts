@@ -43,7 +43,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         return jsonResponse({
             host: target.host,
             vpnHost: target.requiresVpn ? router.wgTunnelIp || router.host : null,
-            wanHost: router.wanIp,
+            wanHost: (router as any).wanIp || null,
             port: target.port,
             browserReachable: !target.requiresVpn,
             hostIsVpnIp: target.requiresVpn,
