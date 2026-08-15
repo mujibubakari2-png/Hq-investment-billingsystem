@@ -346,7 +346,8 @@ jobs:
             DEPLOY_DIR="/var/www/Hq-investment-billingsystem"
 
             echo "Extracting artifacts..."
-            tar -xzf /tmp/release.tar.gz -C $DEPLOY_DIR
+            echo "$SUDO_PASSWORD" | sudo -S tar -xzf /tmp/release.tar.gz -C $DEPLOY_DIR
+            echo "$SUDO_PASSWORD" | sudo -S chown -R $USER:$USER $DEPLOY_DIR
             rm /tmp/release.tar.gz
 
             cd $DEPLOY_DIR
