@@ -2,9 +2,15 @@
 // Do not add CORS headers here to avoid conflicting/duplicate headers.
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
+const isWindows = process.platform === 'win32';
+
 const nextConfig = {
     distDir: process.env.BUILD_DIR || '.next',
-    output: 'standalone',
+    // Next.js standalone output creates symlinks under .next/standalone.
+    // This fails on Windows hosts with EPERM, while Linux production deploys
+    // still require the standalone layout. Keep linux production behavior and
+    // avoid the unsupported Windows-specific failure mode.
+    output: isWindows ? undefined : 'standalone',
     // Prisma and bcryptjs must not be bundled by webpack — they use native bindings
     serverExternalPackages: ['@prisma/client', 'bcryptjs', 'ioredis', 'bullmq'],
 
