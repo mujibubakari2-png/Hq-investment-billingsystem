@@ -90,6 +90,13 @@ export interface RouterAdapter {
     createHotspot(payload?: any): Promise<{ success: boolean; message: string; data?: any }>;
     listHotspotProfiles(payload?: any): Promise<{ success: boolean; message: string; data?: any }>;
     createHotspotProfile(payload?: any): Promise<{ success: boolean; message: string; data?: any }>;
+    // PROV-GAP-001: server-side hotspot provisioning (distinct from the
+    // per-user profile above). Optional since only MikroTik implements these
+    // so far; other vendors configure their captive portal differently.
+    createIpPool?(payload?: any): Promise<{ success: boolean; message: string; data?: any }>;
+    assignInterfaceAddress?(payload?: any): Promise<{ success: boolean; message: string; data?: any }>;
+    createHotspotServerProfile?(payload?: any): Promise<{ success: boolean; message: string; data?: any }>;
+    createHotspotServer?(payload?: any): Promise<{ success: boolean; message: string; data?: any }>;
 
     // ── Service Lifecycle (activate/suspend) ──────────────────────────────────
     // These are in the interface (NOT optional via `as any` casts anymore)

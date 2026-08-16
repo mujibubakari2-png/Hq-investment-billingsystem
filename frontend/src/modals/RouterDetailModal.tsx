@@ -16,8 +16,6 @@ import PeopleIcon from '@mui/icons-material/People';
 import LanIcon from '@mui/icons-material/Lan';
 import SyncIcon from '@mui/icons-material/Sync';
 import OpenInBrowserIcon from '@mui/icons-material/OpenInBrowser';
-import TerminalIcon from '@mui/icons-material/Terminal';
-import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import WireGuardConfigModal from './WireGuardConfigModal';
 import RouterCapabilityMatrix from '../components/RouterCapabilityMatrix';
 import { routersApi } from '../api';
@@ -63,15 +61,6 @@ export default function RouterDetailModal({ router, onClose, onDelete }: RouterD
         host: string;
     } | null>(null);
     const [loadingWebfig, setLoadingWebfig] = useState(false);
-    const [openingWinbox, setOpeningWinbox] = useState(false);
-    const [winboxSession, setWinboxSession] = useState<{
-        host: string;
-        port: number;
-        expiresInSeconds: number;
-        browserReachable?: boolean;
-        hostIsVpnIp?: boolean;
-        instructions: string;
-    } | null>(null);
 
     useEffect(() => {
         let cancelled = false;
@@ -99,28 +88,29 @@ export default function RouterDetailModal({ router, onClose, onDelete }: RouterD
     };
 
     const openWebFig = async () => {
+        // Open window immediately to bypass popup blockers
+        const newWindow = window.open('about:blank', '_blank');
         setLoadingWebfig(true);
         setShowWebFig(true);
         try {
-            const info = await routersApi.remoteAccess.webfigUrl(router.id);
-            setWebfigInfo(info as any);
+            const info = await routersApi.remoteAccess.webfigUrl(router.id) as any;
+            setWebfigInfo(info);
+            if (info.browserReachable) {
+                if (newWindow) {
+                    newWindow.location.href = info.webfigUrl;
+                    setShowWebFig(false); // Close modal since we opened directly
+                } else {
+                    window.location.href = info.webfigUrl;
+                }
+            } else {
+                if (newWindow) newWindow.close();
+            }
         } catch (err: any) {
+            if (newWindow) newWindow.close();
             alert(`Failed to load WebFig info: ${err.message || err}`);
             setShowWebFig(false);
         } finally {
             setLoadingWebfig(false);
-        }
-    };
-
-    const openWinbox = async () => {
-        setOpeningWinbox(true);
-        try {
-            const session = await routersApi.remoteAccess.openWinboxSession(router.id);
-            setWinboxSession(session as any);
-        } catch (err: any) {
-            alert(`Imeshindwa kufungua kikao cha Winbox: ${err.message || err}`);
-        } finally {
-            setOpeningWinbox(false);
         }
     };
 
@@ -377,51 +367,9 @@ export default function RouterDetailModal({ router, onClose, onDelete }: RouterD
                                         border="#a5f3fc"
                                         onClick={openWebFig}
                                     />
-                                    <ActionBtn
-                                        icon={<TerminalIcon fontSize="small" />}
-                                        label={openingWinbox ? 'Opening...' : 'Open Winbox'}
-                                        desc="Live TCP session for desktop Winbox"
-                                        color="#7c3aed"
-                                        bg="#f5f3ff"
-                                        border="#ddd6fe"
-                                        onClick={openWinbox}
-                                        disabled={openingWinbox}
-                                    />
                                 </>
                             )}
                         </div>
-                        {winboxSession && (
-                            <div style={{
-                                marginTop: 10, padding: '12px 14px', borderRadius: 'var(--radius-md)',
-                                background: winboxSession.hostIsVpnIp ? '#fffbeb' : '#f5f3ff',
-                                border: `1px solid ${winboxSession.hostIsVpnIp ? '#fde68a' : '#ddd6fe'}`,
-                                fontSize: '0.82rem',
-                            }}>
-                                {winboxSession.hostIsVpnIp && (
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#92400e', fontWeight: 600, marginBottom: 8, fontSize: '0.78rem' }}>
-                                        <WarningAmberIcon style={{ fontSize: 14 }} /> VPN Router — See instructions below
-                                    </div>
-                                )}
-                                <div style={{ fontWeight: 700, color: winboxSession.hostIsVpnIp ? '#78350f' : '#5b21b6', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
-                                    <TerminalIcon style={{ fontSize: 16 }} /> Winbox Connect To:
-                                </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                    <code style={{ background: winboxSession.hostIsVpnIp ? '#fef3c7' : '#ede9fe', padding: '4px 10px', borderRadius: 6, fontSize: '0.9rem', fontWeight: 600, color: winboxSession.hostIsVpnIp ? '#451a03' : '#4c1d95' }}>
-                                        {winboxSession.host}:{winboxSession.port}
-                                    </code>
-                                    <button
-                                        title="Copy"
-                                        onClick={() => navigator.clipboard.writeText(`${winboxSession.host}:${winboxSession.port}`)}
-                                        style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#6d28d9' }}
-                                    >
-                                        <ContentCopyIcon style={{ fontSize: 15 }} />
-                                    </button>
-                                </div>
-                                <div style={{ color: winboxSession.hostIsVpnIp ? '#78350f' : '#6d28d9', marginTop: 8, fontSize: '0.75rem', lineHeight: 1.6 }}>
-                                    {winboxSession.instructions}
-                                </div>
-                            </div>
-                        )}
                     </div>
 
                     {/* ── Danger Zone ── */}

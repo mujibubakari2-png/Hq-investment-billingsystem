@@ -67,7 +67,6 @@ export default function Mikrotiks() {
     const [totalRouters, setTotalRouters] = useState(0);
     const [actionMenuId, setActionMenuId] = useState<string | null>(null);
     const [connectingId, setConnectingId] = useState<string | null>(null);
-    const [downloadProgress, setDownloadProgress] = useState<{ id: string; percent: number } | null>(null);
     const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
     const [diagnosisRouter, setDiagnosisRouter] = useState<Router | null>(null);
     const menuRef = useRef<HTMLDivElement>(null);
@@ -111,14 +110,6 @@ export default function Mikrotiks() {
     useEffect(() => {
         void Promise.resolve().then(() => setCurrentPage(1));
     }, [searchTerm, pageSize]);
-
-    useEffect(() => {
-        if (window.mikrotikApi) {
-            window.mikrotikApi.onDownloadProgress((p) => {
-                setDownloadProgress(prev => prev ? { ...prev, percent: p } : null);
-            });
-        }
-    }, []);
 
     // Background live stats sync (halisi CPU load)
     const routerIds = useMemo(() => routers.map(r => r.id).join(','), [routers]);
@@ -263,47 +254,24 @@ export default function Mikrotiks() {
             return;
         }
 
-        // MikroTik: use WinBox launcher
+        // MikroTik: open WebFig
         setConnectingId(router.id);
+        const newWindow = window.open('about:blank', '_blank');
         try {
-            let ip = router.host;
-            if (router.vpnMode === 'wireguard') {
-                try {
-                    const wgConfig = await routersApi.wireguard.getConfig(router.id);
-                    if (wgConfig.tunnelActive && wgConfig.routerTunnelIp) {
-                        ip = wgConfig.routerTunnelIp;
-                    }
-                } catch (e) {
-                    console.warn('Failed to check WG status', e);
+            const info = await routersApi.remoteAccess.webfigUrl(router.id) as any;
+            if (info.browserReachable) {
+                if (newWindow) {
+                    newWindow.location.href = info.webfigUrl;
+                } else {
+                    window.location.href = info.webfigUrl;
                 }
-            }
-
-            const rawUser = router.username || 'admin';
-            const rawPass = router.password || '';
-
-            if (window.mikrotikApi) {
-                const installed = await window.mikrotikApi.checkWinBoxInstalled();
-                if (!installed) {
-                    setDownloadProgress({ id: router.id, percent: 0 });
-                    const dlRes = await window.mikrotikApi.downloadWinBox('64');
-                    setDownloadProgress(null);
-                    if (!dlRes.success) throw new Error(dlRes.error);
-                }
-                const launchRes = await window.mikrotikApi.launchWinBox(ip, rawUser, rawPass || undefined);
-                if (!launchRes.success) throw new Error(launchRes.error);
             } else {
-                const username = encodeURIComponent(rawUser);
-                const password = encodeURIComponent(rawPass);
-                const winboxUrl = `winbox://${username}:${password}@${ip}:8291`;
-                window.location.href = winboxUrl;
-                setTimeout(() => {
-                    if (confirm('If WinBox did not open, it may not be installed. Download it from the official MikroTik website?')) {
-                        window.open('https://mt.lv/winbox64', '_blank');
-                    }
-                }, 2000);
+                if (newWindow) newWindow.close();
+                Popup.info('VPN Router', 'This router is only reachable via VPN. Please open Router Details for instructions.');
             }
         } catch (err: any) {
-            Popup.error('Connection Error', `Failed to connect: ${err.message}`);
+            if (newWindow) newWindow.close();
+            Popup.error('Connection Error', `Failed to open WebFig: ${err.message || err}`);
         } finally {
             setConnectingId(null);
         }
@@ -407,7 +375,7 @@ export default function Mikrotiks() {
                                 <th>Status</th>
                                 <th>Last Seen</th>
                                 <th>CPU Load</th>
-                                <th>Console</th>
+                                <th>Remote Access</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -505,7 +473,7 @@ export default function Mikrotiks() {
                                                     </a>
                                                 );
                                             }
-                                            // MikroTik: WinBox launcher button
+                                            // MikroTik: WebFig launcher button
                                             return (
                                                 <button
                                                     className="btn"
@@ -524,8 +492,8 @@ export default function Mikrotiks() {
                                                         ? <SyncIcon style={{ fontSize: 13, animation: 'spin 1s linear infinite' }} />
                                                         : router.status === 'Online' ? <LanguageIcon style={{ fontSize: 13 }} /> : <CellTowerIcon style={{ fontSize: 13 }} />}
                                                     {connectingId === router.id
-                                                        ? (downloadProgress?.id === router.id ? `${downloadProgress.percent}%` : 'Connecting...')
-                                                        : (router.status === 'Online' ? 'WinBox' : 'Offline')}
+                                                        ? 'Opening...'
+                                                        : (router.status === 'Online' ? 'WebFig' : 'Offline')}
                                                 </button>
                                             );
                                         })()}

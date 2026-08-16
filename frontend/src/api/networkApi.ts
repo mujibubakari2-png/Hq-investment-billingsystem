@@ -109,24 +109,6 @@ export const routersApi = {
                 protocol: string;
                 accessNote: string;
             }>(`/routers/${id}/webfig`),
-
-        openWinboxSession: (id: string, winboxPort?: number) =>
-            post<{
-                host: string;
-                vpnHost: string | null;
-                wanHost: string | null;
-                port: number;
-                browserReachable: boolean;
-                hostIsVpnIp: boolean;
-                expiresInSeconds: number;
-                instructions: string;
-            }>(
-                `/routers/${id}/winbox-session`,
-                winboxPort ? { winboxPort } : {}
-            ),
-
-        closeWinboxSession: (id: string, port: number) =>
-            del<{ success: boolean }>(`/routers/${id}/winbox-session?port=${port}`),
     },
 };
 

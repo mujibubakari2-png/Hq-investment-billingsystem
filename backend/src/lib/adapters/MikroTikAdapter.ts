@@ -563,6 +563,116 @@ export class MikroTikAdapter implements RouterAdapter {
         }
     }
 
+    // PROV-GAP-001: These four methods were entirely missing from the adapter,
+    // so buildProvisioningPlan()'s "Hotspot" step could only ever create a user
+    // profile (wrong endpoint) — never an IP pool, never the LAN gateway address,
+    // never the actual /ip/hotspot server object. Auto-Push reported "completed"
+    // while the router had no working hotspot at all. Mirrors the RSC generator's
+    // (already-working) Hotspot Server section, but via REST instead of script.
+
+    async createIpPool(payload?: any): Promise<{ success: boolean; message: string; data?: any }> {
+        const start = Date.now();
+        try {
+            const existing = await this.request(`/ip/pool?name=${encodeURIComponent(payload.name)}`).catch(() => []);
+            if (Array.isArray(existing) && existing.length > 0) {
+                return { success: true, message: `Pool ${payload.name} already exists`, data: existing[0] };
+            }
+            const result = await this.request("/ip/pool", "PUT", {
+                name: payload.name,
+                ranges: payload.ranges,
+            });
+            await this.log("create_ip_pool", `Created IP pool: ${payload.name} (${payload.ranges})`, "success", {
+                commandSent: "PUT /ip/pool", durationMs: Date.now() - start,
+            });
+            return { success: true, message: "IP pool created", data: result };
+        } catch (err: any) {
+            await this.log("create_ip_pool", err.message, "error", { durationMs: Date.now() - start });
+            return { success: false, message: err.message };
+        }
+    }
+
+    async assignInterfaceAddress(payload?: any): Promise<{ success: boolean; message: string; data?: any }> {
+        const start = Date.now();
+        try {
+            const existing = await this.request(
+                `/ip/address?address=${encodeURIComponent(payload.address)}&interface=${encodeURIComponent(payload.interface)}`
+            ).catch(() => []);
+            if (Array.isArray(existing) && existing.length > 0) {
+                return { success: true, message: `Address ${payload.address} already assigned`, data: existing[0] };
+            }
+            const result = await this.request("/ip/address", "PUT", {
+                address: payload.address,
+                interface: payload.interface,
+                comment: payload.comment ?? "HQ-BILLING",
+            });
+            await this.log("assign_interface_address", `Assigned ${payload.address} to ${payload.interface}`, "success", {
+                commandSent: "PUT /ip/address", durationMs: Date.now() - start,
+            });
+            return { success: true, message: "Interface address assigned", data: result };
+        } catch (err: any) {
+            await this.log("assign_interface_address", err.message, "error", { durationMs: Date.now() - start });
+            return { success: false, message: err.message };
+        }
+    }
+
+    async createHotspotServerProfile(payload?: any): Promise<{ success: boolean; message: string; data?: any }> {
+        const start = Date.now();
+        try {
+            // NOTE: this is /ip/hotspot/profile (the SERVER profile — use-radius,
+            // login-by, hotspot-address), a DIFFERENT REST endpoint from
+            // createHotspotProfile()'s /ip/hotspot/user/profile (per-user bandwidth
+            // profile). Verify's [VERIFY] Hotspot profile check reads THIS endpoint.
+            const existing = await this.request(`/ip/hotspot/profile?name=${encodeURIComponent(payload.name)}`).catch(() => []);
+            const entry: any = {
+                name: payload.name,
+                "hotspot-address": payload.hotspotAddress,
+                "html-directory": payload.htmlDirectory ?? "hotspot",
+                "login-by": payload.loginBy ?? "http-chap,https,cookie",
+                "use-radius": "yes",
+            };
+            let result;
+            if (Array.isArray(existing) && existing.length > 0) {
+                result = await this.request(`/ip/hotspot/profile/${existing[0][".id"]}`, "PATCH", entry);
+            } else {
+                result = await this.request("/ip/hotspot/profile", "PUT", entry);
+            }
+            await this.log("create_hotspot_server_profile", `Hotspot server profile: ${payload.name}`, "success", {
+                commandSent: "PUT /ip/hotspot/profile", durationMs: Date.now() - start,
+            });
+            return { success: true, message: "Hotspot server profile configured", data: result };
+        } catch (err: any) {
+            await this.log("create_hotspot_server_profile", err.message, "error", { durationMs: Date.now() - start });
+            return { success: false, message: err.message };
+        }
+    }
+
+    async createHotspotServer(payload?: any): Promise<{ success: boolean; message: string; data?: any }> {
+        const start = Date.now();
+        try {
+            const existing = await this.request(`/ip/hotspot?name=${encodeURIComponent(payload.name)}`).catch(() => []);
+            const entry: any = {
+                name: payload.name,
+                interface: payload.interface,
+                "address-pool": payload.addressPool,
+                profile: payload.profile,
+                disabled: "false",
+            };
+            let result;
+            if (Array.isArray(existing) && existing.length > 0) {
+                result = await this.request(`/ip/hotspot/${existing[0][".id"]}`, "PATCH", entry);
+            } else {
+                result = await this.request("/ip/hotspot", "PUT", entry);
+            }
+            await this.log("create_hotspot_server", `Hotspot server: ${payload.name} on ${payload.interface}`, "success", {
+                commandSent: "PUT /ip/hotspot", durationMs: Date.now() - start,
+            });
+            return { success: true, message: "Hotspot server created", data: result };
+        } catch (err: any) {
+            await this.log("create_hotspot_server", err.message, "error", { durationMs: Date.now() - start });
+            return { success: false, message: err.message };
+        }
+    }
+
     async createHotspotProfile(payload?: any): Promise<{ success: boolean; message: string; data?: any }> {
         const start = Date.now();
         try {

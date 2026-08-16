@@ -106,6 +106,36 @@ function buildMikroTikSteps(
         rollbackParams: { path: "/interface/bridge", method: "DELETE" },
     });
 
+    // PROV-GAP-001: the bridge previously had no gateway IP, so nothing built on
+    // top of it (DHCP, Hotspot) could ever actually serve clients correctly.
+    const lanGatewayIp = router.lanGateway || "10.10.0.1";
+    steps.push({
+        id: "assign-lan-address",
+        name: "Assign LAN gateway IP to bridge",
+        adapterId: "assignInterfaceAddress",
+        params: {
+            address: `${lanGatewayIp}/24`,
+            interface: "bridge-lan",
+            comment: "HQ-BILLING",
+        },
+        dependsOn: ["create-bridge"],
+        idempotent: true,
+    });
+
+    // PROV-GAP-001: create-dhcp (below) referenced a pool that was never
+    // created anywhere — add it explicitly, matching the RSC generator's range.
+    steps.push({
+        id: "create-dhcp-pool",
+        name: "Create DHCP address pool",
+        adapterId: "createIpPool",
+        params: {
+            name: "hq-dhcp-pool",
+            ranges: router.dhcpPoolRange || "10.10.0.10-10.10.0.254",
+        },
+        dependsOn: ["assign-lan-address"],
+        idempotent: true,
+    });
+
     // DHCP
     if (cap(caps, "dhcp")) {
         steps.push({
@@ -119,7 +149,7 @@ function buildMikroTikSteps(
                 leaseTime: "10m",
                 comment: "HQ-BILLING",
             },
-            dependsOn: ["create-bridge"],
+            dependsOn: ["create-dhcp-pool"],
             idempotent: true,
         });
     }
@@ -190,16 +220,61 @@ function buildMikroTikSteps(
 
     // Hotspot
     if (cap(caps, "hotspot")) {
+        // PROV-GAP-001: previously this ONLY created a user profile (wrong
+        // endpoint, /ip/hotspot/user/profile) — no pool, no server profile
+        // (/ip/hotspot/profile), no actual /ip/hotspot server object. Verify's
+        // hotspot check reads /ip/hotspot/profile specifically, so without these
+        // three steps a router could never pass verification no matter how many
+        // times Auto-Push "succeeded".
+        steps.push({
+            id: "create-hotspot-pool",
+            name: "Create hotspot address pool",
+            adapterId: "createIpPool",
+            params: {
+                name: "hq-hotspot-pool",
+                ranges: router.hotspotPoolRange || "10.10.0.10-10.10.0.254",
+            },
+            dependsOn: ["assign-lan-address"],
+            idempotent: true,
+        });
+
+        steps.push({
+            id: "create-hotspot-server-profile",
+            name: "Create hotspot server profile (RADIUS-backed)",
+            adapterId: "createHotspotServerProfile",
+            params: {
+                name: "hq-hotspot-server",
+                hotspotAddress: lanGatewayIp,
+                loginBy: "http-chap,https,cookie",
+            },
+            dependsOn: ["create-hotspot-pool"],
+            idempotent: true,
+        });
+
+        steps.push({
+            id: "create-hotspot-server",
+            name: "Create hotspot server on LAN bridge",
+            adapterId: "createHotspotServer",
+            params: {
+                name: "hq-hotspot-server",
+                interface: "bridge-lan",
+                addressPool: "hq-hotspot-pool",
+                profile: "hq-hotspot-server",
+            },
+            dependsOn: ["create-hotspot-server-profile"],
+            idempotent: true,
+        });
+
         steps.push({
             id: "create-hotspot-profile",
-            name: "Create hotspot default profile",
+            name: "Create hotspot default user profile",
             adapterId: "createHotspotProfile",
             params: {
                 name: "hq-hotspot-default",
                 sharedUsers: 1,
                 comment: "HQ-BILLING",
             },
-            dependsOn: ["create-dhcp"],
+            dependsOn: ["create-hotspot-server"],
             idempotent: true,
         });
     }

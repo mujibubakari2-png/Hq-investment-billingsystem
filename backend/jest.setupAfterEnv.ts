@@ -5,7 +5,6 @@ import { closeCache } from '@/lib/cache';
 import { closeMikroTikQueue } from '@/lib/queue';
 import { closeRadiusQueue } from '@/lib/radius-queue';
 import { shutdownWebfigProxy } from '@/lib/webfigProxyManager';
-import { shutdownWinboxProxy } from '@/lib/winboxProxyManager';
 
 // Suppress console.error and console.warn in tests to keep CI logs clean.
 // Many tests intentionally trigger error paths (e.g. simulating network timeouts)
@@ -23,6 +22,5 @@ afterAll(async () => {
         closeMikroTikQueue(),
         closeRadiusQueue(),
         new Promise<void>((resolve) => shutdownWebfigProxy(resolve)),
-        new Promise<void>((resolve) => shutdownWinboxProxy(resolve)),
     ]);
 });
