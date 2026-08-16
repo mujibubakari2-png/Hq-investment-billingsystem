@@ -290,7 +290,7 @@ ${isWireGuard ? `# ── 9. WireGuard VPN Configuration ───────�
 # /24 required so RouterOS creates a connected 10.0.0.0/24 route via wg-hq.
 # Without this, ICMP/TCP replies from the router exit via WAN and are lost.
 :foreach addr in=[/ip address find interface="wg-hq"] do={ /ip address remove $addr }
-/ip address add address=${routerTunnelIp}/24 interface="wg-hq" comment="HQ INVESTMENT VPN Address"
+/ip address add address=${finalRouterTunnelIp}/24 interface="wg-hq" comment="HQ INVESTMENT VPN Address"
 ` : ''}
 # ── 10. Firewall & NAT ───────────────────────────────────────────
 :if ([:len [/ip firewall nat find action=masquerade chain=srcnat out-interface=$wanInterface]] = 0) do={
@@ -444,8 +444,8 @@ ${subnetAddress ? `:if ([:len [/ip hotspot walled-garden ip find dst-address="${
 # Both Hotspot & PPPoE servers are set up.
 ${isWireGuard ? `# ─────────────────────────────────────────────────────────────
 # VPN Configuration Summary:
-# - Router VPN IP  : ${routerTunnelIp}
-# - Server VPN IP  : ${serverTunnelIp}   ← RADIUS address
+# - Router VPN IP  : ${finalRouterTunnelIp}
+# - Server VPN IP  : ${finalServerTunnelIp}   ← RADIUS address
 # - Server Endpoint: ${serverEndpoint}:${serverPort}
 # - Interface      : wg-hq
 # - Listen Port    : ${listenPort}` : ''}
