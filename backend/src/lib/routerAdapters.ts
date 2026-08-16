@@ -85,6 +85,9 @@ export interface RouterAdapter {
     createPPPoE(payload?: any): Promise<{ success: boolean; message: string; data?: any }>;
     listPPPoEProfiles(payload?: any): Promise<{ success: boolean; message: string; data?: any }>;
     createPPPoEProfile(payload?: any): Promise<{ success: boolean; message: string; data?: any }>;
+    // PROV-GAP-002: server-side PPPoE listener, needed for the same reason
+    // createHotspotServer is needed — a profile alone accepts no connections.
+    createPPPoEServer?(payload?: any): Promise<{ success: boolean; message: string; data?: any }>;
 
     // ── Hotspot ───────────────────────────────────────────────────────────────
     createHotspot(payload?: any): Promise<{ success: boolean; message: string; data?: any }>;

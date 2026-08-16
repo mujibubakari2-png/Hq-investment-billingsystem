@@ -215,17 +215,45 @@ function buildMikroTikSteps(
 
     // PPPoE
     if (cap(caps, "pppoe")) {
+        // PROV-GAP-002: previously only created a profile referencing a pool
+        // that was never created, and no PPPoE server ever listened on any
+        // interface — zero client connections were ever actually possible.
+        steps.push({
+            id: "create-pppoe-pool",
+            name: "Create PPPoE address pool",
+            adapterId: "createIpPool",
+            params: {
+                name: "hq-pppoe-pool",
+                ranges: router.pppoePoolRange || "10.20.0.10-10.20.0.254",
+            },
+            dependsOn: ["assign-lan-address"],
+            idempotent: true,
+        });
+
         steps.push({
             id: "create-pppoe-profile",
             name: "Create PPPoE default profile",
             adapterId: "createPPPoEProfile",
             params: {
                 name: "hq-pppoe-default",
-                localAddress: router.lanGateway || "10.0.0.1",
+                localAddress: router.lanGateway || lanGatewayIp,
                 remoteAddress: "hq-pppoe-pool",
                 comment: "HQ-BILLING",
             },
-            dependsOn: ["create-dhcp"],
+            dependsOn: ["create-pppoe-pool"],
+            idempotent: true,
+        });
+
+        steps.push({
+            id: "create-pppoe-server",
+            name: "Create PPPoE server on LAN bridge",
+            adapterId: "createPPPoEServer",
+            params: {
+                serviceName: "hq-pppoe-service",
+                interface: "bridge-lan",
+                defaultProfile: "hq-pppoe-default",
+            },
+            dependsOn: ["create-pppoe-profile"],
             idempotent: true,
         });
     }

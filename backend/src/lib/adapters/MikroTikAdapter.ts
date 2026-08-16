@@ -537,6 +537,40 @@ export class MikroTikAdapter implements RouterAdapter {
         }
     }
 
+    // PROV-GAP-002: PPPoE had the same class of gap as Hotspot — createPPPoEProfile()
+    // referenced a pool that was never created, and there was no method at all for
+    // the PPPoE SERVER itself (/interface/pppoe-server/server, which listens for
+    // client PPPoE discovery on an interface). A profile with no server behind it
+    // accepts zero connections.
+    async createPPPoEServer(payload?: any): Promise<{ success: boolean; message: string; data?: any }> {
+        const start = Date.now();
+        try {
+            const existing = await this.request(
+                `/interface/pppoe-server/server?service-name=${encodeURIComponent(payload.serviceName)}`
+            ).catch(() => []);
+            const entry: any = {
+                "service-name": payload.serviceName,
+                interface: payload.interface,
+                "default-profile": payload.defaultProfile,
+                "one-session-per-host": "yes",
+                disabled: "false",
+            };
+            let result;
+            if (Array.isArray(existing) && existing.length > 0) {
+                result = await this.request(`/interface/pppoe-server/server/${existing[0][".id"]}`, "PATCH", entry);
+            } else {
+                result = await this.request("/interface/pppoe-server/server", "PUT", entry);
+            }
+            await this.log("create_pppoe_server", `PPPoE server: ${payload.serviceName} on ${payload.interface}`, "success", {
+                commandSent: "PUT /interface/pppoe-server/server", durationMs: Date.now() - start,
+            });
+            return { success: true, message: "PPPoE server created", data: result };
+        } catch (err: any) {
+            await this.log("create_pppoe_server", err.message, "error", { durationMs: Date.now() - start });
+            return { success: false, message: err.message };
+        }
+    }
+
     async createPPPoEProfile(payload?: any): Promise<{ success: boolean; message: string; data?: any }> {
         const start = Date.now();
         try {
