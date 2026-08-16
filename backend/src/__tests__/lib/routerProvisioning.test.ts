@@ -10,6 +10,7 @@ import {
     generateAdminUsername,
     type RouterForScriptGeneration,
 } from '../../lib/routerProvisioning';
+import { buildProvisioningPlan } from '../../lib/routerProvisioningEngine';
 
 function baseRouter(overrides: Partial<RouterForScriptGeneration> = {}): RouterForScriptGeneration {
     return {
@@ -190,6 +191,23 @@ describe('deriveVpnManagementSubnet (TATIZO 2)', () => {
     it('returns null for a malformed IP', () => {
         expect(deriveVpnManagementSubnet('not-an-ip')).toBeNull();
         expect(deriveVpnManagementSubnet('10.200.0')).toBeNull();
+    });
+
+    it('refuses to provision a WireGuard peer with an implicit hardcoded subnet fallback', () => {
+        expect(() => buildProvisioningPlan(
+            baseRouter({
+                wgEnabled: true,
+                wgPrivateKey: 'priv',
+                wgPeerPublicKey: 'pub',
+                wgTunnelIp: null,
+            }),
+            {
+                vendor: 'mikrotik',
+                firmwareVersion: '7.16',
+                capabilities: { wireguard: true, dhcp: true, firewall: true },
+                supportedFeatures: ['WireGuard'],
+            } as any,
+        )).toThrow(/WireGuard.*subnet.*required|WireGuard.*tunnel.*required/i);
     });
 });
 

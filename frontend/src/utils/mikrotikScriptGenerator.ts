@@ -36,6 +36,25 @@ function deriveLanNetworkCidr(lanIp?: string): string | null {
     return `${a}.${b}.${c}.0/24`;
 }
 
+function requireWireGuardAddress(value: string | undefined, label: string): string {
+    if (!value || typeof value !== 'string' || !value.trim()) {
+        throw new Error(`WireGuard ${label} is required for script generation. Missing runtime tunnel configuration.`);
+    }
+    const ip = value.trim();
+    const clean = ip.split('/')[0];
+    const parts = clean.split('.');
+    if (parts.length !== 4 || parts.some((part) => Number.isNaN(Number(part)))) {
+        throw new Error(`WireGuard ${label} is invalid: ${value}`);
+    }
+    return clean;
+}
+
+function deriveSubnetForWireGuard(ip: string): string {
+    const clean = requireWireGuardAddress(ip, 'tunnel IP');
+    const parts = clean.split('.');
+    return `${parts[0]}.${parts[1]}.${parts[2]}.0/24`;
+}
+
 export function generateMikrotikScript(params: MikrotikScriptParams): string {
     const {
         routerName, routerUsername, routerPassword, routerId, apiHost, publicApiBase,
@@ -52,11 +71,19 @@ export function generateMikrotikScript(params: MikrotikScriptParams): string {
     const safeRouterName = sanitizeMikroTikName(routerName);
     const safeRouterNameLower = safeRouterName; // already lower-cased by sanitizer
 
-    // subnetAddress: the VPN management subnet (used for firewall src-address restrictions)
-    const subnetAddress = routerTunnelIp ? `${routerTunnelIp.split('.').slice(0, 3).join('.')}.0/24` : '10.200.0.0/24';
-    // serverSubnet: the server-side VPN subnet used for the peer's allowed-address
-    const serverSubnet = isWireGuard && serverTunnelIp ? `${serverTunnelIp.split('.').slice(0, 3).join('.')}.0/24` : (subnetAddress || '0.0.0.0/0');
-    const radiusAddress = isWireGuard && serverTunnelIp ? serverTunnelIp : apiHost;
+    let finalRouterTunnelIp = routerTunnelIp;
+    let finalServerTunnelIp = serverTunnelIp;
+    let subnetAddress = routerTunnelIp ? `${routerTunnelIp.split('.').slice(0, 3).join('.')}.0/24` : '0.0.0.0/0';
+    let serverSubnet = subnetAddress;
+    let radiusAddress = serverTunnelIp || apiHost;
+
+    if (isWireGuard) {
+        finalRouterTunnelIp = requireWireGuardAddress(routerTunnelIp, 'router tunnel IP');
+        finalServerTunnelIp = requireWireGuardAddress(serverTunnelIp, 'server tunnel IP');
+        subnetAddress = deriveSubnetForWireGuard(finalServerTunnelIp);
+        serverSubnet = subnetAddress;
+        radiusAddress = finalServerTunnelIp;
+    }
 
     // LAN variables
     const cleanLanIp = lanIp.includes('/') ? lanIp.split('/')[0] : lanIp;

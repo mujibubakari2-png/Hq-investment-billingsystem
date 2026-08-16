@@ -94,9 +94,9 @@ export const wireguardManager = {
             if (match && match[1]) {
                 return match[1];
             }
-            return '10.0.0.1';
+            return process.env.WG_SERVER_IP || process.env.SERVER_PUBLIC_IP || '';
         } catch {
-            return '10.0.0.1';
+            return process.env.WG_SERVER_IP || process.env.SERVER_PUBLIC_IP || '';
         }
     },
 

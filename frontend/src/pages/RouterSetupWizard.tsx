@@ -121,7 +121,12 @@ export default function RouterSetupWizard({ router: routerProp, onClose }: Route
         routersApi.wireguard?.getConfig?.(routerId)
             .then((cfg: any) => {
                 setWgConfig(cfg);
-                if (!radiusAddress) setRadiusAddress(cfg?.serverTunnelIp ?? '10.0.0.1');
+                if (!radiusAddress) {
+                    const fallbackServerIp = cfg?.serverTunnelIp || (
+                        cfg?.routerTunnelIp ? `${cfg.routerTunnelIp.split('.').slice(0, 3).join('.')}.1` : ''
+                    );
+                    setRadiusAddress(fallbackServerIp || apiHost || '');
+                }
                 if (cfg?.routerTunnelIp) {
                     const parts = cfg.routerTunnelIp.split('.');
                     const prefix = `${parts[0]}.10.${parts[2] || '0'}`;

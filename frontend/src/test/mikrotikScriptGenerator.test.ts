@@ -35,4 +35,28 @@ describe('generateMikrotikScript', () => {
         expect(script).toContain('/ip hotspot walled-garden ip add dst-address="192.168.88.1" action=accept comment="Hotspot Gateway"');
         expect(script).toContain('/ip dhcp-server network add address=192.168.88.0/24 gateway=192.168.88.1 dns-server=8.8.8.8');
     });
+
+    it('throws when WireGuard tunnel information is missing instead of silently falling back to a hardcoded subnet', () => {
+        expect(() => generateMikrotikScript({
+            routerName: 'Router 1',
+            routerId: 'router-1',
+            apiHost: 'api.example.com',
+            publicApiBase: 'https://api.example.com',
+            isWireGuard: true,
+            listenPort: 51820,
+            routerPrivateKey: 'router-private',
+            serverPubKey: 'server-public',
+            presharedKey: 'preshared',
+            serverEndpoint: 'vpn.example.com',
+            serverPort: 51820,
+            routerTunnelIp: '',
+            serverTunnelIp: '',
+            lanIp: '192.168.88.1/24',
+            lanGateway: '192.168.88.1',
+            hotspotPoolRange: '192.168.88.10-192.168.88.100',
+            pppoePoolRange: '192.168.88.200-192.168.88.250',
+            dns: '8.8.8.8',
+            radiusSecret: 'secret',
+        })).toThrow(/WireGuard .*tunnel.*subnet.*required|WireGuard .*VPN.*subnet.*required/i);
+    });
 });

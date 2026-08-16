@@ -189,6 +189,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
             radiusSecret: router.radiusSecret || "",
             wgConfig: { 
                 routerTunnelIp: router.wgTunnelIp,
+                serverTunnelIp: vpnIp,
                 privateKey: router.wgPrivateKey,
                 peerPublicKey: router.wgPeerPublicKey,
                 serverEndpoint: router.wgServerEndpoint ? router.wgServerEndpoint : (serverUrl ? (function() { try { return new URL(serverUrl).hostname; } catch(e) { return null; } })() : null),

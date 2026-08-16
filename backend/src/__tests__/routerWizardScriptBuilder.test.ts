@@ -127,6 +127,33 @@ describe('DEFECT-4: WireGuard preservation & DROP WAN ordering', () => {
         expect(script).toContain('/interface wireguard find name="wg-hq"');
     });
 
+    it('WireGuard peer routes the VPN subnet through the tunnel, not the router tunnel IP subnet', () => {
+        const script = buildRouterWizardScript(
+            minimalParams({
+                wgConfig: {
+                    routerTunnelIp: '10.200.0.200',
+                    privateKey: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
+                    peerPublicKey: 'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=',
+                    serverEndpoint: '203.0.113.10',
+                    listenPort: 51820,
+                },
+            })
+        );
+        expect(script).toContain('allowed-address="10.200.0.0/24"');
+        expect(script).not.toContain('allowed-address="10.200.0.200/24"');
+        expect(script).toContain('dst-address="10.200.0.0/24" gateway=wg-hq');
+    });
+
+    it('does not hardcode a default VPN subnet when no runtime subnet is supplied', () => {
+        const script = buildRouterWizardScript(
+            minimalParams({
+                vpnManagementSubnet: null,
+                wgConfig: null,
+            })
+        );
+        expect(script).not.toContain('10.200.0.0/24');
+    });
+
     it('DROP WAN rule is gated on wg-hq existence (PHASE 9)', () => {
         const script = buildRouterWizardScript(minimalParams());
         // The drop rule must be inside the wg-hq existence check block
@@ -346,5 +373,75 @@ describe('Auto-Push canonical model check', () => {
     it('Hotspot section absent when serviceType=pppoe', () => {
         const script = buildRouterWizardScript(minimalParams({ serviceType: 'pppoe' }));
         expect(script).not.toMatch(/\/ip hotspot add/);
+    });
+});
+
+// ─── DEFECT-12 FIX: REST API Service Configuration ─────────────────────────
+
+describe('DEFECT-12: REST API Services (www + conditional www-ssl)', () => {
+    it('ALWAYS enables www (HTTP) on port 80 for REST API fallback', () => {
+        const script = buildRouterWizardScript(minimalParams());
+        expect(script).toContain('/ip service set www disabled=no port=80');
+        expect(script).toContain('HQ INVESTMENT: www (HTTP) enabled on port 80');
+    });
+
+    it('Conditionally enables www-ssl (HTTPS) on port 443 only if certificate exists', () => {
+        const script = buildRouterWizardScript(minimalParams());
+        // Must check for certificate before enabling www-ssl
+        expect(script).toContain(':local certCount [:len [/certificate find where name!="none" expires-after!="0s"]]');
+        // Must conditionally set www-ssl only if certCount > 0
+        expect(script).toContain(':if ($certCount > 0) do={');
+        expect(script).toContain('/ip service set www-ssl disabled=no port=443 certificate=$certName');
+    });
+
+    it('Disables www-ssl explicitly when no certificate found', () => {
+        const script = buildRouterWizardScript(minimalParams());
+        expect(script).toContain('} else={');
+        expect(script).toContain('/ip service set www-ssl disabled=yes');
+    });
+
+    it('Logs appropriate messages for www/www-ssl status', () => {
+        const script = buildRouterWizardScript(minimalParams());
+        expect(script).toContain('HQ INVESTMENT: www (HTTP) enabled on port 80');
+        expect(script).toContain('HQ INVESTMENT: www-ssl (HTTPS) enabled on port 443 with certificate $certName');
+        expect(script).toContain('HQ INVESTMENT: No valid certificate found. www-ssl disabled. HTTP (port 80) is available for management.');
+    });
+
+    it('VPN management firewall rule allows both TCP 80 and 443 from hq-mgmt interface', () => {
+        const script = buildRouterWizardScript(minimalParams());
+        expect(script).toContain('Allow HQ INVESTMENT API Access (VPN only)');
+        expect(script).toContain('protocol=tcp dst-port=80,443,8291 in-interface-list=hq-mgmt');
+    });
+
+    it('Firewall rule specifies in-interface-list=hq-mgmt for VPN-only access', () => {
+        const script = buildRouterWizardScript(minimalParams());
+        const line = script.split('\n').find(l => l.includes('/ip firewall filter add') && l.includes('Allow HQ INVESTMENT API Access (VPN only)'));
+        expect(line).toBeDefined();
+        expect(line!).toContain('in-interface-list=hq-mgmt');
+        expect(line!).toContain('src-address=10.200.0.0/24');
+    });
+
+    it('WireGuard UDP 51820 is explicitly allowed from WAN before DROP rules', () => {
+        const script = buildRouterWizardScript(minimalParams());
+        expect(script).toContain('Allow WireGuard UDP from WAN');
+        expect(script).toContain('protocol=udp dst-port=51820 in-interface-list=WAN');
+        expect(script).toContain('action=accept');
+        // Verify it comes before the generic WAN DROP rule
+        const wgUdpIdx = script.indexOf('Allow WireGuard UDP from WAN');
+        const wanDropIdx = script.indexOf('Drop WAN input - HQ INVESTMENT');
+        expect(wgUdpIdx).toBeGreaterThan(0);
+        expect(wanDropIdx).toBeGreaterThan(wgUdpIdx);
+    });
+
+    it('Management ports DROP rule blocks TCP 80,443,8291 from WAN', () => {
+        const script = buildRouterWizardScript(minimalParams());
+        expect(script).toContain('Block HQ INVESTMENT Management Ports (non-VPN)');
+        expect(script).toContain('protocol=tcp dst-port=80,443,8291 in-interface-list=WAN');
+        expect(script).toContain('action=drop');
+    });
+
+    it('Final log message indicates WireGuard is open for incoming connections', () => {
+        const script = buildRouterWizardScript(minimalParams());
+        expect(script).toContain('Router management is VPN-only. WireGuard is open.');
     });
 });

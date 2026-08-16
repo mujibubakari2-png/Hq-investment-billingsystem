@@ -80,9 +80,11 @@ export interface RouterForScriptGeneration {
     hotspotPoolRange?: string | null;
     pppoePoolRange?: string | null;
     dns?: string | null;
+    wgEnabled?: boolean | null;
     wgPrivateKey?: string | null;
     wgPeerPublicKey?: string | null;
     wgTunnelIp?: string | null;
+    wgPresharedKey?: string | null;
 }
 
 export interface ValidationError {

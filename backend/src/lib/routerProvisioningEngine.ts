@@ -58,6 +58,18 @@ function cap(capabilities: Record<string, boolean>, key: string): boolean {
     return capabilities?.[key] === true;
 }
 
+function requireWireGuardTunnelIp(router: any, purpose: string): string {
+    if (!router?.wgTunnelIp || typeof router.wgTunnelIp !== 'string' || !router.wgTunnelIp.trim()) {
+        throw new Error(`WireGuard ${purpose} is required for MikroTik provisioning. Missing router tunnel IP.`);
+    }
+    const value = router.wgTunnelIp.trim();
+    const parts = value.split('.');
+    if (parts.length !== 4 || parts.some((part: string) => Number.isNaN(Number(part)))) {
+        throw new Error(`WireGuard ${purpose} is invalid: ${value}`);
+    }
+    return value;
+}
+
 // ── Common Steps ──────────────────────────────────────────────────────────────
 
 function buildValidateStep(): ProvisioningStep {
@@ -281,6 +293,7 @@ function buildMikroTikSteps(
 
     // WireGuard (v7.6+ only)
     if (cap(caps, "wireguard") && router.wgEnabled) {
+        const routerTunnelIp = requireWireGuardTunnelIp(router, 'tunnel IP');
         steps.push({
             id: "configure-wireguard",
             name: "Configure WireGuard VPN tunnel",
@@ -288,7 +301,9 @@ function buildMikroTikSteps(
             params: {
                 interface: "wg0",
                 publicKey: router.wgPeerPublicKey,
-                allowedAddress: router.wgTunnelIp ? `${router.wgTunnelIp}/24` : "10.200.0.0/24",
+                // Server-side ownership must be host-based, not subnet-based:
+                // a peer owns exactly its tunnel IP (/32), not the entire subnet.
+                allowedAddress: `${routerTunnelIp}/32`,
                 presharedKey: router.wgPresharedKey || "",
             },
             dependsOn: ["discover-capabilities"],

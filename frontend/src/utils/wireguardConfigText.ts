@@ -50,10 +50,14 @@ function normalizeIp(ip?: string): string | undefined {
 
 export function buildWireGuardConfigText(params: WireGuardConfigTextParams): string {
     const routerPrivateKey = params.routerPrivateKey || '<ROUTER_PRIVATE_KEY>';
-    const routerTunnelIp = normalizeIp(params.routerTunnelIp) || '10.0.0.200';
-    const serverTunnelIp = normalizeIp(params.serverTunnelIp) || '10.0.0.1';
+    const routerTunnelIp = normalizeIp(params.routerTunnelIp) || '<ROUTER_TUNNEL_IP>';
+    const serverTunnelIp = normalizeIp(params.serverTunnelIp) || (
+        routerTunnelIp !== '<ROUTER_TUNNEL_IP>'
+            ? `${routerTunnelIp.split('.').slice(0, 3).join('.')}.1`
+            : '<SERVER_TUNNEL_IP>'
+    );
     const listenPort = params.listenPort || 51820;
-    const serverEndpoint = params.serverEndpoint || 'vpn.example.com';
+    const serverEndpoint = params.serverEndpoint || '<SERVER_ENDPOINT>';
     const serverPort = params.serverPort || listenPort;
     const serverPublicKey = params.serverPublicKey || '<SERVER_PUBLIC_KEY>';
     const routerPublicKey = params.routerPublicKey || '<ROUTER_PUBLIC_KEY>';

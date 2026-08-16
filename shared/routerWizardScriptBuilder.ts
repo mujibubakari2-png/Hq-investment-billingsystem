@@ -50,6 +50,7 @@ export interface RouterSetupWizardScriptParams {
   ipsecSecret?: string;
   wgConfig?: {
     routerTunnelIp?: string | null;
+    serverTunnelIp?: string | null;
     privateKey?: string | null;
     peerPublicKey?: string | null;
     serverEndpoint?: string | null;
@@ -246,6 +247,13 @@ export function buildRouterWizardScript(params: RouterSetupWizardScriptParams): 
    * When false, those sections emit BLOCKED_BY_DEPENDENCY comments instead.
    */
   const hasBridgeInterfaces = normalized.selectedInterfaces.length > 0;
+  const vpnCableSubnet =
+    normalized.vpnManagementSubnet ||
+    (normalized.wgConfig?.serverTunnelIp
+      ? `${normalized.wgConfig.serverTunnelIp.split('.').slice(0, 3).join('.')}.0/24`
+      : normalized.wgConfig?.routerTunnelIp
+        ? `${normalized.wgConfig.routerTunnelIp.split('.').slice(0, 3).join('.')}.0/24`
+        : '');
 
   const lines: string[] = [
     // ── Header ──────────────────────────────────────────────────────────────
@@ -303,17 +311,23 @@ export function buildRouterWizardScript(params: RouterSetupWizardScriptParams): 
     '}',
     '',
 
-    // ── TLS / HTTPS ───────────────────────────────────────────────────────────
-    '# ===== TLS / HTTPS =====',
-    '# DEFECT-12 FIX: www-ssl is only enabled when a valid, non-expired certificate exists.',
-    '# To add a certificate: /certificate import file-name=my-cert.pem',
+    // ── REST API Services (HTTP + conditional HTTPS) ──────────────────────────
+    '# ===== REST API Services Configuration =====',
+    '# DEFECT-12 FIX: www (HTTP) is ALWAYS enabled for REST API fallback.',
+    '# www-ssl (HTTPS) is ONLY enabled when a valid, non-expired certificate exists.',
+    '# The application will use HTTPS if available, HTTP if certificate is missing.',
+    '/ip service set www disabled=no port=80',
+    '/log info "HQ INVESTMENT: www (HTTP) enabled on port 80"',
+    '',
+    '# Check for valid certificate and enable www-ssl only if found',
     ':local certCount [:len [/certificate find where name!="none" expires-after!="0s"]]',
     ':if ($certCount > 0) do={',
     '    :local certName [/certificate get [find where name!="none" expires-after!="0s"] name]',
-    '    /ip service set www-ssl disabled=no certificate=$certName',
-    '    /log info "HQ INVESTMENT: www-ssl enabled with certificate $certName"',
+    '    /ip service set www-ssl disabled=no port=443 certificate=$certName',
+    '    /log info "HQ INVESTMENT: www-ssl (HTTPS) enabled on port 443 with certificate $certName"',
     '} else={',
-    '    /log warning "HQ INVESTMENT: No valid certificate found. www-ssl left disabled. Import a certificate first, then re-run this section."',
+    '    /ip service set www-ssl disabled=yes',
+    '    /log warning "HQ INVESTMENT: No valid certificate found. www-ssl disabled. HTTP (port 80) is available for management."',
     '}',
     '',
 
@@ -343,7 +357,7 @@ export function buildRouterWizardScript(params: RouterSetupWizardScriptParams): 
     ...(normalized.vpnManagementSubnet
       ? [
         ':if ([:len [/ip firewall filter find where comment="Allow HQ INVESTMENT API Access (VPN only)"]] = 0) do={',
-        `    /ip firewall filter add chain=input action=accept protocol=tcp dst-port=80,443,8291 src-address=${normalized.vpnManagementSubnet} comment="Allow HQ INVESTMENT API Access (VPN only)"`,
+        `    /ip firewall filter add chain=input action=accept protocol=tcp dst-port=80,443,8291 in-interface-list=hq-mgmt src-address=${normalized.vpnManagementSubnet} comment="Allow HQ INVESTMENT API Access (VPN only)"`,
         '}',
       ]
       : [
@@ -427,7 +441,7 @@ export function buildRouterWizardScript(params: RouterSetupWizardScriptParams): 
     '}',
     '',
     // ── WireGuard VPN (HQ INVESTMENT) ─────────────────────────────────────────
-    ...(normalized.wgConfig?.privateKey && normalized.wgConfig?.peerPublicKey && normalized.wgConfig?.routerTunnelIp
+    ...(normalized.wgConfig?.privateKey && normalized.wgConfig?.peerPublicKey && normalized.wgConfig?.routerTunnelIp && vpnCableSubnet
       ? [
         '# ===== WireGuard VPN =====',
         `:if ([:len [/interface wireguard find name="wg-hq"]] = 0) do={`,
@@ -441,12 +455,12 @@ export function buildRouterWizardScript(params: RouterSetupWizardScriptParams): 
         `:foreach addr in=[/ip address find interface="wg-hq"] do={ /ip address remove $addr }`,
         `/ip address add address="${normalized.wgConfig.routerTunnelIp}/24" interface=wg-hq comment="HQ INVESTMENT VPN Address"`,
         `:if ([:len [/interface wireguard peers find interface="wg-hq" public-key="${normalized.wgConfig.peerPublicKey}"]] = 0) do={`,
-        `    /interface wireguard peers add interface=wg-hq public-key="${normalized.wgConfig.peerPublicKey}" allowed-address="${normalized.wgConfig.routerTunnelIp.split('.').slice(0, 3).join('.')}.0/24" endpoint-address="${normalized.wgConfig.serverEndpoint || 'YOUR_SERVER_IP'}" endpoint-port=${normalized.wgConfig.listenPort || 51820} persistent-keepalive=25s comment="HQ INVESTMENT ISP Server"`,
+        `    /interface wireguard peers add interface=wg-hq public-key="${normalized.wgConfig.peerPublicKey}" allowed-address="${vpnCableSubnet}" endpoint-address="${normalized.wgConfig.serverEndpoint || 'YOUR_SERVER_IP'}" endpoint-port=${normalized.wgConfig.listenPort || 51820} persistent-keepalive=25s comment="HQ INVESTMENT ISP Server"`,
         `} else={`,
-        `    /interface wireguard peers set [find interface="wg-hq" public-key="${normalized.wgConfig.peerPublicKey}"] allowed-address="${normalized.wgConfig.routerTunnelIp.split('.').slice(0, 3).join('.')}.0/24" endpoint-address="${normalized.wgConfig.serverEndpoint || 'YOUR_SERVER_IP'}" endpoint-port=${normalized.wgConfig.listenPort || 51820} persistent-keepalive=25s`,
+        `    /interface wireguard peers set [find interface="wg-hq" public-key="${normalized.wgConfig.peerPublicKey}"] allowed-address="${vpnCableSubnet}" endpoint-address="${normalized.wgConfig.serverEndpoint || 'YOUR_SERVER_IP'}" endpoint-port=${normalized.wgConfig.listenPort || 51820} persistent-keepalive=25s`,
         `}`,
-        `:if ([:len [/ip route find dst-address="${normalized.wgConfig.routerTunnelIp.split('.').slice(0, 3).join('.')}.0/24" gateway="wg-hq"]] = 0) do={`,
-        `    /ip route add dst-address="${normalized.wgConfig.routerTunnelIp.split('.').slice(0, 3).join('.')}.0/24" gateway=wg-hq comment="WireGuard route - HQ INVESTMENT"`,
+        `:if ([:len [/ip route find dst-address="${vpnCableSubnet}" gateway="wg-hq"]] = 0) do={`,
+        `    /ip route add dst-address="${vpnCableSubnet}" gateway=wg-hq comment="WireGuard route - HQ INVESTMENT"`,
         `}`,
         '/log info "WireGuard VPN configured — handshake will initiate via persistent-keepalive=25s"',
       ]
@@ -522,13 +536,16 @@ export function buildRouterWizardScript(params: RouterSetupWizardScriptParams): 
     '# If wg-hq is absent, a log warning is emitted and NO drop rules are added.',
     ':if ([:len [/interface wireguard find name="wg-hq"]] > 0) do={',
     '    :if ([:len [/interface list member find list="hq-mgmt" interface="wg-hq"]] > 0) do={',
+    '        :if ([:len [/ip firewall filter find where comment="Allow WireGuard UDP from WAN"]] = 0) do={',
+    `            /ip firewall filter add chain=input action=accept protocol=udp dst-port=51820 in-interface-list=WAN comment="Allow WireGuard UDP from WAN"`,
+    '        }',
     '        :if ([:len [/ip firewall filter find where comment="Block HQ INVESTMENT Management Ports (non-VPN)"]] = 0) do={',
     '            /ip firewall filter add chain=input action=drop protocol=tcp dst-port=80,443,8291 in-interface-list=WAN comment="Block HQ INVESTMENT Management Ports (non-VPN)"',
     '        }',
     '        :if ([:len [/ip firewall filter find where comment="Drop WAN input - HQ INVESTMENT"]] = 0) do={',
     '            /ip firewall filter add chain=input in-interface-list=WAN action=drop comment="Drop WAN input - HQ INVESTMENT"',
     '        }',
-    '        /log info "HQ INVESTMENT: Restrictive WAN firewall applied. Router management is VPN-only."',
+    '        /log info "HQ INVESTMENT: Restrictive WAN firewall applied. Router management is VPN-only. WireGuard is open."',
     '    } else={',
     '        /log warning "HQ INVESTMENT: wg-hq found but NOT in hq-mgmt. DROP WAN skipped for safety. Re-run after VPN is verified."',
     '    }',
