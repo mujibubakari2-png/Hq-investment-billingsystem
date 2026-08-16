@@ -38,7 +38,7 @@ function deriveLanNetworkCidr(lanIp?: string): string | null {
 
 function requireWireGuardAddress(value: string | undefined, label: string): string {
     if (!value || typeof value !== 'string' || !value.trim()) {
-        throw new Error(`WireGuard ${label} is required for script generation. Missing runtime tunnel configuration.`);
+        throw new Error(`WireGuard ${label} subnet is required for script generation. Missing runtime tunnel configuration.`);
     }
     const ip = value.trim();
     const clean = ip.split('/')[0];
