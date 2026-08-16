@@ -53,13 +53,6 @@ export default function RouterDetailModal({ router, onClose, onDelete }: RouterD
     const [wgStatus, setWgStatus] = useState<WgStatus | null>(null);
     const [loadingWg, setLoadingWg] = useState(true);
     const [downloadingScript, setDownloadingScript] = useState(false);
-    const [showWebFig, setShowWebFig] = useState(false);
-    const [webfigInfo, setWebfigInfo] = useState<{
-        webfigUrl: string;
-        browserReachable: boolean;
-        accessNote: string;
-        host: string;
-    } | null>(null);
     const [loadingWebfig, setLoadingWebfig] = useState(false);
 
     useEffect(() => {
@@ -91,24 +84,16 @@ export default function RouterDetailModal({ router, onClose, onDelete }: RouterD
         // Open window immediately to bypass popup blockers
         const newWindow = window.open('about:blank', '_blank');
         setLoadingWebfig(true);
-        setShowWebFig(true);
         try {
             const info = await routersApi.remoteAccess.webfigUrl(router.id) as any;
-            setWebfigInfo(info);
-            if (info.browserReachable) {
-                if (newWindow) {
-                    newWindow.location.href = info.webfigUrl;
-                    setShowWebFig(false); // Close modal since we opened directly
-                } else {
-                    window.location.href = info.webfigUrl;
-                }
+            if (newWindow) {
+                newWindow.location.href = info.webfigUrl;
             } else {
-                if (newWindow) newWindow.close();
+                window.location.href = info.webfigUrl;
             }
         } catch (err: any) {
             if (newWindow) newWindow.close();
             alert(`Failed to load WebFig info: ${err.message || err}`);
-            setShowWebFig(false);
         } finally {
             setLoadingWebfig(false);
         }
@@ -116,65 +101,6 @@ export default function RouterDetailModal({ router, onClose, onDelete }: RouterD
 
     if (showWireGuard) {
         return <WireGuardConfigModal router={router} onClose={() => setShowWireGuard(false)} />;
-    }
-
-    if (showWebFig) {
-        return (
-            <div className="modal-overlay" onClick={() => setShowWebFig(false)}>
-                <div className="modal" style={{ maxWidth: 640, width: '95vw' }} onClick={e => e.stopPropagation()}>
-                    <div className="modal-header" style={{ background: 'linear-gradient(135deg, #0891b2, #0e7490)', color: '#fff' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                            <OpenInBrowserIcon />
-                            <div style={{ fontWeight: 700, fontSize: '1rem' }}>WebFig — {router.name}</div>
-                        </div>
-                        <button onClick={() => setShowWebFig(false)} className="modal-close" style={{ color: '#fff', background: 'rgba(255,255,255,0.15)' }}>
-                            <CloseIcon fontSize="small" />
-                        </button>
-                    </div>
-                    <div style={{ padding: '20px 24px' }}>
-                        {loadingWebfig ? (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#9ca3af', fontSize: '0.82rem' }}>
-                                <SyncIcon style={{ fontSize: 18, animation: 'spin 1s linear infinite' }} /> Loading router access info…
-                            </div>
-                        ) : webfigInfo ? (
-                            <>
-                                {webfigInfo.browserReachable ? (
-                                    <div style={{ marginBottom: 16 }}>
-                                        <div style={{ fontWeight: 600, marginBottom: 8, color: '#0e7490' }}>Router WebFig Interface</div>
-                                        <p style={{ fontSize: '0.85rem', color: '#475569', marginBottom: 12 }}>
-                                            {webfigInfo.accessNote}
-                                        </p>
-                                        <a
-                                            href={webfigInfo.webfigUrl}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            style={{ display: 'inline-block', padding: '10px 20px', background: '#0891b2', color: '#fff', borderRadius: 8, fontWeight: 600, textDecoration: 'none', fontSize: '0.85rem' }}
-                                        >
-                                            <OpenInBrowserIcon style={{ fontSize: 16, verticalAlign: 'middle', marginRight: 6 }} />
-                                            Open WebFig ({webfigInfo.host})
-                                        </a>
-                                    </div>
-                                ) : (
-                                    <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, padding: '14px 16px' }}>
-                                        <div style={{ fontWeight: 700, color: '#92400e', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-                                            <WarningAmberIcon style={{ fontSize: 18 }} /> VPN-Only Router — Browser Cannot Reach WebFig Directly
-                                        </div>
-                                        <p style={{ fontSize: '0.82rem', color: '#78350f', margin: '0 0 10px', lineHeight: 1.6 }}>
-                                            {webfigInfo.accessNote}
-                                        </p>
-                                        <div style={{ background: '#fef3c7', borderRadius: 6, padding: '8px 12px', fontFamily: 'monospace', fontSize: '0.8rem', color: '#451a03', wordBreak: 'break-all' }}>
-                                            {webfigInfo.webfigUrl}
-                                        </div>
-                                    </div>
-                                )}
-                            </>
-                        ) : (
-                            <div style={{ color: '#ef4444', fontSize: '0.82rem' }}>Failed to load WebFig access info.</div>
-                        )}
-                    </div>
-                </div>
-            </div>
-        );
     }
 
     const isOnline = router.status === 'Online';
@@ -288,8 +214,6 @@ export default function RouterDetailModal({ router, onClose, onDelete }: RouterD
                                             </span>
                                         </div>
                                         {[
-                                            { label: 'Router Tunnel IP', value: wgStatus.routerTunnelIp || '—', mono: true },
-                                            { label: 'Server Tunnel IP', value: wgStatus.serverTunnelIp || '—', mono: true },
                                             { label: 'Status', value: wgStatus.tunnelActive && wgStatus.lastHandshakeSeconds != null
                                                 ? `Handshake ${wgStatus.lastHandshakeSeconds}s ago`
                                                 : wgStatus.tunnelStatusMessage?.slice(0, 48) || '—', mono: false },
@@ -360,12 +284,13 @@ export default function RouterDetailModal({ router, onClose, onDelete }: RouterD
                                 <>
                                     <ActionBtn
                                         icon={<OpenInBrowserIcon fontSize="small" />}
-                                        label="Open WebFig"
+                                        label={loadingWebfig ? 'Opening...' : 'Open WebFig'}
                                         desc="Router web GUI (browser)"
                                         color="#0e7490"
                                         bg="#ecfeff"
                                         border="#a5f3fc"
                                         onClick={openWebFig}
+                                        disabled={loadingWebfig}
                                     />
                                 </>
                             )}

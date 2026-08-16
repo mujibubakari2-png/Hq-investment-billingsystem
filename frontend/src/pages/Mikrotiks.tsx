@@ -259,15 +259,10 @@ export default function Mikrotiks() {
         const newWindow = window.open('about:blank', '_blank');
         try {
             const info = await routersApi.remoteAccess.webfigUrl(router.id) as any;
-            if (info.browserReachable) {
-                if (newWindow) {
-                    newWindow.location.href = info.webfigUrl;
-                } else {
-                    window.location.href = info.webfigUrl;
-                }
+            if (newWindow) {
+                newWindow.location.href = info.webfigUrl;
             } else {
-                if (newWindow) newWindow.close();
-                Popup.info('VPN Router', 'This router is only reachable via VPN. Please open Router Details for instructions.');
+                window.location.href = info.webfigUrl;
             }
         } catch (err: any) {
             if (newWindow) newWindow.close();

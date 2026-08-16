@@ -213,7 +213,7 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
                         }} />
                         <span style={{ fontSize: '0.82rem', fontWeight: 600, color: config.tunnelActive ? '#15803d' : config.enabled ? '#c2410c' : '#92400e', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                             {config.tunnelStatusMessage || (config.enabled
-                                ? `WireGuard Active — Connected via tunnel ${config.routerTunnelIp}`
+                                ? `WireGuard Active — Connected via tunnel`
                                 : 'WireGuard Not Configured — Paste script or auto-push')}
                         </span>
                     </div>
@@ -279,23 +279,7 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
                     </div>
                 </div>
 
-                {/* Key Info Bar */}
-                <div className="responsive-grid-3" style={{
-                    padding: '12px 16px', background: '#f8fafc', borderBottom: '1px solid var(--border-light)', gap: 12
-                }}>
-                    <div>
-                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 2 }}>Router Tunnel IP</div>
-                        <div style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '0.85rem' }}>{config.routerTunnelIp}/24</div>
-                    </div>
-                    <div>
-                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 2 }}>Listen Port</div>
-                        <div style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '0.85rem' }}>{config.listenPort}</div>
-                    </div>
-                    <div>
-                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 2 }}>Server Endpoint</div>
-                        <div style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '0.85rem' }}>{config.serverEndpoint}:{config.serverPort}</div>
-                    </div>
-                </div>
+
 
                 {/* Config Content */}
                 <div style={{ flex: 1, overflow: 'auto', padding: '0 16px 16px' }}>
@@ -319,7 +303,7 @@ export default function WireGuardConfigModal({ router, onClose }: WireGuardConfi
                     <div>
                         <strong>Option 1:</strong> Click "Auto-Push to Router" to configure automatically via API.<br />
                         <strong>Option 2:</strong> Copy and paste this script into MikroTik Terminal, then click "I Pasted It — Activate".<br />
-                        The system will switch to the WireGuard tunnel IP ({config.routerTunnelIp}) for all future API connections.
+                        The system will switch to the WireGuard tunnel for all future API connections.
                     </div>
                 </div>
 
