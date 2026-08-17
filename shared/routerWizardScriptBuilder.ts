@@ -378,7 +378,9 @@ export function buildRouterWizardScript(params: RouterSetupWizardScriptParams): 
           (iface) =>
             `:if ([:len [/interface bridge port find where interface="${iface}"]] = 0) do={ /interface bridge port add bridge=$targetBridge interface=${iface} comment="HQ LAN port" }`,
         ),
-        `:if ([:len [/interface list member find list="hq-mgmt" interface=$targetBridge]] = 0) do={ /interface list member add list="hq-mgmt" interface=$targetBridge comment="HQ Mgmt bridge" }`,
+        `:if ([:len [/interface list member find list="hq-mgmt" interface=$targetBridge]] = 0) do={`,
+        `    /interface list member add list="hq-mgmt" interface=$targetBridge`,
+        `}`,
       ]
       : [
         // DEFECT-1 FIX: No targetBridge variable is declared — no variable will be referenced.
