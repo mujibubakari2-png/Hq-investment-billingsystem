@@ -327,11 +327,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 :if ([:len [/interface bridge find name=$lanBridge]] = 0) do={
     /interface bridge add name=$lanBridge protocol-mode=none comment="HQ INVESTMENT Hotspot LAN"
 }
-:if ([:len [/interface list member find list="LAN" interface=$lanBridge]] = 0) do={
-    /interface list member add list="LAN" interface=$lanBridge comment="HQ INVESTMENT LAN bridge"
+:if ([:len [/interface list member find list="LAN" interface="${lanBridgeName}"]] = 0) do={
+    /interface list member add list="LAN" interface="${lanBridgeName}" comment="HQ INVESTMENT LAN bridge"
 }
-:if ([:len [/interface list member find list="hq-mgmt" interface=$lanBridge]] = 0) do={
-    /interface list member add list="hq-mgmt" interface=$lanBridge comment="HQ INVESTMENT Mgmt bridge"
+:if ([:len [/interface list member find list="hq-mgmt" interface="${lanBridgeName}"]] = 0) do={
+    /interface list member add list="hq-mgmt" interface="${lanBridgeName}" comment="HQ INVESTMENT Mgmt bridge"
 }
 
 # 6b. Bridge Port Membership — Add explicitly selected LAN interfaces as bridge members (for L2 switching)
