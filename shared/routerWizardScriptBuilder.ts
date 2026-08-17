@@ -79,7 +79,7 @@ const FORBIDDEN_RADIUS_SECRETS_WIZARD = new Set([
   '',
 ]);
 
-function sanitizeMikroTikName(name: string): string {
+export function sanitizeMikroTikName(name: string): string {
   if (!name) return 'unnamed';
   return (
     name

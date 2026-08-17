@@ -21,6 +21,12 @@
  */
 
 import type { RouterCapabilitySet } from "./routerAdapters";
+// PROV-GAP-003: import the SAME name-sanitizer the RSC generator uses, so
+// Auto-Push creates objects under IDENTICAL names to what a manual RSC
+// import creates. Without this, the two provisioning paths create
+// differently-named objects for the same router, and Verify/discovery see
+// them as a "CONFLICT" instead of recognizing one consistent configuration.
+import { sanitizeMikroTikName } from "../../../shared/routerWizardScriptBuilder";
 
 // ── Step Definition ────────────────────────────────────────────────────────────
 
@@ -103,13 +109,27 @@ function buildMikroTikSteps(
     const caps = capabilities.capabilities as Record<string, boolean>;
     const steps: ProvisioningStep[] = [];
 
+    // PROV-GAP-003: derive every object name from the router's own name, via
+    // the SAME sanitizer the RSC generator uses. This guarantees Auto-Push
+    // and a manual RSC import for the same router always agree on names,
+    // so Verify/discovery see ONE consistent configuration instead of a
+    // "CONFLICT" between two differently-named sets of objects.
+    const safeRouterName = sanitizeMikroTikName(router.name || router.id || "router");
+    const targetBridge = `bridge-${safeRouterName}`;
+    const hsPoolName = `hs-pool-${safeRouterName}`;
+    const hotspotName = `hq-hotspot-${safeRouterName}`; // used for BOTH the server profile and the server itself, matching the RSC generator
+    const dhcpName = `dhcp-${safeRouterName}`;
+    const pppoePoolName = `pppoe-pool-${safeRouterName}`;
+    const pppoeProfileName = `pppoe-profile-${safeRouterName}`;
+    const pppoeServiceName = `hq-pppoe-${safeRouterName}`;
+
     // Bridge (always — foundational for MikroTik)
     steps.push({
         id: "create-bridge",
         name: "Create LAN bridge interface",
         adapterId: "createBridge",
         params: {
-            name: "bridge-lan",
+            name: targetBridge,
             comment: "HQ-BILLING",
         },
         dependsOn: ["discover-capabilities"],
@@ -120,14 +140,14 @@ function buildMikroTikSteps(
 
     // PROV-GAP-001: the bridge previously had no gateway IP, so nothing built on
     // top of it (DHCP, Hotspot) could ever actually serve clients correctly.
-    const lanGatewayIp = router.lanGateway || "10.10.0.1";
+    const lanGatewayIp = router.lanGateway || router.hotspotLocalAddress || "10.10.0.1";
     steps.push({
         id: "assign-lan-address",
         name: "Assign LAN gateway IP to bridge",
         adapterId: "assignInterfaceAddress",
         params: {
             address: `${lanGatewayIp}/24`,
-            interface: "bridge-lan",
+            interface: targetBridge,
             comment: "HQ-BILLING",
         },
         dependsOn: ["create-bridge"],
@@ -141,8 +161,8 @@ function buildMikroTikSteps(
         name: "Create DHCP address pool",
         adapterId: "createIpPool",
         params: {
-            name: "hq-dhcp-pool",
-            ranges: router.dhcpPoolRange || "10.10.0.10-10.10.0.254",
+            name: hsPoolName,
+            ranges: router.dhcpPoolRange || router.hotspotPoolRange || "10.10.0.10-10.10.0.254",
         },
         dependsOn: ["assign-lan-address"],
         idempotent: true,
@@ -155,10 +175,10 @@ function buildMikroTikSteps(
             name: "Configure DHCP server",
             adapterId: "createDHCP",
             params: {
-                serverName: "dhcp-hq",
-                interface: "bridge-lan",
-                pool: "hq-dhcp-pool",
-                leaseTime: "10m",
+                serverName: dhcpName,
+                interface: targetBridge,
+                pool: hsPoolName,
+                leaseTime: "1h",
                 comment: "HQ-BILLING",
             },
             dependsOn: ["create-dhcp-pool"],
@@ -223,7 +243,7 @@ function buildMikroTikSteps(
             name: "Create PPPoE address pool",
             adapterId: "createIpPool",
             params: {
-                name: "hq-pppoe-pool",
+                name: pppoePoolName,
                 ranges: router.pppoePoolRange || "10.20.0.10-10.20.0.254",
             },
             dependsOn: ["assign-lan-address"],
@@ -235,9 +255,9 @@ function buildMikroTikSteps(
             name: "Create PPPoE default profile",
             adapterId: "createPPPoEProfile",
             params: {
-                name: "hq-pppoe-default",
-                localAddress: router.lanGateway || lanGatewayIp,
-                remoteAddress: "hq-pppoe-pool",
+                name: pppoeProfileName,
+                localAddress: router.pppoeLocalAddress || lanGatewayIp,
+                remoteAddress: pppoePoolName,
                 comment: "HQ-BILLING",
             },
             dependsOn: ["create-pppoe-pool"],
@@ -249,9 +269,9 @@ function buildMikroTikSteps(
             name: "Create PPPoE server on LAN bridge",
             adapterId: "createPPPoEServer",
             params: {
-                serviceName: "hq-pppoe-service",
-                interface: "bridge-lan",
-                defaultProfile: "hq-pppoe-default",
+                serviceName: pppoeServiceName,
+                interface: targetBridge,
+                defaultProfile: pppoeProfileName,
             },
             dependsOn: ["create-pppoe-profile"],
             idempotent: true,
@@ -261,33 +281,23 @@ function buildMikroTikSteps(
     // Hotspot
     if (cap(caps, "hotspot")) {
         // PROV-GAP-001: previously this ONLY created a user profile (wrong
-        // endpoint, /ip/hotspot/user/profile) — no pool, no server profile
+        // endpoint, /ip/hotspot/user/profile) — no server profile
         // (/ip/hotspot/profile), no actual /ip/hotspot server object. Verify's
         // hotspot check reads /ip/hotspot/profile specifically, so without these
-        // three steps a router could never pass verification no matter how many
-        // times Auto-Push "succeeded".
-        steps.push({
-            id: "create-hotspot-pool",
-            name: "Create hotspot address pool",
-            adapterId: "createIpPool",
-            params: {
-                name: "hq-hotspot-pool",
-                ranges: router.hotspotPoolRange || "10.10.0.10-10.10.0.254",
-            },
-            dependsOn: ["assign-lan-address"],
-            idempotent: true,
-        });
-
+        // steps a router could never pass verification no matter how many
+        // times Auto-Push "succeeded". Reuses the SAME pool as DHCP
+        // (hsPoolName), matching the RSC generator — hotspot and DHCP share
+        // one address pool for the LAN bridge, they are not separate ranges.
         steps.push({
             id: "create-hotspot-server-profile",
             name: "Create hotspot server profile (RADIUS-backed)",
             adapterId: "createHotspotServerProfile",
             params: {
-                name: "hq-hotspot-server",
+                name: hotspotName,
                 hotspotAddress: lanGatewayIp,
                 loginBy: "http-chap,https,cookie",
             },
-            dependsOn: ["create-hotspot-pool"],
+            dependsOn: ["create-dhcp-pool"],
             idempotent: true,
         });
 
@@ -296,10 +306,10 @@ function buildMikroTikSteps(
             name: "Create hotspot server on LAN bridge",
             adapterId: "createHotspotServer",
             params: {
-                name: "hq-hotspot-server",
-                interface: "bridge-lan",
-                addressPool: "hq-hotspot-pool",
-                profile: "hq-hotspot-server",
+                name: hotspotName,
+                interface: targetBridge,
+                addressPool: hsPoolName,
+                profile: hotspotName,
             },
             dependsOn: ["create-hotspot-server-profile"],
             idempotent: true,
