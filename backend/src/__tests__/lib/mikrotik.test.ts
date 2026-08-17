@@ -1,6 +1,7 @@
 import { MikroTikService, getMikroTikService } from '@/lib/mikrotik';
 import { env } from '@/lib/env';
 import { getTenantClient } from '@/lib/tenantPrisma';
+import { buildVerificationStatusMessage, detectHotspotConfiguration } from '@/app/api/routers/[id]/verify/route';
 
 // Mock env
 jest.mock('@/lib/env', () => ({
@@ -433,6 +434,78 @@ describe('MikroTikService', () => {
     });
 
     // ── BUG FIX REGRESSION TESTS ─────────────────────────────────────────────
+
+    it('should treat a live RouterOS hotspot server as configured even without use-radius on the profile', async () => {
+        const service = {
+            apiRequestPublic: jest.fn(async (path: string) => {
+                if (path === '/ip/hotspot') return [{ name: 'hq-hotspot-hq-investment-123', interface: 'bridge-hq-investment-123', 'address-pool': 'hs-pool-hq-investment-123', disabled: false }];
+                if (path === '/interface') return [{ name: 'bridge-hq-investment-123' }];
+                if (path === '/ip/pool') return [{ name: 'hs-pool-hq-investment-123', ranges: '10.10.0.10-10.10.0.254' }];
+                if (path === '/ip/address') return [{ interface: 'bridge-hq-investment-123', address: '10.10.0.1/24' }];
+                return [];
+            })
+        };
+
+        const result = await detectHotspotConfiguration(service as any);
+
+        expect(result.configured).toBe(true);
+        expect(result.details.hotspotServer).toBe('hq-hotspot-hq-investment-123');
+        expect(result.details.hotspotIp).toBe('10.10.0.1');
+    });
+
+    it('should treat a live Hotspot server as configured even when the profile is missing use-radius', async () => {
+        const service = {
+            apiRequestPublic: jest.fn(async (path: string) => {
+                if (path === '/ip/hotspot') return [{ name: 'hotspot-router-1', interface: 'bridge-lan', 'address-pool': 'hs-pool-router-1', disabled: false }];
+                if (path === '/interface') return [{ name: 'bridge-lan' }];
+                if (path === '/ip/pool') return [{ name: 'hs-pool-router-1', ranges: '10.10.0.10-10.10.0.254' }];
+                if (path === '/ip/address') return [{ interface: 'bridge-lan', address: '10.10.0.1/24' }];
+                return [];
+            })
+        };
+
+        const result = await detectHotspotConfiguration(service as any);
+
+        expect(result.configured).toBe(true);
+    });
+
+    it('should keep hotspot configured false when the live server references a missing pool', async () => {
+        const service = {
+            apiRequestPublic: jest.fn(async (path: string) => {
+                if (path === '/ip/hotspot') return [{ name: 'hotspot-router-2', interface: 'bridge-lan', 'address-pool': 'missing-pool', disabled: false }];
+                if (path === '/interface') return [{ name: 'bridge-lan' }];
+                if (path === '/ip/pool') return [];
+                if (path === '/ip/address') return [{ interface: 'bridge-lan', address: '10.10.0.1/24' }];
+                return [];
+            })
+        };
+
+        const result = await detectHotspotConfiguration(service as any);
+
+        expect(result.configured).toBe(false);
+    });
+
+    it('should not claim no Hotspot or PPPoE services exist when Hotspot is live', () => {
+        expect(buildVerificationStatusMessage({
+            apiReachable: true,
+            wgEnabled: false,
+            vpnActive: false,
+            hotspotConfigured: true,
+            pppoeConfigured: false,
+            radiusConfigured: false,
+        })).not.toContain('no Hotspot or PPPoE services found');
+    });
+
+    it('should keep the Auto-Push message when neither service exists', () => {
+        expect(buildVerificationStatusMessage({
+            apiReachable: true,
+            wgEnabled: false,
+            vpnActive: false,
+            hotspotConfigured: false,
+            pppoeConfigured: false,
+            radiusConfigured: true,
+        })).toContain('Run Auto-Push first');
+    });
 
     it('[BUG-FIX] 401 response should throw clear auth error, NOT "Failed to connect"', async () => {
         // When RouterOS returns HTTP 401, the old code wrapped it with "Failed to connect to X"

@@ -7,6 +7,91 @@ import { getMikroTikService } from "@/lib/mikrotik";
 import { wireguardManager } from "@/lib/wireguard";
 import logger from "@/lib/logger";
 
+function normalizeArrayResponse(response: any): any[] {
+    if (Array.isArray(response)) return response;
+    if (response == null) return [];
+    if (typeof response === "object") return [response];
+    return [];
+}
+
+export async function detectHotspotConfiguration(service: { apiRequestPublic: (path: string, method?: string, body?: any) => Promise<any> }): Promise<{ configured: boolean; details: Record<string, any> }> {
+    const details: Record<string, any> = {};
+
+    try {
+        const hotspots = normalizeArrayResponse(await service.apiRequestPublic("/ip/hotspot", "GET"));
+        if (hotspots.length === 0) {
+            return { configured: false, details };
+        }
+
+        const interfaces = normalizeArrayResponse(await service.apiRequestPublic("/interface", "GET"));
+        const pools = normalizeArrayResponse(await service.apiRequestPublic("/ip/pool", "GET"));
+        const addresses = normalizeArrayResponse(await service.apiRequestPublic("/ip/address", "GET"));
+
+        for (const hotspot of hotspots) {
+            if (hotspot.disabled === "true" || hotspot.disabled === true) continue;
+
+            const interfaceName = typeof hotspot.interface === "string" ? hotspot.interface.trim() : "";
+            if (!interfaceName) continue;
+
+            const interfaceExists = interfaces.some((iface: any) => iface.name === interfaceName);
+            if (!interfaceExists) continue;
+
+            const poolName = typeof hotspot["address-pool"] === "string" ? hotspot["address-pool"].trim() : "";
+            if (poolName && poolName !== "none") {
+                const pool = pools.find((p: any) => p.name === poolName);
+                const ranges = typeof pool?.ranges === "string" ? pool.ranges.trim() : "";
+                if (!pool || !ranges) continue;
+            }
+
+            const addressMatch = addresses.find((addr: any) => {
+                if (addr.interface !== interfaceName) return false;
+                return !!(addr.address && String(addr.address).trim());
+            });
+
+            if (!addressMatch) continue;
+
+            details.hotspotServer = hotspot.name;
+            details.hotspotInterface = interfaceName;
+            details.hotspotPool = poolName || null;
+            details.hotspotIp = String(addressMatch.address).split('/')[0];
+            return { configured: true, details };
+        }
+    } catch (err: any) {
+        logger.warn("[VERIFY] Hotspot object validation failed", { errorMessage: err?.message });
+    }
+
+    return { configured: false, details };
+}
+
+export function buildVerificationStatusMessage(args: {
+    apiReachable: boolean;
+    wgEnabled: boolean;
+    vpnActive: boolean;
+    hotspotConfigured: boolean;
+    pppoeConfigured: boolean;
+    radiusConfigured: boolean;
+}): string {
+    if (!args.apiReachable) {
+        return "Router API is unreachable. Check power, network, or VPN tunnel.";
+    }
+    if (args.wgEnabled && !args.vpnActive) {
+        return "API reachable, but VPN tunnel is DOWN or handshake is stale.";
+    }
+    if (!args.hotspotConfigured && !args.pppoeConfigured) {
+        return "API reachable, but no Hotspot or PPPoE services found on the router. Run Auto-Push first.";
+    }
+    if (args.hotspotConfigured && !args.pppoeConfigured) {
+        return "API reachable. Hotspot is configured, but PPPoE is not.";
+    }
+    if (!args.hotspotConfigured && args.pppoeConfigured) {
+        return "API reachable. PPPoE is configured, but Hotspot is not.";
+    }
+    if (!args.radiusConfigured) {
+        return "Services configured, but RADIUS server not found. Run Auto-Push to register RADIUS.";
+    }
+    return "Verification successful.";
+}
+
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
         const guard = requirePermission(req, "routers:read");
@@ -30,6 +115,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         let radiusConfigured = false;
         let vpnActive = false;
         let lastHandshakeSeconds: number | null = null;
+        let statusMessage = "";
         let details: Record<string, any> = {};
 
         // 1. API Reachability
@@ -61,29 +147,19 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
         const normalize = (res: any) => Array.isArray(res) ? res : (res ? [res] : []);
 
-        // 2. Hotspot profile presence
+        // 2. Hotspot service presence (actual RouterOS objects, not profile-only checks)
         if (apiReachable && (router.serviceType === "hotspot" || router.serviceType === "both" || !router.serviceType)) {
             try {
-                const profilesRaw = await service.apiRequestPublic("/ip/hotspot/profile");
-                const profiles = normalize(profilesRaw);
-                if (profiles.length > 0) {
-                    // FORENSIC-FIX-002: use-radius can be "yes" (string, ROS 7.x) or true
-                    // (boolean, some firmware versions). The old strict "=== 'yes'" check
-                    // failed when RouterOS returned a boolean true, making hotspot always
-                    // appear unconfigured after a successful Auto-Push.
-                    const hqProf = profiles.find((p: any) =>
-                        (p["use-radius"] === "yes" || p["use-radius"] === true) &&
-                        p.name !== "default"
-                    );
-                    if (hqProf) {
-                        hotspotConfigured = true;
-                        details.hotspotProfile = hqProf.name;
-                    }
+                const hotspotCheck = await detectHotspotConfiguration(service);
+                hotspotConfigured = hotspotCheck.configured;
+                if (hotspotConfigured) {
+                    Object.assign(details, hotspotCheck.details);
                 }
-                logger.info("[VERIFY] Hotspot profile check", {
+                logger.info("[VERIFY] Hotspot object check", {
                     routerId: id,
-                    stage: "HOTSPOT_PROFILE",
+                    stage: "HOTSPOT_OBJECTS",
                     result: hotspotConfigured ? "CONFIGURED" : "NOT_FOUND",
+                    details: hotspotCheck.details,
                 });
             } catch (err: any) {
                 logger.warn("[VERIFY] Hotspot check failed", { routerId: id, errorMessage: err?.message });
@@ -160,16 +236,14 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         }
 
         // Derive high-level status message
-        let statusMessage = "Verification successful.";
-        if (!apiReachable) {
-            statusMessage = "Router API is unreachable. Check power, network, or VPN tunnel.";
-        } else if (router.wgEnabled && !vpnActive) {
-            statusMessage = "API reachable, but VPN tunnel is DOWN or handshake is stale.";
-        } else if (!hotspotConfigured && !pppoeConfigured) {
-            statusMessage = "API reachable, but no Hotspot or PPPoE services found on the router. Run Auto-Push first.";
-        } else if (!radiusConfigured) {
-            statusMessage = "Services configured, but RADIUS server not found. Run Auto-Push to register RADIUS.";
-        }
+        statusMessage = buildVerificationStatusMessage({
+            apiReachable,
+            wgEnabled: !!router.wgEnabled,
+            vpnActive,
+            hotspotConfigured,
+            pppoeConfigured,
+            radiusConfigured,
+        });
 
         logger.info("[VERIFY] Complete", {
             routerId: id,
