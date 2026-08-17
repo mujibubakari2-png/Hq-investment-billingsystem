@@ -128,6 +128,11 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_read_timeout                 86400s;
         proxy_send_timeout                 86400s;
+        
+        # Override strict server-level headers that break WebFig's UI and Terminal
+        add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
     }
 
 
