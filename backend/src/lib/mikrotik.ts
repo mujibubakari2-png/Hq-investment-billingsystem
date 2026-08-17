@@ -248,13 +248,13 @@ export class MikroTikService {
         return urls;
     }
 
-    private async apiRequest(path: string, method: string = "GET", body?: unknown): Promise<any> {
+    private async apiRequest(path: string, method: string = "GET", body?: unknown, customTimeoutMs?: number): Promise<any> {
         const url = `${this.baseUrl}/rest${path}`;
         const headers: Record<string, string> = {
             "Content-Type": "application/json",
             "Authorization": "Basic " + Buffer.from(`${this.conn.username}:${this.conn.password}`).toString("base64"),
         };
-        const timeoutMs = env.MIKROTIK_TIMEOUT_MS;
+        const timeoutMs = customTimeoutMs ?? env.MIKROTIK_TIMEOUT_MS;
 
         try {
             const controller = new AbortController();
@@ -401,8 +401,8 @@ export class MikroTikService {
 
     // ── Public API Request (for advanced operations like WireGuard push) ───
 
-    async apiRequestPublic(path: string, method: string = "GET", body?: unknown): Promise<any> {
-        return this.apiRequest(path, method, body);
+    async apiRequestPublic(path: string, method: string = "GET", body?: unknown, customTimeoutMs?: number): Promise<any> {
+        return this.apiRequest(path, method, body, customTimeoutMs);
     }
 
     // ── Connection Test ─────────────────────────────────────────────────────
@@ -1280,8 +1280,8 @@ export class MikroTikService {
             let pushed = 0;
             const failures: string[] = [];
 
-            // Prevent the entire push from exceeding 25s to avoid 504 Gateway Timeouts
-            const MAX_TIME_MS = 25000; 
+            // Prevent the entire push from exceeding 60s since flash writes over network for 14 files take time
+            const MAX_TIME_MS = 60000; 
             const startTime = Date.now();
             
             // Run in small batches to avoid overloading the router while still parallelizing
@@ -1303,7 +1303,7 @@ export class MikroTikService {
                             url,
                             "dst-path": dstPath,
                             "http-method": "get",
-                        });
+                        }, 20000); // 20s per file: allows time if router queues concurrent fetches
                         pushed++;
                     } catch (fileErr: any) {
                         failures.push(`${file.relPath}: ${fileErr.message}`);
