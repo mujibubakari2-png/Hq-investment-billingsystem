@@ -296,6 +296,142 @@ describe('MikroTikService', () => {
         );
     });
 
+    it('should treat DB lanIp with CIDR and discovered LAN IP without CIDR as the same network', async () => {
+        const dbFindUnique = jest.fn().mockResolvedValue({
+            id: 'router-123',
+            tenantId: 'tenant-1',
+            lanIp: '10.10.0.1/24',
+            hotspotPoolRange: '10.10.0.10-10.10.0.254',
+            pppoePoolRange: null,
+            dns: '8.8.8.8',
+            lanGateway: '10.10.0.1',
+        });
+
+        (getTenantClient as jest.Mock).mockImplementation(() => ({
+            routerLog: { create: mockRouterLogCreate },
+            router: {
+                update: mockRouterUpdate,
+                findUnique: dbFindUnique,
+            },
+        }));
+
+        const service = new MikroTikService({
+            host: '10.0.0.200',
+            port: 8728,
+            username: 'admin',
+            password: 'password',
+            restPort: 80,
+        }, 'router-123', 'tenant-1');
+
+        (global.fetch as jest.Mock)
+            .mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify([{ name: 'HQ INVESTMENT 123' }]) })
+            .mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify([{ version: '7.23.3 (stable)', 'cpu-load': '1', 'free-memory': '26251264', 'total-memory': '67108864', uptime: '16m51s', 'board-name': 'hAP ac lite', 'architecture-name': 'mipsbe' }]) })
+            .mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify([{ 'dst-address': '0.0.0.0/0', gateway: '192.168.1.1', active: 'true' }]) })
+            .mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify({ servers: '8.8.8.8' }) })
+            .mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify([{ name: 'hq-hotspot-hq-investment-123', interface: 'bridge-hq-investment-123', 'address-pool': 'hs-pool-hq-investment-123' }]) })
+            .mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify([{ name: 'hs-pool-hq-investment-123', ranges: '10.10.0.10-10.10.0.254' }]) })
+            .mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify([{ interface: 'bridge-hq-investment-123', address: '10.10.0.1/24' }]) })
+            .mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify([{ name: 'bridge-hq-investment-123' }]) })
+            .mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify([]) })
+            .mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify([]) });
+
+        const result = await service.testConnection();
+
+        expect(result.success).toBe(true);
+        expect(result.discovery.syncState).toBe('CONFIRMED');
+        expect(result.discovery.lanIp).toBe('10.10.0.1');
+    });
+
+    it('should treat DB lanIp /32 and discovered LAN IP without CIDR as equivalent', async () => {
+        const dbFindUnique = jest.fn().mockResolvedValue({
+            id: 'router-124',
+            tenantId: 'tenant-1',
+            lanIp: '10.10.0.1/32',
+            hotspotPoolRange: '10.10.0.10-10.10.0.254',
+            pppoePoolRange: null,
+            dns: '8.8.8.8',
+            lanGateway: '10.10.0.1',
+        });
+
+        (getTenantClient as jest.Mock).mockImplementation(() => ({
+            routerLog: { create: mockRouterLogCreate },
+            router: {
+                update: mockRouterUpdate,
+                findUnique: dbFindUnique,
+            },
+        }));
+
+        const service = new MikroTikService({
+            host: '10.0.0.200',
+            port: 8728,
+            username: 'admin',
+            password: 'password',
+            restPort: 80,
+        }, 'router-124', 'tenant-1');
+
+        (global.fetch as jest.Mock)
+            .mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify([{ name: 'HQ INVESTMENT 124' }]) })
+            .mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify([{ version: '7.23.3', 'cpu-load': '1', 'free-memory': '20000000', 'total-memory': '50000000', uptime: '1m', 'board-name': 'hAP', 'architecture-name': 'mipsbe' }]) })
+            .mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify([{ 'dst-address': '0.0.0.0/0', gateway: '192.168.1.1', active: 'true' }]) })
+            .mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify({ servers: '8.8.8.8' }) })
+            .mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify([{ name: 'hq-hotspot-hq-investment-124', interface: 'bridge-hq-investment-124', 'address-pool': 'hs-pool-hq-investment-124' }]) })
+            .mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify([{ name: 'hs-pool-hq-investment-124', ranges: '10.10.0.10-10.10.0.254' }]) })
+            .mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify([{ interface: 'bridge-hq-investment-124', address: '10.10.0.1/32' }]) })
+            .mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify([{ name: 'bridge-hq-investment-124' }]) })
+            .mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify([]) })
+            .mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify([]) });
+
+        const result = await service.testConnection();
+
+        expect(result.success).toBe(true);
+        expect(result.discovery.syncState).toBe('CONFIRMED');
+    });
+
+    it('should keep CONFLICT when the LAN IP is actually different', async () => {
+        const dbFindUnique = jest.fn().mockResolvedValue({
+            id: 'router-125',
+            tenantId: 'tenant-1',
+            lanIp: '10.10.0.1/24',
+            hotspotPoolRange: '10.10.0.10-10.10.0.254',
+            pppoePoolRange: null,
+            dns: '8.8.8.8',
+            lanGateway: '10.10.0.1',
+        });
+
+        (getTenantClient as jest.Mock).mockImplementation(() => ({
+            routerLog: { create: mockRouterLogCreate },
+            router: {
+                update: mockRouterUpdate,
+                findUnique: dbFindUnique,
+            },
+        }));
+
+        const service = new MikroTikService({
+            host: '10.0.0.200',
+            port: 8728,
+            username: 'admin',
+            password: 'password',
+            restPort: 80,
+        }, 'router-125', 'tenant-1');
+
+        (global.fetch as jest.Mock)
+            .mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify([{ name: 'HQ INVESTMENT 125' }]) })
+            .mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify([{ version: '7.23.3', 'cpu-load': '1', 'free-memory': '20000000', 'total-memory': '50000000', uptime: '1m', 'board-name': 'hAP', 'architecture-name': 'mipsbe' }]) })
+            .mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify([{ 'dst-address': '0.0.0.0/0', gateway: '192.168.1.1', active: 'true' }]) })
+            .mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify({ servers: '8.8.8.8' }) })
+            .mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify([{ name: 'hq-hotspot-hq-investment-125', interface: 'bridge-hq-investment-125', 'address-pool': 'hs-pool-hq-investment-125' }]) })
+            .mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify([{ name: 'hs-pool-hq-investment-125', ranges: '10.10.0.10-10.10.0.254' }]) })
+            .mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify([{ interface: 'bridge-hq-investment-125', address: '10.10.0.2/24' }]) })
+            .mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify([{ name: 'bridge-hq-investment-125' }]) })
+            .mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify([]) })
+            .mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify([]) });
+
+        const result = await service.testConnection();
+
+        expect(result.success).toBe(true);
+        expect(result.discovery.syncState).toBe('CONFLICT');
+    });
+
     // ── BUG FIX REGRESSION TESTS ─────────────────────────────────────────────
 
     it('[BUG-FIX] 401 response should throw clear auth error, NOT "Failed to connect"', async () => {

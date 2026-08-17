@@ -184,6 +184,20 @@ function warnOnce(key: string, message: string): void {
     }
 }
 
+function normalizeComparableAddress(value?: string | null): string | null {
+    if (value == null) return null;
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    const withoutCidr = trimmed.includes('/') ? trimmed.split('/')[0] : trimmed;
+    return withoutCidr.trim();
+}
+
+function isEquivalentAddress(a?: string | null, b?: string | null): boolean {
+    if (a == null && b == null) return true;
+    if (a == null || b == null) return false;
+    return normalizeComparableAddress(a) === normalizeComparableAddress(b);
+}
+
 export class MikroTikService {
     private conn: MikroTikConnection;
     private routerId: string;
@@ -443,14 +457,14 @@ export class MikroTikService {
                 } else if (!rosLan && !rosHsPool && !rosPppoePool) {
                     syncState = "UNKNOWN"; // RouterOS has no config
                 } else {
-                    const isLanConflict = dbLan && rosLan && dbLan !== rosLan;
+                    const isLanConflict = dbLan && rosLan && !isEquivalentAddress(dbLan, rosLan);
                     const isHsPoolConflict = dbHsPool && rosHsPool && dbHsPool !== rosHsPool;
                     const isPppoePoolConflict = dbPppoePool && rosPppoePool && dbPppoePool !== rosPppoePool;
                     
                     if (isLanConflict || isHsPoolConflict || isPppoePoolConflict) {
                         syncState = "CONFLICT";
                     } else if (
-                        dbLan === rosLan && 
+                        isEquivalentAddress(dbLan, rosLan) && 
                         (dbHsPool === rosHsPool || (!dbHsPool && !rosHsPool)) && 
                         (dbPppoePool === rosPppoePool || (!dbPppoePool && !rosPppoePool))
                     ) {
