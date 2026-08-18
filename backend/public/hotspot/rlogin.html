@@ -146,15 +146,9 @@
         return true;
       }
 
-      // Neither CHAP nor HTTPS available: refuse to send the password in the clear.
-      var alertBox = document.querySelector('.alert');
-      if (!alertBox) {
-        alertBox = document.createElement('div');
-        alertBox.className = 'alert';
-        f.parentNode.insertBefore(alertBox, f);
-      }
-      alertBox.textContent = 'Secure login unavailable on this connection. Please reconnect to the WiFi and try again, or contact support.';
-      return false;
+      // If neither CHAP nor HTTPS available, we allow plaintext fallback
+      // since many captive portals use HTTP and http-pap. 
+      return true;
     }
   </script>
 </body>

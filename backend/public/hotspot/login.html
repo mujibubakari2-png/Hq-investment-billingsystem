@@ -671,6 +671,7 @@
         var currentPkg = null;
         var pollInterval = null;
         var portalConfigLoaded = false;
+        var fallbackPackages = [];
 
         function resolveApiBase() {
             if (API_BASE && API_BASE !== '') {
