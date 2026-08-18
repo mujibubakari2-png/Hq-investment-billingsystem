@@ -367,17 +367,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         const routerFull = await (async () => {
             try { return await db.router.findUnique({ where: { id } }); } catch { return null; }
         })();
-        const dbLanGateway   = routerFull?.lanGateway as string | null;
-        const dbLanIp        = routerFull?.lanIp as string | null;
-        const dbHsPool       = routerFull?.hotspotPoolRange as string | null;
-        const dbPpoePool     = routerFull?.pppoePoolRange as string | null;
-        const dbDns          = routerFull?.dns as string | null;
+        const dbLanGateway = routerFull?.lanGateway as string | null;
+        const dbLanIp = routerFull?.lanIp as string | null;
+        const dbHsPool = routerFull?.hotspotPoolRange as string | null;
+        const dbPpoePool = routerFull?.pppoePoolRange as string | null;
+        const dbDns = routerFull?.dns as string | null;
 
         const lanGateway = dbLanGateway || `${vpnDerivedPrefix}.1`;
-        const lanCidr    = dbLanIp     || `${lanGateway}/24`;
-        const lanNetwork = `${lanGateway.split('.').slice(0,3).join('.')}.0/24`;
-        const lanPoolStart = `${lanGateway.split('.').slice(0,3).join('.')}.10`;
-        const lanPoolEnd   = `${lanGateway.split('.').slice(0,3).join('.')}.254`;
+        const lanCidr = dbLanIp || `${lanGateway}/24`;
+        const lanNetwork = `${lanGateway.split('.').slice(0, 3).join('.')}.0/24`;
+        const lanPoolStart = `${lanGateway.split('.').slice(0, 3).join('.')}.10`;
+        const lanPoolEnd = `${lanGateway.split('.').slice(0, 3).join('.')}.254`;
         const listenPort = router.wgListenPort || 51820;
 
         // Resolve the public WireGuard endpoint from the configured values.
@@ -526,7 +526,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         } else {
             // Handshake not confirmed — keep original host to preserve connectivity
             logger.warn(`[WireGuard] Activate: peer ${tunnelIp} has NOT completed a WireGuard handshake. Keeping original host IP to preserve connectivity.`);
-            responseMessage = `WireGuard peer is successfully registered on the server, but the MikroTik handshake is still pending.\n\nThis is normal and takes up to 25 seconds (due to keepalive). Please wait a few seconds, then click Activate again to verify the tunnel and finalize the connection.`;
+            responseMessage = `WireGuard peer registered on server, but MikroTik has NOT connected yet (no handshake).\n\nTo fix:\n1. Verify the config was pasted correctly on MikroTik.\n2. Check UDP port ${listenPort} is open on MikroTik (firewall rule must be above any DROP rule).\n3. Run on Droplet: sudo wg show wg0\n4. Once the MikroTik peer appears with a handshake, click Activate again.`;
         }
 
         await updateRouterWgFields(db, id, activateData);
@@ -541,7 +541,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         });
 
         return jsonResponse({
-            success: true, // Always true if server-side registration succeeded. Prevents false "red error" toasts.
+            success: peerConnected,
             tunnelVerified: peerConnected,
             message: responseMessage,
         });
