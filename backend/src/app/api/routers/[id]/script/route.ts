@@ -339,6 +339,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 ${selectedLanInterfaces.length > 0
                 ? selectedLanInterfaces.map((iface) => `:if ([:len [/interface bridge port find where interface="${iface}"]] = 0) do={
     /interface bridge port add bridge=$lanBridge interface=${iface} comment="HQ INVESTMENT LAN port"
+} else={
+    /interface bridge port set [find where interface="${iface}"] bridge=$lanBridge comment="HQ INVESTMENT LAN port"
 }`).join('\n')
                 : `:foreach intf in=[/interface find where !(name=ether1 || name~"bridge" || name~"ppp" || name~"wlan" || name~"wg" || passthrough=yes || type=loopback)] do={
     :local intfName [/interface get $intf name]
