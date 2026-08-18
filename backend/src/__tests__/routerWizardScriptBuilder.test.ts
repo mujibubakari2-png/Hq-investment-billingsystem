@@ -99,6 +99,14 @@ describe('DEFECT-3: Dynamic WAN interface discovery', () => {
         expect(script).toContain('interface=$wanIface');
     });
 
+    it('LAN interface membership includes selected physical ports so MAC WinBox survives reboot', () => {
+        const script = buildRouterWizardScript(minimalParams());
+        expect(script).toContain('/interface list member add list="LAN" interface="ether2"');
+        expect(script).toContain('/interface list member add list="hq-mgmt" interface="ether2"');
+        expect(script).toContain('/interface list member add list="LAN" interface="ether3"');
+        expect(script).toContain('/interface list member add list="hq-mgmt" interface="ether3"');
+    });
+
     it('3b. ether1 only appears as fallback inside an :if block, not as a bare assignment', () => {
         const script = buildRouterWizardScript(minimalParams());
         // ether1 may appear in the fallback :set, but NOT as the direct interface member arg

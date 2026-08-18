@@ -296,6 +296,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 :if ([:len [/interface list member find list="WAN" interface="ether1"]] = 0) do={
     /interface list member add list="WAN" interface="ether1" comment="HQ INVESTMENT WAN port"
 }
+${selectedLanInterfaces.map((iface) => `:if ([:len [/interface list member find list="LAN" interface="${iface}"]] = 0) do={
+    /interface list member add list="LAN" interface="${iface}" comment="HQ INVESTMENT LAN port"
+}
+:if ([:len [/interface list member find list="hq-mgmt" interface="${iface}"]] = 0) do={
+    /interface list member add list="hq-mgmt" interface="${iface}" comment="HQ INVESTMENT Mgmt port"
+}
+`).join('')}
 :if ([:len [/interface wireguard find name="wg-hq"]] > 0) do={
     :if ([:len [/interface list member find list="hq-mgmt" interface="wg-hq"]] = 0) do={
         /interface list member add list="hq-mgmt" interface="wg-hq"

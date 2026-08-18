@@ -383,9 +383,18 @@ export function buildRouterWizardScript(params: RouterSetupWizardScriptParams): 
           (iface) =>
             `:if ([:len [/interface bridge port find where interface="${iface}"]] = 0) do={ /interface bridge port add bridge=$targetBridge interface=${iface} comment="HQ LAN port" }`,
         ),
-        // Safely add the new bridge to both LAN (for default IP firewall rules) and hq-mgmt (for MAC Winbox).
-        // Using strict 'where' syntax to guarantee RouterOS 7 parser compatibility.
+        // Add both the bridge and each selected physical interface to LAN / hq-mgmt.
+        // This preserves local MAC WinBox access after reboot when the router is physically
+        // connected on the LAN ports before the bridge has re-established itself.
         `:if ([:len [/interface list find name="LAN"]] = 0) do={ /interface list add name="LAN" comment="HQ INVESTMENT LAN" }`,
+        ...normalized.selectedInterfaces.map(
+          (iface) =>
+            `:if ([:len [/interface list member find list="LAN" interface="${iface}"]] = 0) do={ /interface list member add list="LAN" interface="${iface}" comment="HQ LAN port" }`,
+        ),
+        ...normalized.selectedInterfaces.map(
+          (iface) =>
+            `:if ([:len [/interface list member find list="hq-mgmt" interface="${iface}"]] = 0) do={ /interface list member add list="hq-mgmt" interface="${iface}" comment="HQ Mgmt port" }`,
+        ),
         `:if ([:len [/interface list member find list="LAN" interface="${targetBridge}"]] = 0) do={ /interface list member add list="LAN" interface="${targetBridge}" comment="HQ LAN bridge" }`,
         `:if ([:len [/interface list member find list="hq-mgmt" interface="${targetBridge}"]] = 0) do={ /interface list member add list="hq-mgmt" interface="${targetBridge}" comment="HQ Mgmt bridge" }`,
       ]
