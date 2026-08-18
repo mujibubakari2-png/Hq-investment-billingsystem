@@ -407,8 +407,8 @@ export function buildRouterWizardScript(params: RouterSetupWizardScriptParams): 
           ? [
             '# ===== PPPoE Server =====',
             `:if ([:len [/ip pool find where name="${pppoePoolName}"]] = 0) do={ /ip pool add name="${pppoePoolName}" ranges=${normalized.pppoePoolStart}-${normalized.pppoePoolEnd} }`,
-            `/ppp profile add name="${pppoeProfile}" local-address=${normalized.pppoeLocalAddress} dns-server=${dnsServers} use-compression=no use-encryption=yes use-radius=yes`,
-            `/interface pppoe-server server add service-name="hq-pppoe-${safeRouterName}" interface=$targetBridge default-profile="${pppoeProfile}" authentication=mschapv2 one-session-per-host=yes disabled=no`,
+            `:if ([:len [/ppp profile find where name="${pppoeProfile}"]] = 0) do={ /ppp profile add name="${pppoeProfile}" local-address=${normalized.pppoeLocalAddress} remote-address="${pppoePoolName}" dns-server=${dnsServers} use-compression=no use-encryption=yes use-radius=yes } else={ /ppp profile set [find where name="${pppoeProfile}"] local-address=${normalized.pppoeLocalAddress} remote-address="${pppoePoolName}" dns-server=${dnsServers} use-compression=no use-encryption=yes use-radius=yes }`,
+            `:if ([:len [/interface pppoe-server server find where service-name="hq-pppoe-${safeRouterName}"]] = 0) do={ /interface pppoe-server server add service-name="hq-pppoe-${safeRouterName}" interface=$targetBridge default-profile="${pppoeProfile}" authentication=chap,mschap1,mschap2 one-session-per-host=yes disabled=no } else={ /interface pppoe-server server set [find where service-name="hq-pppoe-${safeRouterName}"] interface=$targetBridge default-profile="${pppoeProfile}" authentication=chap,mschap1,mschap2 one-session-per-host=yes disabled=no }`,
             ':if ([:len [/ip firewall filter find where comment="Allow PPPoE to Internet"]] = 0) do={',
             '    /ip firewall filter add chain=forward in-interface=all-ppp out-interface-list=WAN action=accept comment="Allow PPPoE to Internet"',
             '}',
