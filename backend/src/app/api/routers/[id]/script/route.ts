@@ -390,7 +390,7 @@ ${selectedLanInterfaces.length > 0
     /ip hotspot set [find name="${hotspotServerName}"] interface=$lanBridge address-pool="${hotspotPoolName}" profile="${hotspotProfileName}" disabled=no
 }
 :if ([:len [/ppp profile find name="hq-pppoe-${cleanName.toLowerCase()}"]] = 0) do={
-    /ppp profile add name="hq-pppoe-${cleanName.toLowerCase()}" local-address=${router.lanGateway} remote-address="${pppoePoolName}" dns-server=${router.dns} use-encryption=yes use-radius=yes
+    /ppp profile add name="hq-pppoe-${cleanName.toLowerCase()}" local-address=${router.lanGateway} remote-address="${pppoePoolName}" dns-server=${router.dns} use-encryption=yes
 }
 :if ([:len [/interface pppoe-server server find service-name="hq-pppoe-${cleanName.toLowerCase()}"]] = 0) do={
     /interface pppoe-server server add service-name="hq-pppoe-${cleanName.toLowerCase()}" interface=$lanBridge default-profile="hq-pppoe-${cleanName.toLowerCase()}" authentication=pap,chap,mschap1,mschap2 one-session-per-host=yes disabled=no
@@ -708,7 +708,7 @@ ${buildHotspotFlowEnforcementLines("$lanBridge").join("\n")}
 # hotspot portal requires a certificate to be imported first via
 # /certificate import, then: /ip hotspot profile set [find] ssl-certificate=<name>
 /ip hotspot profile set [find default=yes] use-radius=yes login-by=http-chap,https,cookie
-/ppp profile set [find name=default] use-radius=yes
+/ppp aaa set use-radius=yes accounting=yes
 /log info "RADIUS services enabled for Hotspot and PPP"
 
 # 11. Success Notification
