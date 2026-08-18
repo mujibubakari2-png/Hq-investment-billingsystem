@@ -376,7 +376,7 @@ export function buildRouterWizardScript(params: RouterSetupWizardScriptParams): 
         `:if ([:len [/interface bridge find where name=$targetBridge]] > 0) do={ /interface bridge set [find name=$targetBridge] protocol-mode=none arp=enabled vlan-filtering=no }`,
         ...normalized.selectedInterfaces.map(
           (iface) =>
-            `:if ([:len [/interface bridge port find where interface="${iface}"]] = 0) do={ /interface bridge port add bridge="${targetBridge}" interface="${iface}" comment="HQ LAN port" } else={ /interface bridge port set [find where interface="${iface}"] bridge="${targetBridge}" comment="HQ LAN port" }`,
+            `:if ([:len [/interface bridge port find where interface="${iface}"]] = 0) do={ /interface bridge port add bridge=$targetBridge interface=${iface} comment="HQ LAN port" }`,
         ),
         // Safely add the new bridge to both LAN (for default IP firewall rules) and hq-mgmt (for MAC Winbox).
         // Using strict 'where' syntax to guarantee RouterOS 7 parser compatibility.
@@ -401,10 +401,10 @@ export function buildRouterWizardScript(params: RouterSetupWizardScriptParams): 
       ? [
         ...((normalized.hotspotLocalAddress || normalized.pppoeLocalAddress)
           ? [
-              '# ===== LAN IP Address =====',
-              `:local lanCidr "${normalized.hotspotLocalAddress || normalized.pppoeLocalAddress}/24"`,
-              `:if ([:len [/ip address find where address=$lanCidr interface=$targetBridge]] = 0) do={ /ip address add address=$lanCidr interface=$targetBridge comment="HQ INVESTMENT LAN" }`,
-            ]
+            '# ===== LAN IP Address =====',
+            `:local lanCidr "${normalized.hotspotLocalAddress || normalized.pppoeLocalAddress}/24"`,
+            `:if ([:len [/ip address find where address=$lanCidr interface=$targetBridge]] = 0) do={ /ip address add address=$lanCidr interface=$targetBridge comment="HQ INVESTMENT LAN" }`,
+          ]
           : []),
         // PPPoE server
         ...(normalized.serviceType === 'pppoe' || normalized.serviceType === 'both'
