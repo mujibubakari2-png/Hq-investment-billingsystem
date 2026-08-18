@@ -432,6 +432,9 @@ ${selectedLanInterfaces.length > 0
     :if ([:len [/interface list member find list="LAN" interface=wlan1]] = 0) do={
         /interface list member add list="LAN" interface=wlan1 comment="HQ INVESTMENT WiFi 2.4GHz"
     }
+    :if ([:len [/interface list member find list="hq-mgmt" interface=wlan1]] = 0) do={
+        /interface list member add list="hq-mgmt" interface=wlan1 comment="HQ INVESTMENT WiFi 2.4GHz Mgmt"
+    }
 }
 
 # Configure wlan2 (5GHz) if available
@@ -445,6 +448,9 @@ ${selectedLanInterfaces.length > 0
     }
     :if ([:len [/interface list member find list="LAN" interface=wlan2]] = 0) do={
         /interface list member add list="LAN" interface=wlan2 comment="HQ INVESTMENT WiFi 5GHz"
+    }
+    :if ([:len [/interface list member find list="hq-mgmt" interface=wlan2]] = 0) do={
+        /interface list member add list="hq-mgmt" interface=wlan2 comment="HQ INVESTMENT WiFi 5GHz Mgmt"
     }
 }
 /log info "Wireless AP interfaces configured for HQ INVESTMENT"
