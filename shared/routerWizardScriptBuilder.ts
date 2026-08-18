@@ -273,9 +273,12 @@ export function buildRouterWizardScript(params: RouterSetupWizardScriptParams): 
     '',
 
     // ── PHASE 1b: Management Safety ──────────────────────────────────────────
-    '# ===== PHASE 1b: Management Safety (hq-mgmt interface list) =====',
+    '# ===== PHASE 1b: Management Safety (Interface Lists & MAC Server) =====',
     ':if ([:len [/interface list find name="hq-mgmt"]] = 0) do={',
     '    /interface list add name="hq-mgmt" comment="HQ INVESTMENT management interfaces (VPN only)"',
+    '}',
+    ':if ([:len [/interface list find name="LAN"]] = 0) do={',
+    '    /interface list add name="LAN" comment="HQ INVESTMENT LAN"',
     '}',
     '# Only add wg-hq to hq-mgmt if the interface already exists on the router.',
     ':if ([:len [/interface wireguard find name="wg-hq"]] > 0) do={',
@@ -283,9 +286,11 @@ export function buildRouterWizardScript(params: RouterSetupWizardScriptParams): 
     '        /interface list member add list="hq-mgmt" interface="wg-hq"',
     '    }',
     '}',
-    '/tool mac-server set allowed-interface-list=hq-mgmt',
-    '/tool mac-server mac-winbox set allowed-interface-list=hq-mgmt',
-    '/ip neighbor discovery-settings set discover-interface-list=hq-mgmt',
+    '# Protect MAC Server & Discovery by restricting to LAN (prevents WAN L2 exposure)',
+    '# Using LAN preserves the factory-default behavior so local physical ports remain accessible.',
+    '/tool mac-server set allowed-interface-list=LAN',
+    '/tool mac-server mac-winbox set allowed-interface-list=LAN',
+    '/ip neighbor discovery-settings set discover-interface-list=LAN',
     '',
 
     // ── PHASE 3: Semantic WAN Discovery ──────────────────────────────────────

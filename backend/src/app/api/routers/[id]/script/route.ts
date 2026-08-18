@@ -283,25 +283,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     }
 }
 
-# 4. Restrict MAC-Winbox / neighbor discovery to LAN + VPN only (NOT WAN).
-# SECURITY FIX: allowed-interface-list=all previously exposed MAC-Winbox/mac-telnet
-# and MNDP neighbor discovery on ether1 (WAN), a well-known L2 attack vector that
-# lets anyone on the same broadcast segment as the WAN uplink discover and attempt
-# to log into the router bypassing the IP-layer firewall entirely.
+# 4. Interface Lists (hq-mgmt, WAN, LAN)
 :if ([:len [/interface list find name="hq-mgmt"]] = 0) do={
     /interface list add name="hq-mgmt" comment="HQ INVESTMENT management interfaces (VPN only)"
 }
-:if ([:len [/interface wireguard find name="wg-hq"]] > 0) do={
-    :if ([:len [/interface list member find list="hq-mgmt" interface="wg-hq"]] = 0) do={
-        /interface list member add list="hq-mgmt" interface="wg-hq"
-    }
-}
-/tool mac-server set allowed-interface-list=hq-mgmt
-/tool mac-server mac-winbox set allowed-interface-list=hq-mgmt
-/ip neighbor discovery-settings set discover-interface-list=hq-mgmt
-
-# 4b. WAN/LAN Interface Lists (required for out-interface-list=WAN/LAN in firewall/NAT rules)
-# Without these, NAT and PPPoE firewall rules break on routers where WAN is not ether1.
 :if ([:len [/interface list find name="WAN"]] = 0) do={
     /interface list add name="WAN" comment="HQ INVESTMENT WAN"
 }
@@ -311,6 +296,18 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 :if ([:len [/interface list member find list="WAN" interface="ether1"]] = 0) do={
     /interface list member add list="WAN" interface="ether1" comment="HQ INVESTMENT WAN port"
 }
+:if ([:len [/interface wireguard find name="wg-hq"]] > 0) do={
+    :if ([:len [/interface list member find list="hq-mgmt" interface="wg-hq"]] = 0) do={
+        /interface list member add list="hq-mgmt" interface="wg-hq"
+    }
+}
+
+# 4b. Restrict MAC-Winbox / neighbor discovery to LAN (NOT WAN).
+# SECURITY FIX: Restricting to LAN prevents WAN L2 exposure but preserves local
+# physical access so you aren't locked out of Winbox after rebooting.
+/tool mac-server set allowed-interface-list=LAN
+/tool mac-server mac-winbox set allowed-interface-list=LAN
+/ip neighbor discovery-settings set discover-interface-list=LAN
 
 # 5. DNS and NTP (Critical for handshakes)
 /ip dns set servers=${router.dns} allow-remote-requests=yes

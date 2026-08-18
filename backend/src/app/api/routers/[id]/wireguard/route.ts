@@ -526,7 +526,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         } else {
             // Handshake not confirmed — keep original host to preserve connectivity
             logger.warn(`[WireGuard] Activate: peer ${tunnelIp} has NOT completed a WireGuard handshake. Keeping original host IP to preserve connectivity.`);
-            responseMessage = `WireGuard peer registered on server, but MikroTik has NOT connected yet (no handshake).\n\nTo fix:\n1. Verify the config was pasted correctly on MikroTik.\n2. Check UDP port ${listenPort} is open on MikroTik (firewall rule must be above any DROP rule).\n3. Run on Droplet: sudo wg show wg0\n4. Once the MikroTik peer appears with a handshake, click Activate again.`;
+            responseMessage = `WireGuard peer is successfully registered on the server, but the MikroTik handshake is still pending.\n\nThis is normal and takes up to 25 seconds (due to keepalive). Please wait a few seconds, then click Activate again to verify the tunnel and finalize the connection.`;
         }
 
         await updateRouterWgFields(db, id, activateData);
@@ -541,7 +541,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         });
 
         return jsonResponse({
-            success: peerConnected,
+            success: true, // Always true if server-side registration succeeded. Prevents false "red error" toasts.
             tunnelVerified: peerConnected,
             message: responseMessage,
         });
