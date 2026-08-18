@@ -48,6 +48,15 @@ export interface RouterSetupWizardScriptParams {
   vpnMode?: string;
   vpnDns?: string;
   ipsecSecret?: string;
+  wlanEnabled?: boolean;
+  wlan1Ssid?: string | null;
+  wlan2Ssid?: string | null;
+  wlanPassphrase?: string | null;
+  wlanSecurity?: string | null;
+  wlan1TxChain?: string | null;
+  wlan1RxChain?: string | null;
+  wlan2TxChain?: string | null;
+  wlan2RxChain?: string | null;
   wgConfig?: {
     routerTunnelIp?: string | null;
     serverTunnelIp?: string | null;
@@ -136,6 +145,15 @@ export function normalizeWizardScriptInputs(
     radiusSecret: input.radiusSecret || '',
     vpnDns: input.vpnDns,
     ipsecSecret: input.ipsecSecret,
+    wlanEnabled: input.wlanEnabled ?? false,
+    wlan1Ssid: input.wlan1Ssid ?? null,
+    wlan2Ssid: input.wlan2Ssid ?? null,
+    wlanPassphrase: input.wlanPassphrase ?? null,
+    wlanSecurity: input.wlanSecurity ?? null,
+    wlan1TxChain: input.wlan1TxChain ?? null,
+    wlan1RxChain: input.wlan1RxChain ?? null,
+    wlan2TxChain: input.wlan2TxChain ?? null,
+    wlan2RxChain: input.wlan2RxChain ?? null,
     wgConfig: input.wgConfig || null,
     certName: input.certName || 'hq-hotspot-cert',
     vpnManagementSubnet: input.vpnManagementSubnet || null,
@@ -408,6 +426,47 @@ export function buildRouterWizardScript(params: RouterSetupWizardScriptParams): 
     '',
 
     // ── PHASE 5+7: Hotspot / PPPoE / DHCP — gated on hasBridgeInterfaces ─────
+    ...(normalized.wlanEnabled
+      ? [
+        '# ===== PHASE 4b: Wireless AP Configuration =====',
+        ':local wlan1Id [/interface wireless find where default-name="wlan1"]',
+        ':if ([:len $wlan1Id] > 0) do={',
+        '    /interface wireless set $wlan1Id disabled=no mode=ap-bridge band=2ghz-b/g/n tx-power-mode=all-channels-same distance=indoors installation=any channel-width=20/40mhz frequency=auto tx-chains=0,1 rx-chains=0,1',
+        `    /interface wireless set $wlan1Id ssid="${escapeMikroTikString(normalized.wlan1Ssid || 'HQ-Hotspot-2.4GHz')}"`,
+        `    :if ([:len [/interface wireless security-profile find name="hq-wlan-${safeRouterName}"]] = 0) do={`,
+        `        /interface wireless security-profile add name="hq-wlan-${safeRouterName}" mode=${normalized.wlanSecurity || 'wpa2-psk'} authentication-types=${normalized.wlanSecurity || 'wpa2-psk'} wpa2-pre-shared-key="${escapeMikroTikString(normalized.wlanPassphrase || 'hqinvestment123456')}" wpa3-pre-shared-key="${escapeMikroTikString(normalized.wlanPassphrase || 'hqinvestment123456')}" comment="HQ INVESTMENT"`,
+        '    }',
+        `    /interface wireless set $wlan1Id security-profile="hq-wlan-${safeRouterName}"`,
+        '    :if ([:len [/interface bridge port find bridge=$targetBridge interface=wlan1]] = 0) do={',
+        '        /interface bridge port add bridge=$targetBridge interface=wlan1 comment="HQ INVESTMENT WiFi 2.4GHz port"',
+        '    }',
+        '    :if ([:len [/interface list member find list="LAN" interface=wlan1]] = 0) do={',
+        '        /interface list member add list="LAN" interface=wlan1 comment="HQ INVESTMENT WiFi 2.4GHz"',
+        '    }',
+        '    :if ([:len [/interface list member find list="hq-mgmt" interface=wlan1]] = 0) do={',
+        '        /interface list member add list="hq-mgmt" interface=wlan1 comment="HQ INVESTMENT WiFi 2.4GHz Mgmt"',
+        '    }',
+        '}',
+        ':local wlan2Id [/interface wireless find where default-name="wlan2"]',
+        ':if ([:len $wlan2Id] > 0) do={',
+        '    /interface wireless set $wlan2Id disabled=no mode=ap-bridge band=5ghz-a/n/ac tx-power-mode=all-channels-same distance=indoors installation=any channel-width=20/40/80mhz frequency=auto tx-chains=0 rx-chains=0',
+        `    /interface wireless set $wlan2Id ssid="${escapeMikroTikString(normalized.wlan2Ssid || 'HQ-Hotspot-5GHz')}"`,
+        `    /interface wireless set $wlan2Id security-profile="hq-wlan-${safeRouterName}"`,
+        '    :if ([:len [/interface bridge port find bridge=$targetBridge interface=wlan2]] = 0) do={',
+        '        /interface bridge port add bridge=$targetBridge interface=wlan2 comment="HQ INVESTMENT WiFi 5GHz port"',
+        '    }',
+        '    :if ([:len [/interface list member find list="LAN" interface=wlan2]] = 0) do={',
+        '        /interface list member add list="LAN" interface=wlan2 comment="HQ INVESTMENT WiFi 5GHz"',
+        '    }',
+        '    :if ([:len [/interface list member find list="hq-mgmt" interface=wlan2]] = 0) do={',
+        '        /interface list member add list="hq-mgmt" interface=wlan2 comment="HQ INVESTMENT WiFi 5GHz Mgmt"',
+        '    }',
+        '}',
+        '/log info "Wireless AP interfaces configured for HQ INVESTMENT"',
+        '',
+      ]
+      : []),
+
     '# ===== PHASE 5+7: LAN IP, Hotspot / PPPoE / DHCP Services =====',
     `# Service type: ${normalized.serviceType}`,
     '',

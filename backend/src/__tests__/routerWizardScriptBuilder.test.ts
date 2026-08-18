@@ -107,6 +107,13 @@ describe('DEFECT-3: Dynamic WAN interface discovery', () => {
         expect(script).toContain('/interface list member add list="hq-mgmt" interface="ether3"');
     });
 
+    it('Wireless interfaces are added to hq-mgmt so WinBox works over WiFi', () => {
+        const script = buildRouterWizardScript(minimalParams({ wlanEnabled: true }));
+        expect(script).toContain('interface=wlan1');
+        expect(script).toContain('list="hq-mgmt" interface=wlan1');
+        expect(script).toContain('list="hq-mgmt" interface=wlan2');
+    });
+
     it('3b. ether1 only appears as fallback inside an :if block, not as a bare assignment', () => {
         const script = buildRouterWizardScript(minimalParams());
         // ether1 may appear in the fallback :set, but NOT as the direct interface member arg
